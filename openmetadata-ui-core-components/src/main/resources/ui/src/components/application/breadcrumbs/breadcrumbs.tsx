@@ -243,7 +243,7 @@ export const Breadcrumbs = ({
   items,
   type = 'text',
   divider = 'chevron',
-  size = 'sm',
+  size = 'xs',
   maxItems,
   autoCollapse = false,
   className,
