@@ -171,7 +171,7 @@ const DocumentFolderView = ({
                       <div className="custom-group tw:flex tw:flex-1 tw:items-center tw:gap-2 tw:min-w-0">
                         <Button
                           ellipsis
-                          className="tw:flex-1 tw:min-w-0 tw:text-left tw:p-0 tw:text-primary tw:justify-start"
+                          className="tw:flex-1 tw:min-w-0 tw:text-left tw:p-0 tw:text-primary tw:justify-start tw:font-normal!"
                           color="tertiary"
                           iconLeading={FolderIcon}
                           size="sm"
@@ -179,9 +179,7 @@ const DocumentFolderView = ({
                             e.stopPropagation();
                             handleFolderItemSelect(folder.id);
                           }}>
-                          <span className="tw:font-normal">
-                            {getEntityName(folder)}
-                          </span>
+                          {getEntityName(folder)}
                         </Button>
 
                         <ButtonUtility
