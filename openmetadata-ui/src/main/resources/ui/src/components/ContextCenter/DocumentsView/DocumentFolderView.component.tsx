@@ -179,9 +179,9 @@ const DocumentFolderView = ({
                             e.stopPropagation();
                             handleFolderItemSelect(folder.id);
                           }}>
-                            <span className='tw:font-normal'>
-                              {getEntityName(folder)}
-                            </span>
+                          <span className="tw:font-normal">
+                            {getEntityName(folder)}
+                          </span>
                         </Button>
 
                         <ButtonUtility
