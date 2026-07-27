@@ -44,7 +44,7 @@ services:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms1024m -Xmx1024m
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - xpack.security.enabled=false
     networks:
       - app_net
@@ -61,7 +61,7 @@ services:
 
   execute-migrate-all:
     container_name: execute_migrate_all
-    image: docker.getcollate.io/openmetadata/server:1.13.1
+    image: openmetadata/server:custom
     command: "./bootstrap/openmetadata-ops.sh migrate"
     environment:
       OPENMETADATA_CLUSTER_NAME: ${OPENMETADATA_CLUSTER_NAME:-openmetadata}
@@ -241,7 +241,7 @@ services:
       SMTP_SERVER_STRATEGY: ${SMTP_SERVER_STRATEGY:-"SMTP_TLS"}
       
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx512m -Xms512m}
       # Mask passwords values in UI
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-false}
 
@@ -286,7 +286,7 @@ services:
   openmetadata-server:
     container_name: openmetadata_server
     restart: always
-    image: docker.getcollate.io/openmetadata/server:1.13.1
+    image: openmetadata/server:custom
     environment:
       OPENMETADATA_CLUSTER_NAME: ${OPENMETADATA_CLUSTER_NAME:-openmetadata}
       SERVER_PORT: ${SERVER_PORT:-8585}
@@ -457,7 +457,7 @@ services:
       SMTP_SERVER_STRATEGY: ${SMTP_SERVER_STRATEGY:-"SMTP_TLS"}
 
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx512m -Xms512m}
       # Mask passwords values in UI
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-false}
       
