@@ -220,9 +220,7 @@ export const CustomiseSearchBar = ({ disabled }: { disabled?: boolean }) => {
           data-testid="searchBox"
           disabled={disabled}
           id="searchBox"
-          placeholder={t('label.search-for-type', {
-            type: 'Tables, Database, Schema...',
-          })}
+          placeholder="Tìm kiếm cơ sở dữ liệu, bảng dữ liệu, schema, thuật ngữ..."
           type="text"
           value={searchValue}
           onChange={(e) => {

@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import Loader from '../../components/common/Loader/Loader';
 import { AdvanceSearchProvider } from '../../components/Explore/AdvanceSearchProvider/AdvanceSearchProvider.component';
 import CustomiseLandingPageHeader from '../../components/MyData/CustomizableComponents/CustomiseLandingPageHeader/CustomiseLandingPageHeader';
+import AgribankStatsWidget from '../../components/MyData/CustomizableComponents/AgribankStatsWidget/AgribankStatsWidget';
 import WelcomeScreen from '../../components/MyData/WelcomeScreen/WelcomeScreen.component';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import { LOGGED_IN_USER_STORAGE_KEY } from '../../constants/constants';
@@ -277,6 +278,7 @@ const MyDataPage = () => {
             onHomePage
             onBackgroundColorUpdate={handleBackgroundColorUpdate}
           />
+          <AgribankStatsWidget />
           <ReactGridLayout
             className="grid-container p-x-box"
             cols={customizePageClassBase.landingPageMaxGridSize}

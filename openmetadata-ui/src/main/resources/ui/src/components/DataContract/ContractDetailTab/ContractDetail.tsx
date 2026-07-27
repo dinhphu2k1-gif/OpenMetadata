@@ -725,10 +725,10 @@ const ContractDetail: React.FC<{
                     backgroundColor: '#f5faff',
 
                     '& .contract-action-dropdown-item': {
-                      color: '#1570ef',
+                      color: 'var(--ant-primary-color)',
 
                       '& svg': {
-                        color: '#1570ef',
+                        color: 'var(--ant-primary-color)',
                       },
                     },
                   },

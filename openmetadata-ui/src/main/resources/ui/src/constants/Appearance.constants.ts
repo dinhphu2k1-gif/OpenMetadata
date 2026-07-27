@@ -11,9 +11,9 @@
  *  limitations under the License.
  */
 export const DEFAULT_THEME = {
-  primaryColor: '#1570ef',
-  hoverColor: '#d1e9ff',
-  selectedColor: '#175cd3',
+  primaryColor: '#AE1C3F',
+  hoverColor: '#D03A5F',
+  selectedColor: '#8A1531',
   infoColor: '#84caff',
   successColor: '#039855',
   warningColor: '#DC6803',

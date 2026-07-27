@@ -25,17 +25,11 @@ const AntDConfigProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const palette = generatePalette(
-      applicationConfig?.customTheme?.primaryColor ?? DEFAULT_THEME.primaryColor
+      DEFAULT_THEME.primaryColor
     );
     // Use custom hover color if provided, otherwise use generated palette[1]
-    const hoverColor =
-      applicationConfig?.customTheme?.hoverColor ||
-      palette[2] ||
-      DEFAULT_THEME.hoverColor;
-    const selectedColor =
-      applicationConfig?.customTheme?.selectedColor ||
-      palette[8] ||
-      DEFAULT_THEME.hoverColor;
+    const hoverColor = DEFAULT_THEME.hoverColor;
+    const selectedColor = DEFAULT_THEME.selectedColor;
     palette.forEach((color, index) => {
       switch (index) {
         case 0:
@@ -85,6 +79,12 @@ const AntDConfigProvider: FC<{ children: ReactNode }> = ({ children }) => {
   ConfigProvider.config({
     theme: {
       ...applicationConfig?.customTheme,
+      primaryColor: DEFAULT_THEME.primaryColor,
+      hoverColor: DEFAULT_THEME.hoverColor,
+      successColor: DEFAULT_THEME.successColor,
+      infoColor: DEFAULT_THEME.infoColor,
+      warningColor: DEFAULT_THEME.warningColor,
+      errorColor: DEFAULT_THEME.errorColor,
     },
   });
 

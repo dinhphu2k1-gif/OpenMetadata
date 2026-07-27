@@ -36,6 +36,7 @@ const LOCALE_LOADERS: Record<
   'mr-IN': () => import('../../locale/languages/mr-in.json'),
   'tr-TR': () => import('../../locale/languages/tr-tr.json'),
   'ar-SA': () => import('../../locale/languages/ar-sa.json'),
+  'vi-VN': () => import('../../locale/languages/vi-vn.json'),
 };
 
 class LocalUtilClassBase {

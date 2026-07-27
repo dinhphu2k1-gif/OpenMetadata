@@ -71,10 +71,7 @@ const CustomiseLandingPageHeader = ({
   const [announcements, setAnnouncements] = useState<Thread[]>([]);
   const [isAnnouncementLoading, setIsAnnouncementLoading] = useState(true);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
-  const adminPanelBackgroundColor =
-    applicationConfig?.customTheme?.panelBackgroundColor;
-  const bgColor =
-    backgroundColor || adminPanelBackgroundColor || DEFAULT_HEADER_BG_COLOR;
+  const bgColor = backgroundColor || DEFAULT_HEADER_BG_COLOR;
 
   const landingPageStyle = useMemo(() => {
     const backgroundImage = isLinearGradient(bgColor)
@@ -169,14 +166,19 @@ const CustomiseLandingPageHeader = ({
       <div className="header-container">
         <div className="dashboard-header">
           <div
-            className={classNames('d-flex items-center gap-4 mb-5', {
-              'justify-center': !showAnnouncements,
+            className={classNames('d-flex justify-between mb-5', {
+              'w-full': !showAnnouncements,
             })}>
-            <Typography.Text className="welcome-user">
-              {t('label.welcome', {
-                name: currentUser?.displayName || currentUser?.name,
-              })}
-            </Typography.Text>
+            <div className="d-flex flex-col gap-2">
+              <Typography.Text className="welcome-user">
+                {t('label.welcome', {
+                  name: currentUser?.displayName || currentUser?.name,
+                })}
+              </Typography.Text>
+              <Typography.Text style={{ color: 'white', fontSize: '15px', fontWeight: 400 }}>
+                Tìm kiếm và khám phá tài sản dữ liệu trong hệ thống dữ liệu Agribank.
+              </Typography.Text>
+            </div>
             {!hideCustomiseButton && (
               <Button
                 className="customise-header-btn"

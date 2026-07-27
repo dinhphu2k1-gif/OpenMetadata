@@ -46,6 +46,7 @@ import { AdvanceSearchProvider } from '../../../Explore/AdvanceSearchProvider/Ad
 import PageLayoutV1 from '../../../PageLayoutV1/PageLayoutV1';
 import CustomiseHomeModal from '../CustomiseHomeModal/CustomiseHomeModal';
 import CustomiseLandingPageHeader from '../CustomiseLandingPageHeader/CustomiseLandingPageHeader';
+import AgribankStatsWidget from './../AgribankStatsWidget/AgribankStatsWidget';
 import { CustomizablePageHeader } from '../CustomizablePageHeader/CustomizablePageHeader';
 import './customize-my-data.less';
 import { CustomizeMyDataProps } from './CustomizeMyData.interface';
@@ -248,6 +249,7 @@ function CustomizeMyData({
               handleAddWidget={handleMainPanelAddWidget}
               onBackgroundColorUpdate={handleBackgroundColorUpdate}
             />
+            <AgribankStatsWidget />
             {/* 
             ReactGridLayout with optimized drag and drop behavior
             - verticalCompact: Packs widgets tightly without gaps
