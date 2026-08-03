@@ -35,8 +35,8 @@ import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
   getTabLabelMapFromTabs,
-} from '../../../utils/CustomizePage/CustomizePageUtils';
-import { getEntityName } from '../../../utils/EntityUtils';
+} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import {
   DEFAULT_ENTITY_PERMISSION,
   getPrioritizedEditPermission,
@@ -44,7 +44,7 @@ import {
 } from '../../../utils/PermissionsUtils';
 import pipelineClassBase from '../../../utils/PipelineClassBase';
 import { getEntityDetailsPath } from '../../../utils/RouterUtils';
-import { getTagsWithoutTier, getTierTags } from '../../../utils/TableUtils';
+import { getTagsWithoutTier, getTierTags } from '../../../utils/TablePureUtils';
 import {
   createTagObject,
   updateCertificationTag,

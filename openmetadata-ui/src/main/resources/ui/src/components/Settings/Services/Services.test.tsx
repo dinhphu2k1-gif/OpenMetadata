@@ -132,10 +132,6 @@ jest.mock(
   })
 );
 
-jest.mock('../../../utils/CommonUtils', () => ({
-  getServiceLogo: jest.fn().mockReturnValue('Pipeline Service'),
-}));
-
 const mockSearchService = jest.fn();
 jest.mock('../../../rest/serviceAPI', () => ({
   getServices: jest
@@ -144,20 +140,19 @@ jest.mock('../../../rest/serviceAPI', () => ({
   searchService: jest.fn().mockImplementation(() => mockSearchService()),
 }));
 
-jest.mock('../../../utils/StringsUtils', () => ({
-  ...jest.requireActual('../../../utils/StringsUtils'),
+jest.mock('../../../utils/StringUtils', () => ({
+  ...jest.requireActual('../../../utils/StringUtils'),
   stringToHTML: jest.fn((text) => text),
 }));
 
-jest.mock('../../../utils/EntityUtils', () => {
-  const actual = jest.requireActual('../../../utils/EntityUtils');
-
-  return {
-    ...actual,
-    getEntityName: jest.fn().mockReturnValue('Glue'),
-    highlightSearchText: jest.fn((text) => text),
-  };
-});
+jest.mock('../../../utils/EntityNameUtils', () => ({
+  ...jest.requireActual('../../../utils/EntityNameUtils'),
+  getEntityName: jest.fn().mockReturnValue('Glue'),
+}));
+jest.mock('../../../utils/EntitySearchUtils', () => ({
+  ...jest.requireActual('../../../utils/EntitySearchUtils'),
+  highlightSearchText: jest.fn((text) => text),
+}));
 
 jest.mock('../../../utils/PermissionsUtils', () => ({
   checkPermission: jest.fn().mockReturnValue(true),

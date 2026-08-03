@@ -45,7 +45,7 @@ jest.mock('../../common/SearchBarComponent/SearchBar.component', () => {
     </div>
   ));
 });
-jest.mock('../../../utils/StringsUtils', () => {
+jest.mock('../../../utils/StringUtils', () => {
   return {
     replacePlus: jest.fn().mockImplementation((fqn) => fqn),
   };
@@ -55,21 +55,24 @@ jest.mock('../../../utils/FeedUtils', () => {
     getEntityFQN: jest.fn().mockImplementation((fqn) => fqn),
   };
 });
-jest.mock('../../../utils/EntityUtils', () => {
+jest.mock('../../../utils/EntityNameUtils', () => {
   return {
     getEntityName: jest
       .fn()
       .mockImplementation(
         (entity: EntityReference) => entity?.displayName ?? entity?.name
       ),
+  };
+});
+
+jest.mock('../../../utils/EntityPureUtils', () => {
+  return {
     getColumnNameFromEntityLink: jest.fn().mockImplementation((fqn) => fqn),
   };
 });
-jest.mock('../../../utils/CommonUtils', () => {
-  return {
-    getNameFromFQN: jest.fn().mockImplementation((fqn) => fqn),
-  };
-});
+jest.mock('../../../utils/FqnUtils', () => ({
+  getNameFromFQN: jest.fn().mockImplementation((fqn) => fqn),
+}));
 jest.mock('../../../rest/testAPI', () => ({
   getListTestCaseBySearch: jest.fn(),
 }));

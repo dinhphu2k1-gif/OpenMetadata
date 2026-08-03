@@ -43,13 +43,11 @@ import {
   removeDataModelFollower,
   updateDataModelVotes,
 } from '../../rest/dataModelsAPI';
-import {
-  addToRecentViewed,
-  getEntityMissingError,
-} from '../../utils/CommonUtils';
-import { getEntityName } from '../../utils/EntityUtils';
+import { addToRecentViewed } from '../../utils/CommonUtils';
+import { getEntityMissingError } from '../../utils/EntityDisplayUtils';
+import { getEntityName } from '../../utils/EntityNameUtils';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
-import { getTierTags } from '../../utils/TableUtils';
+import { getTierTags } from '../../utils/TablePureUtils';
 import { updateTierTag } from '../../utils/TagsUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
 

@@ -63,7 +63,7 @@ import {
 } from '../interface/service.interface';
 import { getAPIConfig } from './APIServiceUtils';
 import { getDashboardConfig } from './DashboardServiceUtils';
-import { getDatabaseConfig } from './DatabaseServiceUtils';
+import { getDatabaseConfig } from './DatabaseServicePureUtils';
 import { getDriveConfig } from './DriveServiceUtils';
 import { getMessagingConfig } from './MessagingServiceUtils';
 import { getMetadataConfig } from './MetadataServiceUtils';
@@ -77,7 +77,7 @@ import {
   getTestConnectionName,
 } from './ServiceUtils';
 import { getStorageConfig } from './StorageServiceUtils';
-import { customServiceComparator } from './StringsUtils';
+import { customServiceComparator } from './StringUtils';
 
 class ServiceUtilClassBase {
   unSupportedServices: string[] = [

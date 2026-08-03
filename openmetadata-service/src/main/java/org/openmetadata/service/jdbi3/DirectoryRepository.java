@@ -64,6 +64,11 @@ public class DirectoryRepository extends EntityRepository<Directory> {
         "",
         "");
     supportsSearch = true;
+    // Covered by the parent service delete cascade: search docs by service.id
+    // (SearchRepository.deleteOrUpdateChildren) and field_relationship / tag_usage by
+    // the root cleanup() FQN prefix (FQNs are service-nested). See
+    // EntityRepository#descendantsCoveredByAncestorCascade.
+    descendantsCoveredByAncestorCascade = true;
   }
 
   @Override
@@ -412,7 +417,7 @@ public class DirectoryRepository extends EntityRepository<Directory> {
                   List.of(
                       Pair.of(8, TagLabel.TagSource.CLASSIFICATION),
                       Pair.of(9, TagLabel.TagSource.GLOSSARY))))
-          .withDomains(getDomains(printer, csvRecord, 10))
+          .withDomains(getDomains(printer, csvRecord, 10, newDirectory.getDomains()))
           .withDataProducts(getDataProducts(printer, csvRecord, 11));
 
       if (processRecord) {

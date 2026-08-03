@@ -69,18 +69,16 @@ import {
 } from '../../../utils/DataAssetsHeader.utils';
 import { getDataContractStatusIcon } from '../../../utils/DataContract/DataContractUtils';
 import EntityLink from '../../../utils/EntityLink';
+import { getEntityName } from '../../../utils/EntityNameUtils';
+import { getEntityFeedLink } from '../../../utils/EntityPureUtils';
 import entityUtilClassBase from '../../../utils/EntityUtilClassBase';
-import {
-  getEntityFeedLink,
-  getEntityName,
-  getEntityVoteStatus,
-} from '../../../utils/EntityUtils';
+import { getEntityVoteStatus } from '../../../utils/EntityVoteUtils';
 import { getPrioritizedEditPermission } from '../../../utils/PermissionsUtils';
 import { getEntityDetailsPath } from '../../../utils/RouterUtils';
 import serviceUtilClassBase from '../../../utils/ServiceUtilClassBase';
 import { getEntityTypeFromServiceCategory } from '../../../utils/ServiceUtils';
 import tableClassBase from '../../../utils/TableClassBase';
-import { getTierTags } from '../../../utils/TableUtils';
+import { getTierTags } from '../../../utils/TablePureUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import Certification from '../../Certification/Certification.component';
@@ -747,12 +745,14 @@ export const DataAssetsHeader = ({
                 />
               </>
             )}
+
             <OwnerLabel
               showDashPlaceholder
               avatarSize={24}
+              className="header-owner-heading"
               hasPermission={editOwnerPermission}
               isCompactView={false}
-              maxVisibleOwners={4}
+              maxVisibleOwners={3}
               multiple={{
                 user: entityRules.canAddMultipleUserOwners,
                 team: entityRules.canAddMultipleTeamOwner,
@@ -760,6 +760,7 @@ export const DataAssetsHeader = ({
               owners={dataAsset?.owners}
               onUpdate={onOwnerUpdate}
             />
+
             <Divider className="self-center vertical-divider" type="vertical" />
             {tierSuggestionRender ?? (
               <Space

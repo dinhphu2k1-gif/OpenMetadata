@@ -87,10 +87,10 @@ import {
 } from '../../../generated/type/tagLabel';
 import { bulkUpdateColumnsAsync } from '../../../rest/columnAPI';
 import { formatContent } from '../../../utils/BlockEditorUtils';
-import { getTableFQNFromColumnFQN } from '../../../utils/CommonUtils';
+import { getTableFQNFromColumnFQN } from '../../../utils/FqnUtils';
 import { getEntityDetailsPath } from '../../../utils/RouterUtils';
 import { getSanitizeContent } from '../../../utils/sanitize.utils';
-import { stringToDOMElement } from '../../../utils/StringsUtils';
+import { stringToDOMElement } from '../../../utils/StringUtils';
 import tagClassBase from '../../../utils/TagClassBase';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
 import { ColumnGridProps, ColumnGridRowData } from './ColumnGrid.interface';
@@ -440,6 +440,7 @@ const ColumnEditForm = forwardRef<ColumnEditFormHandle, ColumnEditFormProps>(
           <AsyncSelectList
             autoFocus={false}
             fetchOptions={tagClassBase.getTags}
+            getPopupContainer={(triggerNode) => triggerNode.parentElement}
             initialOptions={classificationTagOptions}
             key={`tags-${drawerKey}`}
             mode="multiple"
@@ -496,6 +497,7 @@ const ColumnEditForm = forwardRef<ColumnEditFormHandle, ColumnEditFormProps>(
           </Typography>
           <TreeAsyncSelectList
             hasNoActionButtons
+            getPopupContainer={(triggerNode) => triggerNode.parentElement}
             initialOptions={glossaryTermOptions}
             key={`glossaryTerms-${drawerKey}`}
             open={false}

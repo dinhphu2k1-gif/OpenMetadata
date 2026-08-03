@@ -17,19 +17,22 @@ import { EntityTabs, EntityType } from '../enums/entity.enum';
 import { ServiceCategory } from '../enums/service.enum';
 import { TestSuite } from '../generated/tests/testCase';
 import {
-  columnSorter,
   getBreadcrumbForTestSuite,
-  getColumnSorter,
-  getDomainDisplayName,
   getEntityBreadcrumbs,
   getEntityLinkFromType,
+} from './EntityBreadcrumbUtils';
+import { getDomainDisplayName } from './EntityNameUtils';
+import {
   hasCustomPropertiesTab,
   hasLineageTab,
   hasSchemaTab,
+} from './EntityPermissionUtils';
+import {
   highlightEntityNameAndDescription,
   highlightSearchArrayElement,
   highlightSearchText,
-} from './EntityUtils';
+} from './EntitySearchUtils';
+import { columnSorter, getColumnSorter } from './EntitySortUtils';
 import {
   entityWithoutNameAndDescHighlight,
   highlightedEntityDescription,
@@ -50,7 +53,7 @@ import {
   getServiceDetailsPath,
   getSettingPath,
 } from './RouterUtils';
-import { getServiceRouteFromServiceType } from './ServiceUtils';
+import { getServiceRouteFromServiceType } from './ServicePureUtils';
 
 jest.mock('../constants/constants', () => ({
   DEFAULT_DOMAIN_VALUE: 'All Domains',
@@ -66,7 +69,7 @@ jest.mock('./RouterUtils', () => ({
   getEntityDetailsPath: jest.fn(),
 }));
 
-jest.mock('./ServiceUtils', () => ({
+jest.mock('./ServicePureUtils', () => ({
   getServiceRouteFromServiceType: jest.fn(),
 }));
 
@@ -111,7 +114,7 @@ jest.mock('../components/common/QueryCount/QueryCount.component', () => ({
   default: jest.fn(),
 }));
 
-jest.mock('./StringsUtils', () => ({
+jest.mock('./StringUtils', () => ({
   bytesToSize: jest.fn(),
   getEncodedFqn: jest.fn(),
   stringToHTML: jest.fn().mockImplementation((value) => value),
@@ -127,9 +130,12 @@ jest.mock('./TagsUtils', () => ({
   getTableTags: jest.fn(),
 }));
 
-jest.mock('./CommonUtils', () => ({
+jest.mock('./FqnUtils', () => ({
   getPartialNameFromTableFQN: jest.fn().mockImplementation((value) => value),
   getTableFQNFromColumnFQN: jest.fn().mockImplementation((value) => value),
+}));
+
+jest.mock('./NumberUtils', () => ({
   formatNumberWithComma: jest.fn().mockImplementation((value) => value),
 }));
 jest.mock('./DataInsightUtils', () => ({

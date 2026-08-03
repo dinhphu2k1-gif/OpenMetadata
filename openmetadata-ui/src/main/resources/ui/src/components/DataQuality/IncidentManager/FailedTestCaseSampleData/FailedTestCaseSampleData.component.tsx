@@ -32,8 +32,8 @@ import {
   deleteTestCaseFailedSampleData,
   getTestCaseFailedSampleData,
 } from '../../../../rest/testAPI';
-import { getEntityDeleteMessage } from '../../../../utils/CommonUtils';
-import { getColumnNameFromEntityLink } from '../../../../utils/EntityUtils';
+import { getEntityDeleteMessage } from '../../../../utils/EntityDisplayUtils';
+import { getColumnNameFromEntityLink } from '../../../../utils/EntityPureUtils';
 import { checkPermission } from '../../../../utils/PermissionsUtils';
 import { getTestCaseDetailPagePath } from '../../../../utils/RouterUtils';
 import { showErrorToast } from '../../../../utils/ToastUtils';

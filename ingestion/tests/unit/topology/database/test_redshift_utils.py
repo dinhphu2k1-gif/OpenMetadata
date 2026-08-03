@@ -14,6 +14,7 @@
 import unittest
 from unittest.mock import MagicMock, Mock
 
+from metadata.ingestion.source.database.column_type_parser import ColumnTypeParser
 from metadata.ingestion.source.database.redshift.utils import (
     _get_all_relation_info,
     _get_args_and_kwargs,
@@ -310,7 +311,9 @@ class TestRedshiftColumnTypeParsing(unittest.TestCase):
 
     def test_timestamp_without_time_zone_precision_uses_keyword_argument(self):
         """Timestamp precision must not be passed as positional timezone."""
-        args, kwargs = _get_args_and_kwargs("0", "timestamp without time zone", "timestamp(0) without time zone")
+        args, kwargs = _get_args_and_kwargs(
+            "0", "timestamp without time zone", "timestamp(0) without time zone"
+        )
 
         self.assertEqual(args, ())
         self.assertEqual(kwargs, {"precision": 0, "timezone": False})
@@ -329,7 +332,9 @@ class TestRedshiftColumnTypeParsing(unittest.TestCase):
 
     def test_timestamp_with_time_zone_precision_uses_keyword_argument(self):
         """Timestamp with time zone keeps precision and timezone keywords."""
-        args, kwargs = _get_args_and_kwargs("0", "timestamp with time zone", "timestamp(0) with time zone")
+        args, kwargs = _get_args_and_kwargs(
+            "0", "timestamp with time zone", "timestamp(0) with time zone"
+        )
 
         self.assertEqual(args, ())
         self.assertEqual(kwargs, {"precision": 0, "timezone": True})
@@ -348,7 +353,9 @@ class TestRedshiftColumnTypeParsing(unittest.TestCase):
 
     def test_time_without_time_zone_precision_uses_keyword_argument(self):
         """Time precision must not be passed as positional timezone."""
-        args, kwargs = _get_args_and_kwargs("0", "time without time zone", "time(0) without time zone")
+        args, kwargs = _get_args_and_kwargs(
+            "0", "time without time zone", "time(0) without time zone"
+        )
 
         self.assertEqual(args, ())
         self.assertEqual(kwargs, {"precision": 0, "timezone": False})
@@ -367,8 +374,12 @@ class TestRedshiftColumnTypeParsing(unittest.TestCase):
 
     def test_numeric_and_character_varying_positional_arguments_are_unchanged(self):
         """Non-time types keep their established positional parsing."""
-        numeric_args, numeric_kwargs = _get_args_and_kwargs("10,2", "numeric", "numeric(10,2)")
-        varchar_args, varchar_kwargs = _get_args_and_kwargs("255", "character varying", "character varying(255)")
+        numeric_args, numeric_kwargs = _get_args_and_kwargs(
+            "10,2", "numeric", "numeric(10,2)"
+        )
+        varchar_args, varchar_kwargs = _get_args_and_kwargs(
+            "255", "character varying", "character varying(255)"
+        )
 
         self.assertEqual(numeric_args, (10, 2))
         self.assertEqual(numeric_kwargs, {})
@@ -400,7 +411,9 @@ class TestRedshiftIntervalParsing(unittest.TestCase):
 
     def test_interval_with_fields_and_precision_uses_keyword_arguments(self):
         """interval <fields>(N) must route both precision and fields through kwargs."""
-        args, kwargs = _get_args_and_kwargs("6", "interval day to second", "interval day to second(6)")
+        args, kwargs = _get_args_and_kwargs(
+            "6", "interval day to second", "interval day to second(6)"
+        )
 
         self.assertEqual(args, ())
         self.assertEqual(kwargs, {"precision": 6, "fields": "day to second"})
@@ -479,6 +492,42 @@ class TestRedshiftNumericParsing(unittest.TestCase):
 
         self.assertEqual(args, (10, 2))
         self.assertEqual(kwargs, {})
+
+
+class TestRedshiftExternalTableTypeMapping(unittest.TestCase):
+    """
+    Spectrum/Glue external tables emit Hive-style column types via
+    svv_external_columns. Types like `string` and `double` must resolve to
+    concrete OpenMetadata types instead of UNKNOWN (issue #29589), otherwise
+    column-level data quality test selection shows "No data".
+    """
+
+    def test_external_hive_types_resolve_to_concrete_types(self):
+        """Each Spectrum type is registered and maps to the expected type."""
+        expected = {
+            "string": "VARCHAR",
+            "double": "DOUBLE",
+            "char": "CHAR",
+            "tinyint": "TINYINT",
+        }
+
+        for external_type, expected_om_type in expected.items():
+            with self.subTest(external_type=external_type):
+                self.assertIn(
+                    external_type,
+                    ischema_names,
+                    f"'{external_type}' is not registered in ischema_names",
+                )
+                # Resolve an instantiated type, matching how the dialect passes
+                # column types into the parser during reflection.
+                resolved = ColumnTypeParser.get_column_type(
+                    ischema_names[external_type]()
+                )
+                self.assertEqual(
+                    resolved,
+                    expected_om_type,
+                    f"'{external_type}' resolved to {resolved}, expected {expected_om_type}",
+                )
 
 
 if __name__ == "__main__":

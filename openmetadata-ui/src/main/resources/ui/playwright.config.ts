@@ -157,6 +157,20 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       teardown: 'entity-data-teardown',
     },
+    // Compatibility shim for PR workflows that still pass --project=DomainIsolation.
+    // The DomainIsolation E2E suite is not backported to 1.13, so this project intentionally
+    // matches no tests while allowing the workflow argument to resolve.
+    {
+      name: 'DomainIsolation',
+      testMatch: [],
+    },
+    // Compatibility shim for PR workflows that still pass --project=search-nightly.
+    // The dedicated search nightly suite is not backported to 1.13, so this project
+    // intentionally matches no tests while allowing the workflow argument to resolve.
+    {
+      name: 'search-nightly',
+      testMatch: [],
+    },
     // System Certification Tags tests modify global shared state (system tags like Gold, Silver, Bronze)
     // They must run in isolation after the main chromium project to avoid flakiness
     {

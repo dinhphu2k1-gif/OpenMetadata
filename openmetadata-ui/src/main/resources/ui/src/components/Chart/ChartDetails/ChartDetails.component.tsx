@@ -36,8 +36,8 @@ import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
   getTabLabelMapFromTabs,
-} from '../../../utils/CustomizePage/CustomizePageUtils';
-import { getEntityName } from '../../../utils/EntityUtils';
+} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import {
   DEFAULT_ENTITY_PERMISSION,
   getPrioritizedViewPermission,

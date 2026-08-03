@@ -37,15 +37,18 @@ import {
   Worksheet,
 } from '../../../../generated/entity/data/worksheet';
 import { TagLabel } from '../../../../generated/type/tagLabel';
-import { getEntityName } from '../../../../utils/EntityUtils';
+import { useTreeTagFilter } from '../../../../hooks/useTreeTagFilter';
+import { getEntityName } from '../../../../utils/EntityNameUtils';
 import { columnFilterIcon } from '../../../../utils/TableColumn.util';
+import {
+  pruneEmptyChildren,
+  updateFieldDescription,
+  updateFieldTags,
+} from '../../../../utils/TablePureUtils';
 import { getAllTags } from '../../../../utils/TableTags/TableTags.utils';
 import {
   getTableExpandableConfig,
   prepareConstraintIcon,
-  pruneEmptyChildren,
-  updateFieldDescription,
-  updateFieldTags,
 } from '../../../../utils/TableUtils';
 import CopyLinkButton from '../../../common/CopyLinkButton/CopyLinkButton';
 import { EntityAttachmentProvider } from '../../../common/EntityDescription/EntityAttachmentProvider/EntityAttachmentProvider';
@@ -56,7 +59,6 @@ import { ColumnFilter } from '../../../Database/ColumnFilter/ColumnFilter.compon
 import TableDescription from '../../../Database/TableDescription/TableDescription.component';
 import TableTags from '../../../Database/TableTags/TableTags.component';
 import { ModalWithMarkdownEditor } from '../../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
-import { useTreeTagFilter } from '../../../../hooks/useTreeTagFilter';
 
 function WorksheetColumnsTable() {
   const { t } = useTranslation();

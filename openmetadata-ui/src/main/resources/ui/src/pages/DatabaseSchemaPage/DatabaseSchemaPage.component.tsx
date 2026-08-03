@@ -79,10 +79,10 @@ import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
   getTabLabelMapFromTabs,
-} from '../../utils/CustomizePage/CustomizePageUtils';
+} from '../../utils/CustomizePage/CustomizePageEntityTabUtils';
 import databaseSchemaClassBase from '../../utils/DatabaseSchemaClassBase';
+import { getEntityName } from '../../utils/EntityNameUtils';
 import entityUtilClassBase from '../../utils/EntityUtilClassBase';
-import { getEntityName } from '../../utils/EntityUtils';
 import {
   DEFAULT_ENTITY_PERMISSION,
   getPrioritizedEditPermission,

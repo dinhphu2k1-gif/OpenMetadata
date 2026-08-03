@@ -86,8 +86,8 @@ import { DatabaseFields } from './Database/Database.util';
 import { defaultFields as DatabaseSchemaFields } from './DatabaseSchemaDetailsUtils';
 import { defaultFields as DataModelFields } from './DataModelsUtils';
 import { defaultFields as TableFields } from './DatasetDetailsUtils';
+import { getEntityName } from './EntityNameUtils';
 import entityUtilClassBase from './EntityUtilClassBase';
-import { getEntityName } from './EntityUtils';
 import { getEntityFQN, getEntityType } from './FeedUtils';
 import { getGlossaryBreadcrumbs } from './GlossaryUtils';
 import { t } from './i18next/LocalUtil';
@@ -102,7 +102,7 @@ import {
 } from './RouterUtils';
 import serviceUtilClassBase from './ServiceUtilClassBase';
 import { STORED_PROCEDURE_DEFAULT_FIELDS } from './StoredProceduresUtils';
-import { getEncodedFqn } from './StringsUtils';
+import { getEncodedFqn } from './StringUtils';
 import { showErrorToast } from './ToastUtils';
 
 export const getRequestDescriptionPath = (

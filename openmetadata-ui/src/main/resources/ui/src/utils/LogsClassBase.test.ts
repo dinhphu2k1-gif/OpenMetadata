@@ -17,14 +17,15 @@ import { IngestionPipeline } from '../generated/entity/services/ingestionPipelin
 import { DataQualityPageTabs } from '../pages/DataQuality/DataQualityPage.interface';
 import logsClassBase, { LogsClassBase } from './LogsClassBase';
 
-jest.mock('./EntityUtils', () => ({
+jest.mock('./EntityNameUtils', () => ({
   getEntityName: jest.fn(
     (e: { displayName?: string; name?: string }) =>
       e?.displayName || e?.name || ''
   ),
 }));
 
-jest.mock('./CommonUtils', () => ({
+jest.mock('./FqnUtils', () => ({
+  ...jest.requireActual('./FqnUtils'),
   getNameFromFQN: jest.fn((fqn: string) => {
     const parts = fqn.split('.');
 

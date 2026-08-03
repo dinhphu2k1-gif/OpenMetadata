@@ -41,9 +41,9 @@ import {
   Policy,
 } from '../../../generated/entity/data/dataContract';
 import { Table } from '../../../generated/entity/data/table';
-import { filterSelectOptions } from '../../../utils/CommonUtils';
+import { filterSelectOptions } from '../../../utils/FilterQueryUtils';
 import { getPopupContainer } from '../../../utils/formUtils';
-import { getColumnOptionsFromTableColumn } from '../../../utils/TableUtils';
+import { getColumnOptionsFromTableColumn } from '../../../utils/TablePureUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import ExpandableCard from '../../common/ExpandableCard/ExpandableCard';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';

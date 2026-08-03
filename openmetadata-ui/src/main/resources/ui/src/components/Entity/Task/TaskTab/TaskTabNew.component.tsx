@@ -96,7 +96,7 @@ import EntityLink from '../../../../utils/EntityLink';
 import { getEntityFQN } from '../../../../utils/FeedUtils';
 import { getField } from '../../../../utils/formUtils';
 import { checkPermission } from '../../../../utils/PermissionsUtils';
-import { getErrorText } from '../../../../utils/StringsUtils';
+import { getErrorText } from '../../../../utils/StringUtils';
 import {
   fetchOptions,
   generateOptions,
@@ -117,10 +117,8 @@ import InlineEdit from '../../../common/InlineEdit/InlineEdit.component';
 import { EntityType } from '../../../../enums/entity.enum';
 import { EntityReference } from '../../../../generated/tests/testCase';
 import { getUsers } from '../../../../rest/userAPI';
-import {
-  getEntityName,
-  getEntityReferenceListFromEntities,
-} from '../../../../utils/EntityUtils';
+import { getEntityName } from '../../../../utils/EntityNameUtils';
+import { getEntityReferenceListFromEntities } from '../../../../utils/EntityReferenceUtils';
 import {
   getClassificationTagPath,
   getDomainDetailsPath,

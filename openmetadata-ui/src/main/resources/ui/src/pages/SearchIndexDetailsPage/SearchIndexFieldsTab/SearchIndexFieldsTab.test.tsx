@@ -19,13 +19,13 @@ jest.mock('../SearchIndexFieldsTable/SearchIndexFieldsTable', () =>
   jest.fn().mockImplementation(() => <div>SearchIndexFieldsTable</div>)
 );
 
-jest.mock('../../../utils/StringsUtils', () => ({
-  ...jest.requireActual('../../../utils/StringsUtils'),
+jest.mock('../../../utils/StringUtils', () => ({
+  ...jest.requireActual('../../../utils/StringUtils'),
   stringToHTML: jest.fn((text) => text),
 }));
 
-jest.mock('../../../utils/EntityUtils', () => ({
-  ...jest.requireActual('../../../utils/EntityUtils'),
+jest.mock('../../../utils/EntitySearchUtils', () => ({
+  ...jest.requireActual('../../../utils/EntitySearchUtils'),
   highlightSearchText: jest.fn((text) => text),
 }));
 

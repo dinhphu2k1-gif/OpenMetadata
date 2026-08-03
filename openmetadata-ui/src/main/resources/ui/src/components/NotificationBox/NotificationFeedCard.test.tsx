@@ -37,28 +37,32 @@ jest.mock('../common/ProfilePicture/ProfilePicture', () =>
 const mockNavigate = jest.fn();
 
 jest.mock('react-router-dom', () => ({
-  Link: jest.fn().mockImplementation(
-    ({
-      children,
-      to,
-      onClick,
-    }: {
-      children: React.ReactNode;
-      to: string;
-      onClick?: (e: React.MouseEvent) => void;
-    }) => (
-      <span data-testid="link" data-to={to} onClick={onClick}>
-        {children}
-      </span>
-    )
-  ),
+  Link: jest
+    .fn()
+    .mockImplementation(
+      ({
+        children,
+        to,
+        onClick,
+      }: {
+        children: React.ReactNode;
+        to: string;
+        onClick?: (e: React.MouseEvent) => void;
+      }) => (
+        <span data-testid="link" data-to={to} onClick={onClick}>
+          {children}
+        </span>
+      )
+    ),
   useNavigate: jest.fn(() => mockNavigate),
 }));
-jest.mock('../../utils/EntityUtils', () => ({
-  getEntityLinkFromType: jest.fn().mockReturnValue('/mock-entity-link'),
+jest.mock('../../utils/EntityNameUtils', () => ({
   getEntityName: jest
     .fn()
     .mockImplementation(({ displayName, name }) => displayName || name || ''),
+}));
+jest.mock('../../utils/EntityBreadcrumbUtils', () => ({
+  getEntityLinkFromType: jest.fn().mockReturnValue('/mock-entity-link'),
 }));
 
 jest.mock('../../utils/Fqn', () => ({

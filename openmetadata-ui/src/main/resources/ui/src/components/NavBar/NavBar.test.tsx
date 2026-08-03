@@ -70,10 +70,12 @@ jest.mock('../../utils/BrowserNotificationUtils', () => ({
   hasNotificationPermission: jest.fn(),
   shouldRequestPermission: jest.fn(),
 }));
-jest.mock('../../utils/CommonUtils', () => ({
+jest.mock('../../utils/FqnUtils', () => ({
+  getNameFromFQN: jest.fn().mockImplementation((value) => value),
+}));
+jest.mock('../../utils/RouterUtils', () => ({
   refreshPage: jest.fn(),
   getEntityDetailLink: jest.fn(),
-  getNameFromFQN: jest.fn().mockImplementation((value) => value),
 }));
 jest.mock('../../utils/FeedUtils', () => ({
   getEntityFQN: jest.fn().mockReturnValue('entityFQN'),
@@ -171,7 +173,7 @@ jest.mock('../../utils/EntityUtilClassBase', () => ({
   })),
 }));
 
-jest.mock('../../utils/EntityUtils', () => ({
+jest.mock('../../utils/EntityNameUtils', () => ({
   getEntityName: jest.fn().mockReturnValue('MockedEntityName'),
   getDomainDisplayName: jest.fn().mockReturnValue('All Domains'),
 }));

@@ -12,7 +12,7 @@
  */
 import Icon from '@ant-design/icons';
 import { Avatar } from '@openmetadata/ui-core-components';
-import { Button, Dropdown, Space, Tabs, Tag, Tooltip, Typography } from 'antd';
+import { Button, Dropdown, Tabs, Tooltip, Typography } from 'antd';
 import ButtonGroup from 'antd/lib/button/button-group';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
 import { AxiosError } from 'axios';
@@ -77,17 +77,15 @@ import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
   getTabLabelMapFromTabs,
-} from '../../../utils/CustomizePage/CustomizePageUtils';
+} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
 import { getDataContractStatusIcon } from '../../../utils/DataContract/DataContractUtils';
 import dataProductClassBase from '../../../utils/DataProduct/DataProductClassBase';
 import { getQueryFilterToIncludeDomain } from '../../../utils/DomainUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
+import { getEntityFeedLink } from '../../../utils/EntityPureUtils';
 import entityUtilClassBase from '../../../utils/EntityUtilClassBase';
-import {
-  getEntityFeedLink,
-  getEntityName,
-  getEntityVoteStatus,
-} from '../../../utils/EntityUtils';
 import { getEntityVersionByField } from '../../../utils/EntityVersionUtils';
+import { getEntityVoteStatus } from '../../../utils/EntityVoteUtils';
 import { downloadFile } from '../../../utils/Export/ExportUtils';
 import { getEntityAvatarProps } from '../../../utils/IconUtils';
 import { showNotistackError } from '../../../utils/NotistackUtils';
@@ -773,27 +771,11 @@ const DataProductsDetailsPage = ({
       'entityStatus' in dataProduct
         ? dataProduct.entityStatus
         : EntityStatus.Unprocessed;
-    const { lifecycleStage } = dataProduct;
 
-    if (!shouldShowStatus && !lifecycleStage) {
-      return null;
-    }
-
-    return (
-      <Space size={8}>
-        {shouldShowStatus && entityStatus && (
-          <EntityStatusBadge showDivider={false} status={entityStatus} />
-        )}
-        {lifecycleStage && (
-          <Tag
-            className="tw:rounded-full tw:font-medium"
-            data-testid="lifecycle-stage-badge">
-            {t('label.lifecycle-stage')}: {lifecycleStage}
-          </Tag>
-        )}
-      </Space>
-    );
-  }, [dataProduct, t]);
+    return shouldShowStatus && entityStatus ? (
+      <EntityStatusBadge showDivider={false} status={entityStatus} />
+    ) : null;
+  }, [dataProduct]);
 
   if (isCustomPageLoading) {
     return <Loader />;

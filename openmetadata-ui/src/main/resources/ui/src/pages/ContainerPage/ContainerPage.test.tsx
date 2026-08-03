@@ -197,11 +197,17 @@ jest.mock('../../hooks/paging/usePaging', () => ({
   }),
 }));
 
-jest.mock('../../utils/EntityUtils', () => ({
+jest.mock('../../utils/EntityNameUtils', () => ({
   getEntityName: jest
     .fn()
     .mockImplementation((entity) => entity?.name ?? 'entityName'),
+}));
+
+jest.mock('../../utils/EntityPureUtils', () => ({
   getEntityFeedLink: jest.fn(),
+}));
+
+jest.mock('../../utils/EntitySortUtils', () => ({
   getColumnSorter: jest.fn(),
 }));
 
@@ -211,7 +217,7 @@ jest.mock('../../utils/PermissionsUtils', () => ({
   getPrioritizedViewPermission: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('../../utils/StringsUtils', () => ({
+jest.mock('../../utils/StringUtils', () => ({
   getDecodedFqn: jest.fn().mockImplementation((fqn) => fqn),
   getEncodedFqn: jest.fn().mockImplementation((fqn) => fqn),
   stringToHTML: jest.fn().mockImplementation((str) => str),

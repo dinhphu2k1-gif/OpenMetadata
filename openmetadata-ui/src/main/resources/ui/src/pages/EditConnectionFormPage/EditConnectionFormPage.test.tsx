@@ -136,12 +136,12 @@ jest.mock('../../rest/serviceAPI', () => ({
     .mockImplementation(() => Promise.resolve(mockServiceData)),
 }));
 
-jest.mock('../../utils/CommonUtils', () => ({
+jest.mock('../../utils/EntityDisplayUtils', () => ({
   getEntityMissingError: jest.fn(),
   getServiceLogo: jest.fn().mockReturnValue(''),
 }));
 
-jest.mock('../../utils/EntityUtils', () => ({
+jest.mock('../../utils/EntityNameUtils', () => ({
   getEntityName: jest.fn(),
 }));
 

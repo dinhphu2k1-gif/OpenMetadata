@@ -37,6 +37,8 @@ import static org.openmetadata.service.search.SearchClient.UPDATE_ADDED_DELETE_G
 import static org.openmetadata.service.search.SearchClient.UPDATE_CERTIFICATION_SCRIPT;
 import static org.openmetadata.service.search.SearchClient.UPDATE_PROPAGATED_ENTITY_REFERENCE_FIELD_SCRIPT;
 import static org.openmetadata.service.search.SearchClient.UPDATE_TAGS_FIELD_SCRIPT;
+import static org.openmetadata.service.search.SearchConstants.DATABASE_ID;
+import static org.openmetadata.service.search.SearchConstants.DATABASE_SCHEMA_ID;
 import static org.openmetadata.service.search.SearchConstants.DOMAINS_ID;
 import static org.openmetadata.service.search.SearchConstants.ENTITY_TYPE;
 import static org.openmetadata.service.search.SearchConstants.FAILED_TO_CREATE_INDEX_MESSAGE;
@@ -71,6 +73,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -159,6 +162,7 @@ public class SearchRepository {
   private volatile SearchClient searchClient;
 
   @Getter private Map<String, IndexMapping> entityIndexMap;
+  private Map<String, IndexMapping> aliasIndexMap;
 
   /**
    * Staged index names being populated by an in-flight reindex, keyed by the canonical index name
@@ -281,6 +285,21 @@ public class SearchRepository {
   private void loadIndexMappings() {
     IndexMappingLoader mappingLoader = IndexMappingLoader.getInstance();
     entityIndexMap = mappingLoader.getIndexMapping();
+    aliasIndexMap = buildAliasIndexMap(entityIndexMap);
+  }
+
+  private static Map<String, IndexMapping> buildAliasIndexMap(
+      Map<String, IndexMapping> mappingsByKey) {
+    Map<String, IndexMapping> mappingsByAlias = new HashMap<>();
+    if (mappingsByKey != null) {
+      for (IndexMapping mapping : mappingsByKey.values()) {
+        String alias = mapping.getAlias(null);
+        if (alias != null && !mappingsByKey.containsKey(alias)) {
+          mappingsByAlias.putIfAbsent(alias, mapping);
+        }
+      }
+    }
+    return mappingsByAlias;
   }
 
   public SearchClient buildSearchClient(ElasticSearchConfiguration config) {
@@ -694,6 +713,9 @@ public class SearchRepository {
       return token;
     }
     IndexMapping mapping = entityIndexMap == null ? null : entityIndexMap.get(token);
+    if (mapping == null && aliasIndexMap != null) {
+      mapping = aliasIndexMap.get(token);
+    }
     if (mapping != null) {
       return mapping.getIndexName(clusterAlias);
     }
@@ -792,25 +814,33 @@ public class SearchRepository {
     }
   }
 
-  private String getIndexMapping(IndexMapping indexMapping) {
-    try (InputStream in =
-        getClass()
-            .getResourceAsStream(
-                String.format(indexMapping.getIndexMappingFile(), language.toLowerCase()))) {
-      assert in != null;
-      return new String(in.readAllBytes());
-    } catch (Exception e) {
-      LOG.error("Failed to read index Mapping file due to ", e);
-    }
-    return null;
-  }
-
+  /**
+   * The effective index mapping for an entity: the bundled classpath resource, field-safety hardened
+   * on the fly by {@link SearchIndexSettings#harden} at index-creation time.
+   */
   public String readIndexMapping(IndexMapping indexMapping) {
-    String mapping = getIndexMapping(indexMapping);
+    String mapping = getHardenedResourceMapping(indexMapping);
     if (isVectorEmbeddingEnabled() && embeddingClient != null && mapping != null) {
       mapping = reformatVectorIndexWithDimension(mapping, embeddingClient.getDimension());
     }
     return mapping;
+  }
+
+  private String getHardenedResourceMapping(IndexMapping indexMapping) {
+    String result = null;
+    try (InputStream in =
+        getClass()
+            .getResourceAsStream(
+                String.format(
+                    indexMapping.getIndexMappingFile(), language.toLowerCase(Locale.ROOT)))) {
+      if (in != null) {
+        result =
+            SearchIndexSettings.harden(new String(in.readAllBytes()), SearchFieldLimits.active());
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to read index Mapping file due to ", e);
+    }
+    return result;
   }
 
   /**
@@ -924,6 +954,49 @@ public class SearchRepository {
         throw re;
       }
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Remove descendant column docs when a table's ancestor (databaseService / database /
+   * databaseSchema) is hard-deleted recursively.
+   *
+   * <p>Column docs live in a flat secondary index ({@code column_search_index}). A table's own
+   * delete prunes them via {@link #deleteTableColumns} (by {@code table.id}), but a recursive
+   * service/database/schema hard delete skips the per-table search dispatch
+   * ({@code descendantsCoveredByAncestorCascade}) and the ancestor's {@link #deleteOrUpdateChildren}
+   * cascade only targets the service childAliases, which do not include {@code tableColumn} — so
+   * without this prune the descendant column docs linger in search. Column docs carry
+   * {@code service.id} / {@code database.id} / {@code databaseSchema.id}, so delete by whichever
+   * ancestor the deleted entity is.
+   */
+  private void deleteDescendantColumns(EntityInterface entity, String entityType) {
+    String columnParentField =
+        switch (entityType) {
+          case Entity.DATABASE_SERVICE -> SERVICE_ID;
+          case Entity.DATABASE -> DATABASE_ID;
+          case Entity.DATABASE_SCHEMA -> DATABASE_SCHEMA_ID;
+          default -> null;
+        };
+    if (columnParentField != null) {
+      IndexMapping columnIndexMapping = entityIndexMap.get(Entity.TABLE_COLUMN);
+      if (columnIndexMapping != null) {
+        try {
+          searchClient.deleteEntityByFields(
+              List.of(getWriteIndexName(columnIndexMapping)),
+              List.of(new ImmutablePair<>(columnParentField, entity.getId().toString())));
+        } catch (Exception e) {
+          LOG.error(
+              "Issue deleting descendant columns for {} [{}]: {}",
+              entityType,
+              entity.getFullyQualifiedName(),
+              e.getMessage());
+          if (e instanceof RuntimeException re) {
+            throw re;
+          }
+          throw new RuntimeException(e);
+        }
+      }
     }
   }
 
@@ -2365,6 +2438,8 @@ public class SearchRepository {
       deleteOrUpdateChildren(entity, indexMapping);
       if (Entity.TABLE.equals(entityType)) {
         deleteTableColumns((Table) entity);
+      } else {
+        deleteDescendantColumns(entity, entityType);
       }
     } catch (Exception ie) {
       SearchIndexRetryQueue.enqueue(
@@ -2555,7 +2630,8 @@ public class SearchRepository {
                   Collections.singletonMap("suiteId", testSuite.getId().toString())));
         }
       }
-      case Entity.DASHBOARD_SERVICE,
+      case Entity.API_SERVICE,
+          Entity.DASHBOARD_SERVICE,
           Entity.DATABASE_SERVICE,
           Entity.MESSAGING_SERVICE,
           Entity.PIPELINE_SERVICE,

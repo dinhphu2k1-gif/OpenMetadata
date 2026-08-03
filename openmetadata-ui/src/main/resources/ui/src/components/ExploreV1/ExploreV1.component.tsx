@@ -54,7 +54,7 @@ import {
 } from '../../rest/searchAPI';
 import { getDropDownItems } from '../../utils/AdvancedSearchUtils';
 import { parseExportErrorMessage } from '../../utils/APIUtils';
-import { highlightEntityNameAndDescription } from '../../utils/EntityUtils';
+import { highlightEntityNameAndDescription } from '../../utils/EntitySearchUtils';
 import { getCombinedQueryFilterObject } from '../../utils/ExplorePage/ExplorePageUtils';
 import {
   getExploreQueryFilterMust,
@@ -139,6 +139,10 @@ const ExploreV1: React.FC<ExploreProps> = ({
   const isSearchMode = useMemo(
     () => Boolean(searchQueryParam),
     [searchQueryParam]
+  );
+  const hasActiveFilters = useMemo(
+    () => Boolean(queryFilter || quickFilters || sqlQuery || searchQueryParam),
+    [queryFilter, quickFilters, sqlQuery, searchQueryParam]
   );
   const pageResultCount = useMemo(
     () => searchResults?.hits?.hits?.length ?? 0,
@@ -633,12 +637,13 @@ const ExploreV1: React.FC<ExploreProps> = ({
               <Card className="h-full tw:flex-1 explore-main-card">
                 {!loading && !isElasticSearchIssue ? (
                   <SearchedData
-                    isFilterSelected
                     data={searchResults?.hits.hits ?? []}
                     filter={parsedSearch}
                     handleSummaryPanelDisplay={handleSummaryPanelDisplay}
+                    isFilterSelected={hasActiveFilters}
                     isSummaryPanelVisible={showSummaryPanel}
                     selectedEntityId={entityDetails?.id || ''}
+                    showResultCount={hasActiveFilters}
                     totalValue={searchResults?.hits.total.value ?? 0}
                     onPaginationChange={onChangePage}
                   />

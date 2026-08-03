@@ -39,8 +39,8 @@ import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
   getTabLabelMapFromTabs,
-} from '../../../utils/CustomizePage/CustomizePageUtils';
-import { getEntityName } from '../../../utils/EntityUtils';
+} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import mlModelDetailsClassBase from '../../../utils/MlModel/MlModelClassBase';
 import {
   DEFAULT_ENTITY_PERMISSION,
@@ -48,7 +48,7 @@ import {
   getPrioritizedViewPermission,
 } from '../../../utils/PermissionsUtils';
 import { getEntityDetailsPath } from '../../../utils/RouterUtils';
-import { getTagsWithoutTier, getTierTags } from '../../../utils/TableUtils';
+import { getTagsWithoutTier, getTierTags } from '../../../utils/TablePureUtils';
 import {
   updateCertificationTag,
   updateTierTag,

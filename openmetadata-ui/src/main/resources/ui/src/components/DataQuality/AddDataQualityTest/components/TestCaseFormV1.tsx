@@ -97,14 +97,11 @@ import {
   getListTestDefinitions,
 } from '../../../../rest/testAPI';
 import {
-  filterSelectOptions,
-  replaceAllSpacialCharWith_,
-} from '../../../../utils/CommonUtils';
-import {
   convertSearchSourceToTable,
   getServiceTypeForTestDefinition,
 } from '../../../../utils/DataQuality/DataQualityUtils';
-import { getEntityName } from '../../../../utils/EntityUtils';
+import { getEntityName } from '../../../../utils/EntityNameUtils';
+import { filterSelectOptions } from '../../../../utils/FilterQueryUtils';
 import {
   createScrollToErrorHandler,
   generateFormFields,
@@ -116,8 +113,9 @@ import { getIngestionName } from '../../../../utils/ServiceUtils';
 import {
   escapeESReservedCharacters,
   generateUUID,
-} from '../../../../utils/StringsUtils';
-import { generateEntityLink } from '../../../../utils/TableUtils';
+  replaceAllSpacialCharWith_,
+} from '../../../../utils/StringUtils';
+import { generateEntityLink } from '../../../../utils/TablePureUtils';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { AsyncSelect } from '../../../common/AsyncSelect/AsyncSelect';
 import SelectionCardGroup from '../../../common/SelectionCardGroup/SelectionCardGroup';

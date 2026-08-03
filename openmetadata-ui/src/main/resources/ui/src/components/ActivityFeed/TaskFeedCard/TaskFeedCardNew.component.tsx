@@ -46,9 +46,9 @@ import { useUserProfile } from '../../../hooks/user-profile/useUserProfile';
 import DescriptionTaskNew from '../../../pages/TasksPage/shared/DescriptionTaskNew';
 import TagsTask from '../../../pages/TasksPage/shared/TagsTask';
 import { updateTask } from '../../../rest/feedsAPI';
-import { getNameFromFQN } from '../../../utils/CommonUtils';
-import { getEntityName } from '../../../utils/EntityUtils';
-import { getErrorText } from '../../../utils/StringsUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
+import { getNameFromFQN } from '../../../utils/FqnUtils';
+import { getErrorText } from '../../../utils/StringUtils';
 import {
   getTaskDetailPath,
   isDescriptionTask,

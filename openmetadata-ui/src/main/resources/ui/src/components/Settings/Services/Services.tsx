@@ -44,11 +44,9 @@ import { DatabaseServiceSearchSource } from '../../../interface/search.interface
 import { ServicesType } from '../../../interface/service.interface';
 import { getServices, searchService } from '../../../rest/serviceAPI';
 import { getServiceLogo } from '../../../utils/CommonUtils';
-import {
-  getColumnSorter,
-  getEntityName,
-  highlightSearchText,
-} from '../../../utils/EntityUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
+import { highlightSearchText } from '../../../utils/EntitySearchUtils';
+import { getColumnSorter } from '../../../utils/EntitySortUtils';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import {
   getAddServicePath,
@@ -60,7 +58,7 @@ import {
   getResourceEntityFromServiceCategory,
   getServiceTypesFromServiceCategory,
 } from '../../../utils/ServiceUtils';
-import { stringToHTML } from '../../../utils/StringsUtils';
+import { stringToHTML } from '../../../utils/StringUtils';
 import {
   columnFilterIcon,
   ownerTableObject,

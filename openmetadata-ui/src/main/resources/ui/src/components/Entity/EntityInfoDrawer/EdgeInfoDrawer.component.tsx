@@ -25,13 +25,13 @@ import { CSMode } from '../../../enums/codemirror.enum';
 import { EntityType } from '../../../enums/entity.enum';
 import { AddLineage } from '../../../generated/api/lineage/addLineage';
 import { Source } from '../../../generated/type/entityLineage';
-import { getNameFromFQN } from '../../../utils/CommonUtils';
 import {
   getColumnFunctionValue,
   getLineageDetailsObject,
 } from '../../../utils/EntityLineageUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import entityUtilClassBase from '../../../utils/EntityUtilClassBase';
-import { getEntityName } from '../../../utils/EntityUtils';
+import { getNameFromFQN } from '../../../utils/FqnUtils';
 import Loader from '../../common/Loader/Loader';
 import SchemaEditor from '../../Database/SchemaEditor/SchemaEditor';
 import { ModalWithFunctionEditor } from '../../Modals/ModalWithFunctionEditor/ModalWithFunctionEditor';
@@ -73,6 +73,24 @@ const EdgeInfoDrawer = ({
 
     return Boolean(sourceHandle && targetHandle);
   }, [edge]);
+
+  const resolvedSqlQuery = useMemo(() => {
+    const inlineQuery = edgeEntity?.sqlQuery;
+    if (inlineQuery) {
+      return inlineQuery;
+    }
+
+    // When the same SQL appears on multiple edges it is deduped into the target
+    // node's lineageSqlQueries map and referenced from the edge by sqlQueryKey.
+    const sqlQueryKey = edgeEntity?.sqlQueryKey;
+    if (!sqlQueryKey) {
+      return '';
+    }
+
+    const targetNode = nodes.find((node) => node.id === edge.target);
+
+    return targetNode?.data?.node?.lineageSqlQueries?.[sqlQueryKey] ?? '';
+  }, [edgeEntity, nodes, edge.target]);
 
   const onDescriptionUpdate = useCallback(
     async (updatedHTML: string) => {
@@ -324,8 +342,8 @@ const EdgeInfoDrawer = ({
   useEffect(() => {
     setIsLoading(true);
     getEdgeInfo();
-    setMysqlQuery(edge.data.edge?.sqlQuery);
-  }, [edge, visible]);
+    setMysqlQuery(resolvedSqlQuery);
+  }, [edge, visible, nodes, resolvedSqlQuery]);
 
   return (
     <>

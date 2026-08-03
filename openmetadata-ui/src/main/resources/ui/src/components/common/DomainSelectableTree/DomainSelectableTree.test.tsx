@@ -90,7 +90,7 @@ jest.mock('../../../utils/DomainUtils', () => ({
   isDomainExist: jest.fn().mockReturnValue(false),
 }));
 
-jest.mock('../../../utils/EntityUtils', () => ({
+jest.mock('../../../utils/EntityReferenceUtils', () => ({
   getEntityReferenceFromEntity: jest
     .fn()
     .mockImplementation((entity: Domain) => ({
@@ -102,7 +102,7 @@ jest.mock('../../../utils/EntityUtils', () => ({
     })),
 }));
 
-jest.mock('../../../utils/StringsUtils', () => ({
+jest.mock('../../../utils/StringUtils', () => ({
   escapeESReservedCharacters: jest.fn().mockImplementation((value) => value),
   getEncodedFqn: jest.fn().mockImplementation((value) => value),
 }));
