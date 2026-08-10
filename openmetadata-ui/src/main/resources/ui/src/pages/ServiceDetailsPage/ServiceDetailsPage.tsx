@@ -270,7 +270,7 @@ const ServiceDetailsPage: FunctionComponent = () => {
   const [data, setData] = useState<Array<ServicePageData>>([]);
   const [files, setFiles] = useState<Array<File>>([]);
   const [spreadsheets, setSpreadsheets] = useState<Array<Spreadsheet>>([]);
-  const [isLoading, setIsLoading] = useState(!isOpenMetadataService);
+  const [isLoading, setIsLoading] = useState(true);
   const [isIngestionPipelineLoading, setIsIngestionPipelineLoading] =
     useState(false);
   const [isServiceLoading, setIsServiceLoading] = useState(true);
@@ -1532,9 +1532,7 @@ const ServiceDetailsPage: FunctionComponent = () => {
   }, [decodedServiceFQN, serviceCategory, servicePermission]);
 
   useEffect(() => {
-    if (!isOpenMetadataService) {
-      fetchServicePermission();
-    }
+    fetchServicePermission();
   }, [decodedServiceFQN, serviceCategory]);
 
   useEffect(() => {

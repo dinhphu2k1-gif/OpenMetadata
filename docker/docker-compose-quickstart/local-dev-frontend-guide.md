@@ -19,13 +19,13 @@ Thay vì bật toàn bộ các service (bao gồm cả Airflow/Ingestion rất n
 Mở Terminal tại thư mục gốc của project (ví dụ: `/home/dinhphu/Documents/openmetadata/OpenMetadata`):
 
 ```bash
-# Khởi động PostgreSQL, Elasticsearch và OpenMetadata API Server dưới chế độ chạy ngầm (-d)
-docker compose -f docker/docker-compose-quickstart/docker-compose-postgres.yml up -d postgresql elasticsearch openmetadata-server
+# Khởi động PostgreSQL, OpenSearch và OpenMetadata API Server dưới chế độ chạy ngầm (-d)
+docker compose -f docker/docker-compose-quickstart/docker-compose.prod.yml up -d postgresql opensearch openmetadata-server
 ```
 
 > [!TIP]
 > **Tối ưu hóa RAM:**
-> File `docker-compose-postgres.yml` hiện tại đã được tinh chỉnh để giới hạn RAM của Elasticsearch và Server xuống mức 512MB mỗi service, giúp máy tính của bạn không bị "đơ" khi code.
+> File `docker-compose.prod.yml` hiện tại đã được tinh chỉnh để giới hạn RAM của OpenSearch và Server xuống mức 512MB mỗi service, giúp máy tính của bạn không bị "đơ" khi code.
 
 > [!NOTE]
 > Lần khởi động đầu tiên có thể mất từ 1-3 phút để Database được khởi tạo xong. Bạn có thể dùng lệnh `docker ps` để kiểm tra trạng thái các container (cột Status hiện `Up`).
@@ -45,6 +45,8 @@ cd openmetadata-ui/src/main/resources/ui/
 yarn install
 
 # 2. Khởi động Dev Server
+VITE_DEV_SERVER_TARGET=http://localhost:80/ yarn start
+or
 yarn start
 ```
 

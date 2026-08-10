@@ -17,7 +17,7 @@ volumes:
   es-data:
 services:
   postgresql:
-    image: docker.getcollate.io/openmetadata/postgresql:1.13.1
+    image: docker.getcollate.io/openmetadata/postgresql:1.13.3
     container_name: openmetadata_postgresql
     # restart: always
     command: "--work_mem=20MB"
@@ -45,7 +45,7 @@ services:
     container_name: openmetadata_opensearch
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - plugins.security.disabled=true
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenMetadata_password123!!!
       - indices.query.bool.max_clause_count=4096
@@ -66,7 +66,7 @@ services:
       - es-data:/usr/share/opensearch/data
 
   execute-migrate-all:
-    image: openmetadata/server:custom-1.13.1
+    image: openmetadata/server:custom-1.13.3
     container_name: execute_migrate_all
     command: "./bootstrap/openmetadata-ops.sh -d migrate --force"
     environment:
@@ -252,7 +252,7 @@ services:
       OM_EXTENSIONS: ${OM_EXTENSIONS:-[]}
 
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx512m -Xms512m}
       # Mask passwords values in UI
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-false}
 
@@ -295,7 +295,7 @@ services:
       - local_app_net
 
   openmetadata-server:
-    image: openmetadata/server:custom-1.13.1
+    image: openmetadata/server:custom-1.13.3
     container_name: openmetadata_server
     environment:
       OPENMETADATA_CLUSTER_NAME: ${OPENMETADATA_CLUSTER_NAME:-openmetadata}
@@ -472,7 +472,7 @@ services:
       OM_EXTENSIONS: ${OM_EXTENSIONS:-[]}
 
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx4G -Xms2G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-true}      
     expose:
       - 8585
@@ -495,7 +495,7 @@ services:
       test: [ "CMD", "wget", "-q", "--spider",  "http://localhost:8586/healthcheck" ]
 
   ingestion:
-    image: docker.getcollate.io/openmetadata/ingestion:1.13.1
+    image: docker.getcollate.io/openmetadata/ingestion:1.13.3
     container_name: openmetadata_ingestion
     environment:
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
