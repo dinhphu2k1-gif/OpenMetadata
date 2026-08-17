@@ -33,14 +33,14 @@ unzip -q "$JAR_FILE"
 
 echo "Replacing UI assets..."
 rm -rf assets/*
-cp -r /home/dinhphu/Documents/openmetadata/OpenMetadata/$UI_DIST/* assets/
+cp -r ~/project/OpenMetadata/$UI_DIST/* assets/
 
 echo "Re-zipping JAR file..."
 zip -qr "$JAR_FILE" .
 
 echo "Re-tarring everything..."
 cd "$TMP_BUILD"
-tar czf /home/dinhphu/Documents/openmetadata/OpenMetadata/$TAR_FILE openmetadata-1.13.3/
+tar czf ~/project/OpenMetadata/$TAR_FILE openmetadata-1.13.3/
 
 echo "Cleaning up..."
 rm -rf "$TMP_BUILD" "$TMP_JAR"

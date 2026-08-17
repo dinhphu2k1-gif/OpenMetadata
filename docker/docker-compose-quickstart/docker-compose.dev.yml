@@ -17,7 +17,7 @@ volumes:
   es-data:
 services:
   postgresql:
-    image: docker.getcollate.io/openmetadata/postgresql:1.13.1
+    image: docker.getcollate.io/openmetadata/postgresql:1.13.3
     container_name: openmetadata_postgresql
     # restart: always
     command: "--work_mem=20MB"
@@ -45,7 +45,7 @@ services:
     container_name: openmetadata_opensearch
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
       - plugins.security.disabled=true
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenMetadata_password123!!!
       - indices.query.bool.max_clause_count=4096
@@ -123,12 +123,12 @@ services:
       # SAML_IDP_ENTITY_ID: ${SAML_IDP_ENTITY_ID:-""}
       # SAML_IDP_SSO_LOGIN_URL: ${SAML_IDP_SSO_LOGIN_URL:-""}
       # SAML_IDP_CERTIFICATE: ${SAML_IDP_CERTIFICATE:-""}
-      # SAML_AUTHORITY_URL: ${SAML_AUTHORITY_URL:-"http://localhost:8585/api/v1/saml/login"}
+      # SAML_AUTHORITY_URL: ${SAML_AUTHORITY_URL:-"http://localhost/api/v1/saml/login"}
       # SAML_IDP_NAME_ID: ${SAML_IDP_NAME_ID:-"urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress"}
-      # SAML_SP_ENTITY_ID: ${SAML_SP_ENTITY_ID:-"http://localhost:8585/api/v1/saml/metadata"}
-      # SAML_SP_ACS: ${SAML_SP_ACS:-"http://localhost:8585/api/v1/saml/acs"}
+      # SAML_SP_ENTITY_ID: ${SAML_SP_ENTITY_ID:-"http://localhost/api/v1/saml/metadata"}
+      # SAML_SP_ACS: ${SAML_SP_ACS:-"http://localhost/api/v1/saml/acs"}
       # SAML_SP_CERTIFICATE: ${SAML_SP_CERTIFICATE:-""}
-      # SAML_SP_CALLBACK: ${SAML_SP_CALLBACK:-"http://localhost:8585/saml/callback"}
+      # SAML_SP_CALLBACK: ${SAML_SP_CALLBACK:-"http://localhost/saml/callback"}
       # SAML_STRICT_MODE: ${SAML_STRICT_MODE:-false}
       # SAML_SP_TOKEN_VALIDITY: ${SAML_SP_TOKEN_VALIDITY:-"3600"}
       # SAML_SEND_ENCRYPTED_NAME_ID: ${SAML_SEND_ENCRYPTED_NAME_ID:-false}
@@ -239,7 +239,7 @@ services:
       OM_EMAIL_ENTITY: ${OM_EMAIL_ENTITY:-"OpenMetadata"}
       OM_SUPPORT_URL: ${OM_SUPPORT_URL:-"https://slack.open-metadata.org"}
       AUTHORIZER_ENABLE_SMTP : ${AUTHORIZER_ENABLE_SMTP:-false}
-      OPENMETADATA_SERVER_URL: ${OPENMETADATA_SERVER_URL:-""}
+      OPENMETADATA_SERVER_URL: ${OPENMETADATA_SERVER_URL:-"http://localhost"}
       OPENMETADATA_SMTP_SENDER_MAIL: ${OPENMETADATA_SMTP_SENDER_MAIL:-""}
       SMTP_SERVER_ENDPOINT: ${SMTP_SERVER_ENDPOINT:-""}
       SMTP_SERVER_PORT: ${SMTP_SERVER_PORT:-""}
@@ -252,7 +252,7 @@ services:
       OM_EXTENSIONS: ${OM_EXTENSIONS:-[]}
 
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx512m -Xms512m}
       # Mask passwords values in UI
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-false}
 
@@ -295,6 +295,8 @@ services:
       - local_app_net
 
   openmetadata-server:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     image: openmetadata/server:custom-1.13.3
     container_name: openmetadata_server
     environment:
@@ -322,7 +324,7 @@ services:
       AUTHENTICATION_CALLBACK_URL: ${AUTHENTICATION_CALLBACK_URL:-""}
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS:-[email,preferred_username,sub]}
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING:-[]}
-      AUTHENTICATION_ENABLE_SELF_SIGNUP : ${AUTHENTICATION_ENABLE_SELF_SIGNUP:-true}
+      AUTHENTICATION_ENABLE_SELF_SIGNUP: ${AUTHENTICATION_ENABLE_SELF_SIGNUP:-true}
       AUTHENTICATION_CLIENT_TYPE: ${AUTHENTICATION_CLIENT_TYPE:-public}
       #For OIDC Authentication, when client is confidential
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-""}
@@ -348,12 +350,12 @@ services:
       # SAML_IDP_ENTITY_ID: ${SAML_IDP_ENTITY_ID:-""}
       # SAML_IDP_SSO_LOGIN_URL: ${SAML_IDP_SSO_LOGIN_URL:-""}
       # SAML_IDP_CERTIFICATE: ${SAML_IDP_CERTIFICATE:-""}
-      # SAML_AUTHORITY_URL: ${SAML_AUTHORITY_URL:-"http://localhost:8585/api/v1/saml/login"}
+      # SAML_AUTHORITY_URL: ${SAML_AUTHORITY_URL:-"http://localhost/api/v1/saml/login"}
       # SAML_IDP_NAME_ID: ${SAML_IDP_NAME_ID:-"urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress"}
-      # SAML_SP_ENTITY_ID: ${SAML_SP_ENTITY_ID:-"http://localhost:8585/api/v1/saml/metadata"}
-      # SAML_SP_ACS: ${SAML_SP_ACS:-"http://localhost:8585/api/v1/saml/acs"}
+      # SAML_SP_ENTITY_ID: ${SAML_SP_ENTITY_ID:-"http://localhost/api/v1/saml/metadata"}
+      # SAML_SP_ACS: ${SAML_SP_ACS:-"http://localhost/api/v1/saml/acs"}
       # SAML_SP_CERTIFICATE: ${SAML_SP_CERTIFICATE:-""}
-      # SAML_SP_CALLBACK: ${SAML_SP_CALLBACK:-"http://localhost:8585/saml/callback"}
+      # SAML_SP_CALLBACK: ${SAML_SP_CALLBACK:-"http://localhost/saml/callback"}
       # SAML_STRICT_MODE: ${SAML_STRICT_MODE:-false}
       # SAML_SP_TOKEN_VALIDITY: ${SAML_SP_TOKEN_VALIDITY:-"3600"}
       # SAML_SEND_ENCRYPTED_NAME_ID: ${SAML_SEND_ENCRYPTED_NAME_ID:-false}
@@ -459,7 +461,7 @@ services:
       OM_EMAIL_ENTITY: ${OM_EMAIL_ENTITY:-"OpenMetadata"}
       OM_SUPPORT_URL: ${OM_SUPPORT_URL:-"https://slack.open-metadata.org"}
       AUTHORIZER_ENABLE_SMTP : ${AUTHORIZER_ENABLE_SMTP:-false}
-      OPENMETADATA_SERVER_URL: ${OPENMETADATA_SERVER_URL:-""}
+      OPENMETADATA_SERVER_URL: ${OPENMETADATA_SERVER_URL:-"http://localhost"}
       OPENMETADATA_SMTP_SENDER_MAIL: ${OPENMETADATA_SMTP_SENDER_MAIL:-""}
       SMTP_SERVER_ENDPOINT: ${SMTP_SERVER_ENDPOINT:-""}
       SMTP_SERVER_PORT: ${SMTP_SERVER_PORT:-""}
@@ -472,14 +474,14 @@ services:
       OM_EXTENSIONS: ${OM_EXTENSIONS:-[]}
 
       # Heap OPTS Configurations
-      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx4G -Xms2G}
+      OPENMETADATA_HEAP_OPTS: ${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}
       MASK_PASSWORDS_API: ${MASK_PASSWORDS_API:-true}      
     expose:
       - 8585
       - 8586
       - 5005
     ports:
-      - "8085:8585"
+      - "80:8585"
       - "8586:8586"
       - "5005:5005"
     depends_on:
@@ -494,52 +496,52 @@ services:
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider",  "http://localhost:8586/healthcheck" ]
 
-  ingestion:
-    image: docker.getcollate.io/openmetadata/ingestion:1.13.1
-    container_name: openmetadata_ingestion
-    environment:
-      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
-      DB_HOST: ${AIRFLOW_DB_HOST:-postgresql}
-      DB_PORT: ${AIRFLOW_DB_PORT:-5432}
-      AIRFLOW_DB: ${AIRFLOW_DB:-airflow_db}
-      DB_USER: ${AIRFLOW_DB_USER:-airflow_user}
-      DB_SCHEME: ${AIRFLOW_DB_SCHEME:-postgresql+psycopg2}
-      DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_pass}
-      # extra connection-string properties for the database
-      # EXAMPLE 
-      # require SSL (only for Postgres)
-      # properties: "?sslmode=require"
-      DB_PROPERTIES: ${AIRFLOW_DB_PROPERTIES:-}
-      # To test the lineage backend
-      # AIRFLOW__LINEAGE__BACKEND: airflow_provider_openmetadata.lineage.backend.OpenMetadataLineageBackend
-      # AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
-      # AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
-      # AIRFLOW__LINEAGE__JWT_TOKEN: ...
-      # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-      # AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: true
+  # ingestion:
+  #   image: docker.getcollate.io/openmetadata/ingestion:1.13.3
+  #   container_name: openmetadata_ingestion
+  #   environment:
+  #     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  #     AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
+  #     DB_HOST: ${AIRFLOW_DB_HOST:-postgresql}
+  #     DB_PORT: ${AIRFLOW_DB_PORT:-5432}
+  #     AIRFLOW_DB: ${AIRFLOW_DB:-airflow_db}
+  #     DB_USER: ${AIRFLOW_DB_USER:-airflow_user}
+  #     DB_SCHEME: ${AIRFLOW_DB_SCHEME:-postgresql+psycopg2}
+  #     DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_pass}
+  #     # extra connection-string properties for the database
+  #     # EXAMPLE 
+  #     # require SSL (only for Postgres)
+  #     # properties: "?sslmode=require"
+  #     DB_PROPERTIES: ${AIRFLOW_DB_PROPERTIES:-}
+  #     # To test the lineage backend
+  #     # AIRFLOW__LINEAGE__BACKEND: airflow_provider_openmetadata.lineage.backend.OpenMetadataLineageBackend
+  #     # AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
+  #     # AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
+  #     # AIRFLOW__LINEAGE__JWT_TOKEN: ...
+  #     # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+  #     # AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: true
 
-    entrypoint: /bin/bash
-    command:
-      - "/opt/airflow/ingestion_dependency.sh"
-    depends_on:
-      opensearch:
-        condition: service_started
-      postgresql:
-        condition: service_healthy
-      openmetadata-server:
-        condition: service_started
-    expose:
-      - 8080
-    ports:
-      - "8080:8080"
-    networks:
-      - local_app_net
-    volumes:
-      - ingestion-volume-dag-airflow:/opt/airflow/dag_generated_configs
-      - ingestion-volume-dags:/opt/airflow/dags
-      - ingestion-volume-tmp:/tmp
+  #   entrypoint: /bin/bash
+  #   command:
+  #     - "/opt/airflow/ingestion_dependency.sh"
+  #   depends_on:
+  #     opensearch:
+  #       condition: service_started
+  #     postgresql:
+  #       condition: service_healthy
+  #     openmetadata-server:
+  #       condition: service_started
+  #   expose:
+  #     - 8080
+  #   ports:
+  #     - "8082:8080"
+  #   networks:
+  #     - local_app_net
+  #   volumes:
+  #     - ingestion-volume-dag-airflow:/opt/airflow/dag_generated_configs
+  #     - ingestion-volume-dags:/opt/airflow/dags
+  #     - ingestion-volume-tmp:/tmp
 
 networks:
   local_app_net:
