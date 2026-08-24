@@ -1,5 +1,8 @@
 {
   "cde": {
+    "business-context": "Ngữ cảnh nghiệp vụ",
+    "core-definition": "Định nghĩa cốt lõi",
+    "data-dictionary": "Từ điển dữ liệu dùng chung",
     "term-code": "Mã thuật ngữ",
     "business-group": "Nhóm theo nghiệp vụ",
     "business-term-name": "Tên thuật ngữ nghiệp vụ",

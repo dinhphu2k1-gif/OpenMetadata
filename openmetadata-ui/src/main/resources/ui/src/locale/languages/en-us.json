@@ -1,8 +1,11 @@
 {
   "cde": {
+    "business-context": "Business context",
     "business-group": "Business Group",
     "business-meaning": "Business Meaning",
     "business-term-name": "Business Term Name",
+    "core-definition": "Core definition",
+    "data-dictionary": "Data Dictionary",
     "data-classification": "Data Classification",
     "data-governance-review": "Data Governance Review",
     "data-owner": "Data Owner",
