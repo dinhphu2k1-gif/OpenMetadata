@@ -1,14 +1,14 @@
 {
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
-  "numPassedTestSuites": 1,
-  "numPassedTests": 49,
+  "numPassedTestSuites": 3,
+  "numPassedTests": 67,
   "numPendingTestSuites": 0,
   "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
-  "numTotalTestSuites": 1,
-  "numTotalTests": 49,
+  "numTotalTestSuites": 3,
+  "numTotalTests": 67,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,290 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1787545814251,
+  "startTime": 1787556769254,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 49,
+      "numPassingTests": 15,
       "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1787545831169,
-        "runtime": 16204,
+        "end": 1787556777830,
+        "runtime": 7719,
         "slow": true,
-        "start": 1787545814965
+        "start": 1787556770111
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/CustomPropertyTable/PropertyValue.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 52,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render value component",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render value component"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 6,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should not render edit component if user has no edit permissions",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should not render edit component if user has no edit permissions"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 7,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render an overridden custom property display name",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render an overridden custom property display name"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 15,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render richtext previewer component for markdown type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render richtext previewer component for markdown type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 50,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render select component for enum type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render select component for enum type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 17,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render date picker component for \"date\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render date picker component for \"date\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 13,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render date picker component for \"dateTime\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render date picker component for \"dateTime\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 34,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render time picker component for \"time\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render time picker component for \"time\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 16,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render email input component for \"email\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render email input component for \"email\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 15,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render timestamp input component for \"timestamp\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render timestamp input component for \"timestamp\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 18,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render start and end input component for \"timeInterval\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render start and end input component for \"timeInterval\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 14,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render duration input component for \"duration\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render duration input component for \"duration\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 17,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render sqlQuery editor component for \"sqlQuery\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render sqlQuery editor component for \"sqlQuery\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 35,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render entity reference select component for \"entityReference\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render entity reference select component for \"entityReference\" type"
+        },
+        {
+          "ancestorTitles": [
+            "Test PropertyValue Component"
+          ],
+          "duration": 15,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test PropertyValue Component Should render entity reference select component for \"entityReferenceList\" type",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "Should render entity reference select component for \"entityReferenceList\" type"
+        }
+      ],
+      "console": [
+        {
+          "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:26:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/CustomPropertyTable/PropertyValue.test.tsx:430:11\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/CustomPropertyTable/PropertyValue.test.tsx:417:95)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:37:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/CustomPropertyTable/PropertyValue.test.tsx:430:11\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/CustomPropertyTable/PropertyValue.test.tsx:417:95)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    },
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 50,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1787556781325,
+        "runtime": 3464,
+        "slow": false,
+        "start": 1787556777861
       },
       "skipped": false,
       "snapshot": {
@@ -59,7 +328,7 @@
             "Test GlossaryTermTab component",
             "Empty State"
           ],
-          "duration": 218,
+          "duration": 142,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Empty State should show the ErrorPlaceHolder component when no glossary terms are present",
@@ -75,7 +344,7 @@
             "Test GlossaryTermTab component",
             "Empty State"
           ],
-          "duration": 45,
+          "duration": 35,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Empty State should call the onAddGlossaryTerm function when clicking add button in ErrorPlaceHolder",
@@ -91,7 +360,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 69,
+          "duration": 65,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should render the table when glossary terms are present",
@@ -107,7 +376,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 52,
+          "duration": 50,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should display glossary term names as links",
@@ -123,7 +392,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 52,
+          "duration": 46,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should render description column with rich text preview",
@@ -139,7 +408,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 63,
+          "duration": 61,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should render status badges for each term",
@@ -155,7 +424,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 44,
+          "duration": 45,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should render owner labels",
@@ -171,7 +440,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 39,
+          "duration": 43,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should render action buttons when user has create permissions",
@@ -187,7 +456,7 @@
             "Test GlossaryTermTab component",
             "Table Rendering with Data"
           ],
-          "duration": 48,
+          "duration": 50,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Rendering with Data should keep the standard columns for non-CDE glossaries",
@@ -197,6 +466,22 @@
           "retryReasons": [],
           "status": "passed",
           "title": "should keep the standard columns for non-CDE glossaries"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 2,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table uses English CDE column labels and value text",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "uses English CDE column labels and value text"
         },
         {
           "ancestorTitles": [
@@ -219,7 +504,7 @@
             "Test GlossaryTermTab component",
             "CDE glossary table"
           ],
-          "duration": 78,
+          "duration": 82,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component CDE glossary table should show approval actions in the status column for permitted reviewers",
@@ -235,7 +520,7 @@
             "Test GlossaryTermTab component",
             "CDE glossary table"
           ],
-          "duration": 32,
+          "duration": 38,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component CDE glossary table should not show or submit approval actions without task permission",
@@ -251,7 +536,7 @@
             "Test GlossaryTermTab component",
             "CDE glossary table"
           ],
-          "duration": 30,
+          "duration": 35,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component CDE glossary table should request extended fields only for the CDE table",
@@ -267,7 +552,7 @@
             "Test GlossaryTermTab component",
             "CDE glossary table"
           ],
-          "duration": 29,
+          "duration": 35,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component CDE glossary table should render CDE table when glossary name is Từ điển dữ liệu dùng chung",
@@ -283,7 +568,7 @@
             "Test GlossaryTermTab component",
             "Search Functionality"
           ],
-          "duration": 30,
+          "duration": 29,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Search Functionality should render search input field",
@@ -299,7 +584,7 @@
             "Test GlossaryTermTab component",
             "Search Functionality"
           ],
-          "duration": 44,
+          "duration": 45,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Search Functionality should filter terms based on search input",
@@ -315,7 +600,7 @@
             "Test GlossaryTermTab component",
             "Status Filtering"
           ],
-          "duration": 35,
+          "duration": 33,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Status Filtering should render status dropdown button",
@@ -347,7 +632,7 @@
             "Test GlossaryTermTab component",
             "Expand/Collapse Functionality"
           ],
-          "duration": 25,
+          "duration": 26,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should render expand/collapse all button",
@@ -363,7 +648,7 @@
             "Test GlossaryTermTab component",
             "Expand/Collapse Functionality"
           ],
-          "duration": 24,
+          "duration": 28,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should show expand icon for terms with children",
@@ -379,7 +664,7 @@
             "Test GlossaryTermTab component",
             "Expand/Collapse Functionality"
           ],
-          "duration": 38,
+          "duration": 39,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should call fetchChildTerms when expanding a term with children",
@@ -395,7 +680,7 @@
             "Test GlossaryTermTab component",
             "Actions"
           ],
-          "duration": 29,
+          "duration": 31,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Actions should call onEditGlossaryTerm when edit button is clicked",
@@ -411,7 +696,7 @@
             "Test GlossaryTermTab component",
             "Actions"
           ],
-          "duration": 29,
+          "duration": 33,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Actions should call onAddGlossaryTerm when add term button is clicked",
@@ -427,7 +712,7 @@
             "Test GlossaryTermTab component",
             "Permissions"
           ],
-          "duration": 26,
+          "duration": 28,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Permissions should not show action buttons when user lacks create permissions",
@@ -443,7 +728,7 @@
             "Test GlossaryTermTab component",
             "Loading States"
           ],
-          "duration": 43,
+          "duration": 22,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Loading States should show loader when table is loading",
@@ -459,7 +744,7 @@
             "Test GlossaryTermTab component",
             "Infinite Scroll"
           ],
-          "duration": 24,
+          "duration": 36,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Infinite Scroll should call fetchAllTerms when scroll trigger is in view",
@@ -475,7 +760,7 @@
             "Test GlossaryTermTab component",
             "Drag and Drop"
           ],
-          "duration": 36,
+          "duration": 28,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Drag and Drop should render drag icons for each row",
@@ -507,7 +792,7 @@
             "Test GlossaryTermTab component",
             "Glossary vs Glossary Term Context"
           ],
-          "duration": 21,
+          "duration": 23,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Glossary vs Glossary Term Context should behave differently when isGlossary is true",
@@ -523,7 +808,7 @@
             "Test GlossaryTermTab component",
             "Glossary vs Glossary Term Context"
           ],
-          "duration": 20,
+          "duration": 21,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Glossary vs Glossary Term Context should behave differently when isGlossary is false",
@@ -539,7 +824,7 @@
             "Test GlossaryTermTab component",
             "Error Handling"
           ],
-          "duration": 19,
+          "duration": 22,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Error Handling should handle API errors gracefully when fetching terms",
@@ -571,7 +856,7 @@
             "Test GlossaryTermTab component",
             "Error Handling"
           ],
-          "duration": 18,
+          "duration": 20,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Error Handling should handle errors when fetching feeds",
@@ -603,7 +888,7 @@
             "Test GlossaryTermTab component",
             "Advanced Pagination"
           ],
-          "duration": 38,
+          "duration": 28,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Advanced Pagination should not refetch when the component rerenders with the same page",
@@ -619,7 +904,7 @@
             "Test GlossaryTermTab component",
             "Advanced Pagination"
           ],
-          "duration": 33,
+          "duration": 46,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Advanced Pagination should show the supported page sizes",
@@ -635,7 +920,7 @@
             "Test GlossaryTermTab component",
             "Advanced Pagination"
           ],
-          "duration": 19,
+          "duration": 21,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Advanced Pagination should stop loading when no more terms are available",
@@ -651,7 +936,7 @@
             "Test GlossaryTermTab component",
             "Status Dropdown Advanced Functionality"
           ],
-          "duration": 48,
+          "duration": 57,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Status Dropdown Advanced Functionality should handle status selection save action",
@@ -667,7 +952,7 @@
             "Test GlossaryTermTab component",
             "Status Dropdown Advanced Functionality"
           ],
-          "duration": 49,
+          "duration": 48,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Status Dropdown Advanced Functionality should handle status selection cancel action",
@@ -683,7 +968,7 @@
             "Test GlossaryTermTab component",
             "Table Column Rendering"
           ],
-          "duration": 27,
+          "duration": 24,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Column Rendering should render synonyms column correctly",
@@ -699,7 +984,7 @@
             "Test GlossaryTermTab component",
             "Table Column Rendering"
           ],
-          "duration": 24,
+          "duration": 25,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Column Rendering should render terms with icons when available",
@@ -715,7 +1000,7 @@
             "Test GlossaryTermTab component",
             "Table Column Rendering"
           ],
-          "duration": 21,
+          "duration": 24,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Table Column Rendering should render empty description placeholder",
@@ -731,7 +1016,7 @@
             "Test GlossaryTermTab component",
             "Expand All Functionality"
           ],
-          "duration": 58,
+          "duration": 56,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Expand All Functionality should expand all button exists and is clickable",
@@ -795,7 +1080,7 @@
             "Test GlossaryTermTab component",
             "Edge Cases"
           ],
-          "duration": 21,
+          "duration": 23,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryTermTab component Edge Cases should handle terms with undefined description gracefully",
@@ -837,6 +1122,177 @@
           "retryReasons": [],
           "status": "passed",
           "title": "should handle non-array glossaryChildTerms gracefully"
+        }
+      ],
+      "console": [
+        {
+          "message": "Warning: Table: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.\n    at Table (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Table.js:141:25)\n    at div\n    at div\n    at Spin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/spin/index.js:63:25)\n    at SpinFC (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/spin/index.js:123:34)\n    at div\n    at InternalTable (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/table/Table.js:39:34)\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/col.js:35:33\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/row.js:59:34\n    at Table (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/Table/Table.tsx:59:5)\n    at div\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/col.js:35:33\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/row.js:59:34\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at validateFunctionComponentInDev (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20230:9)\n    at mountIndeterminateComponent (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20189:7)\n    at beginWork (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:344:35\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:337:100)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:26:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at performSyncWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26115:3)\n    at flushSyncCallbacks (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:12042:22)\n    at commitRootImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26998:3)\n    at commitRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26721:5)\n    at finishConcurrentRender (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26020:9)\n    at performConcurrentWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25848:7)\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:344:35\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:337:100)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:37:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at performSyncWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26115:3)\n    at flushSyncCallbacks (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:12042:22)\n    at commitRootImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26998:3)\n    at commitRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26721:5)\n    at finishConcurrentRender (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26020:9)\n    at performConcurrentWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25848:7)\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:344:35\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:337:100)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:437:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:354:9\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:357:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:359:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:363:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:437:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:354:9\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:357:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:359:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:363:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:437:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:354:9\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:357:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:359:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: An update to GlossaryTermTab inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at warnIfUpdatesNotWrappedWithActDEV (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27628:9)\n    at scheduleUpdateOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25547:5)\n    at dispatchSetState (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16708:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:363:7\n    at Generator.next (<anonymous>)\n    at fulfilled (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:115:62)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: Each child in a list should have a unique \"key\" prop.\n\nCheck the render method of `Body`. See https://reactjs.org/link/warning-keys for more information.\n    at BodyRow (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Body/BodyRow.js:37:25)\n    at Body (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Body/index.js:41:19)\n    at table\n    at div\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Table.js:126:23\n    at div\n    at DomWrapper (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-resize-observer/lib/SingleObserver/DomWrapper.js:21:34)\n    at SingleObserver (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-resize-observer/lib/SingleObserver/index.js:18:24)\n    at ResizeObserver (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-resize-observer/lib/index.js:24:24)\n    at Table (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Table.js:141:25)\n    at div\n    at div\n    at Spin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/spin/index.js:63:25)\n    at SpinFC (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/spin/index.js:123:34)\n    at div\n    at InternalTable (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/table/Table.js:39:34)\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/col.js:35:33\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/row.js:59:34\n    at Table (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/common/Table/Table.tsx:59:5)\n    at div\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/col.js:35:33\n    at div\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/grid/row.js:59:34\n    at GlossaryTermTab (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.component.tsx:128:28)\n    at basenameProp (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:421:13)\n    at basename (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:225:3)",
+          "origin": "    at printWarning (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:209:30)\n    at error (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:183:7)\n    at validateExplicitKey (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2191:5)\n    at validateChildKeys (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2217:9)\n    at Object.createElementWithValidation [as createElement] (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2372:7)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Body/index.js:123:31\n    at mountMemo (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16406:19)\n    at Object.useMemo (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:16851:16)\n    at Object.useMemo (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:1650:21)\n    at Body (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-table/lib/Body/index.js:81:24)\n    at renderWithHooks (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at updateFunctionComponent (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19617:20)\n    at updateSimpleMemoComponent (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19454:10)\n    at updateMemoComponent (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19303:14)\n    at beginWork (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21712:16)\n    at beginWork$1 (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:1412:13\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx:1402:82)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    },
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 2,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1787556782593,
+        "runtime": 1239,
+        "slow": false,
+        "start": 1787556781354
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 41,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary renders every mapped CDE column as an independent field",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 12,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "renders every mapped CDE column as an independent field"
+        },
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 8,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary uses English labels and passes localized custom property names",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 7,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "uses English labels and passes localized custom property names"
+        }
+      ],
+      "console": [
+        {
+          "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:26:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:134:11)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+          "origin": "    at warn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:37:5)\n    at logV6DeprecationWarnings (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:134:11)\n    at Promise.then.completed (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
         }
       ],
       "displayName": {

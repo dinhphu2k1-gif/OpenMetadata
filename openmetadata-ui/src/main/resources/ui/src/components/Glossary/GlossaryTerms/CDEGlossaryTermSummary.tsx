@@ -153,7 +153,7 @@ const CDEOwnersField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   ) : undefined;
 
   return (
-    <CDEField label="Chủ sở hữu dữ liệu">
+    <CDEField label={t('cde.data-owner')}>
       <div className="cde-owner-field-value">
         {renderCDEOwners(glossaryTerm.owners as EntityReference[])}
         {editAction}
@@ -201,7 +201,7 @@ const CDEDomainsField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   ) : undefined;
 
   return (
-    <CDEField label="Nhóm theo nghiệp vụ">
+    <CDEField label={t('cde.business-group')}>
       <div className="cde-domain-field-value">
         {renderCDEReferences(glossaryTerm.domains as EntityReference[])}
         {editAction}
@@ -214,6 +214,7 @@ const CDEGlossaryTermSummary = ({
   glossaryTerm,
 }: CDEGlossaryTermSummaryProps) => {
   const { permissions, isVersionView } = useGenericContext<GlossaryTerm>();
+  const { t } = useTranslation();
   const canEditCustomFields =
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
@@ -230,23 +231,23 @@ const CDEGlossaryTermSummary = ({
         <CDETagField
           classification={CDE_TAG_CLASSIFICATIONS.dataSource}
           glossaryTerm={glossaryTerm}
-          label="Nguồn dữ liệu"
+          label={t('cde.data-source')}
         />
         <CDEOwnersField glossaryTerm={glossaryTerm} />
         <CDETagField
           classification={CDE_TAG_CLASSIFICATIONS.dataClassification}
           glossaryTerm={glossaryTerm}
-          label="Phân loại dữ liệu"
+          label={t('cde.data-classification')}
         />
         <CDETagField
           classification={CDE_TAG_CLASSIFICATIONS.qtdlReview}
           glossaryTerm={glossaryTerm}
-          label="QTDL rà soát"
+          label={t('cde.data-governance-review')}
         />
         <CDETagField
           classification={CDE_TAG_CLASSIFICATIONS.personalData}
           glossaryTerm={glossaryTerm}
-          label="Dữ liệu cá nhân"
+          label={t('cde.personal-data')}
         />
         <Col className="cde-custom-properties" span={24}>
           <CustomPropertyTable<EntityType.GLOSSARY_TERM>
@@ -255,6 +256,13 @@ const CDEGlossaryTermSummary = ({
             hasPermission={canViewCustomFields}
             isVersionView={isVersionView}
             layout="two-column-last-full-width"
+            propertyDisplayNames={{
+              ghi_chu: t('cde.notes'),
+              quy_dinh_chat_luong_du_lieu: t('cde.data-quality-rules'),
+              van_ban_quy_dinh_lien_quan: t(
+                'cde.related-regulatory-documents'
+              ),
+            }}
           />
         </Col>
       </Row>

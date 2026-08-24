@@ -19,6 +19,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -28,6 +29,10 @@ import {
 } from '../../../mocks/Glossary.mock';
 import { findExpandableKeysForArray } from '../../../utils/GlossaryUtils';
 import GlossaryTermTab from './GlossaryTermTab.component';
+import {
+  getCDEGlossaryTableColumns,
+  renderCDEQualityRule,
+} from './CDEGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 const mockOnAddGlossaryTerm = jest.fn();
@@ -39,6 +44,46 @@ const mockGetGlossaryTermChildrenLazy = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
 const mockGetAllFeeds = jest.fn();
 const mockUpdateTask = jest.fn();
+
+const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
+  en: {
+    'cde.term-code': 'Term Code',
+    'cde.business-group': 'Business Group',
+    'cde.business-term-name': 'Business Term Name',
+    'cde.data-source': 'Data Source',
+    'cde.business-meaning': 'Business Meaning',
+    'cde.data-owner': 'Data Owner',
+    'cde.data-classification': 'Data Classification',
+    'cde.data-governance-review': 'Data Governance Review',
+    'cde.personal-data': 'Personal Data',
+    'cde.related-regulatory-documents': 'Related Regulatory Documents',
+    'cde.data-quality-rules': 'Data Quality Rules',
+    'cde.notes': 'Notes',
+    'label.yes': 'Yes',
+    'label.no': 'No',
+    'label.view-more': 'View more',
+  },
+  vi: {
+    'cde.term-code': 'Mã thuật ngữ',
+    'cde.business-group': 'Nhóm theo nghiệp vụ',
+    'cde.business-term-name': 'Tên thuật ngữ nghiệp vụ',
+    'cde.data-source': 'Nguồn dữ liệu',
+    'cde.business-meaning': 'Ý nghĩa nghiệp vụ',
+    'cde.data-owner': 'Chủ sở hữu dữ liệu',
+    'cde.data-classification': 'Phân loại dữ liệu',
+    'cde.data-governance-review': 'QTDL rà soát',
+    'cde.personal-data': 'Dữ liệu cá nhân',
+    'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
+    'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
+    'cde.notes': 'Ghi chú',
+    'label.yes': 'Có',
+    'label.no': 'Không',
+    'label.view-more': 'Xem thêm',
+  },
+};
+
+const getCDETranslation = (locale: keyof typeof cdeTranslations) =>
+  (key: string) => cdeTranslations[locale][key] ?? key;
 
 jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryTerms: jest
@@ -497,6 +542,10 @@ describe('Test GlossaryTermTab component', () => {
     } as unknown as ModifiedGlossaryTerm;
 
     beforeEach(() => {
+      (useTranslation as jest.Mock).mockReturnValue({
+        t: getCDETranslation('vi'),
+        i18n: { language: 'vi-VN', dir: jest.fn().mockReturnValue('ltr') },
+      });
       Object.assign(mockUseGlossaryStore, {
         activeGlossary: {
           id: 'data-dictionary-id',
@@ -510,6 +559,36 @@ describe('Test GlossaryTermTab component', () => {
       mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
         data: [cdeTerm],
         paging: { after: null },
+      });
+    });
+
+    it('uses English CDE column labels and value text', () => {
+      const t = getCDETranslation('en');
+      const columns = getCDEGlossaryTableColumns({
+        handleLoadMoreChildren: jest.fn(),
+        loadingChildren: {},
+        t,
+      });
+
+      expect(columns.slice(0, 12).map((column) => column.title)).toEqual([
+        'Term Code',
+        'Business Group',
+        'Business Term Name',
+        'Data Source',
+        'Business Meaning',
+        'Data Owner',
+        'Data Classification',
+        'Data Governance Review',
+        'Personal Data',
+        'Related Regulatory Documents',
+        'Data Quality Rules',
+        'Notes',
+      ]);
+      expect(renderCDEQualityRule(true, t)).toMatchObject({
+        props: { children: 'Yes' },
+      });
+      expect(renderCDEQualityRule(false, t)).toMatchObject({
+        props: { children: 'No' },
       });
     });
 

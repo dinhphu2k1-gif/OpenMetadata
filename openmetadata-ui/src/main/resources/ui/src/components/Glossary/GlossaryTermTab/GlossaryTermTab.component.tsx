@@ -904,6 +904,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         ...getCDEGlossaryTableColumns({
           handleLoadMoreChildren,
           loadingChildren,
+          t,
         }),
         ...governanceColumns,
       ];
@@ -919,6 +920,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     handleLoadMoreChildren,
     isCDEGlossary,
     loadingChildren,
+    t,
   ]);
 
   const handleCheckboxChange = useCallback(

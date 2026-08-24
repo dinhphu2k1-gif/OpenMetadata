@@ -1,4 +1,18 @@
 {
+  "cde": {
+    "term-code": "Mã thuật ngữ",
+    "business-group": "Nhóm theo nghiệp vụ",
+    "business-term-name": "Tên thuật ngữ nghiệp vụ",
+    "data-source": "Nguồn dữ liệu",
+    "business-meaning": "Ý nghĩa nghiệp vụ",
+    "data-owner": "Chủ sở hữu dữ liệu",
+    "data-classification": "Phân loại dữ liệu",
+    "data-governance-review": "QTDL rà soát",
+    "personal-data": "Dữ liệu cá nhân",
+    "related-regulatory-documents": "Văn bản quy định liên quan",
+    "data-quality-rules": "Quy định về chất lượng dữ liệu",
+    "notes": "Ghi chú"
+  },
   "label": {
     "-with-colon": "{{text}}:",
     "1-day": "1 ngày",

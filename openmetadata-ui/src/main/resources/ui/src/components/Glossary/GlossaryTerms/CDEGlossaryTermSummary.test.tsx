@@ -13,8 +13,10 @@
  */
 
 import { render, screen } from '@testing-library/react';
+import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import { CustomPropertyTable } from '../../common/CustomPropertyTable/CustomPropertyTable';
 import CDEGlossaryTermSummary from './CDEGlossaryTermSummary';
 
 jest.mock('../../common/ProfilePicture/ProfilePicture', () =>
@@ -90,7 +92,44 @@ const glossaryTerm = {
   },
 } as GlossaryTerm;
 
+const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
+  en: {
+    'cde.business-group': 'Business Group',
+    'cde.data-source': 'Data Source',
+    'cde.data-owner': 'Data Owner',
+    'cde.data-classification': 'Data Classification',
+    'cde.data-governance-review': 'Data Governance Review',
+    'cde.personal-data': 'Personal Data',
+    'cde.notes': 'Notes',
+    'cde.data-quality-rules': 'Data Quality Rules',
+    'cde.related-regulatory-documents': 'Related Regulatory Documents',
+  },
+  vi: {
+    'cde.business-group': 'Nhóm theo nghiệp vụ',
+    'cde.data-source': 'Nguồn dữ liệu',
+    'cde.data-owner': 'Chủ sở hữu dữ liệu',
+    'cde.data-classification': 'Phân loại dữ liệu',
+    'cde.data-governance-review': 'QTDL rà soát',
+    'cde.personal-data': 'Dữ liệu cá nhân',
+    'cde.notes': 'Ghi chú',
+    'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
+    'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
+  },
+};
+
+const setCDELocale = (locale: keyof typeof cdeTranslations) => {
+  (useTranslation as jest.Mock).mockReturnValue({
+    t: (key: string) => cdeTranslations[locale][key] ?? key,
+    i18n: { language: locale === 'en' ? 'en-US' : 'vi-VN' },
+  });
+};
+
 describe('CDEGlossaryTermSummary', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setCDELocale('vi');
+  });
+
   it('renders every mapped CDE column as an independent field', () => {
     render(
       <MemoryRouter>
@@ -114,5 +153,33 @@ describe('CDEGlossaryTermSummary', () => {
     expect(screen.getByText('Nội bộ')).toBeInTheDocument();
     expect(screen.getByText('Đã rà soát')).toBeInTheDocument();
     expect(screen.getByText('CustomPropertyTable')).toBeInTheDocument();
+  });
+
+  it('uses English labels and passes localized custom property names', () => {
+    setCDELocale('en');
+
+    render(
+      <MemoryRouter>
+        <CDEGlossaryTermSummary glossaryTerm={glossaryTerm} />
+      </MemoryRouter>
+    );
+
+    [
+      'Business Group',
+      'Data Source',
+      'Data Owner',
+      'Data Classification',
+      'Data Governance Review',
+      'Personal Data',
+    ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+
+    expect((CustomPropertyTable as jest.Mock).mock.calls.at(-1)?.[0])
+      .toMatchObject({
+        propertyDisplayNames: {
+          ghi_chu: 'Notes',
+          quy_dinh_chat_luong_du_lieu: 'Data Quality Rules',
+          van_ban_quy_dinh_lien_quan: 'Related Regulatory Documents',
+        },
+      });
   });
 });

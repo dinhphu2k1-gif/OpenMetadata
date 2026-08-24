@@ -74,6 +74,7 @@ export interface CustomPropertyProps<T extends ExtentionEntitiesKeys> {
   maxDataCap?: number;
   isRenderedInRightPanel?: boolean;
   layout?: 'default' | 'two-column-last-full-width';
+  propertyDisplayNames?: Record<string, string>;
 }
 
 export interface PropertyValueProps {
@@ -83,6 +84,7 @@ export interface PropertyValueProps {
   versionDataKeys?: string[];
   isVersionView?: boolean;
   isRenderedInRightPanel?: boolean;
+  propertyDisplayName?: string;
   onExtensionUpdate: (updatedExtension: Table['extension']) => Promise<void>;
 }
 

@@ -13,6 +13,7 @@
 
 import { Button, Space, Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
+import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
@@ -33,6 +34,7 @@ export type CDEExtension = {
 type CDEGlossaryTableColumnsProps = {
   handleLoadMoreChildren: (record: ModifiedGlossaryTerm) => void;
   loadingChildren: Record<string, boolean>;
+  t: TFunction;
 };
 
 export const CDE_TAG_CLASSIFICATIONS = {
@@ -131,7 +133,10 @@ export const renderCDEMarkdown = (value?: string, className?: string) =>
     NO_DATA_PLACEHOLDER
   );
 
-export const renderCDEQualityRule = (value?: boolean | string | string[]) => {
+export const renderCDEQualityRule = (
+  value: boolean | string | string[] | undefined,
+  t: TFunction
+) => {
   if (
     value === undefined ||
     value === null ||
@@ -153,7 +158,7 @@ export const renderCDEQualityRule = (value?: boolean | string | string[]) => {
       className={`cde-value-pill ${
         hasQualityRule ? 'cde-value-pill-quality' : 'cde-value-pill-neutral'
       }`}>
-      {hasQualityRule ? 'Có' : 'Không'}
+      {hasQualityRule ? t('label.yes') : t('label.no')}
     </Tag>
   );
 };
@@ -161,9 +166,10 @@ export const renderCDEQualityRule = (value?: boolean | string | string[]) => {
 export const getCDEGlossaryTableColumns = ({
   handleLoadMoreChildren,
   loadingChildren,
+  t,
 }: CDEGlossaryTableColumnsProps): ColumnsType<ModifiedGlossaryTerm> => [
   {
-    title: 'Mã thuật ngữ',
+    title: t('cde.term-code'),
     dataIndex: 'name',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NAME,
     fixed: 'left',
@@ -186,7 +192,7 @@ export const getCDEGlossaryTableColumns = ({
             onClick={() =>
               parentRecord && handleLoadMoreChildren(parentRecord)
             }>
-            Xem thêm ({Math.max(totalCount - loadedCount, 0)})
+            {t('label.view-more')} ({Math.max(totalCount - loadedCount, 0)})
           </Button>
         );
       }
@@ -202,7 +208,7 @@ export const getCDEGlossaryTableColumns = ({
     },
   },
   {
-    title: 'Nhóm theo nghiệp vụ',
+    title: t('cde.business-group'),
     dataIndex: 'domains',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DOMAINS,
     fixed: 'left',
@@ -211,7 +217,7 @@ export const getCDEGlossaryTableColumns = ({
       record.isLoadMoreButton ? null : renderCDEReferences(domains),
   },
   {
-    title: 'Tên thuật ngữ nghiệp vụ',
+    title: t('cde.business-term-name'),
     dataIndex: 'displayName',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DISPLAY_NAME,
     fixed: 'left',
@@ -222,7 +228,7 @@ export const getCDEGlossaryTableColumns = ({
         : displayName || record.name || NO_DATA_PLACEHOLDER,
   },
   {
-    title: 'Nguồn dữ liệu',
+    title: t('cde.data-source'),
     dataIndex: 'tags',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DATA_SOURCE,
     width: 170,
@@ -236,7 +242,7 @@ export const getCDEGlossaryTableColumns = ({
           ),
   },
   {
-    title: 'Ý nghĩa nghiệp vụ',
+    title: t('cde.business-meaning'),
     dataIndex: 'description',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
     width: 320,
@@ -244,7 +250,7 @@ export const getCDEGlossaryTableColumns = ({
       record.isLoadMoreButton ? null : renderCDEMarkdown(description),
   },
   {
-    title: 'Chủ sở hữu dữ liệu',
+    title: t('cde.data-owner'),
     dataIndex: 'owners',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.OWNERS,
     width: 240,
@@ -252,7 +258,7 @@ export const getCDEGlossaryTableColumns = ({
       record.isLoadMoreButton ? null : renderCDEOwners(owners),
   },
   {
-    title: 'Phân loại dữ liệu',
+    title: t('cde.data-classification'),
     dataIndex: 'tags',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DATA_CLASSIFICATION,
     width: 170,
@@ -266,7 +272,7 @@ export const getCDEGlossaryTableColumns = ({
           ),
   },
   {
-    title: 'QTDL rà soát',
+    title: t('cde.data-governance-review'),
     dataIndex: 'tags',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.QTDL_REVIEW,
     width: 160,
@@ -280,7 +286,7 @@ export const getCDEGlossaryTableColumns = ({
           ),
   },
   {
-    title: 'Dữ liệu cá nhân',
+    title: t('cde.personal-data'),
     dataIndex: 'tags',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.PERSONAL_DATA,
     width: 170,
@@ -294,7 +300,7 @@ export const getCDEGlossaryTableColumns = ({
           ),
   },
   {
-    title: 'Văn bản quy định liên quan',
+    title: t('cde.related-regulatory-documents'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELATED_REGULATION,
     width: 280,
     render: (_, record) =>
@@ -306,7 +312,7 @@ export const getCDEGlossaryTableColumns = ({
           ),
   },
   {
-    title: 'Quy định về chất lượng dữ liệu',
+    title: t('cde.data-quality-rules'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DATA_QUALITY_RULE,
     width: 210,
     render: (_, record) =>
@@ -314,11 +320,12 @@ export const getCDEGlossaryTableColumns = ({
         ? null
         : renderCDEQualityRule(
             (record.extension as CDEExtension | undefined)
-              ?.quy_dinh_chat_luong_du_lieu
+              ?.quy_dinh_chat_luong_du_lieu,
+            t
           ),
   },
   {
-    title: 'Ghi chú',
+    title: t('cde.notes'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NOTE,
     width: 240,
     render: (_, record) =>

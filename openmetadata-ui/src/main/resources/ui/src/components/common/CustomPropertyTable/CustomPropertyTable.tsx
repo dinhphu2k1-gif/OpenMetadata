@@ -53,6 +53,7 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
   maxDataCap,
   isRenderedInRightPanel = false,
   layout = 'default',
+  propertyDisplayNames,
 }: CustomPropertyProps<T>) => {
   const { t } = useTranslation();
   const {
@@ -265,6 +266,7 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
                 isVersionView={isVersionView}
                 key={record.name}
                 property={record}
+                propertyDisplayName={propertyDisplayNames?.[record.name]}
                 versionDataKeys={extensionObject.addedKeysList}
                 onExtensionUpdate={onExtensionUpdate}
               />
@@ -305,6 +307,7 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
         isRenderedInRightPanel={isRenderedInRightPanel}
         isVersionView={isVersionView}
         property={record}
+        propertyDisplayName={propertyDisplayNames?.[record.name]}
         versionDataKeys={extensionObject.addedKeysList}
         onExtensionUpdate={onExtensionUpdate}
       />
