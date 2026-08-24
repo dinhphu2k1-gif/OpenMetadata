@@ -76,6 +76,11 @@ chmod +x repackage_ui.sh
 > **Script này làm gì?**
 > Script sẽ sao lưu file nén gốc, giải nén `openmetadata-1.13.3.tar.gz`, trích xuất file `.jar`, đè các file từ thư mục `dist` vào trong thư mục `assets` của file `.jar`, và cuối cùng nén toàn bộ lại thành file `.tar.gz` sẵn sàng cho Docker.
 
+> Nếu file `openmetadata-1.13.3.tar.gz` không có sẵn thì ta cần phải download về trước bằng lệnh sau:
+> ```bash
+> curl -L -o openmetadata-dist/target/openmetadata-1.13.3.tar.gz https://github.com/open-metadata/OpenMetadata/releases/download/1.13.3-release/openmetadata-1.13.3.tar.gz
+> ```
+
 ---
 
 ## 🐳 Bước 3: Build Custom Docker Image
