@@ -59,12 +59,17 @@ class TagClassBase {
   public async getTags(
     searchText: string,
     page: number,
-    emptyQueryFilter?: boolean
+    emptyQueryFilter?: boolean,
+    classificationFilter?: string
   ) {
     const encodedValue = getEncodedFqn(escapeESReservedCharacters(searchText));
 
     // Build the queryFilter by merging disabled:false with any existing filters
-    const disabledFilter = getTermQuery({ disabled: 'false' });
+    const requiredTerms: Record<string, string> = { disabled: 'false' };
+    if (classificationFilter) {
+      requiredTerms['classification.name.keyword'] = classificationFilter;
+    }
+    const disabledFilter = getTermQuery(requiredTerms);
 
     let mergedQueryFilter = {};
     if (emptyQueryFilter) {

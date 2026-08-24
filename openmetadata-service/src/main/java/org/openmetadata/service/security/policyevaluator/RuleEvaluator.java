@@ -100,6 +100,64 @@ public class RuleEvaluator {
   }
 
   @Function(
+      name = "isCreator",
+      input = "none",
+      description = "Returns true if the logged in user created/updated the entity or is the owner",
+      examples = {"isCreator()", "!isCreator()"})
+  public boolean isCreator() {
+    if (expressionValidation) {
+      return false;
+    }
+    if (subjectContext == null || resourceContext == null || resourceContext.getEntity() == null) {
+      return false;
+    }
+    String userName = subjectContext.user() != null ? subjectContext.user().getName() : null;
+    if (userName == null) {
+      return false;
+    }
+    EntityInterface entity = resourceContext.getEntity();
+    String updatedBy = entity.getUpdatedBy();
+    if (userName.equals(updatedBy)) {
+      return true;
+    }
+    if (subjectContext.isOwner(resourceContext.getOwners())) {
+      return true;
+    }
+    // If updatedBy was modified by a system bot or workflow, check original creator from version
+    // 0.1
+    if (entity.getId() != null) {
+      try {
+        org.openmetadata.service.jdbi3.EntityRepository repo =
+            Entity.getEntityRepository(entity.getEntityReference().getType());
+        EntityInterface v01 = (EntityInterface) repo.getVersion(entity.getId(), "0.1");
+        if (v01 != null && userName.equals(v01.getUpdatedBy())) {
+          return true;
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return false;
+  }
+
+  @Function(
+      name = "notApproved",
+      input = "none",
+      description =
+          "Returns true if the entity is not in Approved status (e.g. Draft or In Review)",
+      examples = {"notApproved()", "!notApproved()"})
+  public boolean notApproved() {
+    if (expressionValidation) {
+      return false;
+    }
+    if (resourceContext == null || resourceContext.getEntity() == null) {
+      return false;
+    }
+    EntityInterface entity = resourceContext.getEntity();
+    return entity.getEntityStatus() == null
+        || entity.getEntityStatus() != org.openmetadata.schema.type.EntityStatus.APPROVED;
+  }
+
+  @Function(
       name = "hasDomain",
       input = "none",
       description =

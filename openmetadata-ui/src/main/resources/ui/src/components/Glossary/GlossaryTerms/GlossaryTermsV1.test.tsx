@@ -73,6 +73,9 @@ jest.mock('../GlossaryHeader/GlossaryHeader.component', () =>
 jest.mock('../../Customization/GenericTab/GenericTab', () => ({
   GenericTab: jest.fn().mockImplementation(() => <div>GenericTab</div>),
 }));
+jest.mock('./CDEGlossaryTermOverview', () =>
+  jest.fn().mockImplementation(() => <div>CDEGlossaryTermOverview</div>)
+);
 jest.mock('../../OntologyExplorer', () => ({
   OntologyExplorer: jest
     .fn()
@@ -174,6 +177,24 @@ describe('Test Glossary-term component', () => {
       });
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('should replace the standard overview widgets with the CDE overview', async () => {
+    render(
+      <GlossaryTerms
+        {...mockProps}
+        glossaryTerm={{
+          ...mockProps.glossaryTerm,
+          fullyQualifiedName: 'Data Dictionary.CDE1',
+          name: 'CDE1',
+        }}
+      />
+    );
+
+    expect(
+      await screen.findByText('CDEGlossaryTermOverview')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('GenericTab')).not.toBeInTheDocument();
   });
 
   it('Should render GlossaryTermTab component', async () => {

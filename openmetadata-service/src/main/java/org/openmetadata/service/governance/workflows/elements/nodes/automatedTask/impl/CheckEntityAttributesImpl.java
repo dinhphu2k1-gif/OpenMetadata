@@ -49,6 +49,21 @@ public class CheckEntityAttributesImpl implements JavaDelegate {
   private Boolean checkAttributes(
       WorkflowVariableHandler varHandler, MessageParser.EntityLink entityLink, String rules) {
     EntityInterface entity = varHandler.getRelatedEntity(entityLink, "*", Include.ALL);
+    if (entity != null) {
+      try {
+        org.openmetadata.service.jdbi3.EntityRepository repo =
+            org.openmetadata.service.Entity.getEntityRepository(entityLink.getEntityType());
+        if (repo.isSupportsReviewers()
+            && (entity.getReviewers() == null || entity.getReviewers().isEmpty())) {
+          EntityInterface parent = repo.getParentEntity(entity, "reviewers");
+          if (parent != null && parent.getReviewers() != null && !parent.getReviewers().isEmpty()) {
+            entity.setReviewers(parent.getReviewers());
+          }
+        }
+      } catch (Exception e) {
+        LOG.warn("Failed to get parent reviewers in CheckEntityAttributesImpl: {}", e.getMessage());
+      }
+    }
 
     boolean result;
     try {

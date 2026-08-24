@@ -29,7 +29,11 @@ import {
   useGlossaryStore,
 } from '../../../components/Glossary/useGlossary.store';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
-import { PAGE_SIZE_LARGE, ROUTES } from '../../../constants/constants';
+import {
+  PAGE_SIZE_LARGE,
+  pagingObject,
+  ROUTES,
+} from '../../../constants/constants';
 import { GLOSSARIES_DOCS } from '../../../constants/docs.constants';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { observerOptions } from '../../../constants/Mydata.constants';
@@ -46,8 +50,8 @@ import {
 import { Glossary } from '../../../generated/entity/data/glossary';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
+import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
-import { usePaging } from '../../../hooks/paging/usePaging';
 import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
@@ -83,7 +87,8 @@ const GlossaryPage = () => {
     root: document.querySelector('#panel-container'),
     rootMargin: '0px 0px 2px 0px',
   });
-  const { paging, pageSize, handlePagingChange } = usePaging();
+  const [paging, setPaging] = useState<Paging>(pagingObject);
+  const handlePagingChange = setPaging;
 
   const [isRightPanelLoading, setIsRightPanelLoading] = useState(true);
   const [previewAsset, setPreviewAsset] =
@@ -103,8 +108,6 @@ const GlossaryPage = () => {
   );
 
   const isGlossaryActive = useMemo(() => {
-    setIsRightPanelLoading(true);
-
     if (glossaryFqn) {
       return Fqn.split(glossaryFqn).length === 1;
     }
@@ -230,7 +233,7 @@ const GlossaryPage = () => {
     if (paging?.after && isInView && !isMoreGlossaryLoading) {
       fetchNextGlossaryItems(paging.after);
     }
-  }, [paging, isInView, isMoreGlossaryLoading, pageSize]);
+  }, [paging, isInView, isMoreGlossaryLoading]);
 
   const fetchGlossaryTermDetails = useCallback(async () => {
     setIsRightPanelLoading(true);
@@ -502,6 +505,7 @@ const GlossaryPage = () => {
   const resizableLayout = isGlossaryActive ? (
     <ResizableLeftPanels
       showLearningIcon
+      collapsibleFirstPanel
       className="content-height-with-resizable-panel"
       firstPanel={{
         className:

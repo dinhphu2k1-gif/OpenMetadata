@@ -4,7 +4,7 @@
       "name": "Multiple Users or Single Team Ownership",
       "description": "Validates that an entity has either multiple owners or a single team as the owner.",
       "rule": "{\"multipleUsersOrSingleTeamOwnership\":{\"var\":\"owners\"}}",
-      "enabled": true,
+      "enabled": false,
       "provider": "system"
     },
     {

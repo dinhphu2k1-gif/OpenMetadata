@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { FEED_COUNT_INITIAL_DATA } from '../../../constants/entity.constants';
 import { EntityField } from '../../../constants/Feeds.constants';
+import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
 import { EntityTabs, EntityType } from '../../../enums/entity.enum';
 import { SearchIndex } from '../../../enums/search.enum';
 import {
@@ -59,6 +60,7 @@ import { AssetSelectionModal } from '../../DataAssets/AssetsSelectionModal/Asset
 import { EntityDetailsObjectInterface } from '../../Explore/ExplorePage.interface';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
+import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
@@ -174,6 +176,16 @@ const GlossaryTermsV1 = ({
     [permissions]
   );
 
+  const isCDEGlossaryTerm = useMemo(
+    () =>
+      isDataDictionaryGlossary(
+        glossaryTerm.fullyQualifiedName,
+        glossaryTerm.glossary?.name,
+        glossaryTerm.glossary?.displayName
+      ),
+    [glossaryTerm]
+  );
+
   const tabItems = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedPage?.tabs);
 
@@ -197,11 +209,24 @@ const GlossaryTermsV1 = ({
       setPreviewAsset,
     });
 
-    return getDetailsTabWithNewLabel(
+    const detailTabs = getDetailsTabWithNewLabel(
       items,
       customizedPage?.tabs,
       EntityTabs.OVERVIEW,
       isVersionView
+    );
+
+    if (!isCDEGlossaryTerm) {
+      return detailTabs;
+    }
+
+    return detailTabs.map((tab) =>
+      tab.key === EntityTabs.OVERVIEW
+        ? {
+            ...tab,
+            children: <CDEGlossaryTermOverview glossaryTerm={glossaryTerm} />,
+          }
+        : tab
     );
   }, [
     customizedPage?.tabs,
@@ -217,6 +242,7 @@ const GlossaryTermsV1 = ({
     handleAssetSave,
     previewAsset,
     handleAssetClick,
+    isCDEGlossaryTerm,
   ]);
 
   useEffect(() => {
@@ -291,9 +317,12 @@ const GlossaryTermsV1 = ({
             tabBarExtraContent={
               isExpandViewSupported && (
                 <AlignRightIconButton
-                  className={isTabExpanded ? 'rotate-180' : ''}
+                  aria-label={
+                    isTabExpanded ? t('label.expand') : t('label.collapse')
+                  }
+                  className={isTabExpanded ? '' : 'rotate-180'}
                   title={
-                    isTabExpanded ? t('label.collapse') : t('label.expand')
+                    isTabExpanded ? t('label.expand') : t('label.collapse')
                   }
                   onClick={toggleTabExpanded}
                 />

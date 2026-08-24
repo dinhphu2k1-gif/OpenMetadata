@@ -77,6 +77,7 @@ const TagsContainerV2 = ({
   useGenericControls,
   tagNewLook = false,
   multiSelect,
+  classificationFilter,
 }: TagsContainerV2Props) => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -148,12 +149,17 @@ const TagsContainerV2 = ({
   const fetchAPI = useCallback(
     (searchValue: string, page: number) => {
       if (tagType === TagSource.Classification) {
-        return tagClassBase.getTags(searchValue, page);
+        return tagClassBase.getTags(
+          searchValue,
+          page,
+          false,
+          classificationFilter
+        );
       } else {
         return fetchGlossaryList(searchValue, page);
       }
     },
-    [tagType]
+    [tagType, classificationFilter]
   );
 
   const showNoDataPlaceholder = useMemo(

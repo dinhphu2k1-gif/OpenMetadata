@@ -14,6 +14,7 @@
 import i18next, { InitOptions } from 'i18next';
 import { map, upperCase } from 'lodash';
 import enUS from '../../locale/languages/en-us.json';
+import { APPLICATION_BRAND_NAME, rebrandLocaleResources } from '../BrandUtils';
 import { SupportedLocales } from './LocalUtil.interface';
 
 export const languageSelectOptions = map(SupportedLocales, (value, key) => ({
@@ -26,7 +27,7 @@ export const getInitOptions = (): InitOptions => {
   return {
     supportedLngs: Object.values(SupportedLocales),
     resources: {
-      'en-US': { translation: enUS },
+      'en-US': { translation: rebrandLocaleResources(enUS) },
     },
     fallbackLng: ['en-US'],
     detection: {
@@ -35,7 +36,7 @@ export const getInitOptions = (): InitOptions => {
     },
     interpolation: {
       escapeValue: false,
-      defaultVariables: { brandName: process.env.BRAND_NAME ?? 'OpenMetadata' },
+      defaultVariables: { brandName: APPLICATION_BRAND_NAME },
     },
     missingKeyHandler: (_lngs, _ns, key) =>
       // eslint-disable-next-line no-console

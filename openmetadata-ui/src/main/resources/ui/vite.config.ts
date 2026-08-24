@@ -216,6 +216,8 @@ export default defineConfig(({ mode }) => {
         '@azure/msal-react',
         'codemirror',
         '@deuex-solutions/react-tour',
+        '@dagrejs/dagre',
+        '@dagrejs/graphlib',
       ],
       esbuildOptions: {
         target: 'esnext',
@@ -226,9 +228,7 @@ export default defineConfig(({ mode }) => {
 
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
-      'process.env.BRAND_NAME': JSON.stringify(
-        env.BRAND_NAME || 'OpenMetadata'
-      ),
+      'process.env.BRAND_NAME': JSON.stringify('Agribank'),
       global: 'globalThis',
     },
   };

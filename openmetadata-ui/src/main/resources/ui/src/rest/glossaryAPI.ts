@@ -393,7 +393,9 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   parentFQN: string,
   pageSize = 50,
   after?: string,
-  entityStatus?: string
+  entityStatus?: string,
+  fields?: string[],
+  before?: string
 ) => {
   const apiUrl = `/glossaryTerms`;
 
@@ -402,13 +404,14 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   >(apiUrl, {
     params: {
       directChildrenOf: parentFQN,
-      fields: [
+      fields: fields ?? [
         TabSpecificField.CHILDREN_COUNT,
         TabSpecificField.OWNERS,
         TabSpecificField.REVIEWERS,
       ],
       limit: pageSize,
       after: after,
+      before,
       entityStatus,
     },
   });
@@ -419,7 +422,8 @@ export const getFirstLevelGlossaryTermsPaginated = async (
 export const getGlossaryTermChildrenLazy = async (
   parentFQN: string,
   limit = 50,
-  after?: string
+  after?: string,
+  fields?: string[]
 ) => {
   const apiUrl = `/glossaryTerms`;
 
@@ -428,7 +432,7 @@ export const getGlossaryTermChildrenLazy = async (
   >(apiUrl, {
     params: {
       directChildrenOf: parentFQN,
-      fields: [
+      fields: fields ?? [
         TabSpecificField.CHILDREN_COUNT,
         TabSpecificField.OWNERS,
         TabSpecificField.REVIEWERS,

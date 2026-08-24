@@ -1682,6 +1682,18 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   public static void checkUpdatedByReviewer(GlossaryTerm term, String updatedBy) {
     // Only list of allowed reviewers can change the status from DRAFT to APPROVED
     List<EntityReference> reviewers = term.getReviewers();
+    if (nullOrEmpty(reviewers)) {
+      try {
+        GlossaryTermRepository repo =
+            (GlossaryTermRepository) Entity.getEntityRepository(GLOSSARY_TERM);
+        EntityInterface parent = repo.getParentEntity(term, "reviewers");
+        if (parent != null && !nullOrEmpty(parent.getReviewers())) {
+          reviewers = parent.getReviewers();
+        }
+      } catch (Exception e) {
+        LOG.warn("Failed to inherit reviewers for glossary term: {}", e.getMessage());
+      }
+    }
     if (!nullOrEmpty(reviewers)) {
       // Updating user must be one of the reviewers
       boolean isReviewer =

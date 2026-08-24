@@ -57,7 +57,9 @@ const GlossaryDetails = ({
   const { onAddGlossaryTerm } = useGlossaryStore();
 
   // Since we are rendering this component for all customized tabs we need tab ID to get layout form store
-  const { tab: activeTab } = useRequiredParams<{ tab: EntityTabs }>();
+  const { tab: activeTab = EntityTabs.TERMS } = useRequiredParams<{
+    tab: EntityTabs;
+  }>();
   const { customizedPage, isLoading } = useCustomPages(PageType.Glossary);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
@@ -197,8 +199,11 @@ const GlossaryDetails = ({
           tabBarExtraContent={
             isExpandViewSupported && (
               <AlignRightIconButton
-                className={isTabExpanded ? 'rotate-180' : ''}
-                title={isTabExpanded ? t('label.collapse') : t('label.expand')}
+                aria-label={
+                  isTabExpanded ? t('label.expand') : t('label.collapse')
+                }
+                className={isTabExpanded ? '' : 'rotate-180'}
+                title={isTabExpanded ? t('label.expand') : t('label.collapse')}
                 onClick={toggleTabExpanded}
               />
             )

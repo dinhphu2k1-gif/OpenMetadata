@@ -786,7 +786,15 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
         path={ROUTES.ADD_METRIC}
       />
       <Route
-        element={<ColumnBulkOperationsPage />}
+        element={
+          <AdminProtectedRoute
+            hasPermission={userPermissions.hasViewPermissions(
+              ResourceEntity.TABLE,
+              permissions
+            )}>
+            <ColumnBulkOperationsPage />
+          </AdminProtectedRoute>
+        }
         path={ROUTES.COLUMN_BULK_OPERATIONS}
       />
 

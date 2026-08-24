@@ -349,4 +349,17 @@ describe('Test GlossaryComponent page', () => {
       expect.anything()
     );
   });
+
+  it('should enable the left-panel collapse control for all glossaries', async () => {
+    await act(async () => {
+      render(<GlossaryPage {...mockProps} />);
+    });
+
+    expect(ResizableLeftPanels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collapsibleFirstPanel: true,
+      }),
+      expect.anything()
+    );
+  });
 });

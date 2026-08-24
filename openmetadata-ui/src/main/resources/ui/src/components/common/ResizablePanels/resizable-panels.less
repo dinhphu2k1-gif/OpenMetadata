@@ -200,6 +200,33 @@ h2.rotated-header {
   }
 }
 
+.left-panel-collapse-toggle,
+.left-panel-expand-toggle {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: @white;
+}
+
+.left-panel-expand-toggle {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 101;
+}
+
+.left-panel-splitter.left-panel-is-collapsed {
+  position: relative;
+  width: 40px !important;
+  min-width: 40px;
+  margin-right: 0;
+  cursor: default !important;
+}
+
 .right-panel-splitter {
   margin-left: @reflex-card-gap;
 

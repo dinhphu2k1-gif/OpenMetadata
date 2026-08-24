@@ -227,6 +227,8 @@ public final class ExpressionValidator {
           Arrays.asList(
               "noOwner",
               "isOwner",
+              "isCreator",
+              "notApproved",
               "hasDomain",
               "matchAllTags",
               "matchAnyTag",
@@ -255,6 +257,8 @@ public final class ExpressionValidator {
           Arrays.asList(
               "noOwner",
               "isOwner",
+              "isCreator",
+              "notApproved",
               "isReviewer",
               "isTaskFiler",
               "isTaskAssignee",

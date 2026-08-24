@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 
-import { graphlib, layout } from '@dagrejs/dagre';
+import * as dagreModule from '@dagrejs/dagre';
+import dagreDefault from '@dagrejs/dagre';
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk.bundled.js';
 import type { Edge, Node, ReactFlowInstance } from 'reactflow';
 import { Position } from 'reactflow';
@@ -28,6 +29,26 @@ import { useLineageStore } from '../hooks/useLineageStore';
 import { getNodeHeight } from './CanvasUtils';
 import { getEntityChildrenAndLabel } from './EntityLineageNodeUtils';
 import ELKLayout from './Lineage/Layout/ELKUtil/ELKUtil';
+
+// Robust resolution for @dagrejs/dagre CommonJS bundle across Vite dev server, prod build, and Jest
+const getDagre = () => {
+  const d = (dagreDefault as any) || (dagreModule as any);
+
+  return d?.default && (d.default.graphlib || d.default.layout) ? d.default : d;
+};
+
+const getGraphClass = () => {
+  const d = getDagre();
+  const graphlibObj = d?.graphlib?.default || d?.graphlib || d;
+
+  return graphlibObj?.Graph || d?.Graph;
+};
+
+const getLayoutFn = () => {
+  const d = getDagre();
+
+  return d?.layout?.default || d?.layout || d;
+};
 
 interface LayoutedElements {
   node: Array<Node & { nodeHeight: number }>;
@@ -55,7 +76,8 @@ export const getLayoutedElements = (
   direction = EntityLineageDirection.LEFT_RIGHT,
   isExpanded = true
 ): LayoutedElements => {
-  const Graph = graphlib.Graph;
+  const Graph = getGraphClass();
+  const layout = getLayoutFn();
   const dagreGraph = new Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
   dagreGraph.setGraph({ rankdir: direction });

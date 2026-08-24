@@ -8329,6 +8329,19 @@ public abstract class EntityRepository<T extends EntityInterface> {
     public static void checkUpdatedByReviewer(EntityInterface entity, String updatedBy) {
       // Only list of allowed reviewers can change the status from DRAFT to APPROVED
       List<EntityReference> reviewers = entity.getReviewers();
+      if (nullOrEmpty(reviewers)) {
+        try {
+          EntityRepository repo = Entity.getEntityRepository(entity.getEntityReference().getType());
+          if (repo.isSupportsReviewers()) {
+            EntityInterface parent = repo.getParentEntity(entity, "reviewers");
+            if (parent != null && !nullOrEmpty(parent.getReviewers())) {
+              reviewers = parent.getReviewers();
+            }
+          }
+        } catch (Exception e) {
+          LOG.warn("Failed to inherit reviewers in checkUpdatedByReviewer: {}", e.getMessage());
+        }
+      }
       if (!nullOrEmpty(reviewers)) {
         // Updating user must be one of the reviewers
         boolean isReviewer =

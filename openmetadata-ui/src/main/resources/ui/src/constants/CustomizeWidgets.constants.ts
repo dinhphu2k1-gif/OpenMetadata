@@ -152,7 +152,7 @@ export const DUMMY_OWNER_LIST = [
 export const WIDGET_CUSTOM_PROPERTIES = [
   {
     name: 'name',
-    value: 'OpenMetadata',
+    value: 'Agribank',
     propertyType: {
       name: 'string',
       type: 'string',
@@ -163,7 +163,7 @@ export const WIDGET_CUSTOM_PROPERTIES = [
   },
   {
     name: 'email',
-    value: 'customproperty@OpenMetadata.com',
+    value: 'customproperty@agribank.com.vn',
     propertyType: {
       name: 'string',
       type: 'string',

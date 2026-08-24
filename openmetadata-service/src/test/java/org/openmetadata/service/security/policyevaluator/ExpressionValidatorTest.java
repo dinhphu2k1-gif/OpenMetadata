@@ -29,6 +29,9 @@ public class ExpressionValidatorTest {
       "noOwner()",
       "!noOwner()",
       "isOwner()",
+      "isCreator()",
+      "notApproved()",
+      "isCreator() && notApproved()",
       "hasDomain()",
       "matchAllTags('PersonalData.Personal', 'Tier.Tier1')",
       "matchAnyTag('PersonalData.Personal', 'Tier.Tier1')",
@@ -67,6 +70,10 @@ public class ExpressionValidatorTest {
       "!noOwner",
       "isReviewer",
       "!isReviewer",
+      "isCreator",
+      "!isCreator",
+      "notApproved",
+      "!notApproved",
       "matchTeam",
       "hasDomain",
       "noOwner() || isOwner",
@@ -552,6 +559,9 @@ public class ExpressionValidatorTest {
     // These functions should be present (from RuleEvaluator)
     assertTrue(allowedFunctions.contains("noOwner"), "noOwner should be an allowed function");
     assertTrue(allowedFunctions.contains("isOwner"), "isOwner should be an allowed function");
+    assertTrue(allowedFunctions.contains("isCreator"), "isCreator should be an allowed function");
+    assertTrue(
+        allowedFunctions.contains("notApproved"), "notApproved should be an allowed function");
     assertTrue(allowedFunctions.contains("hasDomain"), "hasDomain should be an allowed function");
     assertTrue(
         allowedFunctions.contains("matchAllTags"), "matchAllTags should be an allowed function");

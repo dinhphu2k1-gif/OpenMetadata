@@ -13,16 +13,25 @@
 import { useMemo } from 'react';
 import { useApplicationsProvider } from '../components/Settings/Applications/ApplicationsProvider/ApplicationsProvider';
 import { filterHiddenNavigationItems } from '../utils/CustomizaNavigation/CustomizeNavigation';
+import {
+  hideBasicConsumerMarketplaceOverview,
+  isBasicConsumerPersona,
+} from '../utils/Persona/BasicConsumerNavigation';
+import { useApplicationStore } from './useApplicationStore';
 import { useCustomPages } from './useCustomPages';
 
 export const useSidebarItems = () => {
   const { navigation } = useCustomPages('Navigation');
   const { plugins = [] } = useApplicationsProvider();
+  const { selectedPersona } = useApplicationStore();
 
-  const sideBarItems = useMemo(
-    () => filterHiddenNavigationItems(navigation, plugins),
-    [navigation, plugins]
-  );
+  const sideBarItems = useMemo(() => {
+    const items = filterHiddenNavigationItems(navigation, plugins);
+
+    return isBasicConsumerPersona(selectedPersona)
+      ? hideBasicConsumerMarketplaceOverview(items)
+      : items;
+  }, [navigation, plugins, selectedPersona]);
 
   return sideBarItems;
 };

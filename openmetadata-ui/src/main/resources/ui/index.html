@@ -20,9 +20,11 @@
       name="msapplication-TileImage"
       content="${basePath}favicons/ms-icon-144x144.png" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="OpenMetadata Application" />
-    <meta property="og:title" content="OpenMetadata" />
-    <meta property="og:description" content="OpenMetadata Application" />
+    <meta name="description" content="Agribank Data Governance Application" />
+    <meta property="og:title" content="Agribank Data Governance" />
+    <meta
+      property="og:description"
+      content="Agribank Data Governance Application" />
     <meta
       property="og:image"
       content="${basePath}favicons/android-icon-192x192.png" />
@@ -102,35 +104,11 @@
       });
     </script>
 
-    <script id="google-tag-manager" nonce="${cspNonce}">
-      let isSandbox = location.host === 'sandbox.open-metadata.org';
-
-      if (isSandbox) {
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          'gtm.start': new Date().getTime(),
-          event: 'gtm.js',
-        });
-
-        const gtmScript = document.createElement('script');
-        gtmScript.async = true;
-        gtmScript.setAttribute('nonce', '${cspNonce}');
-        gtmScript.src =
-          'https://www.googletagmanager.com/gtm.js?id=GTM-554C968W';
-        document.head.appendChild(gtmScript);
-      }
-    </script>
-
-    <title>OpenMetadata</title>
+    <title>Agribank Data Governance</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <img
-      referrerpolicy="no-referrer-when-downgrade"
-      src="https://static.scarf.sh/a.png?x-pxid=9744b844-501a-4ca1-ad54-29b13e6b4642"
-      style="display: none"
-      alt="" />
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

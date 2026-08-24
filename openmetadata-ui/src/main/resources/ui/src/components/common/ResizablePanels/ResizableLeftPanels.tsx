@@ -10,15 +10,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Button, Card, Tooltip, Typography } from 'antd';
+import { Card, Typography } from 'antd';
 import classNames from 'classnames';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReflexContainer, ReflexElement, ReflexSplitter } from 'react-reflex';
-import { ReactComponent as SidebarCollapsedIcon } from '../../../assets/svg/ic-sidebar-collapsed.svg';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
 import DocumentTitle from '../DocumentTitle/DocumentTitle';
+import { AlignRightIconButton } from '../IconButtons/EditIconButton';
 import './resizable-panels.less';
 import { ResizablePanelsLeftProps } from './ResizablePanels.interface';
 
@@ -29,6 +29,7 @@ const ResizableLeftPanels: React.FC<ResizablePanelsLeftProps> = ({
   secondPanel,
   pageTitle,
   hideFirstPanel = false,
+  collapsibleFirstPanel = false,
   showLearningIcon = false,
   learningPageId = LEARNING_PAGE_IDS.EXPLORE,
   learningTitle,
@@ -39,6 +40,12 @@ const ResizableLeftPanels: React.FC<ResizablePanelsLeftProps> = ({
   const handleCollapse = () => {
     setIsLeftPanelCollapsed((prev) => !prev);
   };
+
+  useEffect(() => {
+    if (!collapsibleFirstPanel) {
+      setIsLeftPanelCollapsed(false);
+    }
+  }, [collapsibleFirstPanel]);
 
   return (
     <>
@@ -60,6 +67,18 @@ const ResizableLeftPanels: React.FC<ResizablePanelsLeftProps> = ({
           {!hideFirstPanel && (
             <Card
               className="reflex-card card-padding-0"
+              extra={
+                collapsibleFirstPanel &&
+                !isLeftPanelCollapsed && (
+                  <AlignRightIconButton
+                    aria-label={t('label.collapse')}
+                    className="left-panel-collapse-toggle rotate-180"
+                    data-testid="left-panel-toggle"
+                    title={t('label.collapse')}
+                    onClick={handleCollapse}
+                  />
+                )
+              }
               title={
                 firstPanel.title && (
                   <div className="d-flex align-items-center gap-2">
@@ -83,22 +102,17 @@ const ResizableLeftPanels: React.FC<ResizablePanelsLeftProps> = ({
         <ReflexSplitter
           className={classNames('splitter left-panel-splitter', {
             hidden: hideFirstPanel,
+            'left-panel-is-collapsed': isLeftPanelCollapsed,
           })}>
-          {isLeftPanelCollapsed && (
-            <Card className="reflex-card card-padding-0">
-              <Tooltip placement="right" title={t('label.expand')}>
-                <Button
-                  className="mr-2"
-                  data-testid="sidebar-toggle"
-                  icon={<SidebarCollapsedIcon height={20} width={20} />}
-                  size="middle"
-                  type="text"
-                  onClick={handleCollapse}
-                />
-              </Tooltip>
-            </Card>
-          )}
-          {!isLeftPanelCollapsed && (
+          {isLeftPanelCollapsed ? (
+            <AlignRightIconButton
+              aria-label={t('label.expand')}
+              className="left-panel-expand-toggle"
+              data-testid="left-panel-toggle"
+              title={t('label.expand')}
+              onClick={handleCollapse}
+            />
+          ) : (
             <div
               className={classNames({
                 'panel-grabber-vertical': orientation === 'vertical',

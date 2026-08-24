@@ -5,7 +5,9 @@ Tài liệu này cung cấp các bước chuẩn xác nhất dành cho **Fronten
 ---
 
 ## 🛠 Yêu Cầu Hệ Thống (Pre-requisites)
+
 Đảm bảo bạn đã cài đặt các công cụ sau:
+
 - **Docker & Docker Compose**: Để chạy Backend API, Database, và Search Engine.
 - **Node.js** (Khuyến nghị phiên bản 18.x trở lên).
 - **Yarn**: Trình quản lý package (OpenMetadata sử dụng Yarn thay vì npm).
@@ -20,12 +22,12 @@ Mở Terminal tại thư mục gốc của project (ví dụ: `/home/dinhphu/Doc
 
 ```bash
 # Khởi động PostgreSQL, OpenSearch và OpenMetadata API Server dưới chế độ chạy ngầm (-d)
-docker compose -f docker/docker-compose-quickstart/docker-compose.prod.yml up -d postgresql opensearch openmetadata-server
+docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml up -d postgresql opensearch openmetadata-server
 ```
 
 > [!TIP]
-> **Tối ưu hóa RAM:**
-> File `docker-compose.prod.yml` hiện tại đã được tinh chỉnh để giới hạn RAM của OpenSearch và Server xuống mức 512MB mỗi service, giúp máy tính của bạn không bị "đơ" khi code.
+> **Tối ưu hóa RAM tối đa (Chỉ ~650MB tổng cộng):**
+> File `docker-compose.dev.yml` đã được tinh chỉnh ép RAM xuống mức siêu nhẹ: OpenSearch tối đa 256MB (`-Xms128m -Xmx256m`) và OpenMetadata Server tối đa 384MB (`-Xms128m -Xmx384m`), giúp máy cá nhân chạy cực mượt mà không lo bị tràn bộ nhớ.
 
 > [!NOTE]
 > Lần khởi động đầu tiên có thể mất từ 1-3 phút để Database được khởi tạo xong. Bạn có thể dùng lệnh `docker ps` để kiểm tra trạng thái các container (cột Status hiện `Up`).
@@ -60,8 +62,9 @@ Sau khi chạy xong, Vite sẽ thông báo địa chỉ truy cập (thường l�
 
 1. **Tắt Frontend:** Ở cửa sổ terminal đang chạy `yarn start`, bấm `Ctrl + C`.
 2. **Tắt Backend:** Mở terminal ở thư mục gốc project và chạy:
+
 ```bash
-docker compose -f docker/docker-compose-quickstart/docker-compose-postgres.yml down
+docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml down
 ```
 
 ---
@@ -70,7 +73,7 @@ docker compose -f docker/docker-compose-quickstart/docker-compose-postgres.yml d
 
 > [!WARNING]
 > **Lỗi: "Network Error" hoặc "Cannot connect to server" trên giao diện**
-> 
+>
 > *Nguyên nhân:* Backend Server chưa chạy lên kịp, hoặc đang bị lỗi.
 > *Cách xử lý:*
 > Chạy lệnh `docker logs -f openmetadata_server` để xem chi tiết lỗi của server. Hãy đảm bảo terminal báo "Started OpenMetadataApplication" trước khi bạn sử dụng giao diện.
@@ -78,4 +81,4 @@ docker compose -f docker/docker-compose-quickstart/docker-compose-postgres.yml d
 > [!IMPORTANT]
 > **Lỗi: Thiếu dữ liệu mẫu trên UI**
 >
-> Vì chúng ta không chạy container `ingestion` để tối ưu tải, nên nếu database của bạn hoàn toàn trống, giao diện sẽ không có dữ liệu mẫu. Nếu bạn thật sự cần nạp dữ liệu mẫu ban đầu, hãy chạy lệnh gốc một lần duy nhất: `docker compose -f docker/docker-compose-quickstart/docker-compose-postgres.yml up -d`. Sau khi dữ liệu mẫu nạp xong, hãy `down` và bật lại bằng "chế độ siêu nhẹ" ở Bước 1.
+> Vì chúng ta không chạy container `ingestion` để tối ưu tải, nên nếu database của bạn hoàn toàn trống, giao diện sẽ không có dữ liệu mẫu. Nếu bạn thật sự cần nạp dữ liệu mẫu ban đầu, hãy chạy lệnh gốc một lần duy nhất: `docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml up -d`. Sau khi dữ liệu mẫu nạp xong, hãy `down` và bật lại bằng "chế độ siêu nhẹ" ở Bước 1.

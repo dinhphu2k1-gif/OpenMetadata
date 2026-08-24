@@ -119,7 +119,7 @@ const ServiceDocPanel: FC<ServiceDocPanelProp> = ({
       setMarkdownContent(
         response.replaceAll(
           'OpenMetadata',
-          process.env.BRAND_NAME ?? 'OpenMetadata'
+          process.env.BRAND_NAME ?? 'Agribank'
         )
       );
     } catch {

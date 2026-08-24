@@ -10,11 +10,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { HELP_ITEMS } from '../constants/Navbar.constants';
+import { HELP_ITEMS, HELP_ITEMS_ENUM } from '../constants/Navbar.constants';
 
 class NavbarUtilClassBase {
   public getHelpItems() {
-    return HELP_ITEMS;
+    // Keep only the internal API reference. Upstream tours, documentation,
+    // community support, and release links are not part of the Agribank UI.
+    return HELP_ITEMS.filter((item) => item.key === HELP_ITEMS_ENUM.API);
   }
 }
 

@@ -88,6 +88,13 @@ jest.mock('../../Customization/GenericTab/GenericTab', () => ({
   GenericTab: jest.fn().mockImplementation(() => <div>GenericTab</div>),
 }));
 
+jest.mock('../../../utils/CustomizePage/CustomizePageEntityTabUtils', () => ({
+  ...jest.requireActual(
+    '../../../utils/CustomizePage/CustomizePageEntityTabUtils'
+  ),
+  checkIfExpandViewSupported: jest.fn().mockReturnValue(true),
+}));
+
 describe('Test Glossary-details component', () => {
   it('Should render Glossary-details component', async () => {
     await act(async () => {
@@ -100,5 +107,20 @@ describe('Test Glossary-details component', () => {
     expect(headerComponent).toBeInTheDocument();
     expect(glossaryDetails).toBeInTheDocument();
     expect(await screen.findByText('GenericTab')).toBeInTheDocument();
+  });
+
+  it('should show the action opposite to the glossary information state', async () => {
+    const { rerender } = render(<GlossaryDetails {...mockProps} />);
+    const collapseButton = await screen.findByTestId('tab-expand-button');
+
+    expect(collapseButton).toHaveAttribute('aria-label', 'label.collapse');
+    expect(collapseButton).toHaveClass('rotate-180');
+
+    rerender(<GlossaryDetails {...mockProps} isTabExpanded />);
+
+    const expandButton = await screen.findByTestId('tab-expand-button');
+
+    expect(expandButton).toHaveAttribute('aria-label', 'label.expand');
+    expect(expandButton).not.toHaveClass('rotate-180');
   });
 });

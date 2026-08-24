@@ -12,10 +12,9 @@
  */
 import { isArray, isEmpty, isNil, isString } from 'lodash';
 import qs, { ParsedQs } from 'qs';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLocationSearch } from './LocationSearch/useLocationSearch';
-import useCustomLocation from './useCustomLocation/useCustomLocation';
 
 type FilterState = Record<
   string,
@@ -23,11 +22,10 @@ type FilterState = Record<
 >;
 
 export const useTableFilters = <T extends FilterState>(initialFilters: T) => {
-  const location = useCustomLocation();
   const navigate = useNavigate();
   const searchQuery = useLocationSearch<ParsedQs>();
 
-  const parseFiltersFromUrl = (): T => {
+  const parseFiltersFromUrl = useCallback((): T => {
     const parsedFilters = { ...initialFilters };
 
     for (const key of Object.keys(initialFilters)) {
@@ -53,51 +51,57 @@ export const useTableFilters = <T extends FilterState>(initialFilters: T) => {
     }
 
     return parsedFilters;
-  };
+  }, [searchQuery, initialFilters]);
 
   // Update URL with the filters applied for the table as query parameters.
-  const updateUrlWithFilters = (updatedFilters: FilterState) => {
-    const currentQueryParams = qs.parse(globalThis.location.search, {
-      ignoreQueryPrefix: true,
-    });
+  const updateUrlWithFilters = useCallback(
+    (updatedFilters: FilterState) => {
+      const currentQueryParams = qs.parse(globalThis.location.search, {
+        ignoreQueryPrefix: true,
+      });
 
-    // Merge the existing query params with the updated filters
-    const mergedQueryParams = {
-      ...currentQueryParams,
-      ...updatedFilters,
-    };
+      // Merge the existing query params with the updated filters
+      const mergedQueryParams = {
+        ...currentQueryParams,
+        ...updatedFilters,
+      };
 
-    for (const key of Object.keys(mergedQueryParams)) {
-      const value = mergedQueryParams[key];
+      for (const key of Object.keys(mergedQueryParams)) {
+        const value = mergedQueryParams[key];
 
-      if (isNil(value) || (isArray(value) && isEmpty(value))) {
-        delete mergedQueryParams[key];
+        if (isNil(value) || (isArray(value) && isEmpty(value))) {
+          delete mergedQueryParams[key];
+        }
+        // Remove the array to string conversion to preserve array format
+        // The qs.stringify function will handle arrays properly
       }
-      // Remove the array to string conversion to preserve array format
-      // The qs.stringify function will handle arrays properly
-    }
-    navigate(
-      {
-        search: qs.stringify(mergedQueryParams, {
-          addQueryPrefix: true,
-          arrayFormat: 'brackets', // This will format arrays as key[0]=value&key[1]=value
-        }),
-      },
-      {
-        replace: true,
-      }
-    );
-  };
+      navigate(
+        {
+          search: qs.stringify(mergedQueryParams, {
+            addQueryPrefix: true,
+            arrayFormat: 'brackets', // This will format arrays as key[0]=value&key[1]=value
+          }),
+        },
+        {
+          replace: true,
+        }
+      );
+    },
+    [navigate]
+  );
 
   const filters = useMemo(
     () => parseFiltersFromUrl(),
-    [location.search, initialFilters]
+    [parseFiltersFromUrl]
   );
 
   // Update multiple filters at a time
-  const setFilters = (newFilters: FilterState) => {
-    updateUrlWithFilters(newFilters);
-  };
+  const setFilters = useCallback(
+    (newFilters: FilterState) => {
+      updateUrlWithFilters(newFilters);
+    },
+    [updateUrlWithFilters]
+  );
 
   return { filters, setFilters };
 };

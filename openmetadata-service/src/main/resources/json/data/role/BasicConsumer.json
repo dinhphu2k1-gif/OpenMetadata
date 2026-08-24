@@ -1,0 +1,13 @@
+{
+  "name": "BasicConsumer",
+  "displayName": "Basic Consumer",
+  "description": "Enterprise-wide standard user role with access restricted to glossaries.",
+  "allowDelete": false,
+  "provider": "system",
+  "policies": [
+    {
+      "type": "policy",
+      "name": "BasicConsumerPolicy"
+    }
+  ]
+}

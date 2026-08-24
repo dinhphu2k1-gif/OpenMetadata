@@ -1,0 +1,850 @@
+{
+  "numFailedTestSuites": 0,
+  "numFailedTests": 0,
+  "numPassedTestSuites": 1,
+  "numPassedTests": 49,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 0,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 49,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1787545814251,
+  "success": true,
+  "testResults": [
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 49,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1787545831169,
+        "runtime": 16204,
+        "slow": true,
+        "start": 1787545814965
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermTab/GlossaryTermTab.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Empty State"
+          ],
+          "duration": 218,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Empty State should show the ErrorPlaceHolder component when no glossary terms are present",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show the ErrorPlaceHolder component when no glossary terms are present"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Empty State"
+          ],
+          "duration": 45,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Empty State should call the onAddGlossaryTerm function when clicking add button in ErrorPlaceHolder",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should call the onAddGlossaryTerm function when clicking add button in ErrorPlaceHolder"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 69,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should render the table when glossary terms are present",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render the table when glossary terms are present"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 52,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should display glossary term names as links",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should display glossary term names as links"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 52,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should render description column with rich text preview",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render description column with rich text preview"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 63,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should render status badges for each term",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render status badges for each term"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 44,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should render owner labels",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render owner labels"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 39,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should render action buttons when user has create permissions",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render action buttons when user has create permissions"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Rendering with Data"
+          ],
+          "duration": 48,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Rendering with Data should keep the standard columns for non-CDE glossaries",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should keep the standard columns for non-CDE glossaries"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 70,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table should render the Excel-like CDE columns and values",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 16,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render the Excel-like CDE columns and values"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 78,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table should show approval actions in the status column for permitted reviewers",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show approval actions in the status column for permitted reviewers"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 32,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table should not show or submit approval actions without task permission",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should not show or submit approval actions without task permission"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 30,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table should request extended fields only for the CDE table",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should request extended fields only for the CDE table"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "CDE glossary table"
+          ],
+          "duration": 29,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component CDE glossary table should render CDE table when glossary name is Từ điển dữ liệu dùng chung",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render CDE table when glossary name is Từ điển dữ liệu dùng chung"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Search Functionality"
+          ],
+          "duration": 30,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Search Functionality should render search input field",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render search input field"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Search Functionality"
+          ],
+          "duration": 44,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Search Functionality should filter terms based on search input",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should filter terms based on search input"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Status Filtering"
+          ],
+          "duration": 35,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Status Filtering should render status dropdown button",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render status dropdown button"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Status Filtering"
+          ],
+          "duration": 75,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Status Filtering should open status dropdown when clicked",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should open status dropdown when clicked"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Expand/Collapse Functionality"
+          ],
+          "duration": 25,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should render expand/collapse all button",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render expand/collapse all button"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Expand/Collapse Functionality"
+          ],
+          "duration": 24,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should show expand icon for terms with children",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show expand icon for terms with children"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Expand/Collapse Functionality"
+          ],
+          "duration": 38,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Expand/Collapse Functionality should call fetchChildTerms when expanding a term with children",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should call fetchChildTerms when expanding a term with children"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Actions"
+          ],
+          "duration": 29,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Actions should call onEditGlossaryTerm when edit button is clicked",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should call onEditGlossaryTerm when edit button is clicked"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Actions"
+          ],
+          "duration": 29,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Actions should call onAddGlossaryTerm when add term button is clicked",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should call onAddGlossaryTerm when add term button is clicked"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Permissions"
+          ],
+          "duration": 26,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Permissions should not show action buttons when user lacks create permissions",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should not show action buttons when user lacks create permissions"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Loading States"
+          ],
+          "duration": 43,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Loading States should show loader when table is loading",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show loader when table is loading"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Infinite Scroll"
+          ],
+          "duration": 24,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Infinite Scroll should call fetchAllTerms when scroll trigger is in view",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should call fetchAllTerms when scroll trigger is in view"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Drag and Drop"
+          ],
+          "duration": 36,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Drag and Drop should render drag icons for each row",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render drag icons for each row"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Modal Functionality"
+          ],
+          "duration": 24,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Modal Functionality should not show modal initially",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should not show modal initially"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Glossary vs Glossary Term Context"
+          ],
+          "duration": 21,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Glossary vs Glossary Term Context should behave differently when isGlossary is true",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should behave differently when isGlossary is true"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Glossary vs Glossary Term Context"
+          ],
+          "duration": 20,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Glossary vs Glossary Term Context should behave differently when isGlossary is false",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should behave differently when isGlossary is false"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Error Handling"
+          ],
+          "duration": 19,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Error Handling should handle API errors gracefully when fetching terms",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle API errors gracefully when fetching terms"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Error Handling"
+          ],
+          "duration": 33,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Error Handling should handle errors when fetching child terms",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle errors when fetching child terms"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Error Handling"
+          ],
+          "duration": 18,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Error Handling should handle errors when fetching feeds",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle errors when fetching feeds"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Task Management and Status Actions"
+          ],
+          "duration": 23,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Task Management and Status Actions should render status action buttons for terms in review",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render status action buttons for terms in review"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Advanced Pagination"
+          ],
+          "duration": 38,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Advanced Pagination should not refetch when the component rerenders with the same page",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should not refetch when the component rerenders with the same page"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Advanced Pagination"
+          ],
+          "duration": 33,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Advanced Pagination should show the supported page sizes",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show the supported page sizes"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Advanced Pagination"
+          ],
+          "duration": 19,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Advanced Pagination should stop loading when no more terms are available",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should stop loading when no more terms are available"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Status Dropdown Advanced Functionality"
+          ],
+          "duration": 48,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Status Dropdown Advanced Functionality should handle status selection save action",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle status selection save action"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Status Dropdown Advanced Functionality"
+          ],
+          "duration": 49,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Status Dropdown Advanced Functionality should handle status selection cancel action",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle status selection cancel action"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Column Rendering"
+          ],
+          "duration": 27,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Column Rendering should render synonyms column correctly",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render synonyms column correctly"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Column Rendering"
+          ],
+          "duration": 24,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Column Rendering should render terms with icons when available",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render terms with icons when available"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Table Column Rendering"
+          ],
+          "duration": 21,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Table Column Rendering should render empty description placeholder",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should render empty description placeholder"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Expand All Functionality"
+          ],
+          "duration": 58,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Expand All Functionality should expand all button exists and is clickable",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should expand all button exists and is clickable"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Expand All Functionality"
+          ],
+          "duration": 25,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Expand All Functionality should have expand/collapse button with proper text",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should have expand/collapse button with proper text"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Drag and Drop Modal"
+          ],
+          "duration": 25,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Drag and Drop Modal should show confirmation modal when terms are moved",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should show confirmation modal when terms are moved"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Edge Cases"
+          ],
+          "duration": 29,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Edge Cases should handle terms with missing required fields gracefully",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle terms with missing required fields gracefully"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Edge Cases"
+          ],
+          "duration": 21,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Edge Cases should handle terms with undefined description gracefully",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle terms with undefined description gracefully"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Edge Cases"
+          ],
+          "duration": 24,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Edge Cases should handle terms with null description gracefully",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle terms with null description gracefully"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryTermTab component",
+            "Edge Cases"
+          ],
+          "duration": 19,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryTermTab component Edge Cases should handle non-array glossaryChildTerms gracefully",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "should handle non-array glossaryChildTerms gracefully"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    }
+  ],
+  "wasInterrupted": false
+}

@@ -104,6 +104,8 @@ import org.openmetadata.service.util.UserUtil;
 
 @Slf4j
 public class UserRepository extends EntityRepository<User> {
+  static final String BASIC_CONSUMER_ROLE = "BasicConsumer";
+  static final String BASIC_CONSUMER_PERSONA = "BasicConsumerPersona";
   static final String ROLES_FIELD = "roles";
   static final String TEAMS_FIELD = "teams";
   public static final String AUTH_MECHANISM_FIELD = "authenticationMechanism";
@@ -640,15 +642,77 @@ public class UserRepository extends EntityRepository<User> {
   }
 
   public EntityReference getDefaultPersona(User user) {
-    EntityReference userDefaultPersona =
+    EntityReference explicitDefaultPersona =
         getFromEntityRef(user.getId(), USER, Relationship.DEFAULTS_TO, Entity.PERSONA, false);
-    if (userDefaultPersona != null) {
-      return userDefaultPersona;
-    }
     PersonaRepository personaRepository =
         (PersonaRepository) Entity.getEntityRepository(Entity.PERSONA);
     Persona systemDefault = personaRepository.getSystemDefaultPersona();
-    return systemDefault != null ? systemDefault.getEntityReference() : null;
+    return resolveDefaultPersona(
+        Boolean.TRUE.equals(user.getIsAdmin()),
+        getEffectiveRolesForPersona(user),
+        explicitDefaultPersona,
+        getBasicConsumerPersona(),
+        systemDefault != null ? systemDefault.getEntityReference() : null);
+  }
+
+  private List<EntityReference> getEffectiveRolesForPersona(User user) {
+    List<EntityReference> effectiveRoles =
+        new ArrayList<>(listOrEmpty(user.getRoles() != null ? user.getRoles() : getRoles(user)));
+    effectiveRoles.addAll(
+        listOrEmpty(
+            user.getInheritedRoles() != null ? user.getInheritedRoles() : getInheritedRoles(user)));
+    return effectiveRoles;
+  }
+
+  private EntityReference getBasicConsumerPersona() {
+    try {
+      return Entity.getEntityReferenceByName(Entity.PERSONA, BASIC_CONSUMER_PERSONA, NON_DELETED);
+    } catch (EntityNotFoundException e) {
+      LOG.warn(
+          "Persona {} is not initialized; BasicConsumer users will use the regular default persona",
+          BASIC_CONSUMER_PERSONA);
+      return null;
+    }
+  }
+
+  static EntityReference resolveDefaultPersona(
+      boolean isAdmin,
+      List<EntityReference> effectiveRoles,
+      EntityReference explicitDefaultPersona,
+      EntityReference basicConsumerPersona,
+      EntityReference systemDefaultPersona) {
+    if (isAdmin) {
+      return null;
+    }
+
+    boolean isBasicConsumer =
+        listOrEmpty(effectiveRoles).stream()
+            .anyMatch(
+                role ->
+                    BASIC_CONSUMER_ROLE.equalsIgnoreCase(role.getName())
+                        || BASIC_CONSUMER_ROLE.equalsIgnoreCase(role.getFullyQualifiedName()));
+    if (isBasicConsumer) {
+      if (basicConsumerPersona != null) {
+        return basicConsumerPersona;
+      }
+      if (explicitDefaultPersona != null
+          && (BASIC_CONSUMER_PERSONA.equalsIgnoreCase(explicitDefaultPersona.getName())
+              || BASIC_CONSUMER_PERSONA.equalsIgnoreCase(
+                  explicitDefaultPersona.getFullyQualifiedName()))) {
+        return explicitDefaultPersona;
+      }
+    }
+
+    // Ignore stale assignments created by the former post-deployment script after a user moves
+    // out of BasicConsumer. Explicit assignments to any other persona remain user-controlled.
+    if (explicitDefaultPersona != null
+        && (BASIC_CONSUMER_PERSONA.equalsIgnoreCase(explicitDefaultPersona.getName())
+            || BASIC_CONSUMER_PERSONA.equalsIgnoreCase(
+                explicitDefaultPersona.getFullyQualifiedName()))) {
+      explicitDefaultPersona = null;
+    }
+
+    return explicitDefaultPersona != null ? explicitDefaultPersona : systemDefaultPersona;
   }
 
   private List<EntityReference> getInheritedPersonas(User user) {
@@ -1030,9 +1094,21 @@ public class UserRepository extends EntityRepository<User> {
       userToDefaultPersona.put(userId, personaRef);
     }
 
+    PersonaRepository personaRepository =
+        (PersonaRepository) Entity.getEntityRepository(Entity.PERSONA);
+    Persona systemDefault = personaRepository.getSystemDefaultPersona();
+    EntityReference systemDefaultRef =
+        systemDefault != null ? systemDefault.getEntityReference() : null;
+    EntityReference basicConsumerPersona = getBasicConsumerPersona();
+
     for (User user : users) {
-      EntityReference defaultPersonaRef = userToDefaultPersona.get(user.getId());
-      user.setDefaultPersona(defaultPersonaRef);
+      user.setDefaultPersona(
+          resolveDefaultPersona(
+              Boolean.TRUE.equals(user.getIsAdmin()),
+              getEffectiveRolesForPersona(user),
+              userToDefaultPersona.get(user.getId()),
+              basicConsumerPersona,
+              systemDefaultRef));
     }
   }
 

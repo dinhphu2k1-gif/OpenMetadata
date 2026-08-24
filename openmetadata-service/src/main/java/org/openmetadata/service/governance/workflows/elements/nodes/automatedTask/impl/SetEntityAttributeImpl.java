@@ -59,6 +59,9 @@ public class SetEntityAttributeImpl implements JavaDelegate {
           Optional.ofNullable(updatedByNamespace)
               .map(ns -> (String) varHandler.getNamespacedVariable(ns, UPDATED_BY_VARIABLE))
               .orElse(null);
+      if (actualUser == null && entity != null && entity.getUpdatedBy() != null) {
+        actualUser = entity.getUpdatedBy();
+      }
 
       // Apply the field change using shared utility with bot impersonation
       // Note: fieldValue can be null to clear/remove a field value

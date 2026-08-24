@@ -1,0 +1,6 @@
+{
+  "name": "BasicConsumerPersona",
+  "displayName": "Basic Consumer Persona",
+  "description": "Restricted navigation persona automatically selected for BasicConsumer users",
+  "default": false
+}

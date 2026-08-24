@@ -1,6 +1,6 @@
 {
-  "short_name": "catalog",
-  "name": "OpenMetadata Application",
+  "short_name": "Agribank",
+  "name": "Agribank Data Governance",
   "icons": [
     {
       "src": "./favicon.png",

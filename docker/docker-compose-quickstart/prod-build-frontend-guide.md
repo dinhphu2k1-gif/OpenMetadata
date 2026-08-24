@@ -1,6 +1,36 @@
+Op
+
 # 🚀 Hướng Dẫn Build & Chạy Môi Trường Production (Frontend) Cho OpenMetadata
 
 Tài liệu này cung cấp quy trình chuẩn để build giao diện Frontend (React/Vite) mà bạn đã tùy chỉnh, sau đó đóng gói thành một Docker Image hoàn chỉnh để chạy trên môi trường Production.
+
+---
+
+## ⚡ Cách Nhanh Nhất: Chạy 1 Lệnh Duy Nhất (All-in-One Script)
+
+Nếu bạn muốn thực hiện toàn bộ quy trình 4 bước tự động chỉ với 1 lần bấm, hãy mở Terminal tại thư mục gốc của project và chạy:
+
+```bash
+chmod +x build-prod-frontend.sh
+./build-prod-frontend.sh
+```
+
+> [!TIP]
+> **Các tùy chọn bổ sung:**
+>
+> - `./build-prod-frontend.sh --skip-install` : Bỏ qua bước `yarn install` (chạy cực nhanh nếu không thêm package mới).
+> - `./build-prod-frontend.sh --skip-start` : Chỉ build và đóng gói image, không tự khởi động lại Docker.
+> - `./build-prod-frontend.sh --no-cache` : Build Docker image không dùng cache.
+
+---
+
+## 🛑 Bước 0: Dừng Services Để Giải Phóng Tài Nguyên (RAM & CPU)
+
+Trước khi tiến hành build Frontend và Docker Image, bạn nên tắt các container đang chạy để tránh tràn RAM/CPU và giúp quá trình build nhanh hơn:
+
+```bash
+docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml down
+```
 
 ---
 
@@ -14,7 +44,7 @@ Mở Terminal tại thư mục gốc của project, sau đó di chuyển vào th
 cd openmetadata-ui/src/main/resources/ui/
 
 # 1. Cài đặt các thư viện phụ thuộc (chỉ cần nếu có thay đổi trong package.json)
-yarn install
+yarn install --ignore-engines
 
 # 2. Tiến hành build code giao diện
 yarn build
@@ -60,23 +90,24 @@ docker build -f docker/development/Dockerfile -t openmetadata/server:custom-1.13
 
 > [!TIP]
 > - `docker/development/Dockerfile`: File Docker này được cấu hình riêng để đọc file `.tar.gz` từ thư mục local thay vì tải từ Github về.
-> - `-t openmetadata/server:custom-1.13.3`: Gắn tag này để khớp với `docker-compose.prod.yml` mà bạn đang dùng.
+> - `-t openmetadata/server:custom-1.13.3`: Gắn tag này để khớp với `docker-compose.dev.yml` mà bạn đang dùng.
 
 ---
 
-## 🚀 Bước 4: Khởi Động Production Server
+## 🚀 Bước 4: Khởi Động dev Server
 
 Cuối cùng, hệ thống đã sẵn sàng với Image `custom-1.13.3`. Hãy khởi động lại toàn bộ service:
 
 ```bash
 # Nếu hệ thống đang chạy, hãy down trước
-docker compose -f docker/docker-compose-quickstart/docker-compose.prod.yml down
+docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml down
 
 # Khởi động lại ở chế độ ngầm (Daemon)
-docker compose -f docker/docker-compose-quickstart/docker-compose.prod.yml up -d
+docker compose -f docker/docker-compose-quickstart/docker-compose.dev.yml up -d
 ```
 
 > [!IMPORTANT]
 > **Kiểm Tra Trạng Thái:**
+>
 > - Xem logs khởi động để đảm bảo Server lên thành công: `docker logs -f openmetadata_server`
 > - Khi hệ thống báo *Started OpenMetadataApplication*, hãy truy cập vào domain (ví dụ: `http://metadata.agribank.com.vn`) để xem thành quả Frontend tùy chỉnh của bạn!

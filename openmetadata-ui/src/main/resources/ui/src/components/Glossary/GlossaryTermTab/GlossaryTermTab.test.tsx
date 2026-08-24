@@ -20,6 +20,8 @@ import {
 } from '@testing-library/react';
 import { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import {
   mockedGlossaryTerms,
   MOCK_PERMISSIONS,
@@ -36,6 +38,7 @@ const mockGetFirstLevelGlossaryTermsPaginated = jest.fn();
 const mockGetGlossaryTermChildrenLazy = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
 const mockGetAllFeeds = jest.fn();
+const mockUpdateTask = jest.fn();
 
 jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryTerms: jest
@@ -59,6 +62,9 @@ jest.mock('../../../rest/feedsAPI', () => ({
   getAllFeeds: jest
     .fn()
     .mockImplementation((...args) => mockGetAllFeeds(...args)),
+  updateTask: jest
+    .fn()
+    .mockImplementation((...args) => mockUpdateTask(...args)),
 }));
 
 jest.mock('../../common/RichTextEditor/RichTextEditorPreviewNew', () =>
@@ -96,9 +102,24 @@ jest.mock('../../../utils/GlossaryUtils', () => ({
     reviewers: 180,
     actions: 100,
   }),
-  permissionForApproveOrReject: jest
-    .fn()
-    .mockReturnValue({ permission: false, taskId: '' }),
+  permissionForApproveOrReject: jest.fn((record, currentUser, threads) => {
+    const entityLink = `<#E::glossaryTerm::${record.fullyQualifiedName}>`;
+    const taskThread = threads[entityLink]?.[0];
+    const isAssignee = taskThread?.task?.assignees?.some(
+      (assignee: { id: string }) => assignee.id === currentUser.id
+    );
+
+    return {
+      permission: Boolean(isAssignee),
+      taskId: taskThread?.task?.id ?? '',
+    };
+  }),
+}));
+
+jest.mock('../../../hooks/useApplicationStore', () => ({
+  useApplicationStore: jest.fn().mockReturnValue({
+    currentUser: { id: 'reviewer-id', name: 'reviewer' },
+  }),
 }));
 
 jest.mock('../../../utils/EntityStatusUtils', () => ({
@@ -137,6 +158,14 @@ jest.mock('../../common/Loader/Loader', () =>
 jest.mock('../../common/OwnerLabel/OwnerLabel.component', () => ({
   OwnerLabel: jest.fn().mockImplementation(() => <div>OwnerLabel</div>),
 }));
+
+jest.mock('../../common/ProfilePicture/ProfilePicture', () =>
+  jest
+    .fn()
+    .mockImplementation(({ name }) => (
+      <span data-testid={`profile-picture-${name}`}>Avatar</span>
+    ))
+);
 
 jest.mock('../../../utils/TableColumn.util', () => ({
   ownerTableObject: jest.fn().mockReturnValue([
@@ -222,6 +251,7 @@ global.MutationObserver = jest.fn().mockImplementation(() => ({
 describe('Test GlossaryTermTab component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdateTask.mockResolvedValue({});
     mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
       data: mockedGlossaryTerms,
       paging: { after: null },
@@ -373,6 +403,286 @@ describe('Test GlossaryTermTab component', () => {
         const editButtons = screen.getAllByTestId('edit-button');
 
         expect(editButtons).toHaveLength(2);
+      });
+    });
+
+    it('should keep the standard columns for non-CDE glossaries', async () => {
+      render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Mã thuật ngữ')).not.toBeInTheDocument();
+        expect(
+          screen.queryByText('Nhóm theo nghiệp vụ')
+        ).not.toBeInTheDocument();
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.any(Number),
+          undefined,
+          expect.any(String),
+          undefined,
+          undefined
+        );
+        expect(screen.getByTestId('glossary-terms-table')).not.toHaveClass(
+          'cde-glossary-terms-table'
+        );
+      });
+    });
+  });
+
+  describe('CDE glossary table', () => {
+    const cdeTerm = {
+      ...mockedGlossaryTerms[0],
+      name: 'CDE102',
+      displayName: 'Nợ gốc theo tài khoản vay (CBAL)',
+      fullyQualifiedName: 'Data Dictionary.CDE102',
+      domains: [
+        {
+          id: 'domain-id',
+          type: 'domain',
+          name: 'TinDung',
+          displayName: 'Tín dụng',
+        },
+      ],
+      owners: [
+        {
+          id: 'credit-team-id',
+          type: 'team',
+          name: 'BanTinDung',
+          displayName: 'Ban Tín dụng',
+        },
+        {
+          id: 'data-center-id',
+          type: 'team',
+          name: 'TrungTamDuLieu',
+          displayName: 'Trung tâm Dữ liệu',
+        },
+      ],
+      tags: [
+        {
+          tagFQN: 'Nguon_du_lieu.IPCAS',
+          displayName: 'IPCAS',
+          source: 'Classification',
+          labelType: 'Manual',
+          state: 'Confirmed',
+        },
+        {
+          tagFQN: 'Phan_loai_du_lieu.Bi_mat',
+          displayName: 'Bí mật',
+          source: 'Classification',
+          labelType: 'Manual',
+          state: 'Confirmed',
+        },
+        {
+          tagFQN: 'QTDL_ra_soat.Noi_bo',
+          displayName: 'Nội bộ',
+          source: 'Classification',
+          labelType: 'Manual',
+          state: 'Confirmed',
+        },
+        {
+          tagFQN: 'Du_lieu_ca_nhan.Nhay_cam',
+          displayName: 'Nhạy cảm',
+          source: 'Classification',
+          labelType: 'Manual',
+          state: 'Confirmed',
+        },
+      ],
+      extension: {
+        van_ban_quy_dinh_lien_quan: 'Quyết định 123/QĐ-NHNo',
+        quy_dinh_chat_luong_du_lieu: true,
+        ghi_chu: 'Rà soát định kỳ hằng quý',
+      },
+    } as unknown as ModifiedGlossaryTerm;
+
+    beforeEach(() => {
+      Object.assign(mockUseGlossaryStore, {
+        activeGlossary: {
+          id: 'data-dictionary-id',
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+          fullyQualifiedName: 'Data Dictionary',
+          description: 'Từ điển dữ liệu dùng chung',
+        },
+        glossaryChildTerms: [cdeTerm],
+      });
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [cdeTerm],
+        paging: { after: null },
+      });
+    });
+
+    it('should render the Excel-like CDE columns and values', async () => {
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Mã thuật ngữ')).toBeInTheDocument();
+        expect(screen.getByText('Nhóm theo nghiệp vụ')).toBeInTheDocument();
+        expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument();
+        expect(screen.getAllByText('label.status')).not.toHaveLength(0);
+        expect(
+          screen.getByText('Quy định về chất lượng dữ liệu')
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('cde-code-CDE102')).toBeInTheDocument();
+        expect(screen.getByText('Tín dụng')).toBeInTheDocument();
+        expect(screen.getByText('IPCAS')).toBeInTheDocument();
+        expect(screen.getByText('Bí mật')).toBeInTheDocument();
+        expect(screen.getByText('Nhạy cảm')).toBeInTheDocument();
+        expect(screen.getByText('Ban Tín dụng')).toBeInTheDocument();
+        expect(screen.getByText('Trung tâm Dữ liệu')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('profile-picture-BanTinDung')
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId('profile-picture-TrungTamDuLieu')
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText('Rà soát định kỳ hằng quý')
+        ).toBeInTheDocument();
+        expect(
+          screen
+            .getByTestId('glossary-terms-table')
+            .closest('.cde-glossary-terms-table')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should show approval actions in the status column for permitted reviewers', async () => {
+      const inReviewTerm = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.InReview,
+        reviewers: [
+          {
+            id: 'reviewer-id',
+            type: 'user',
+            name: 'reviewer',
+          },
+        ],
+      };
+      Object.assign(mockUseGlossaryStore, {
+        glossaryChildTerms: [inReviewTerm],
+      });
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [inReviewTerm],
+        paging: { after: null },
+      });
+      mockGetAllFeeds.mockResolvedValue({
+        data: [
+          {
+            id: 'thread-id',
+            about: '<#E::glossaryTerm::Data Dictionary.CDE102>',
+            task: {
+              id: 'task-id',
+              assignees: [
+                { id: 'reviewer-id', type: 'user', name: 'reviewer' },
+              ],
+            },
+          },
+        ],
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      expect(
+        await screen.findByTestId('CDE102-approve-btn')
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('CDE102-reject-btn')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('CDE102-approve-btn'));
+
+      await waitFor(() => {
+        expect(mockUpdateTask).toHaveBeenCalledWith(
+          'resolve',
+          'task-id',
+          expect.objectContaining({ newValue: 'approved' })
+        );
+      });
+    });
+
+    it('should not show or submit approval actions without task permission', async () => {
+      const inReviewTerm = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.InReview,
+      };
+      Object.assign(mockUseGlossaryStore, {
+        glossaryChildTerms: [inReviewTerm],
+      });
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [inReviewTerm],
+        paging: { after: null },
+      });
+      mockGetAllFeeds.mockResolvedValue({
+        data: [
+          {
+            id: 'thread-id',
+            about: '<#E::glossaryTerm::Data Dictionary.CDE102>',
+            task: {
+              id: 'task-id',
+              assignees: [
+                { id: 'another-user-id', type: 'user', name: 'another-user' },
+              ],
+            },
+          },
+        ],
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      expect(
+        await screen.findByTestId('Data Dictionary.CDE102-status')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('CDE102-approve-btn')
+      ).not.toBeInTheDocument();
+      expect(mockUpdateTask).not.toHaveBeenCalled();
+    });
+
+    it('should request extended fields only for the CDE table', async () => {
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
+          'Data Dictionary',
+          expect.any(Number),
+          undefined,
+          expect.any(String),
+          CDE_GLOSSARY_TERM_FIELDS,
+          undefined
+        );
+      });
+    });
+
+    it('should render CDE table when glossary name is Từ điển dữ liệu dùng chung', async () => {
+      Object.assign(mockUseGlossaryStore, {
+        activeGlossary: {
+          id: 'data-dictionary-vi-id',
+          name: 'Từ điển dữ liệu dùng chung',
+          displayName: 'Từ điển dữ liệu dùng chung',
+          fullyQualifiedName: 'Từ điển dữ liệu dùng chung',
+          description: 'Từ điển dữ liệu dùng chung',
+        },
+        glossaryChildTerms: [cdeTerm],
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(
+          screen
+            .getByTestId('glossary-terms-table')
+            .closest('.cde-glossary-terms-table')
+        ).toBeInTheDocument();
       });
     });
   });
@@ -748,24 +1058,45 @@ describe('Test GlossaryTermTab component', () => {
   });
 
   describe('Advanced Pagination', () => {
-    it('should handle pagination with cursor-based loading', async () => {
-      mockGetFirstLevelGlossaryTermsPaginated
-        .mockResolvedValueOnce({
-          data: mockedGlossaryTerms.slice(0, 1),
-          paging: { after: 'cursor-1' },
-        })
-        .mockResolvedValueOnce({
-          data: mockedGlossaryTerms.slice(1, 2),
-          paging: { after: null },
-        });
+    it('should not refetch when the component rerenders with the same page', async () => {
+      const { rerender } = render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(
+          1
+        );
+      });
+
+      rerender(<GlossaryTermTab isGlossary={false} />);
+
+      expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the supported page sizes', async () => {
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: mockedGlossaryTerms.slice(0, 1),
+        paging: { after: 'cursor-1', total: 100 },
+      });
 
       render(<GlossaryTermTab isGlossary={false} />, {
         wrapper: MemoryRouter,
       });
 
-      await waitFor(() => {
-        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalled();
-      });
+      const pageSizeDropdown = await screen.findByTestId(
+        'page-size-selection-dropdown'
+      );
+
+      expect(pageSizeDropdown).toHaveTextContent('15 / label.page');
+      expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
+        expect.any(String),
+        15,
+        undefined,
+        expect.any(String),
+        undefined,
+        undefined
+      );
     });
 
     it('should stop loading when no more terms are available', async () => {

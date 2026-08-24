@@ -115,6 +115,33 @@ describe('TagClassBase', () => {
       );
     });
 
+    it('limits results to the requested classification when a filter is provided', async () => {
+      (searchQuery as jest.Mock).mockResolvedValue(mockSearchResponse('test'));
+
+      await tagClassBase.getTags('test', 1, false, 'Phan_loai_du_lieu');
+
+      expect(searchQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryFilter: {
+            query: {
+              bool: {
+                must: [
+                  { term: { disabled: 'false' } },
+                  {
+                    term: {
+                      'classification.name.keyword': 'Phan_loai_du_lieu',
+                    },
+                  },
+                ],
+                must_not:
+                  queryFilterToRemoveSomeClassification.query.bool.must_not,
+              },
+            },
+          },
+        })
+      );
+    });
+
     it('returns correct data shape from searchQuery response', async () => {
       (searchQuery as jest.Mock).mockResolvedValue(mockSearchResponse('test'));
 

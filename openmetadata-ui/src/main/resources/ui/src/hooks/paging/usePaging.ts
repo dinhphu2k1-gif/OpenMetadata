@@ -67,12 +67,18 @@ export const usePaging = (defaultPageSize?: number): UsePagingInterface => {
 
   const processedPageSize = defaultPageSize ?? globalPageSize;
 
-  const { filters: urlParams, setFilters: updateUrlParams } = useTableFilters({
-    cursorType: undefined,
-    cursorValue: undefined,
-    currentPage: String(INITIAL_PAGING_VALUE),
-    pageSize: String(processedPageSize),
-  });
+  const initialFilters = useMemo(
+    () => ({
+      cursorType: undefined,
+      cursorValue: undefined,
+      currentPage: String(INITIAL_PAGING_VALUE),
+      pageSize: String(processedPageSize),
+    }),
+    [processedPageSize]
+  );
+
+  const { filters: urlParams, setFilters: updateUrlParams } =
+    useTableFilters(initialFilters);
 
   const initialPageSize = Number(urlParams.pageSize) || processedPageSize;
   const initialCurrentPage =
@@ -112,7 +118,7 @@ export const usePaging = (defaultPageSize?: number): UsePagingInterface => {
         cursorValue: null,
       });
     },
-    [setPageSize, setCurrentPage, updateUrlParams]
+    [setPageSize, setCurrentPage, updateUrlParams, setPreference]
   );
 
   const paginationVisible = useMemo(() => {
@@ -120,18 +126,23 @@ export const usePaging = (defaultPageSize?: number): UsePagingInterface => {
       paging.total > pageSize ||
       pageSize !== (defaultPageSize ?? PAGE_SIZE_BASE)
     );
-  }, [processedPageSize, paging, pageSize]);
+  }, [defaultPageSize, paging.total, pageSize]);
 
   const handlePageChange = useCallback(
     (
       page: number | ((page: number) => number),
       cursorData?: CursorState,
-      pageSize?: number
+      newPageSize?: number
     ) => {
-      setCurrentPage(page);
+      let resolvedPage: number;
+      setCurrentPage((prev) => {
+        resolvedPage = typeof page === 'function' ? page(prev) : page;
+
+        return resolvedPage;
+      });
 
       const urlUpdate: Partial<PagingUrlParams> = {
-        currentPage: String(page),
+        currentPage: String(typeof page === 'function' ? resolvedPage! : page),
       };
 
       if (cursorData) {
@@ -139,14 +150,14 @@ export const usePaging = (defaultPageSize?: number): UsePagingInterface => {
         urlUpdate.cursorValue = cursorData.cursorValue;
       }
 
-      if (pageSize) {
-        urlUpdate.pageSize = pageSize;
-        setPreference({ globalPageSize: pageSize });
+      if (newPageSize) {
+        urlUpdate.pageSize = newPageSize;
+        setPreference({ globalPageSize: newPageSize });
       }
 
       updateUrlParams(urlUpdate as FilterState);
     },
-    [setCurrentPage, updateUrlParams, currentPage]
+    [setCurrentPage, updateUrlParams, setPreference]
   );
 
   return {

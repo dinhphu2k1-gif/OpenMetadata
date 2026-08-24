@@ -52,6 +52,7 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
   hasPermission,
   maxDataCap,
   isRenderedInRightPanel = false,
+  layout = 'default',
 }: CustomPropertyProps<T>) => {
   const { t } = useTranslation();
   const {
@@ -294,26 +295,44 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
     return null;
   }
 
+  const renderProperty = (
+    record: NonNullable<Type['customProperties']>[number]
+  ) => (
+    <div key={record.name} style={{ marginBottom: '16px' }}>
+      <PropertyValue
+        extension={extensionObject.extensionObject}
+        hasEditPermissions={hasEditAccess}
+        isRenderedInRightPanel={isRenderedInRightPanel}
+        isVersionView={isVersionView}
+        property={record}
+        versionDataKeys={extensionObject.addedKeysList}
+        onExtensionUpdate={onExtensionUpdate}
+      />
+    </div>
+  );
+
   return (
     <div className="custom-properties-card">
-      <Row data-testid="custom-properties-card" gutter={[16, 16]}>
-        {dataSourceColumns.map((columns, colIndex) => (
-          <Col key={colIndex} span={8}>
-            {columns.map((record) => (
-              <div key={record.name} style={{ marginBottom: '16px' }}>
-                <PropertyValue
-                  extension={extensionObject.extensionObject}
-                  hasEditPermissions={hasEditAccess}
-                  isRenderedInRightPanel={isRenderedInRightPanel}
-                  isVersionView={isVersionView}
-                  property={record}
-                  versionDataKeys={extensionObject.addedKeysList}
-                  onExtensionUpdate={onExtensionUpdate}
-                />
-              </div>
+      <Row
+        className={classNames({
+          'custom-properties-two-column-last-full-width':
+            layout === 'two-column-last-full-width',
+        })}
+        data-testid="custom-properties-card"
+        gutter={[16, 16]}>
+        {layout === 'two-column-last-full-width'
+          ? dataSource.map((record, index) => (
+              <Col
+                key={record.name}
+                span={index === dataSource.length - 1 ? 24 : 12}>
+                {renderProperty(record)}
+              </Col>
+            ))
+          : dataSourceColumns.map((columns, colIndex) => (
+              <Col key={colIndex} span={8}>
+                {columns.map(renderProperty)}
+              </Col>
             ))}
-          </Col>
-        ))}
       </Row>
     </div>
   );

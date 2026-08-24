@@ -14,16 +14,13 @@ import { Button, Card, Col, Divider, Row, Space, Typography } from 'antd';
 import { split } from 'lodash';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { ReactComponent as CloseIcon } from '../../../assets/svg/close.svg';
-import { ReactComponent as LineArrowRight } from '../../../assets/svg/line-arrow-right.svg';
-import { ROUTES } from '../../../constants/constants';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import brandClassBase from '../../../utils/BrandData/BrandClassBase';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import './welcome-screen.style.less';
 
-const { Paragraph, Text } = Typography;
+const { Paragraph } = Typography;
 
 interface WelcomeScreenProps {
   onClose: () => void;
@@ -84,12 +81,6 @@ const WelcomeScreen = ({ onClose }: WelcomeScreenProps) => {
             <Paragraph className="m-b-0 text-base">
               {t('message.welcome-screen-message')}
             </Paragraph>
-            <Link className="flex items-center gap-2 p-0" to={ROUTES.TOUR}>
-              <Text className="welcome-screen-button-text">
-                {t('message.take-quick-product-tour')}
-              </Text>
-              <LineArrowRight className="text-primary" height={14} width={18} />
-            </Link>
           </Space>
         </Col>
       </Row>

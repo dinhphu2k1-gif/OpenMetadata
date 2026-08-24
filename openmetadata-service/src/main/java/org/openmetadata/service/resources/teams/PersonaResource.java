@@ -75,6 +75,12 @@ public class PersonaResource extends EntityResource<Persona, PersonaRepository> 
   }
 
   @Override
+  public void initialize(org.openmetadata.service.OpenMetadataApplicationConfig config)
+      throws java.io.IOException {
+    repository.initSeedDataFromResources();
+  }
+
+  @Override
   protected List<MetadataOperation> getEntitySpecificOperations() {
     addViewOperation(FIELDS, MetadataOperation.VIEW_BASIC);
     return listOf(MetadataOperation.EDIT_ALL);

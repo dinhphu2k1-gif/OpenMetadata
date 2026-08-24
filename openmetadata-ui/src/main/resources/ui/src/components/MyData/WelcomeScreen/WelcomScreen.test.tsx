@@ -55,5 +55,8 @@ describe('WelcomeScreen', () => {
     const welcomeMessage = getByText('message.welcome-screen-message');
 
     expect(welcomeMessage).toBeInTheDocument();
+    expect(
+      screen.queryByText('message.take-quick-product-tour')
+    ).not.toBeInTheDocument();
   });
 });

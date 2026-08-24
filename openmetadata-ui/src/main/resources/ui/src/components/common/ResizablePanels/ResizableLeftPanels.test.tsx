@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import ResizableLeftPanels from './ResizableLeftPanels';
 jest.mock('../DocumentTitle/DocumentTitle', () =>
   jest.fn().mockImplementation(() => <div>DocumentTitle</div>)
@@ -91,5 +91,41 @@ describe('ResizableLeftPanels', () => {
     );
 
     expect(container.querySelector('.test-class')).toBeInTheDocument();
+  });
+
+  it('should collapse and restore the first panel when enabled', () => {
+    render(
+      <ResizableLeftPanels
+        collapsibleFirstPanel
+        firstPanel={firstPanel}
+        pageTitle="Test Page"
+        secondPanel={secondPanel}
+      />
+    );
+
+    const collapseToggle = screen.getByTestId('left-panel-toggle');
+    const secondPanelContent = screen.getByText('Second Panel');
+
+    expect(collapseToggle).toHaveClass('tab-expand-icon', 'rotate-180');
+
+    fireEvent.click(collapseToggle);
+
+    expect(screen.getByTestId('first-panel')).toHaveClass(
+      'left-panel-collapsed'
+    );
+    expect(screen.getByTestId('second-panel')).toHaveClass('full-width');
+    expect(screen.getByText('Second Panel')).toBe(secondPanelContent);
+
+    const expandToggle = screen.getByTestId('left-panel-toggle');
+
+    expect(expandToggle).toBeInTheDocument();
+    expect(expandToggle).not.toHaveClass('rotate-180');
+
+    fireEvent.click(expandToggle);
+
+    expect(screen.getByTestId('first-panel')).not.toHaveClass(
+      'left-panel-collapsed'
+    );
+    expect(screen.getByText('Second Panel')).toBe(secondPanelContent);
   });
 });

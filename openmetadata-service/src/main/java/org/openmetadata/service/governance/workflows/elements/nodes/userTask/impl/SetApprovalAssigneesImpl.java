@@ -56,14 +56,27 @@ public class SetApprovalAssigneesImpl implements JavaDelegate {
       // Process addReviewers flag
       Boolean addReviewers = (Boolean) assigneesConfig.getOrDefault("addReviewers", true);
       if (addReviewers) {
-        boolean entitySupportsReviewers =
-            Entity.getEntityRepository(entityLink.getEntityType()).isSupportsReviewers();
+        org.openmetadata.service.jdbi3.EntityRepository repo =
+            Entity.getEntityRepository(entityLink.getEntityType());
+        boolean entitySupportsReviewers = repo.isSupportsReviewers();
 
-        if (entitySupportsReviewers
-            && entity.getReviewers() != null
-            && !entity.getReviewers().isEmpty()) {
+        List<EntityReference> reviewers = entity.getReviewers();
+        if (entitySupportsReviewers && (reviewers == null || reviewers.isEmpty())) {
+          try {
+            EntityInterface parent = repo.getParentEntity(entity, "reviewers");
+            if (parent != null
+                && parent.getReviewers() != null
+                && !parent.getReviewers().isEmpty()) {
+              reviewers = parent.getReviewers();
+            }
+          } catch (Exception e) {
+            LOG.warn("Failed to get reviewers from parent entity: {}", e.getMessage());
+          }
+        }
+
+        if (entitySupportsReviewers && reviewers != null && !reviewers.isEmpty()) {
           List<String> reviewerAssignees =
-              getEntityLinkStringFromEntityReferenceWithTeamExpansion(entity.getReviewers());
+              getEntityLinkStringFromEntityReferenceWithTeamExpansion(reviewers);
           assignees.addAll(reviewerAssignees);
         } else if (!entitySupportsReviewers
             && entity.getOwners() != null

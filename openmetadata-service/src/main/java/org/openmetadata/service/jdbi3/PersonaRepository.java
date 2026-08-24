@@ -196,6 +196,7 @@ public class PersonaRepository extends EntityRepository<Persona> {
       Boolean updatedDefault = updatedPersona.getDefault();
       if (!Objects.equals(origDefault, updatedDefault)) {
         recordChange("default", origDefault, updatedDefault);
+        origPersona.setDefault(updatedDefault);
       }
     }
   }

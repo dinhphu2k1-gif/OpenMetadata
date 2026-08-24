@@ -24,6 +24,7 @@ export interface ResizablePanelsProps {
 
 export interface ResizablePanelsLeftProps extends ResizablePanelsProps {
   hideFirstPanel?: boolean;
+  collapsibleFirstPanel?: boolean;
 }
 
 export interface PanelProps {

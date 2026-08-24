@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 
+import { rebrandLocaleResources } from '../BrandUtils';
 import i18next from './LocalUtil';
 
 const LOCALE_LOADERS: Record<
@@ -56,7 +57,7 @@ class LocalUtilClassBase {
     i18next.addResourceBundle(
       locale,
       'translation',
-      translations.default,
+      rebrandLocaleResources(translations.default),
       true
     );
   }

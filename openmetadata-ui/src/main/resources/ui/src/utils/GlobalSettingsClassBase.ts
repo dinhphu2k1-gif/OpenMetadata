@@ -264,7 +264,15 @@ class GlobalSettingsClassBase {
           {
             label: t('label.data-observability'),
             description: t('message.page-sub-header-for-data-observability'),
-            isProtected: true,
+            isProtected:
+              userPermissions.hasViewPermissions(
+                ResourceEntity.INGESTION_PIPELINE,
+                permissions
+              ) ||
+              userPermissions.hasViewPermissions(
+                ResourceEntity.TEST_SUITE,
+                permissions
+              ),
             key: `${GlobalSettingsMenuCategory.SERVICES}.${GlobalSettingOptions.DATA_OBSERVABILITY}`,
             icon: DataObservability,
           },
@@ -328,10 +336,7 @@ class GlobalSettingsClassBase {
           {
             label: t('label.admin-plural'),
             description: t('message.page-sub-header-for-admins'),
-            isProtected: userPermissions.hasViewPermissions(
-              ResourceEntity.USER,
-              permissions
-            ),
+            isProtected: Boolean(isAdminUser),
             key: `${GlobalSettingsMenuCategory.MEMBERS}.${GlobalSettingOptions.ADMINS}`,
             icon: AdminIcon,
           },

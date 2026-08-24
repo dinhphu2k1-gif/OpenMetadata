@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 
+import { TabSpecificField } from '../enums/entity.enum';
 import { EntityStatus } from '../generated/entity/data/glossaryTerm';
 import i18n from '../utils/i18next/LocalUtil';
 
@@ -23,6 +24,59 @@ export const GLOSSARY_TERM_TABLE_COLUMNS_KEYS = {
   STATUS: 'status',
   ACTIONS: 'actions',
 };
+
+export const CDE_GLOSSARY_TERM_FIELDS = [
+  TabSpecificField.CHILDREN_COUNT,
+  TabSpecificField.OWNERS,
+  TabSpecificField.REVIEWERS,
+  TabSpecificField.DOMAINS,
+  TabSpecificField.TAGS,
+  TabSpecificField.EXTENSION,
+];
+
+export const DATA_DICTIONARY_GLOSSARY_NAME = 'Data Dictionary';
+export const DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME =
+  'Từ điển dữ liệu dùng chung';
+
+export const isDataDictionaryGlossary = (
+  ...identifiers: Array<string | undefined>
+) =>
+  identifiers.some(
+    (identifier) =>
+      identifier === DATA_DICTIONARY_GLOSSARY_NAME ||
+      identifier === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
+      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
+      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
+  );
+
+export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
+  NAME: 'name',
+  DOMAINS: 'cdeDomains',
+  DISPLAY_NAME: 'cdeDisplayName',
+  DATA_SOURCE: 'cdeDataSource',
+  DESCRIPTION: 'cdeDescription',
+  OWNERS: 'cdeOwners',
+  DATA_CLASSIFICATION: 'cdeDataClassification',
+  QTDL_REVIEW: 'cdeQtdlReview',
+  PERSONAL_DATA: 'cdePersonalData',
+  RELATED_REGULATION: 'cdeRelatedRegulation',
+  DATA_QUALITY_RULE: 'cdeDataQualityRule',
+  NOTE: 'cdeNote',
+};
+
+export const CDE_DEFAULT_VISIBLE_COLUMNS = Object.values(
+  CDE_GLOSSARY_TABLE_COLUMNS_KEYS
+)
+  .filter((key) => key !== CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NAME)
+  .concat(GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS);
+
+export const CDE_STATIC_VISIBLE_COLUMNS = [
+  CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NAME,
+  GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
+  GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
+];
+
+export const CDE_GLOSSARY_TABLE_PREFERENCE_KEY = 'cdeGlossaryTerm';
 
 export const DEFAULT_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.DESCRIPTION,

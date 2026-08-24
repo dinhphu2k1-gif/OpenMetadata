@@ -2,16 +2,38 @@
   "name": "DataConsumerPolicy",
   "displayName": "Data Consumer Policy",
   "fullyQualifiedName": "DataConsumerPolicy",
-  "description": "Policy for Data Consumer to perform operations on metadata entities",
+  "description": "Policy for Data Consumer: View all assets, contribute metadata, and create glossary terms",
   "enabled": true,
   "allowDelete": false,
   "provider": "system",
   "rules": [
     {
+      "name": "DataConsumerPolicy-CreateRule",
+      "description": "Allow creating new glossary terms strictly within the glossary resource",
+      "resources": ["glossaryTerm"],
+      "operations": ["Create"],
+      "effect": "allow"
+    },
+    {
+      "name": "DataConsumerPolicy-ManageUnapprovedGlossaryTermRule",
+      "description": "Cho phép người tạo toàn quyền xem, sửa mọi thông tin (Mô tả, Từ đồng nghĩa, Tham chiếu, Nhãn, Thuộc tính...) và xóa thuật ngữ của chính mình khi chưa được phê duyệt",
+      "resources": ["glossaryTerm"],
+      "operations": ["All"],
+      "effect": "allow",
+      "condition": "isCreator() && notApproved()"
+    },
+    {
       "name": "DataConsumerPolicy-EditRule",
-      "description" : "Allow some of the edit operations on a resource for everyone.",
-      "resources" : ["all"],
-      "operations": ["ViewAll", "EditDescription", "EditTags", "EditGlossaryTerms", "EditTier", "EditCertification"],
+      "description": "Allow collaborative editing (descriptions, tags, tiers, status) on all metadata assets",
+      "resources": ["all"],
+      "operations": ["EditCertification", "EditDescription", "EditDisplayName", "EditGlossaryTerms", "EditStatus", "EditTags", "EditTier"],
+      "effect": "allow"
+    },
+    {
+      "name": "DataConsumerPolicy-ViewRule",
+      "description": "Allow viewing all metadata entities in the catalog",
+      "resources": ["all"],
+      "operations": ["ViewAll"],
       "effect": "allow"
     }
   ]

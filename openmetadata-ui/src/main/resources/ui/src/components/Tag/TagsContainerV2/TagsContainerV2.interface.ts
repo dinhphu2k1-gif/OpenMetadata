@@ -40,4 +40,5 @@ export interface TagsContainerV2Props {
   useGenericControls?: boolean;
   tagNewLook?: boolean;
   multiSelect?: boolean;
+  classificationFilter?: string;
 }
