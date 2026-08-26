@@ -64,8 +64,9 @@ finish_wip() {
         exit 1
     fi
     
-    echo "🔀 [1/3] Đang chuyển về nhánh chính '$MAIN_BRANCH'..."
+    echo "🔀 [1/3] Đang chuyển về và cập nhật nhánh chính '$MAIN_BRANCH'..."
     git checkout "$MAIN_BRANCH"
+    git pull origin "$MAIN_BRANCH" --rebase
     
     echo "🧹 [2/3] Đang gộp toàn bộ các commit nháp lại thành 1 (Squash merge)..."
     git merge --squash "$WIP_BRANCH"
