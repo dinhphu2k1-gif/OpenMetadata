@@ -106,6 +106,23 @@ import org.openmetadata.service.util.UserUtil;
 public class UserRepository extends EntityRepository<User> {
   static final String BASIC_CONSUMER_ROLE = "BasicConsumer";
   static final String BASIC_CONSUMER_PERSONA = "BasicConsumerPersona";
+  static final String DATA_CONSUMER_ROLE = "DataConsumer";
+  static final String DATA_CONSUMER_PERSONA = "DataConsumerPersona";
+  static final String DATA_PROPOSER_ROLE = "DataProposer";
+  static final String DATA_PROPOSER_PERSONA = "DataProposerPersona";
+  static final String DATA_STEWARD_ROLE = "DataSteward";
+  static final String DATA_STEWARD_PERSONA = "DataStewardPersona";
+
+  static final Map<String, String> ROLE_TO_PERSONA_NAME_MAP =
+      Map.of(
+          DATA_STEWARD_ROLE, DATA_STEWARD_PERSONA,
+          DATA_PROPOSER_ROLE, DATA_PROPOSER_PERSONA,
+          DATA_CONSUMER_ROLE, DATA_CONSUMER_PERSONA,
+          BASIC_CONSUMER_ROLE, BASIC_CONSUMER_PERSONA);
+
+  static final List<String> STANDARD_ROLES_PRIORITY =
+      List.of(DATA_STEWARD_ROLE, DATA_PROPOSER_ROLE, DATA_CONSUMER_ROLE, BASIC_CONSUMER_ROLE);
+
   static final String ROLES_FIELD = "roles";
   static final String TEAMS_FIELD = "teams";
   public static final String AUTH_MECHANISM_FIELD = "authenticationMechanism";
@@ -223,6 +240,17 @@ public class UserRepository extends EntityRepository<User> {
   @Override
   public void prepare(User user, boolean update) {
     validateTeams(user);
+    if (!Boolean.TRUE.equals(user.getIsBot())
+        && !Boolean.TRUE.equals(user.getIsAdmin())
+        && (user.getRoles() == null || user.getRoles().isEmpty())) {
+      try {
+        EntityReference defaultRole =
+            Entity.getEntityReferenceByName(Entity.ROLE, BASIC_CONSUMER_ROLE, NON_DELETED);
+        user.setRoles(new ArrayList<>(List.of(defaultRole)));
+      } catch (Exception e) {
+        LOG.warn("Default role {} not found when preparing user {}", BASIC_CONSUMER_ROLE, user.getName());
+      }
+    }
     validateRoles(user.getRoles());
   }
 
@@ -651,7 +679,7 @@ public class UserRepository extends EntityRepository<User> {
         Boolean.TRUE.equals(user.getIsAdmin()),
         getEffectiveRolesForPersona(user),
         explicitDefaultPersona,
-        getBasicConsumerPersona(),
+        getStandardRolePersonaRefs(),
         systemDefault != null ? systemDefault.getEntityReference() : null);
   }
 
@@ -664,15 +692,73 @@ public class UserRepository extends EntityRepository<User> {
     return effectiveRoles;
   }
 
-  private EntityReference getBasicConsumerPersona() {
+  private EntityReference getPersonaRefByName(String personaName) {
     try {
-      return Entity.getEntityReferenceByName(Entity.PERSONA, BASIC_CONSUMER_PERSONA, NON_DELETED);
+      return Entity.getEntityReferenceByName(Entity.PERSONA, personaName, NON_DELETED);
     } catch (EntityNotFoundException e) {
       LOG.warn(
-          "Persona {} is not initialized; BasicConsumer users will use the regular default persona",
-          BASIC_CONSUMER_PERSONA);
+          "Persona {} is not initialized; users will use the regular default persona",
+          personaName);
       return null;
     }
+  }
+
+  private Map<String, EntityReference> getStandardRolePersonaRefs() {
+    Map<String, EntityReference> map = new HashMap<>();
+    for (Map.Entry<String, String> entry : ROLE_TO_PERSONA_NAME_MAP.entrySet()) {
+      EntityReference ref = getPersonaRefByName(entry.getValue());
+      if (ref != null) {
+        map.put(entry.getKey(), ref);
+      }
+    }
+    return map;
+  }
+
+  static EntityReference resolveDefaultPersona(
+      boolean isAdmin,
+      List<EntityReference> effectiveRoles,
+      EntityReference explicitDefaultPersona,
+      Map<String, EntityReference> roleToPersonaMap,
+      EntityReference systemDefaultPersona) {
+    if (isAdmin) {
+      return null;
+    }
+
+    for (String roleName : STANDARD_ROLES_PRIORITY) {
+      boolean hasRole =
+          listOrEmpty(effectiveRoles).stream()
+              .anyMatch(
+                  role ->
+                      roleName.equalsIgnoreCase(role.getName())
+                          || roleName.equalsIgnoreCase(role.getFullyQualifiedName()));
+      if (hasRole) {
+        EntityReference rolePersona =
+            roleToPersonaMap != null ? roleToPersonaMap.get(roleName) : null;
+        if (rolePersona != null) {
+          return rolePersona;
+        }
+        String personaName = ROLE_TO_PERSONA_NAME_MAP.get(roleName);
+        if (explicitDefaultPersona != null
+            && personaName != null
+            && (personaName.equalsIgnoreCase(explicitDefaultPersona.getName())
+                || personaName.equalsIgnoreCase(explicitDefaultPersona.getFullyQualifiedName()))) {
+          return explicitDefaultPersona;
+        }
+      }
+    }
+
+    // Ignore stale assignments to any standard restricted persona if user no longer has that role
+    if (explicitDefaultPersona != null) {
+      for (String personaName : ROLE_TO_PERSONA_NAME_MAP.values()) {
+        if (personaName.equalsIgnoreCase(explicitDefaultPersona.getName())
+            || personaName.equalsIgnoreCase(explicitDefaultPersona.getFullyQualifiedName())) {
+          explicitDefaultPersona = null;
+          break;
+        }
+      }
+    }
+
+    return explicitDefaultPersona != null ? explicitDefaultPersona : systemDefaultPersona;
   }
 
   static EntityReference resolveDefaultPersona(
@@ -681,38 +767,10 @@ public class UserRepository extends EntityRepository<User> {
       EntityReference explicitDefaultPersona,
       EntityReference basicConsumerPersona,
       EntityReference systemDefaultPersona) {
-    if (isAdmin) {
-      return null;
-    }
-
-    boolean isBasicConsumer =
-        listOrEmpty(effectiveRoles).stream()
-            .anyMatch(
-                role ->
-                    BASIC_CONSUMER_ROLE.equalsIgnoreCase(role.getName())
-                        || BASIC_CONSUMER_ROLE.equalsIgnoreCase(role.getFullyQualifiedName()));
-    if (isBasicConsumer) {
-      if (basicConsumerPersona != null) {
-        return basicConsumerPersona;
-      }
-      if (explicitDefaultPersona != null
-          && (BASIC_CONSUMER_PERSONA.equalsIgnoreCase(explicitDefaultPersona.getName())
-              || BASIC_CONSUMER_PERSONA.equalsIgnoreCase(
-                  explicitDefaultPersona.getFullyQualifiedName()))) {
-        return explicitDefaultPersona;
-      }
-    }
-
-    // Ignore stale assignments created by the former post-deployment script after a user moves
-    // out of BasicConsumer. Explicit assignments to any other persona remain user-controlled.
-    if (explicitDefaultPersona != null
-        && (BASIC_CONSUMER_PERSONA.equalsIgnoreCase(explicitDefaultPersona.getName())
-            || BASIC_CONSUMER_PERSONA.equalsIgnoreCase(
-                explicitDefaultPersona.getFullyQualifiedName()))) {
-      explicitDefaultPersona = null;
-    }
-
-    return explicitDefaultPersona != null ? explicitDefaultPersona : systemDefaultPersona;
+    Map<String, EntityReference> map =
+        basicConsumerPersona != null ? Map.of(BASIC_CONSUMER_ROLE, basicConsumerPersona) : Map.of();
+    return resolveDefaultPersona(
+        isAdmin, effectiveRoles, explicitDefaultPersona, map, systemDefaultPersona);
   }
 
   private List<EntityReference> getInheritedPersonas(User user) {
@@ -1099,7 +1157,7 @@ public class UserRepository extends EntityRepository<User> {
     Persona systemDefault = personaRepository.getSystemDefaultPersona();
     EntityReference systemDefaultRef =
         systemDefault != null ? systemDefault.getEntityReference() : null;
-    EntityReference basicConsumerPersona = getBasicConsumerPersona();
+    Map<String, EntityReference> standardRolePersonas = getStandardRolePersonaRefs();
 
     for (User user : users) {
       user.setDefaultPersona(
@@ -1107,7 +1165,7 @@ public class UserRepository extends EntityRepository<User> {
               Boolean.TRUE.equals(user.getIsAdmin()),
               getEffectiveRolesForPersona(user),
               userToDefaultPersona.get(user.getId()),
-              basicConsumerPersona,
+              standardRolePersonas,
               systemDefaultRef));
     }
   }

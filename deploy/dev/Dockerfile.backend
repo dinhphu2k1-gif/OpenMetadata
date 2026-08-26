@@ -1,0 +1,33 @@
+# ==============================================================================
+# 🐳 Dockerfile for OpenMetadata Custom Backend Server (Java 21)
+# Image: openmetadata/server:custom-1.13.3
+# ==============================================================================
+
+# Stage 1: Giải nén bản phân phối Maven đã build (.tar.gz)
+FROM alpine:3 AS build
+
+COPY openmetadata-dist/target/openmetadata-*.tar.gz /
+
+RUN mkdir -p /opt/openmetadata && \
+    tar zxvf openmetadata-*.tar.gz -C /opt/openmetadata --strip-components 1 && \
+    rm openmetadata-*.tar.gz
+
+# Stage 2: Runtime image với OpenJDK 21
+FROM alpine:3
+
+EXPOSE 8585
+EXPOSE 8586
+
+RUN adduser -D openmetadata && \
+    apk update && \
+    apk upgrade && \
+    apk add --update --no-cache bash openjdk21-jre curl
+
+COPY --chown=openmetadata:openmetadata --from=build /opt/openmetadata /opt/openmetadata
+COPY --chmod=755 docker/openmetadata-start.sh /
+
+USER openmetadata
+
+WORKDIR /opt/openmetadata
+ENTRYPOINT [ "/bin/bash" ]
+CMD ["/openmetadata-start.sh"]

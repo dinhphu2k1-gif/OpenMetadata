@@ -20,7 +20,6 @@ import { GenericTab } from '../../components/Customization/GenericTab/GenericTab
 import EntitySummaryPanel from '../../components/Explore/EntitySummaryPanel/EntitySummaryPanel.component';
 import AssetsTabs from '../../components/Glossary/GlossaryTerms/tabs/AssetsTabs.component';
 import GlossaryTermTab from '../../components/Glossary/GlossaryTermTab/GlossaryTermTab.component';
-import OntologyExplorer from '../../components/OntologyExplorer/OntologyExplorer';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
 import { PageType } from '../../generated/system/ui/page';
 import { getCountBadge } from '../../utils/EntityDisplayUtils';
@@ -173,19 +172,6 @@ export const getGlossaryTermDetailPageTabs = (
                 onUpdateEntityDetails={refreshActiveGlossaryTerm}
               />
             ),
-          },
-          {
-            label: (
-              <TabsLabel
-                id={EntityTabs.RELATIONS_GRAPH}
-                name={
-                  tabLabelMap[EntityTabs.RELATIONS_GRAPH] ??
-                  i18n.t('label.relations-graph')
-                }
-              />
-            ),
-            key: EntityTabs.RELATIONS_GRAPH,
-            children: <OntologyExplorer height="100%" scope="term" />,
           },
           {
             label: (

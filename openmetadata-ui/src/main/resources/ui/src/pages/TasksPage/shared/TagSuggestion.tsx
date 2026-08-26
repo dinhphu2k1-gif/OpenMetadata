@@ -38,6 +38,7 @@ export interface TagSuggestionProps {
   newLook?: boolean;
   autoFocus?: boolean;
   dropdownContainerRef?: React.RefObject<HTMLDivElement>;
+  classificationFilter?: string;
 }
 
 const TagSuggestion: React.FC<TagSuggestionProps> = ({
@@ -53,6 +54,7 @@ const TagSuggestion: React.FC<TagSuggestionProps> = ({
   newLook,
   autoFocus = false,
   dropdownContainerRef,
+  classificationFilter,
 }) => {
   const isGlossaryType = useMemo(
     () => tagType === TagSource.Glossary,
@@ -98,7 +100,10 @@ const TagSuggestion: React.FC<TagSuggestionProps> = ({
   };
 
   const commonProps = {
-    fetchOptions: isGlossaryType ? fetchGlossaryList : tagClassBase.getTags,
+    fetchOptions: isGlossaryType
+      ? fetchGlossaryList
+      : (search: string, page: number) =>
+          tagClassBase.getTags(search, page, false, classificationFilter),
     initialOptions,
     ...selectProps,
     mode: 'multiple' as const,

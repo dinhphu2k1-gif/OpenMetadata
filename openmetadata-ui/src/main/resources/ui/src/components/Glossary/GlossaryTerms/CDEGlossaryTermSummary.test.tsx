@@ -13,6 +13,7 @@
  */
 
 import { render, screen } from '@testing-library/react';
+import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import CDEGlossaryTermSummary from './CDEGlossaryTermSummary';
@@ -21,7 +22,7 @@ jest.mock('../../common/ProfilePicture/ProfilePicture', () =>
   jest.fn().mockImplementation(({ displayName }) => <span>{displayName}</span>)
 );
 
-jest.mock('../../common/RichTextEditor/RichTextEditorPreviewNew', () =>
+jest.mock('../../common/RichTextEditor/RichTextEditorPreviewerV1', () =>
   jest.fn().mockImplementation(({ markdown }) => <span>{markdown}</span>)
 );
 
@@ -32,12 +33,6 @@ jest.mock('../../Tag/TagsContainerV2/TagsContainerV2', () =>
     </div>
   ))
 );
-
-jest.mock('../../common/CustomPropertyTable/CustomPropertyTable', () => ({
-  CustomPropertyTable: jest
-    .fn()
-    .mockImplementation(() => <div>CustomPropertyTable</div>),
-}));
 
 jest.mock('../../common/DomainSelectableList/DomainSelectableList.component', () =>
   jest.fn().mockImplementation(({ children }) => <div>{children}</div>)
@@ -65,33 +60,108 @@ const glossaryTerm = {
   tags: [
     {
       name: 'CRM',
-      tagFQN: 'Nguon_du_lieu.CRM',
+      tagFQN: 'DataSource.CRM',
     },
     {
       name: 'Noi_bo',
       displayName: 'Nội bộ',
-      tagFQN: 'Phan_loai_du_lieu.Noi_bo',
-    },
-    {
-      name: 'Da_ra_soat',
-      displayName: 'Đã rà soát',
-      tagFQN: 'QTDL_ra_soat.Da_ra_soat',
+      tagFQN: 'DataClassification.Noi_bo',
     },
     {
       name: 'Co',
       displayName: 'Có',
-      tagFQN: 'Du_lieu_ca_nhan.Co',
+      tagFQN: 'PersonalData.Co',
     },
   ],
   extension: {
-    van_ban_quy_dinh_lien_quan: 'Quy chế quản lý khách hàng',
-    quy_dinh_chat_luong_du_lieu: true,
-    ghi_chu: 'Áp dụng cho dữ liệu khách hàng cá nhân và tổ chức.',
+    entityRelationship: 'Quan hệ khách hàng với tài khoản',
+    relatedRegulatoryDocuments: 'Quy chế quản lý khách hàng',
+    dataQualityRules: true,
   },
 } as GlossaryTerm;
 
+const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
+  en: {
+    'cde.business-group': 'Business Group',
+    'cde.data-source': 'Data Source',
+    'cde.data-owner': 'Data Owner',
+    'cde.data-classification': 'Data Classification',
+    'cde.personal-data': 'Personal Data',
+    'cde.data-quality-rules': 'Data Quality Rules',
+    'cde.related-regulatory-documents': 'Related Regulatory Documents',
+    'cde.entity-relationship': 'Entity Relationship',
+    'label.yes': 'Yes',
+    'label.no': 'No',
+  },
+  vi: {
+    'cde.business-group': 'Nhóm theo nghiệp vụ',
+    'cde.data-source': 'Nguồn dữ liệu',
+    'cde.data-owner': 'Chủ sở hữu dữ liệu',
+    'cde.data-classification': 'Phân loại dữ liệu',
+    'cde.personal-data': 'Dữ liệu cá nhân',
+    'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
+    'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
+    'cde.entity-relationship': 'Mối quan hệ với thực thể',
+    'label.yes': 'Có',
+    'label.no': 'Không',
+  },
+};
+
+const setCDELocale = (locale: keyof typeof cdeTranslations) => {
+  (useTranslation as jest.Mock).mockReturnValue({
+    t: (key: string) => cdeTranslations[locale][key] ?? key,
+    i18n: { language: locale === 'en' ? 'en-US' : 'vi-VN' },
+  });
+};
+
 describe('CDEGlossaryTermSummary', () => {
-  it('renders every mapped CDE column as an independent field', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setCDELocale('vi');
+  });
+
+  it('renders Group 1 and Group 2 as structured sections with mapped CDE fields', () => {
+    render(
+      <MemoryRouter>
+        <CDEGlossaryTermSummary glossaryTerm={glossaryTerm} />
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByTestId('cde-glossary-term-summary-group-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('cde-glossary-term-summary-group-2')
+    ).toBeInTheDocument();
+
+    [
+      'Nhóm theo nghiệp vụ',
+      'Nguồn dữ liệu',
+      'Chủ sở hữu dữ liệu',
+      'Phân loại dữ liệu',
+      'Dữ liệu cá nhân',
+      'Quy định về chất lượng dữ liệu',
+      'Mối quan hệ với thực thể',
+      'Văn bản quy định liên quan',
+    ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+
+    expect(screen.getAllByRole('group')).toHaveLength(8);
+
+    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
+    expect(screen.getByText('CRM')).toBeInTheDocument();
+    expect(screen.getByText('Nội bộ')).toBeInTheDocument();
+    expect(screen.getByText('Y')).toBeInTheDocument();
+    expect(
+      screen.getByText('Quan hệ khách hàng với tài khoản')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Quy chế quản lý khách hàng')
+    ).toBeInTheDocument();
+  });
+
+  it('uses English labels when language is set to English', () => {
+    setCDELocale('en');
+
     render(
       <MemoryRouter>
         <CDEGlossaryTermSummary glossaryTerm={glossaryTerm} />
@@ -99,20 +169,14 @@ describe('CDEGlossaryTermSummary', () => {
     );
 
     [
-      'Nhóm theo nghiệp vụ',
-      'Nguồn dữ liệu',
-      'Chủ sở hữu dữ liệu',
-      'Phân loại dữ liệu',
-      'QTDL rà soát',
-      'Dữ liệu cá nhân',
+      'Business Group',
+      'Data Source',
+      'Data Owner',
+      'Data Classification',
+      'Personal Data',
+      'Data Quality Rules',
+      'Entity Relationship',
+      'Related Regulatory Documents',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
-
-    expect(screen.getAllByRole('group')).toHaveLength(6);
-
-    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
-    expect(screen.getByText('CRM')).toBeInTheDocument();
-    expect(screen.getByText('Nội bộ')).toBeInTheDocument();
-    expect(screen.getByText('Đã rà soát')).toBeInTheDocument();
-    expect(screen.getByText('CustomPropertyTable')).toBeInTheDocument();
   });
 });

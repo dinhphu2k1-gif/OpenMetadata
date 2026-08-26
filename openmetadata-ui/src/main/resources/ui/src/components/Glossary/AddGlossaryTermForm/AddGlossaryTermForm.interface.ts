@@ -40,4 +40,6 @@ export interface GlossaryTermForm {
   tags: TagLabel[];
   owners: EntityReference[];
   style: GlossaryTerm['style'];
+  domains?: EntityReference[];
+  extension?: Record<string, unknown>;
 }

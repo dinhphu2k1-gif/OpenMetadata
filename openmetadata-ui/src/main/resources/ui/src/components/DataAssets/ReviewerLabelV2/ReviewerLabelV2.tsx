@@ -36,7 +36,7 @@ export const ReviewerLabelV2 = <
   const { t } = useTranslation();
 
   const hasEditReviewerAccess = useMemo(() => {
-    return permissions.EditAll || permissions.EditReviewers;
+    return Boolean(permissions.EditReviewers);
   }, [permissions]);
 
   const { assignedReviewers, hasReviewers } = useMemo(() => {
@@ -78,7 +78,7 @@ export const ReviewerLabelV2 = <
             hasPermission={hasEditReviewerAccess}
             label={t('label.reviewer-plural')}
             listHeight={200}
-            multiple={{ user: true, team: false }}
+            multiple={{ user: true, team: true }}
             owner={assignedReviewers ?? []}
             popoverProps={{ placement: 'topLeft' }}
             onUpdate={handleReviewerSave}>

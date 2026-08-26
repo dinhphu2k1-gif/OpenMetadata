@@ -35,7 +35,6 @@ import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
 import Loader from '../../common/Loader/Loader';
 import TabsLabel from '../../common/TabsLabel/TabsLabel.component';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
-import OntologyExplorer from '../../OntologyExplorer/OntologyExplorer';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import './glossary-details.less';
@@ -61,6 +60,13 @@ const GlossaryDetails = ({
     tab: EntityTabs;
   }>();
   const { customizedPage, isLoading } = useCustomPages(PageType.Glossary);
+  const customizedTabs = useMemo(() => {
+    const tabs = customizedPage?.tabs?.filter(
+      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH
+    );
+
+    return tabs?.length ? tabs : undefined;
+  }, [customizedPage?.tabs]);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
     setFeedCount(data);
@@ -82,8 +88,19 @@ const GlossaryDetails = ({
     }
   };
 
+  useEffect(() => {
+    const glossaryFqn = glossary.fullyQualifiedName ?? glossary.name;
+
+    if (activeTab === EntityTabs.RELATIONS_GRAPH && glossaryFqn) {
+      navigate(
+        getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS),
+        { replace: true }
+      );
+    }
+  }, [activeTab, glossary.fullyQualifiedName, glossary.name, navigate]);
+
   const tabs = useMemo(() => {
-    const tabLabelMap = getTabLabelMapFromTabs(customizedPage?.tabs);
+    const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
     const items = [
       {
@@ -100,26 +117,6 @@ const GlossaryDetails = ({
       },
       ...(!isVersionView
         ? [
-            {
-              label: (
-                <TabsLabel
-                  id={EntityTabs.RELATIONS_GRAPH}
-                  isActive={activeTab === EntityTabs.RELATIONS_GRAPH}
-                  name={
-                    tabLabelMap[EntityTabs.RELATIONS_GRAPH] ??
-                    t('label.relations-graph')
-                  }
-                />
-              ),
-              key: EntityTabs.RELATIONS_GRAPH,
-              children: (
-                <OntologyExplorer
-                  glossaryId={glossary.id}
-                  height="100%"
-                  scope="glossary"
-                />
-              ),
-            },
             {
               label: (
                 <TabsLabel
@@ -153,11 +150,11 @@ const GlossaryDetails = ({
 
     return getDetailsTabWithNewLabel(
       items,
-      customizedPage?.tabs,
+      customizedTabs,
       EntityTabs.TERMS
     );
   }, [
-    customizedPage?.tabs,
+    customizedTabs,
     glossary.fullyQualifiedName,
     feedCount.conversationCount,
     feedCount.totalTasksCount,

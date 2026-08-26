@@ -19,6 +19,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -28,6 +29,10 @@ import {
 } from '../../../mocks/Glossary.mock';
 import { findExpandableKeysForArray } from '../../../utils/GlossaryUtils';
 import GlossaryTermTab from './GlossaryTermTab.component';
+import {
+  getCDEGlossaryTableColumns,
+  renderCDEQualityRule,
+} from './CDEGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 const mockOnAddGlossaryTerm = jest.fn();
@@ -39,6 +44,48 @@ const mockGetGlossaryTermChildrenLazy = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
 const mockGetAllFeeds = jest.fn();
 const mockUpdateTask = jest.fn();
+
+const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
+  en: {
+    'cde.term-code': 'Term Code',
+    'cde.business-group': 'Business Group',
+    'cde.business-term-name': 'Business Term Name',
+    'cde.data-source': 'Data Source',
+    'cde.business-meaning': 'Business Meaning',
+    'cde.entity-relationship': 'Entity Relationship',
+    'cde.data-owner': 'Data Owner',
+    'cde.data-classification': 'Data Classification',
+    'cde.data-governance-review': 'Data Governance Review',
+    'cde.personal-data': 'Personal Data',
+    'cde.related-regulatory-documents': 'Related Regulatory Documents',
+    'cde.data-quality-rules': 'Data Quality Rules',
+    'cde.notes': 'Notes',
+    'label.yes': 'Yes',
+    'label.no': 'No',
+    'label.view-more': 'View more',
+  },
+  vi: {
+    'cde.term-code': 'Mã thuật ngữ',
+    'cde.business-group': 'Nhóm theo nghiệp vụ',
+    'cde.business-term-name': 'Tên thuật ngữ nghiệp vụ',
+    'cde.data-source': 'Nguồn dữ liệu',
+    'cde.business-meaning': 'Ý nghĩa nghiệp vụ',
+    'cde.entity-relationship': 'Mối quan hệ với thực thể',
+    'cde.data-owner': 'Chủ sở hữu dữ liệu',
+    'cde.data-classification': 'Phân loại dữ liệu',
+    'cde.data-governance-review': 'QTDL rà soát',
+    'cde.personal-data': 'Dữ liệu cá nhân',
+    'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
+    'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
+    'cde.notes': 'Ghi chú',
+    'label.yes': 'Có',
+    'label.no': 'Không',
+    'label.view-more': 'Xem thêm',
+  },
+};
+
+const getCDETranslation = (locale: keyof typeof cdeTranslations) =>
+  (key: string) => cdeTranslations[locale][key] ?? key;
 
 jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryTerms: jest
@@ -461,28 +508,21 @@ describe('Test GlossaryTermTab component', () => {
       ],
       tags: [
         {
-          tagFQN: 'Nguon_du_lieu.IPCAS',
+          tagFQN: 'DataSource.IPCAS',
           displayName: 'IPCAS',
           source: 'Classification',
           labelType: 'Manual',
           state: 'Confirmed',
         },
         {
-          tagFQN: 'Phan_loai_du_lieu.Bi_mat',
+          tagFQN: 'DataClassification.Bi_mat',
           displayName: 'Bí mật',
           source: 'Classification',
           labelType: 'Manual',
           state: 'Confirmed',
         },
         {
-          tagFQN: 'QTDL_ra_soat.Noi_bo',
-          displayName: 'Nội bộ',
-          source: 'Classification',
-          labelType: 'Manual',
-          state: 'Confirmed',
-        },
-        {
-          tagFQN: 'Du_lieu_ca_nhan.Nhay_cam',
+          tagFQN: 'PersonalData.Nhay_cam',
           displayName: 'Nhạy cảm',
           source: 'Classification',
           labelType: 'Manual',
@@ -490,13 +530,17 @@ describe('Test GlossaryTermTab component', () => {
         },
       ],
       extension: {
-        van_ban_quy_dinh_lien_quan: 'Quyết định 123/QĐ-NHNo',
-        quy_dinh_chat_luong_du_lieu: true,
-        ghi_chu: 'Rà soát định kỳ hằng quý',
+        entityRelationship: 'Quan hệ 1-N với khách hàng',
+        relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
+        dataQualityRules: true,
       },
     } as unknown as ModifiedGlossaryTerm;
 
     beforeEach(() => {
+      (useTranslation as jest.Mock).mockReturnValue({
+        t: getCDETranslation('vi'),
+        i18n: { language: 'vi-VN', dir: jest.fn().mockReturnValue('ltr') },
+      });
       Object.assign(mockUseGlossaryStore, {
         activeGlossary: {
           id: 'data-dictionary-id',
@@ -513,6 +557,35 @@ describe('Test GlossaryTermTab component', () => {
       });
     });
 
+    it('uses English CDE column labels and value text', () => {
+      const t = getCDETranslation('en');
+      const columns = getCDEGlossaryTableColumns({
+        handleLoadMoreChildren: jest.fn(),
+        loadingChildren: {},
+        t,
+      });
+
+      expect(columns.slice(0, 11).map((column) => column.title)).toEqual([
+        'Term Code',
+        'Business Group',
+        'Business Term Name',
+        'Data Source',
+        'Business Meaning',
+        'Entity Relationship',
+        'Data Owner',
+        'Data Classification',
+        'Personal Data',
+        'Related Regulatory Documents',
+        'Data Quality Rules',
+      ]);
+      expect(renderCDEQualityRule(true, t)).toMatchObject({
+        props: { children: 'Yes' },
+      });
+      expect(renderCDEQualityRule(false, t)).toMatchObject({
+        props: { children: 'No' },
+      });
+    });
+
     it('should render the Excel-like CDE columns and values', async () => {
       render(<GlossaryTermTab isGlossary />, {
         wrapper: MemoryRouter,
@@ -522,6 +595,8 @@ describe('Test GlossaryTermTab component', () => {
         expect(screen.getByText('Mã thuật ngữ')).toBeInTheDocument();
         expect(screen.getByText('Nhóm theo nghiệp vụ')).toBeInTheDocument();
         expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument();
+        expect(screen.getByText('Mối quan hệ với thực thể')).toBeInTheDocument();
+        expect(screen.getByText('Quan hệ 1-N với khách hàng')).toBeInTheDocument();
         expect(screen.getAllByText('label.status')).not.toHaveLength(0);
         expect(
           screen.getByText('Quy định về chất lượng dữ liệu')
@@ -538,9 +613,6 @@ describe('Test GlossaryTermTab component', () => {
         ).toBeInTheDocument();
         expect(
           screen.getByTestId('profile-picture-TrungTamDuLieu')
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText('Rà soát định kỳ hằng quý')
         ).toBeInTheDocument();
         expect(
           screen

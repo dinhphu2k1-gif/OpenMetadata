@@ -94,6 +94,7 @@ export const PropertyValue: FC<PropertyValueProps> = ({
   onExtensionUpdate,
   hasEditPermissions,
   property,
+  propertyDisplayName,
   isRenderedInRightPanel = false,
 }) => {
   const { propertyName, propertyType, value, isTableType } = useMemo(() => {
@@ -112,6 +113,7 @@ export const PropertyValue: FC<PropertyValueProps> = ({
   }, [property, extension]);
 
   const { t } = useTranslation();
+  const displayName = propertyDisplayName ?? getEntityName(property);
   const [showInput, setShowInput] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -213,7 +215,7 @@ export const PropertyValue: FC<PropertyValueProps> = ({
       case 'markdown': {
         const header = t('label.edit-entity-name', {
           entityType: t('label.property'),
-          entityName: getEntityName(property),
+          entityName: displayName,
         });
 
         return (
@@ -1123,7 +1125,7 @@ export const PropertyValue: FC<PropertyValueProps> = ({
         <Typography.Text
           className="text-grey-body property-name"
           data-testid="property-name">
-          {getEntityName(property)}
+          {displayName}
           {propertyCountSuffix}
         </Typography.Text>
         {property.description && (
@@ -1166,7 +1168,7 @@ export const PropertyValue: FC<PropertyValueProps> = ({
             <Tooltip
               placement="left"
               title={t('label.edit-entity', {
-                entity: getEntityName(property),
+                entity: displayName,
               })}>
               <Icon
                 component={EditIconComponent}

@@ -1,0 +1,182 @@
+{
+  "name": "DataProposerPolicy",
+  "displayName": "Data Proposer Policy",
+  "fullyQualifiedName": "DataProposerPolicy",
+  "description": "Strict Least-Privilege Policy for Data Proposer (Maker / Proposer): Create, draft, and propose terms/rules. Explicit Deny on self-approval, platform admin, and destructive infrastructure mutations.",
+  "enabled": true,
+  "allowDelete": false,
+  "provider": "system",
+  "rules": [
+    {
+      "name": "DataProposer-ViewAllRule",
+      "description": "Allow read-only view on all metadata assets",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataProposer-CreateRule",
+      "description": "Allow creating new glossary terms, test suites, and test cases",
+      "resources": [
+        "glossaryTerm",
+        "testCase",
+        "testSuite"
+      ],
+      "operations": [
+        "Create"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataProposer-ManageUnapprovedRule",
+      "description": "Allow editing/deleting draft/unapproved glossary terms and test cases",
+      "resources": [
+        "glossaryTerm",
+        "testCase",
+        "testSuite"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "allow",
+      "condition": "notApproved()"
+    },
+    {
+      "name": "DataProposer-CollaborativeEditRule",
+      "description": "Allow proposing metadata contributions (descriptions, tags, custom fields, glossary terms)",
+      "resources": [
+        "apiEndpoint",
+        "chart",
+        "container",
+        "dashboard",
+        "database",
+        "databaseSchema",
+        "mlmodel",
+        "pipeline",
+        "searchIndex",
+        "storedProcedure",
+        "table",
+        "topic"
+      ],
+      "operations": [
+        "EditCustomFields",
+        "EditDescription",
+        "EditDisplayName",
+        "EditGlossaryTerms",
+        "EditTags",
+        "EditTier"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataProposer-FeedAndTaskRule",
+      "description": "Allow creating and participating in discussion threads and approval tasks",
+      "resources": [
+        "feed",
+        "suggestion",
+        "task",
+        "thread"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataProposer-DenySelfApprovalAndCertification",
+      "description": "Explicitly deny self-approving, changing status to Approved, or certifying metadata assets",
+      "resources": [
+        "classification",
+        "dataProduct",
+        "database",
+        "databaseSchema",
+        "domain",
+        "glossary",
+        "glossaryTerm",
+        "table",
+        "tag",
+        "testCase",
+        "testSuite"
+      ],
+      "operations": [
+        "EditCertification",
+        "EditReviewers"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataProposer-DenyAdminAndSecurityResources",
+      "description": "Explicitly deny managing platform security, roles, policies, bots, and app definitions",
+      "resources": [
+        "agentExecution",
+        "app",
+        "appMarketPlaceDefinition",
+        "auditLog",
+        "bot",
+        "eventsubscription",
+        "ingestionPipeline",
+        "mcpExecution",
+        "mcpServer",
+        "mcpService",
+        "notificationTemplate",
+        "policy",
+        "queryCostRecord",
+        "role",
+        "securityService",
+        "type"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataProposer-DenyDestructiveInfrastructureOps",
+      "description": "Explicitly deny destructive operations on core infrastructure services and schemas",
+      "resources": [
+        "apiService",
+        "dashboardService",
+        "database",
+        "databaseSchema",
+        "databaseService",
+        "driveService",
+        "messagingService",
+        "metadataService",
+        "mlmodelService",
+        "pipelineService",
+        "searchService",
+        "storageService"
+      ],
+      "operations": [
+        "Delete",
+        "Deploy",
+        "Kill"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataProposer-DenyDangerousGlobalOps",
+      "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "CreateScim",
+        "DeleteScim",
+        "EditPolicy",
+        "EditRole",
+        "EditScim",
+        "EditTeams",
+        "EditUsers",
+        "GenerateToken",
+        "Impersonate"
+      ],
+      "effect": "deny"
+    }
+  ]
+}

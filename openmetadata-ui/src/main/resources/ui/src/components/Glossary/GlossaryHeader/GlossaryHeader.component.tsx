@@ -29,10 +29,14 @@ import { ReactComponent as ExportIcon } from '../../../assets/svg/ic-export.svg'
 import { ReactComponent as ImportIcon } from '../../../assets/svg/ic-import.svg';
 import { ReactComponent as VersionIcon } from '../../../assets/svg/ic-version.svg';
 import { ReactComponent as IconDropdown } from '../../../assets/svg/menu.svg';
+import { ReactComponent as RevokeIcon } from '../../../assets/svg/ic-cancel-outline.svg';
+import { ReactComponent as PaperPlaneIcon } from '../../../assets/svg/paper-plane.svg';
+import { ReactComponent as CheckIcon } from '../../../assets/svg/ic-check-circle.svg';
 import { ReactComponent as StyleIcon } from '../../../assets/svg/style.svg';
 import { ManageButtonItemLabel } from '../../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
+import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
@@ -66,7 +70,7 @@ import {
   getGlossaryTermsVersionsPath,
   getGlossaryVersionsPath,
 } from '../../../utils/RouterUtils';
-import { showErrorToast } from '../../../utils/ToastUtils';
+import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
@@ -112,6 +116,16 @@ const GlossaryHeader = ({
   const [isStyleEditing, setIsStyleEditing] = useState(false);
   const [openChangeParentHierarchyModal, setOpenChangeParentHierarchyModal] =
     useState(false);
+  const [isRevokeModalOpen, setIsRevokeModalOpen] = useState<boolean>(false);
+  const [isRevoking, setIsRevoking] = useState<boolean>(false);
+  const [isSubmitForReviewModalOpen, setIsSubmitForReviewModalOpen] =
+    useState<boolean>(false);
+  const [isSubmittingForReview, setIsSubmittingForReview] =
+    useState<boolean>(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
+  const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const isGlossary = entityType === EntityType.GLOSSARY;
   const { permissions: globalPermissions } = usePermissionProvider();
 
@@ -268,6 +282,152 @@ const GlossaryHeader = ({
     setIsStyleEditing(false);
   };
 
+  const canRevokeApproval = useMemo(() => {
+    if (isGlossary || glossaryTermStatus !== EntityStatus.Approved) {
+      return false;
+    }
+    const currentUserId = currentUser?.id;
+    const isReviewer = selectedData?.reviewers?.some(
+      (reviewer) => reviewer.id === currentUserId
+    );
+    const isOwner = selectedData?.owners?.some(
+      (owner) => owner.id === currentUserId
+    );
+    return (
+      Boolean(currentUser?.isAdmin) ||
+      Boolean(permissions?.EditAll) ||
+      Boolean(permissions?.EditStatus) ||
+      Boolean(isReviewer) ||
+      Boolean(isOwner)
+    );
+  }, [isGlossary, glossaryTermStatus, currentUser, permissions, selectedData]);
+
+  const handleRevokeApproval = async () => {
+    try {
+      setIsRevoking(true);
+      const updatedDetails = {
+        ...selectedData,
+        entityStatus: EntityStatus.Draft,
+      };
+      await onUpdate(updatedDetails);
+      showSuccessToast(t('message.revoke-approval-success'));
+      setIsRevokeModalOpen(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
+  const canSubmitForReview = useMemo(() => {
+    if (
+      isGlossary ||
+      isVersionView ||
+      (glossaryTermStatus !== EntityStatus.Draft &&
+        glossaryTermStatus !== EntityStatus.Rejected)
+    ) {
+      return false;
+    }
+    const currentUserId = currentUser?.id;
+    const isOwner = selectedData?.owners?.some(
+      (owner) => owner.id === currentUserId
+    );
+    return (
+      Boolean(currentUser?.isAdmin) ||
+      Boolean(permissions?.EditAll) ||
+      Boolean(permissions?.EditDescription) ||
+      Boolean(permissions?.EditTags) ||
+      Boolean(permissions?.EditCustomFields) ||
+      Boolean(isOwner)
+    );
+  }, [
+    isGlossary,
+    isVersionView,
+    glossaryTermStatus,
+    currentUser,
+    permissions,
+    selectedData,
+  ]);
+
+  const handleSubmitForReview = async () => {
+    try {
+      setIsSubmittingForReview(true);
+      const updatedDetails = {
+        ...selectedData,
+        entityStatus: EntityStatus.InReview,
+      };
+      await onUpdate(updatedDetails);
+      showSuccessToast(t('message.submit-for-review-success'));
+      setIsSubmitForReviewModalOpen(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsSubmittingForReview(false);
+    }
+  };
+
+  const isReviewerOrAdmin = useMemo(() => {
+    if (isGlossary || isVersionView) {
+      return false;
+    }
+    const currentUserId = currentUser?.id;
+    const isReviewer = selectedData?.reviewers?.some(
+      (reviewer) => reviewer.id === currentUserId
+    );
+    return (
+      Boolean(currentUser?.isAdmin) ||
+      Boolean(permissions?.EditAll) ||
+      Boolean(permissions?.EditStatus) ||
+      Boolean(isReviewer)
+    );
+  }, [isGlossary, isVersionView, currentUser, permissions, selectedData]);
+
+  const canApproveOrReject = useMemo(() => {
+    return isReviewerOrAdmin && glossaryTermStatus === EntityStatus.InReview;
+  }, [isReviewerOrAdmin, glossaryTermStatus]);
+
+  const handleApproveTerm = async () => {
+    try {
+      setIsApproving(true);
+      const updatedDetails = {
+        ...selectedData,
+        entityStatus: EntityStatus.Approved,
+      };
+      await onUpdate(updatedDetails);
+      showSuccessToast(
+        t('message.entity-approved-success', {
+          entity: t('label.glossary-term'),
+        })
+      );
+      setIsApproveModalOpen(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleRejectTerm = async () => {
+    try {
+      setIsRejecting(true);
+      const updatedDetails = {
+        ...selectedData,
+        entityStatus: EntityStatus.Draft,
+      };
+      await onUpdate(updatedDetails);
+      showSuccessToast(
+        t('message.entity-rejected-success', {
+          entity: t('label.glossary-term'),
+        })
+      );
+      setIsRejectModalOpen(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const addButtonContent = [
     {
       label: t('label.glossary-term'),
@@ -399,6 +559,89 @@ const GlossaryHeader = ({
         ] as ItemType[])
       : []),
 
+    ...(canSubmitForReview
+      ? ([
+          {
+            label: (
+              <ManageButtonItemLabel
+                description={t('message.submit-for-review-help')}
+                icon={PaperPlaneIcon}
+                id="submit-for-review-button"
+                name={t('label.submit-for-review')}
+              />
+            ),
+            key: 'submit-for-review-button',
+            onClick: (e) => {
+              e.domEvent.stopPropagation();
+              setIsSubmitForReviewModalOpen(true);
+              setShowActions(false);
+            },
+          },
+        ] as ItemType[])
+      : []),
+
+    ...(canApproveOrReject
+      ? ([
+          {
+            label: (
+              <ManageButtonItemLabel
+                description={t('message.approve-entity-help', {
+                  entity: t('label.glossary-term'),
+                })}
+                icon={CheckIcon}
+                id="approve-button"
+                name={t('label.approve')}
+              />
+            ),
+            key: 'approve-button',
+            onClick: (e) => {
+              e.domEvent.stopPropagation();
+              setIsApproveModalOpen(true);
+              setShowActions(false);
+            },
+          },
+          {
+            label: (
+              <ManageButtonItemLabel
+                description={t('message.reject-entity-help', {
+                  entity: t('label.glossary-term'),
+                })}
+                icon={RevokeIcon}
+                id="reject-button"
+                name={t('label.reject')}
+              />
+            ),
+            key: 'reject-button',
+            onClick: (e) => {
+              e.domEvent.stopPropagation();
+              setIsRejectModalOpen(true);
+              setShowActions(false);
+            },
+          },
+        ] as ItemType[])
+      : []),
+
+    ...(canRevokeApproval
+      ? ([
+          {
+            label: (
+              <ManageButtonItemLabel
+                description={t('message.revoke-approval-help')}
+                icon={RevokeIcon}
+                id="revoke-approval-button"
+                name={t('label.revoke-approval')}
+              />
+            ),
+            key: 'revoke-approval-button',
+            onClick: (e) => {
+              e.domEvent.stopPropagation();
+              setIsRevokeModalOpen(true);
+              setShowActions(false);
+            },
+          },
+        ] as ItemType[])
+      : []),
+
     ...(permissions.Delete
       ? ([
           {
@@ -513,7 +756,7 @@ const GlossaryHeader = ({
   useEffect(() => {
     const { fullyQualifiedName, name } = selectedData;
     handleBreadcrumb(fullyQualifiedName ?? name);
-  }, [selectedData]);
+  }, [selectedData?.fullyQualifiedName, selectedData?.name]);
 
   useEffect(() => {
     if (isVersionView) {
@@ -664,6 +907,50 @@ const GlossaryHeader = ({
           onCancel={() => setOpenChangeParentHierarchyModal(false)}
         />
       )}
+
+      <ConfirmationModal
+        bodyText={t('message.confirm-revoke-approval-message')}
+        cancelText={t('label.cancel')}
+        confirmText={t('label.revoke-approval')}
+        header={t('message.confirm-revoke-approval-title')}
+        isLoading={isRevoking}
+        visible={isRevokeModalOpen}
+        onCancel={() => setIsRevokeModalOpen(false)}
+        onConfirm={handleRevokeApproval}
+      />
+
+      <ConfirmationModal
+        bodyText={t('message.confirm-submit-for-review-message')}
+        cancelText={t('label.cancel')}
+        confirmText={t('label.submit-for-review')}
+        header={t('message.confirm-submit-for-review-title')}
+        isLoading={isSubmittingForReview}
+        visible={isSubmitForReviewModalOpen}
+        onCancel={() => setIsSubmitForReviewModalOpen(false)}
+        onConfirm={handleSubmitForReview}
+      />
+
+      <ConfirmationModal
+        bodyText={t('message.confirm-approve-glossary-term-message')}
+        cancelText={t('label.cancel')}
+        confirmText={t('label.approve')}
+        header={t('message.confirm-approve-glossary-term-title')}
+        isLoading={isApproving}
+        visible={isApproveModalOpen}
+        onCancel={() => setIsApproveModalOpen(false)}
+        onConfirm={handleApproveTerm}
+      />
+
+      <ConfirmationModal
+        bodyText={t('message.confirm-reject-glossary-term-message')}
+        cancelText={t('label.cancel')}
+        confirmText={t('label.reject')}
+        header={t('message.confirm-reject-glossary-term-title')}
+        isLoading={isRejecting}
+        visible={isRejectModalOpen}
+        onCancel={() => setIsRejectModalOpen(false)}
+        onConfirm={handleRejectTerm}
+      />
     </>
   );
 };

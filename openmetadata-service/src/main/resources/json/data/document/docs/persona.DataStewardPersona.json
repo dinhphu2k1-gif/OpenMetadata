@@ -1,9 +1,9 @@
 {
-  "name": "GeneralUser-GeneralUser",
-  "displayName": "GeneralUser Navigation",
-  "description": "Restricted navigation customization for GeneralUser persona",
+  "name": "DataStewardPersona-DataStewardPersona",
+  "displayName": "Data Steward Persona Navigation",
+  "description": "Restricted navigation for users with the DataSteward role",
   "entityType": "page",
-  "fullyQualifiedName": "persona.GeneralUser",
+  "fullyQualifiedName": "persona.DataStewardPersona",
   "data": {
     "pages": [],
     "navigation": [
@@ -62,7 +62,7 @@
           {
             "id": "/data-marketplace",
             "title": "label.overview",
-            "isHidden": false
+            "isHidden": true
           },
           {
             "id": "/domain",

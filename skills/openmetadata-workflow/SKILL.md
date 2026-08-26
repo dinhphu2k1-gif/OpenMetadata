@@ -19,7 +19,7 @@ This skill is loaded automatically at session start. It ensures you follow the r
 | Bug fix | `/systematic-debugging` then `/tdd` (write regression test) then `/verification` |
 | New API endpoint | `/planning` then `/tdd` then `/test-enforcement` (must include integration test) |
 | New connector | `/connector-standards` then `/connector-building` then `/test-enforcement` |
-| UI component | `/tdd` then `/test-enforcement` (must include Jest + Playwright if user-facing) |
+| UI feature or component | `/openmetadata-ui-feature` (routes presentation, component, workflow, and cross-layer work to proportionate tests) |
 | Code review / PR review | `/code-review` then `/test-enforcement` |
 | Connector review | `/connector-review` |
 | E2E test creation | `/playwright` |

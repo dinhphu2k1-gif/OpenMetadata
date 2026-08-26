@@ -10,9 +10,6 @@
 #  limitations under the License.
 
 volumes:
-  ingestion-volume-dag-airflow:
-  ingestion-volume-dags:
-  ingestion-volume-tmp:
   es-data:
 services:
   postgresql:
@@ -296,8 +293,6 @@ services:
       - local_app_net
 
   openmetadata-server:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     image: openmetadata/server:custom-1.13.3
     container_name: openmetadata_server
     environment:
@@ -484,7 +479,7 @@ services:
       - 8586
       - 5005
     ports:
-      - "80:8585"
+      - "8585:8585"
       - "8586:8586"
       - "5005:5005"
     depends_on:
@@ -499,56 +494,22 @@ services:
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider",  "http://localhost:8586/healthcheck" ]
 
-  # ingestion:
-  #   image: docker.getcollate.io/openmetadata/ingestion:1.13.3
-  #   container_name: openmetadata_ingestion
-  #   environment:
-  #     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-  #     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-  #     AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
-  #     DB_HOST: ${AIRFLOW_DB_HOST:-postgresql}
-  #     DB_PORT: ${AIRFLOW_DB_PORT:-5432}
-  #     AIRFLOW_DB: ${AIRFLOW_DB:-airflow_db}
-  #     DB_USER: ${AIRFLOW_DB_USER:-airflow_user}
-  #     DB_SCHEME: ${AIRFLOW_DB_SCHEME:-postgresql+psycopg2}
-  #     DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_pass}
-  #     # extra connection-string properties for the database
-  #     # EXAMPLE 
-  #     # require SSL (only for Postgres)
-  #     # properties: "?sslmode=require"
-  #     DB_PROPERTIES: ${AIRFLOW_DB_PROPERTIES:-}
-  #     # To test the lineage backend
-  #     # AIRFLOW__LINEAGE__BACKEND: airflow_provider_openmetadata.lineage.backend.OpenMetadataLineageBackend
-  #     # AIRFLOW__LINEAGE__AIRFLOW_SERVICE_NAME: local_airflow
-  #     # AIRFLOW__LINEAGE__OPENMETADATA_API_ENDPOINT: http://openmetadata-server:8585/api
-  #     # AIRFLOW__LINEAGE__JWT_TOKEN: ...
-  #     # AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-  #     # AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: true
-
-  #   entrypoint: /bin/bash
-  #   command:
-  #     - "/opt/airflow/ingestion_dependency.sh"
-  #   depends_on:
-  #     opensearch:
-  #       condition: service_started
-  #     postgresql:
-  #       condition: service_healthy
-  #     openmetadata-server:
-  #       condition: service_started
-  #   expose:
-  #     - 8080
-  #   ports:
-  #     - "8082:8080"
-  #   networks:
-  #     - local_app_net
-  #   volumes:
-  #     - ingestion-volume-dag-airflow:/opt/airflow/dag_generated_configs
-  #     - ingestion-volume-dags:/opt/airflow/dags
-  #     - ingestion-volume-tmp:/tmp
+  openmetadata-ui:
+    image: ${OPENMETADATA_UI_IMAGE:-openmetadata/frontend:custom-1.13.3}
+    container_name: openmetadata_ui
+    expose:
+      - 80
+    ports:
+      - "3000:80"
+    depends_on:
+      openmetadata-server:
+        condition: service_healthy
+    networks:
+      - local_app_net
 
 networks:
   local_app_net:
-    name: ometa_network
+    name: omd_network
     ipam:
       driver: default
       config:

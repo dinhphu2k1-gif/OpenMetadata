@@ -60,7 +60,7 @@ import {
   PlusIconButton,
 } from '../../../common/IconButtons/EditIconButton';
 import { useGenericContext } from '../../../Customization/GenericProvider/GenericProvider';
-import { DEFAULT_GLOSSARY_TERM_RELATION_TYPES_FALLBACK } from '../../../OntologyExplorer/OntologyExplorer.constants';
+import { DEFAULT_GLOSSARY_TERM_RELATION_TYPES_FALLBACK } from '../../../../constants/Glossary.contant';
 import {
   RelatedTermTagButtonProps,
   RelationEditRow,

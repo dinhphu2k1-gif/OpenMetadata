@@ -128,6 +128,14 @@ describe('Test PropertyValue Component', () => {
     expect(iconElement).not.toBeInTheDocument();
   });
 
+  it('Should render an overridden custom property display name', async () => {
+    render(<PropertyValue {...mockData} propertyDisplayName="Notes" />);
+
+    expect(await screen.findByTestId('property-name')).toHaveTextContent(
+      'Notes'
+    );
+  });
+
   it('Should render richtext previewer component for markdown type', async () => {
     const extension = { yNumber: 'markdown value' };
     const propertyType = {

@@ -18,11 +18,19 @@ import {
 } from './BasicConsumerNavigation';
 
 describe('BasicConsumerNavigation', () => {
-  it('recognizes the Basic Consumer persona by name or FQN', () => {
+  it('recognizes the Basic Consumer and standard restricted personas by name or FQN', () => {
     expect(isBasicConsumerPersona({ name: 'BasicConsumerPersona' })).toBe(true);
+    expect(isBasicConsumerPersona({ name: 'DataConsumerPersona' })).toBe(true);
+    expect(isBasicConsumerPersona({ name: 'DataProposerPersona' })).toBe(true);
+    expect(isBasicConsumerPersona({ name: 'DataStewardPersona' })).toBe(true);
     expect(
       isBasicConsumerPersona({
         fullyQualifiedName: 'persona.BasicConsumerPersona',
+      })
+    ).toBe(true);
+    expect(
+      isBasicConsumerPersona({
+        fullyQualifiedName: 'persona.DataConsumerPersona',
       })
     ).toBe(true);
     expect(isBasicConsumerPersona({ name: 'GeneralUser' })).toBe(false);

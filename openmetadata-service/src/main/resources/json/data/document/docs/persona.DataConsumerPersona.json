@@ -1,0 +1,113 @@
+{
+  "name": "DataConsumerPersona-DataConsumerPersona",
+  "displayName": "Data Consumer Persona Navigation",
+  "description": "Restricted navigation for users with the DataConsumer role",
+  "entityType": "page",
+  "fullyQualifiedName": "persona.DataConsumerPersona",
+  "data": {
+    "pages": [],
+    "navigation": [
+      {
+        "id": "/my-data",
+        "title": "label.home",
+        "isHidden": false
+      },
+      {
+        "id": "/explore",
+        "title": "label.explore",
+        "isHidden": false
+      },
+      {
+        "id": "/lineage",
+        "title": "label.lineage",
+        "isHidden": true
+      },
+      {
+        "id": "/observability",
+        "title": "label.observability",
+        "isHidden": true,
+        "children": [
+          {
+            "id": "/data-quality",
+            "title": "label.data-quality",
+            "isHidden": true
+          },
+          {
+            "id": "/incident-manager",
+            "title": "label.incident-manager",
+            "isHidden": true
+          },
+          {
+            "id": "/observability/alerts",
+            "title": "label.alert-plural",
+            "isHidden": true
+          },
+          {
+            "id": "/test-library",
+            "title": "label.test-library",
+            "isHidden": true
+          }
+        ]
+      },
+      {
+        "id": "/data-insight",
+        "title": "label.insight-plural",
+        "isHidden": true
+      },
+      {
+        "id": "/data-marketplace-section",
+        "title": "label.data-marketplace-section",
+        "isHidden": false,
+        "children": [
+          {
+            "id": "/data-marketplace",
+            "title": "label.overview",
+            "isHidden": true
+          },
+          {
+            "id": "/domain",
+            "title": "label.domain-plural",
+            "isHidden": false
+          },
+          {
+            "id": "/dataProduct",
+            "title": "label.data-product-plural",
+            "isHidden": true
+          }
+        ]
+      },
+      {
+        "id": "governance",
+        "title": "label.govern",
+        "isHidden": false,
+        "children": [
+          {
+            "id": "/glossary",
+            "title": "label.glossary",
+            "isHidden": false
+          },
+          {
+            "id": "/ontology-explorer",
+            "title": "label.ontology-explorer",
+            "isHidden": true
+          },
+          {
+            "id": "/tags",
+            "title": "label.classification",
+            "isHidden": false
+          },
+          {
+            "id": "/metrics",
+            "title": "label.metric-plural",
+            "isHidden": true
+          },
+          {
+            "id": "/column-bulk-operations",
+            "title": "label.column-bulk-operations",
+            "isHidden": true
+          }
+        ]
+      }
+    ]
+  }
+}

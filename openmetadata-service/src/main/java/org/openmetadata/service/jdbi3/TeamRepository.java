@@ -1076,10 +1076,6 @@ public class TeamRepository extends EntityRepository<Team> {
       LOG.debug("Organization {} is not initialized", ORGANIZATION_NAME);
       // Teams
       try {
-        EntityReference organizationPolicy =
-            Entity.getEntityReferenceByName(POLICY, "OrganizationPolicy", Include.ALL);
-        EntityReference dataConsumerRole =
-            Entity.getEntityReferenceByName(ROLE, "DataConsumer", Include.ALL);
         Team team =
             new Team()
                 .withId(UUID.randomUUID())
@@ -1089,8 +1085,10 @@ public class TeamRepository extends EntityRepository<Team> {
                 .withTeamType(ORGANIZATION)
                 .withUpdatedBy(ADMIN_USER_NAME)
                 .withUpdatedAt(System.currentTimeMillis())
-                .withPolicies(new ArrayList<>(List.of(organizationPolicy)))
-                .withDefaultRoles(new ArrayList<>(List.of(dataConsumerRole)));
+                // Organization is a structural root, not an authorization grant. Roles and policies
+                // must be assigned explicitly to the appropriate user or business team.
+                .withPolicies(new ArrayList<>())
+                .withDefaultRoles(new ArrayList<>());
         organization = create(null, team);
         LOG.info(
             "Organization {}:{} is successfully initialized",
@@ -1101,8 +1099,31 @@ public class TeamRepository extends EntityRepository<Team> {
         throw e;
       }
     } else {
-      LOG.info("Organization is already initialized");
+      clearOrganizationAuthorizationGrants();
+      LOG.info("Organization is already initialized without default roles or policies");
     }
+  }
+
+  /**
+   * Organization is the required root of the team hierarchy, but it must never grant catalog
+   * access implicitly. Run this on every startup so existing installations converge to the
+   * least-privilege model when a newly built image is deployed.
+   */
+  private void clearOrganizationAuthorizationGrants() {
+    List<EntityReference> defaultRoles = findTo(organization.getId(), TEAM, Relationship.HAS, Entity.ROLE);
+    List<EntityReference> policies = findTo(organization.getId(), TEAM, Relationship.HAS, POLICY);
+    if (defaultRoles.isEmpty() && policies.isEmpty()) {
+      return;
+    }
+
+    deleteTo(organization.getId(), TEAM, Relationship.HAS, Entity.ROLE);
+    deleteTo(organization.getId(), TEAM, Relationship.HAS, POLICY);
+    organization.setDefaultRoles(new ArrayList<>());
+    organization.setPolicies(new ArrayList<>());
+    LOG.info(
+        "Removed {} default role(s) and {} policy/policies from Organization during startup",
+        defaultRoles.size(),
+        policies.size());
   }
 
   public static class TeamCsv extends EntityCsv<Team> {

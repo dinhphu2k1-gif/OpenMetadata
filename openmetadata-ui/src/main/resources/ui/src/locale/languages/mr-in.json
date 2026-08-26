@@ -1,4 +1,19 @@
 {
+  "cde": {
+    "business-group": "Business Group",
+    "business-meaning": "Business Meaning",
+    "business-term-name": "Business Term Name",
+    "data-classification": "Data Classification",
+    "data-governance-review": "Data Governance Review",
+    "data-owner": "Data Owner",
+    "data-quality-rules": "Data Quality Rules",
+    "data-source": "Data Source",
+    "notes": "Notes",
+    "personal-data": "Personal Data",
+    "related-regulatory-documents": "Related Regulatory Documents",
+    "term-code": "Term Code",
+    "entity-relationship": "Entity Relationship"
+  },
   "label": {
     "-with-colon": "{{text}}:",
     "1-day": "1 दिवस",

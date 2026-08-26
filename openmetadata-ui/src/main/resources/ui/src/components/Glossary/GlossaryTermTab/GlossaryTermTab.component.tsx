@@ -591,39 +591,101 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   );
 
   const handleApproveGlossaryTerm = useCallback(
-    (record: ModifiedGlossaryTerm) => {
+    async (record: ModifiedGlossaryTerm) => {
       const { permission, taskId } = permissionForApproveOrReject(
         record,
         currentUser as User,
-        termTaskThreads
+        termTaskThreads,
+        activeGlossary?.reviewers,
+        permissions
       );
 
-      if (!permission || !taskId) {
+      if (!permission) {
         return;
       }
 
-      const data = { newValue: 'approved' } as ResolveTask;
-      updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
+      if (taskId) {
+        const data = { newValue: 'approved' } as ResolveTask;
+        updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
+      } else {
+        try {
+          const jsonPatch = [
+            {
+              op: 'replace',
+              path: '/entityStatus',
+              value: EntityStatus.Approved,
+            },
+          ];
+          await patchGlossaryTerm(record.id, jsonPatch);
+          refreshGlossaryTerms && refreshGlossaryTerms();
+          showSuccessToast(
+            t('message.entity-approved-success', {
+              entity: t('label.glossary-term'),
+            })
+          );
+        } catch (error) {
+          showErrorToast(error as AxiosError);
+        }
+      }
     },
-    [currentUser, termTaskThreads, updateTaskData]
+    [
+      currentUser,
+      termTaskThreads,
+      activeGlossary?.reviewers,
+      permissions,
+      updateTaskData,
+      refreshGlossaryTerms,
+      t,
+    ]
   );
 
   const handleRejectGlossaryTerm = useCallback(
-    (record: ModifiedGlossaryTerm) => {
+    async (record: ModifiedGlossaryTerm) => {
       const { permission, taskId } = permissionForApproveOrReject(
         record,
         currentUser as User,
-        termTaskThreads
+        termTaskThreads,
+        activeGlossary?.reviewers,
+        permissions
       );
 
-      if (!permission || !taskId) {
+      if (!permission) {
         return;
       }
 
-      const data = { newValue: 'rejected' } as ResolveTask;
-      updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
+      if (taskId) {
+        const data = { newValue: 'rejected' } as ResolveTask;
+        updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
+      } else {
+        try {
+          const jsonPatch = [
+            {
+              op: 'replace',
+              path: '/entityStatus',
+              value: EntityStatus.Draft,
+            },
+          ];
+          await patchGlossaryTerm(record.id, jsonPatch);
+          refreshGlossaryTerms && refreshGlossaryTerms();
+          showSuccessToast(
+            t('message.entity-rejected-success', {
+              entity: t('label.glossary-term'),
+            })
+          );
+        } catch (error) {
+          showErrorToast(error as AxiosError);
+        }
+      }
     },
-    [currentUser, termTaskThreads, updateTaskData]
+    [
+      currentUser,
+      termTaskThreads,
+      activeGlossary?.reviewers,
+      permissions,
+      updateTaskData,
+      refreshGlossaryTerms,
+      t,
+    ]
   );
 
   const handleLoadMoreChildren = useCallback(
@@ -744,13 +806,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           }
 
           const status = record.entityStatus ?? EntityStatus.Approved;
-          const { permission, taskId } = permissionForApproveOrReject(
+          const { permission } = permissionForApproveOrReject(
             record,
             currentUser as User,
-            termTaskThreads
+            termTaskThreads,
+            activeGlossary?.reviewers,
+            permissions
           );
 
-          if (status === EntityStatus.InReview && permission && taskId) {
+          if (status === EntityStatus.InReview && permission) {
             return (
               <StatusAction
                 dataTestId={record.name}
@@ -904,6 +968,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         ...getCDEGlossaryTableColumns({
           handleLoadMoreChildren,
           loadingChildren,
+          t,
         }),
         ...governanceColumns,
       ];
@@ -919,6 +984,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     handleLoadMoreChildren,
     isCDEGlossary,
     loadingChildren,
+    t,
   ]);
 
   const handleCheckboxChange = useCallback(

@@ -39,6 +39,7 @@ import {
 } from '../../rest/glossaryAPI';
 import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
 import { updateGlossaryTermByFqn } from '../../utils/GlossaryUtils';
+import { isDataDictionaryGlossary } from '../../constants/Glossary.contant';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
@@ -283,6 +284,9 @@ const GlossaryV1 = ({
   const handleGlossaryTermAdd = async (formData: GlossaryTermForm) => {
     const term = await addGlossaryTerm({
       ...formData,
+      domains: formData.domains?.map((domain) =>
+        domain.fullyQualifiedName ?? domain.name ?? ''
+      ),
       glossary:
         activeGlossaryTerm?.glossary?.name ||
         (selectedData.fullyQualifiedName ?? ''),
@@ -308,6 +312,8 @@ const GlossaryV1 = ({
           owners,
           relatedTerms,
           style,
+          domains,
+          extension,
         } = formData || {};
 
         newTermData.name = name;
@@ -324,6 +330,8 @@ const GlossaryV1 = ({
           id: term,
           type: 'glossaryTerm',
         }));
+        newTermData.domains = domains;
+        newTermData.extension = extension;
         await updateGlossaryTerm(activeGlossaryTerm, newTermData);
       }
     } else {
@@ -496,6 +504,10 @@ const GlossaryV1 = ({
         <GlossaryTermModal
           editMode={editMode}
           glossaryTermFQN={activeGlossaryTerm?.fullyQualifiedName}
+          isCDEGlossary={isDataDictionaryGlossary(
+            activeGlossary?.name,
+            activeGlossary?.displayName
+          )}
           visible={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}
           onSave={handleGlossaryTermSave}

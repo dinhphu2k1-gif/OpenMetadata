@@ -12,10 +12,6 @@
  */
 
 import { Graph } from '@antv/g6';
-import {
-  GlossaryTermRelationType,
-  RelationCategory,
-} from '../../generated/configuration/glossaryTermRelationSettings';
 
 /** Synthetic id for the glossary/relation "All" option in ontology filter autocompletes */
 export const ONTOLOGY_AUTOCOMPLETE_ALL_ID = '__all__';
@@ -25,17 +21,6 @@ export const GLOSSARY_TERM_ASSET_COUNT_FETCH_CONCURRENCY = 4;
 
 export const withoutOntologyAutocompleteAll = (ids: string[]): string[] =>
   ids.filter((id) => id !== ONTOLOGY_AUTOCOMPLETE_ALL_ID);
-
-export const DEFAULT_GLOSSARY_TERM_RELATION_TYPES_FALLBACK: GlossaryTermRelationType[] =
-  [
-    {
-      name: 'relatedTo',
-      displayName: 'Related To',
-      description: 'General associative relationship',
-      isSymmetric: true,
-      category: RelationCategory.Associative,
-    },
-  ];
 
 export const RELATION_META: Record<
   string,

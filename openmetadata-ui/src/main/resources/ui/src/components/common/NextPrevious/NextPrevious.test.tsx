@@ -25,6 +25,10 @@ const computeTotalPages = jest
   });
 
 describe('Test Pagination Component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('Component should render', () => {
     const paging = {
       after: 'afterString',
@@ -186,7 +190,7 @@ describe('Test Pagination Component', () => {
     expect(previous).not.toBeDisabled();
   });
 
-  it('should render proper page indicator', () => {
+  it('should render proper page indicator with input when total pages > 1', () => {
     const paging = {
       before: 'test',
       after: '',
@@ -207,15 +211,15 @@ describe('Test Pagination Component', () => {
     const next = getByTestId('next');
     const previous = getByTestId('previous');
     const pageIndicator = getByTestId('page-indicator');
+    const pageInput = getByTestId('page-number-input');
 
     expect(next).toBeDisabled();
     expect(previous).not.toBeDisabled();
 
     expect(pageIndicator).toBeInTheDocument();
-
-    expect(pageIndicator).toHaveTextContent(
-      `label.page ${totalPage} label.of ${totalPage}`
-    );
+    expect(pageInput).toBeInTheDocument();
+    expect(pageIndicator).toHaveTextContent('label.page');
+    expect(pageIndicator).toHaveTextContent(`label.of ${totalPage}`);
   });
 
   it('On clicking Previous and Next button respective pages should be rendered', async () => {
@@ -250,5 +254,29 @@ describe('Test Pagination Component', () => {
     });
 
     expect(mockCallback).toHaveBeenCalledTimes(2);
+  });
+
+  it('should trigger page change when page number is changed via input', () => {
+    const paging = {
+      before: 'test',
+      after: 'test',
+      total: PAGE_SIZE * 5,
+    };
+
+    const { getByRole } = render(
+      <NextPrevious
+        isNumberBased
+        currentPage={1}
+        pageSize={PAGE_SIZE}
+        paging={paging}
+        pagingHandler={mockCallback}
+      />
+    );
+
+    const spinButton = getByRole('spinbutton');
+    fireEvent.change(spinButton, { target: { value: '3' } });
+    fireEvent.keyDown(spinButton, { key: 'Enter', code: 'Enter' });
+
+    expect(mockCallback).toHaveBeenCalledWith({ currentPage: 3 });
   });
 });

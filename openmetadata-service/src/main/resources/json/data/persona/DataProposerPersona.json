@@ -1,0 +1,6 @@
+{
+  "name": "DataProposerPersona",
+  "displayName": "Data Proposer Persona",
+  "description": "Navigation persona for DataProposer users",
+  "default": false
+}

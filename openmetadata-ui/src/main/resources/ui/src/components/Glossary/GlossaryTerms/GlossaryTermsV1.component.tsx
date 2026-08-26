@@ -94,6 +94,13 @@ const GlossaryTermsV1 = ({
   const { onAddGlossaryTerm } = useGlossaryStore();
   const { permissions } = useGenericContext<GlossaryTerm>();
   const { customizedPage, isLoading } = useCustomPages(PageType.GlossaryTerm);
+  const customizedTabs = useMemo(() => {
+    const tabs = customizedPage?.tabs?.filter(
+      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH
+    );
+
+    return tabs?.length ? tabs : undefined;
+  }, [customizedPage?.tabs]);
   const { t } = useTranslation();
 
   const assetPermissions = useMemo(() => {
@@ -105,7 +112,7 @@ const GlossaryTermsV1 = ({
       : MOCK_GLOSSARY_NO_PERMISSIONS;
   }, [glossaryTerm, permissions]);
 
-  const activeTabHandler = (tab: string) => {
+  const activeTabHandler = useCallback((tab: string) => {
     navigate(
       {
         pathname: version
@@ -114,7 +121,13 @@ const GlossaryTermsV1 = ({
       },
       { replace: true }
     );
-  };
+  }, [glossaryFqn, navigate, version]);
+
+  useEffect(() => {
+    if (activeTab === EntityTabs.RELATIONS_GRAPH) {
+      activeTabHandler(EntityTabs.OVERVIEW);
+    }
+  }, [activeTab, activeTabHandler]);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
     setFeedCount(data);
@@ -152,7 +165,7 @@ const GlossaryTermsV1 = ({
     fetchGlossaryTermAssets();
     assetTabRef.current?.refreshAssets();
     activeTab !== EntityTabs.ASSETS && activeTabHandler(EntityTabs.ASSETS);
-  }, [assetTabRef, activeTab]);
+  }, [assetTabRef, activeTab, activeTabHandler]);
 
   const onTermUpdate = async (data: GlossaryTerm | Glossary) => {
     await handleGlossaryTermUpdate(data as GlossaryTerm);
@@ -187,7 +200,7 @@ const GlossaryTermsV1 = ({
   );
 
   const tabItems = useMemo(() => {
-    const tabLabelMap = getTabLabelMapFromTabs(customizedPage?.tabs);
+    const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
     const items = glossaryTermClassBase.getGlossaryTermDetailPageTabs({
       glossaryTerm,
@@ -211,7 +224,7 @@ const GlossaryTermsV1 = ({
 
     const detailTabs = getDetailsTabWithNewLabel(
       items,
-      customizedPage?.tabs,
+      customizedTabs,
       EntityTabs.OVERVIEW,
       isVersionView
     );
@@ -229,7 +242,7 @@ const GlossaryTermsV1 = ({
         : tab
     );
   }, [
-    customizedPage?.tabs,
+    customizedTabs,
     glossaryTerm,
     viewCustomPropertiesPermission,
     activeTab,
