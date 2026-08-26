@@ -118,7 +118,7 @@ describe('TagClassBase', () => {
     it('limits results to the requested classification when a filter is provided', async () => {
       (searchQuery as jest.Mock).mockResolvedValue(mockSearchResponse('test'));
 
-      await tagClassBase.getTags('test', 1, false, 'Phan_loai_du_lieu');
+      await tagClassBase.getTags('test', 1, false, 'DataClassification');
 
       expect(searchQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -129,7 +129,7 @@ describe('TagClassBase', () => {
                   { term: { disabled: 'false' } },
                   {
                     term: {
-                      'classification.name.keyword': 'Phan_loai_du_lieu',
+                      'classification.name.keyword': 'DataClassification',
                     },
                   },
                 ],

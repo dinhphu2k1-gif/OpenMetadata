@@ -11,14 +11,20 @@
  *  limitations under the License.
  */
 
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
+import { EntityTabs } from '../../../enums/entity.enum';
 import { OperationPermission } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import {
   mockedGlossaries,
   MOCK_PERMISSIONS,
 } from '../../../mocks/Glossary.mock';
+import { getGlossaryTermDetailsPath } from '../../../utils/RouterUtils';
+import { useRequiredParams } from '../../../utils/useRequiredParams';
+import { useGlossaryStore } from '../useGlossary.store';
 import GlossaryDetails from './GlossaryDetails.component';
+
+const mockNavigate = jest.fn();
 
 jest.mock('../GlossaryTermTab/GlossaryTermTab.component', () => {
   return jest.fn().mockReturnValue(<p>GlossaryTermTab.component</p>);
@@ -36,7 +42,11 @@ jest.mock('react-router-dom', () => ({
     glossaryName: 'GlossaryName',
     tab: 'terms',
   })),
-  useNavigate: jest.fn().mockReturnValue(jest.fn()),
+  useNavigate: jest.fn().mockImplementation(() => mockNavigate),
+}));
+
+jest.mock('../../../utils/useRequiredParams', () => ({
+  useRequiredParams: jest.fn(),
 }));
 
 jest.mock(
@@ -96,6 +106,14 @@ jest.mock('../../../utils/CustomizePage/CustomizePageEntityTabUtils', () => ({
 }));
 
 describe('Test Glossary-details component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useGlossaryStore.setState({ activeGlossary: mockedGlossaries[0] });
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.TERMS,
+    });
+  });
+
   it('Should render Glossary-details component', async () => {
     await act(async () => {
       render(<GlossaryDetails {...mockProps} />);
@@ -107,6 +125,24 @@ describe('Test Glossary-details component', () => {
     expect(headerComponent).toBeInTheDocument();
     expect(glossaryDetails).toBeInTheDocument();
     expect(await screen.findByText('GenericTab')).toBeInTheDocument();
+  });
+
+  it('redirects the legacy Relations Graph URL to Terms', async () => {
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.RELATIONS_GRAPH,
+    });
+
+    render(<GlossaryDetails {...mockProps} />);
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(
+        getGlossaryTermDetailsPath(
+          mockedGlossaries[0].fullyQualifiedName ?? mockedGlossaries[0].name,
+          EntityTabs.TERMS
+        ),
+        { replace: true }
+      )
+    );
   });
 
   it('should show the action opposite to the glossary information state', async () => {

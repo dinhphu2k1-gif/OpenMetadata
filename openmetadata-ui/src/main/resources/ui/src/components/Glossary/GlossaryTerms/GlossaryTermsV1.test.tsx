@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { OperationPermission } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import { EntityTabs } from '../../../enums/entity.enum';
 import { EntityReference } from '../../../generated/entity/type';
@@ -22,6 +22,10 @@ import {
 } from '../../../mocks/Glossary.mock';
 import * as CommonUtils from '../../../utils/CommonUtils';
 import glossaryTermClassBase from '../../../utils/Glossary/GlossaryTermClassBase';
+import { useCustomPages } from '../../../hooks/useCustomPages';
+import {
+  getDetailsTabWithNewLabel,
+} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import GlossaryTerms from './GlossaryTermsV1.component';
 
@@ -76,12 +80,6 @@ jest.mock('../../Customization/GenericTab/GenericTab', () => ({
 jest.mock('./CDEGlossaryTermOverview', () =>
   jest.fn().mockImplementation(() => <div>CDEGlossaryTermOverview</div>)
 );
-jest.mock('../../OntologyExplorer', () => ({
-  OntologyExplorer: jest
-    .fn()
-    .mockImplementation(() => <div>OntologyExplorer</div>),
-}));
-
 const mockProps = {
   isSummaryPanelOpen: false,
   permissions: {
@@ -160,6 +158,18 @@ jest.mock('../../Customization/GenericProvider/GenericProvider', () => {
 });
 
 describe('Test Glossary-term component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: undefined,
+      version: 'glossaryVersion',
+    });
+    (useCustomPages as jest.Mock).mockReturnValue({
+      customizedPage: null,
+      isLoading: false,
+    });
+  });
+
   it('Should render overview tab when activeTab is undefined', async () => {
     render(<GlossaryTerms {...mockProps} />);
 
@@ -167,7 +177,7 @@ describe('Test Glossary-term component', () => {
 
     const tabs = await screen.findAllByRole('tab');
 
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(6);
     expect(tabs[0].textContent).toBe('label.overview');
 
     tabs
@@ -177,6 +187,44 @@ describe('Test Glossary-term component', () => {
       });
 
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('redirects the legacy Relations Graph URL to Overview', async () => {
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.RELATIONS_GRAPH,
+      version: undefined,
+    });
+
+    render(<GlossaryTerms {...mockProps} />);
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        { pathname: '/glossary/glossaryTerm/overview' },
+        { replace: true }
+      )
+    );
+  });
+
+  it('filters Relations Graph from saved custom tabs', () => {
+    const overviewTab = { id: EntityTabs.OVERVIEW, name: 'Overview' };
+    (useCustomPages as jest.Mock).mockReturnValue({
+      customizedPage: {
+        tabs: [
+          { id: EntityTabs.RELATIONS_GRAPH, name: 'Relations Graph' },
+          overviewTab,
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<GlossaryTerms {...mockProps} />);
+
+    expect(getDetailsTabWithNewLabel).toHaveBeenCalledWith(
+      expect.any(Array),
+      [overviewTab],
+      EntityTabs.OVERVIEW,
+      undefined
+    );
   });
 
   it('should replace the standard overview widgets with the CDE overview', async () => {
@@ -210,13 +258,12 @@ describe('Test Glossary-term component', () => {
 
     expect(await screen.findByText('GlossaryTermTab')).toBeInTheDocument();
 
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(6);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',
       'label.glossary-term-plural2',
       'label.asset-plural0',
       'label.activity-feed-and-task-plural0',
-      'label.relations-graph',
       'label.custom-property-plural',
       'label.data-observability',
     ]);

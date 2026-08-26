@@ -79,5 +79,32 @@
     color: @grey-700;
     font-weight: @font-medium;
     font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    .pagination-page-input {
+      width: 52px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid @grey-300;
+      background: @white;
+
+      .ant-input-number-input {
+        height: 26px;
+        text-align: center;
+        padding: 0 4px;
+        font-size: 13px;
+        font-weight: 600;
+        color: @text-color;
+      }
+
+      &:hover,
+      &:focus,
+      &.ant-input-number-focused {
+        border-color: @primary-color;
+        box-shadow: 0 0 0 2px rgba(0, 131, 89, 0.15);
+      }
+    }
   }
 }

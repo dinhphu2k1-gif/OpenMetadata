@@ -431,11 +431,6 @@
   color: #6941c6;
 }
 
-.cde-value-pill-review {
-  background: #ecfdf3;
-  color: #027a48;
-}
-
 .cde-value-pill-personal {
   background: #fffaeb;
   color: #b54708;
@@ -454,30 +449,13 @@
 .cde-glossary-term-overview {
   margin: 16px;
 
-  .cde-glossary-term-overview-content {
-    padding: 16px;
-    border: 1px solid @grey-300;
-    border-radius: 10px;
-    background: @white;
-  }
-
-  .cde-glossary-term-overview-grid {
-    overflow: hidden;
-    border: 1px solid @grey-300;
-    border-radius: 10px;
-    background: @white;
-  }
-
-  .cde-glossary-term-overview-grid {
-    margin-top: 16px;
-  }
-
   .cde-glossary-term-description {
     height: 100%;
 
     .ant-card.new-description-card {
       height: 100%;
       border: 1px solid @grey-300;
+      border-radius: 10px;
       background: @white;
     }
   }
@@ -485,39 +463,71 @@
   .cde-glossary-term-overview-reviewers {
     height: 100%;
   }
+
+  .cde-glossary-term-overview-summary {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
 }
 
 .cde-detail-summary {
+  overflow: hidden;
+  border: 1px solid @grey-300;
+  border-radius: 10px;
+  background: @white;
+
   .cde-detail-field {
-    min-height: 86px;
-    padding: 12px 16px;
+    min-height: 80px;
+    padding: 14px 16px;
     border-bottom: 1px solid @grey-300;
     background: @white;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
   }
 
   .cde-detail-field:nth-child(odd) {
     border-right: 1px solid @grey-300;
   }
 
+  .cde-detail-field:nth-last-child(1),
+  .cde-detail-field:nth-last-child(2) {
+    border-bottom: 0;
+  }
+
   .cde-detail-field-label {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 8px;
-    color: #344054;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 18px;
+
+    .ant-typography {
+      font-size: 14px;
+      font-weight: 500;
+      color: @text-color;
+      line-height: 20px;
+    }
   }
 
   .cde-detail-field-value {
-    color: #344054;
-    font-size: 13px;
+    color: @text-color;
+    font-size: 14px;
     line-height: 20px;
+  }
+
+  .cde-detail-field-markdown-content {
+    font-size: 14px;
+    line-height: 22px;
+    color: @text-color;
   }
 
   .cde-related-regulation a {
     color: @primary-color;
   }
 
+  .cde-detail-field-DataSource .ant-tag.tag-chip-content,
   .cde-detail-field-Nguon_du_lieu .ant-tag.tag-chip-content {
     background: #eff8ff;
 
@@ -526,6 +536,7 @@
     }
   }
 
+  .cde-detail-field-DataClassification .ant-tag.tag-chip-content,
   .cde-detail-field-Phan_loai_du_lieu .ant-tag.tag-chip-content {
     background: #f4ebff;
 
@@ -534,14 +545,7 @@
     }
   }
 
-  .cde-detail-field-QTDL_ra_soat .ant-tag.tag-chip-content {
-    background: #ecfdf3;
-
-    .tags-label {
-      color: #027a48 !important;
-    }
-  }
-
+  .cde-detail-field-PersonalData .ant-tag.tag-chip-content,
   .cde-detail-field-Du_lieu_ca_nhan .ant-tag.tag-chip-content {
     background: #fffaeb;
 
@@ -549,9 +553,7 @@
       color: #b54708 !important;
     }
   }
-}
 
-.cde-detail-summary {
   .cde-owner-field-value,
   .cde-domain-field-value,
   .cde-owner-list {
@@ -576,6 +578,26 @@
     padding: 0;
     border: 0;
     background: transparent;
+  }
+
+  .custom-properties-two-column {
+    margin: 0 !important;
+
+    > .ant-col {
+      min-width: 0;
+      max-width: none;
+      padding: 0 !important;
+
+      &:nth-child(odd) {
+        border-right: 1px solid @grey-300;
+      }
+
+      > div {
+        height: 100%;
+        min-height: 86px;
+        margin-bottom: 0 !important;
+      }
+    }
   }
 
   .custom-properties-two-column-last-full-width {
@@ -617,21 +639,25 @@
 @media (max-width: 767px) {
   .cde-glossary-term-overview {
     margin: 12px;
-
-    .cde-glossary-term-overview-content {
-      padding: 12px;
-    }
   }
 
   .cde-detail-summary {
     .cde-detail-field:nth-child(odd) {
       border-right: 0;
     }
+    .cde-detail-field {
+      border-bottom: 1px solid @grey-300 !important;
+    }
+    .cde-detail-field:last-child {
+      border-bottom: 0 !important;
+    }
   }
 
   .cde-custom-properties {
+    .custom-properties-two-column > .ant-col:nth-child(odd),
     .custom-properties-two-column-last-full-width > .ant-col:nth-child(odd) {
       border-right: 0;
+      border-bottom: 1px solid @grey-300;
     }
   }
 }
@@ -747,6 +773,38 @@
   }
 }
 
+.cde-glossary-term-form--add {
+  gap: 12px;
+
+  .cde-form-section {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .cde-form-business-meaning {
+    .block-editor-wrapper.block-editor-wrapper--bar-menu {
+      .om-block-editor {
+        max-height: 132px;
+        min-height: 100px;
+      }
+
+      .om-block-editor > p:last-child {
+        padding-bottom: 56px;
+      }
+    }
+  }
+
+  .cde-form-tag-source,
+  .cde-form-tag-classification,
+  .cde-form-tag-personal {
+    .ant-select-selector {
+      background-color: @white !important;
+      border-color: @grey-300 !important;
+    }
+  }
+}
+
 .cde-glossary-term-modal {
   .ant-modal-header {
     padding: 16px 24px 12px;
@@ -772,6 +830,15 @@
   }
 }
 
+@media (min-width: 1440px) and (min-height: 900px) {
+  .cde-glossary-term-modal--add {
+    .ant-modal-body {
+      max-height: none;
+      overflow-y: visible;
+    }
+  }
+}
+
 @media (max-width: 767px) {
   .cde-glossary-term-modal {
     width: calc(100vw - 24px) !important;
@@ -787,10 +854,6 @@
   .cde-glossary-term-form {
     gap: 12px;
 
-    .cde-form-section {
-      padding: 12px;
-    }
-
     .cde-form-grid {
       grid-template-columns: 1fr;
     }
@@ -798,5 +861,9 @@
     .cde-form-field-full {
       grid-column: auto;
     }
+  }
+
+  .cde-glossary-term-form--edit .cde-form-section {
+    padding: 12px;
   }
 }

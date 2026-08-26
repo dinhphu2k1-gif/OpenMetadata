@@ -2,39 +2,135 @@
   "name": "DataConsumerPolicy",
   "displayName": "Data Consumer Policy",
   "fullyQualifiedName": "DataConsumerPolicy",
-  "description": "Policy for Data Consumer: View all assets, contribute metadata, and create glossary terms",
+  "description": "Strict Least-Privilege Read-Only Policy for Data Consumer (Internal Viewer): Full read-only view of business & technical assets. Explicit Deny on all mutations and platform administration.",
   "enabled": true,
   "allowDelete": false,
   "provider": "system",
   "rules": [
     {
-      "name": "DataConsumerPolicy-CreateRule",
-      "description": "Allow creating new glossary terms strictly within the glossary resource",
-      "resources": ["glossaryTerm"],
-      "operations": ["Create"],
+      "name": "DataConsumer-ViewAllRule",
+      "description": "Allow read-only view on all metadata assets",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
       "effect": "allow"
     },
     {
-      "name": "DataConsumerPolicy-ManageUnapprovedGlossaryTermRule",
-      "description": "Cho phép người tạo toàn quyền xem, sửa mọi thông tin (Mô tả, Từ đồng nghĩa, Tham chiếu, Nhãn, Thuộc tính...) và xóa thuật ngữ của chính mình khi chưa được phê duyệt",
-      "resources": ["glossaryTerm"],
-      "operations": ["All"],
-      "effect": "allow",
-      "condition": "isCreator() && notApproved()"
-    },
-    {
-      "name": "DataConsumerPolicy-EditRule",
-      "description": "Allow collaborative editing (descriptions, tags, tiers, status) on all metadata assets",
-      "resources": ["all"],
-      "operations": ["EditCertification", "EditDescription", "EditDisplayName", "EditGlossaryTerms", "EditStatus", "EditTags", "EditTier"],
+      "name": "DataConsumer-ViewCollaborationRule",
+      "description": "Allow read-only view on discussion feeds and threads",
+      "resources": [
+        "feed",
+        "thread"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
       "effect": "allow"
     },
     {
-      "name": "DataConsumerPolicy-ViewRule",
-      "description": "Allow viewing all metadata entities in the catalog",
-      "resources": ["all"],
-      "operations": ["ViewAll"],
-      "effect": "allow"
+      "name": "DataConsumer-DenyAllNonReadOperations",
+      "description": "Explicitly deny all mutating, editing, deleting, deploying, and triggering operations when not owner",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "AuditLogs",
+        "BulkCreate",
+        "BulkUpdate",
+        "Create",
+        "CreateIngestionPipelineAutomator",
+        "CreateScim",
+        "CreateTests",
+        "Delete",
+        "DeleteScim",
+        "DeleteTestCaseFailedRowsSample",
+        "Deploy",
+        "EditAll",
+        "EditCertification",
+        "EditCustomFields",
+        "EditDataProfile",
+        "EditDescription",
+        "EditDisplayName",
+        "EditEntityRelationship",
+        "EditGlossaryTerms",
+        "EditIngestionPipelineStatus",
+        "EditKnowledgePanel",
+        "EditLifeCycle",
+        "EditLineage",
+        "EditOwners",
+        "EditPage",
+        "EditPolicy",
+        "EditQueries",
+        "EditReviewers",
+        "EditRole",
+        "EditSampleData",
+        "EditScim",
+        "EditStatus",
+        "EditTags",
+        "EditTeams",
+        "EditTestDefinitionLibrary",
+        "EditTests",
+        "EditTier",
+        "EditUsage",
+        "EditUserNotificationTemplate",
+        "EditUsers",
+        "GenerateToken",
+        "Impersonate",
+        "Kill",
+        "Trigger"
+      ],
+      "effect": "deny",
+      "condition": "!isOwner()"
+    },
+    {
+      "name": "DataConsumer-DenyAdminAndSecurityResources",
+      "description": "Explicitly deny access to platform security, roles, policies, bots, and app definitions",
+      "resources": [
+        "agentExecution",
+        "app",
+        "appMarketPlaceDefinition",
+        "auditLog",
+        "bot",
+        "eventsubscription",
+        "ingestionPipeline",
+        "mcpExecution",
+        "mcpServer",
+        "mcpService",
+        "notificationTemplate",
+        "policy",
+        "queryCostRecord",
+        "role",
+        "securityService",
+        "type"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataConsumer-DenyDangerousGlobalOps",
+      "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "CreateScim",
+        "DeleteScim",
+        "EditPolicy",
+        "EditRole",
+        "EditScim",
+        "EditTeams",
+        "EditUsers",
+        "GenerateToken",
+        "Impersonate"
+      ],
+      "effect": "deny"
     }
   ]
 }

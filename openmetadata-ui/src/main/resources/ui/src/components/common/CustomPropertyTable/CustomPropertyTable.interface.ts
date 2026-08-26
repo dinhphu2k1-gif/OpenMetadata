@@ -73,8 +73,10 @@ export interface CustomPropertyProps<T extends ExtentionEntitiesKeys> {
   hasPermission: boolean;
   maxDataCap?: number;
   isRenderedInRightPanel?: boolean;
-  layout?: 'default' | 'two-column-last-full-width';
+  layout?: 'default' | 'two-column-last-full-width' | 'two-column' | 'single-column';
   propertyDisplayNames?: Record<string, string>;
+  includedProperties?: string[];
+  excludedProperties?: string[];
 }
 
 export interface PropertyValueProps {

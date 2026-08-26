@@ -32,6 +32,8 @@ cd "$PROJECT_ROOT"
 SKIP_INSTALL=false
 SKIP_START=false
 DOCKER_NO_CACHE=false
+SKIP_CLEAN=false
+BUILD_THREADS="1C"
 
 # Help function
 show_help() {
@@ -41,7 +43,9 @@ show_help() {
     echo ""
     echo -e "${BOLD}Options:${NC}"
     echo "  --skip-install    Skip 'yarn install' step (faster if dependencies haven't changed)"
+    echo "  --skip-clean      Skip 'mvn clean' step (faster incremental build)"
     echo "  --skip-start      Build all artifacts and Docker image only, do not restart docker compose"
+    echo "  --threads <N>     Number of threads for Maven (default: 1C = 1 thread per CPU core)"
     echo "  --no-cache        Build Docker image with --no-cache"
     echo "  -h, --help        Show this help message"
     echo ""
@@ -51,7 +55,9 @@ show_help() {
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --skip-install) SKIP_INSTALL=true ;;
+        --skip-clean) SKIP_CLEAN=true ;;
         --skip-start) SKIP_START=true ;;
+        --threads) BUILD_THREADS="$2"; shift ;;
         --no-cache) DOCKER_NO_CACHE=true ;;
         -h|--help) show_help; exit 0 ;;
         *) echo -e "${RED}Unknown option: $1${NC}"; show_help; exit 1 ;;
@@ -128,8 +134,30 @@ echo ""
 echo -e "${BLUE}${BOLD}[Bước 2/4] 📦 Build Backend và Distribution bằng Maven Reactor...${NC}"
 cd "$PROJECT_ROOT"
 
-echo -e "${YELLOW}>> Maven sẽ dùng UI dist vừa build và biên dịch lại toàn bộ backend dependency graph.${NC}"
-mvn -DskipTests -Dskip.yarn=true -Dskip.installyarn=true install -pl :openmetadata-dist -am
+# Tối ưu RAM cho Maven JVM
+export MAVEN_OPTS="-Xmx4096m -XX:+UseG1GC"
+
+MAVEN_GOALS="install"
+if [ "$SKIP_CLEAN" = false ]; then
+    MAVEN_GOALS="clean install"
+fi
+
+echo -e "${YELLOW}>> Đang chạy Maven với ${BOLD}${BUILD_THREADS}${NC}${YELLOW} luồng song song (Goals: ${MAVEN_GOALS})...${NC}"
+mvn $MAVEN_GOALS \
+    -pl :openmetadata-dist \
+    -am \
+    -T "$BUILD_THREADS" \
+    -DskipTests \
+    -DskipITs \
+    -Dmaven.javadoc.skip=true \
+    -Dcheckstyle.skip=true \
+    -Dspotbugs.skip=true \
+    -Dpmd.skip=true \
+    -Drat.skip=true \
+    -Dlicense.skip=true \
+    -Dmaven.source.skip=true \
+    -Dskip.yarn=true \
+    -Dskip.installyarn=true
 
 TAR_FILE="$PROJECT_ROOT/openmetadata-dist/target/openmetadata-1.13.3.tar.gz"
 SERVICE_JAR="$PROJECT_ROOT/openmetadata-service/target/openmetadata-service-1.13.3.jar"

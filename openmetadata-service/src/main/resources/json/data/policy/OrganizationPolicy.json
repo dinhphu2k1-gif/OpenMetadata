@@ -2,33 +2,34 @@
   "name": "OrganizationPolicy",
   "displayName": "Organization Policy",
   "fullyQualifiedName": "OrganizationPolicy",
-  "description": "Policy for all the users of an organization.",
+  "description": "Policy for users of an organization. Restricted to owner actions only; discovery permissions must be granted through explicit roles.",
   "enabled": true,
   "allowDelete": false,
   "provider": "system",
   "rules": [
     {
       "name": "OrganizationPolicy-Owner-Rule",
-      "description" : "Allow all the operations on an entity for the owner.",
-      "resources" : ["all"],
-      "operations": ["All"],
+      "description": "Allow all operations on an entity for the owner.",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "All"
+      ],
       "effect": "allow",
       "condition": "isOwner()"
     },
     {
       "name": "OrganizationPolicy-NoOwner-Rule",
-      "description" : "Allow any one to set the owner of an entity that has no owner set.",
-      "resources" : ["all"],
-      "operations": ["EditOwners"],
+      "description": "Allow anyone to set the owner of an entity that has no owner set.",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "EditOwners"
+      ],
       "effect": "allow",
       "condition": "noOwner()"
-    },
-    {
-      "name": "OrganizationPolicy-ViewAll-Rule",
-      "description" : "Allow all users to discover data assets.",
-      "resources" : ["all"],
-      "operations": ["ViewAll"],
-      "effect": "allow"
     }
   ]
 }

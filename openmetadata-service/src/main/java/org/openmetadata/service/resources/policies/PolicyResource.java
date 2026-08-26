@@ -108,6 +108,39 @@ public class PolicyResource extends EntityResource<Policy, PolicyRepository> {
   public void initialize(OpenMetadataApplicationConfig config) throws IOException {
     // Load any existing rules from database, before loading seed data.
     repository.initSeedDataFromResources();
+    reconcileBasicConsumerPolicy();
+  }
+
+  /**
+   * Seed data is create-only. Reconcile this security-critical system policy at startup so a
+   * rebuilt image also updates an existing metadata database without a separate migration command.
+   */
+  private void reconcileBasicConsumerPolicy() throws IOException {
+    Policy seededPolicy =
+        repository.getEntitiesFromSeedData().stream()
+            .filter(policy -> "BasicConsumerPolicy".equals(policy.getName()))
+            .findFirst()
+            .orElse(null);
+    if (seededPolicy == null) {
+      return;
+    }
+
+    Policy existingPolicy = repository.findByNameOrNull("BasicConsumerPolicy", Include.ALL);
+    if (existingPolicy == null) {
+      return;
+    }
+
+    String originalJson = JsonUtils.pojoToJson(existingPolicy);
+    Policy updatedPolicy = JsonUtils.readValue(originalJson, Policy.class);
+    updatedPolicy.setDisplayName(seededPolicy.getDisplayName());
+    updatedPolicy.setDescription(seededPolicy.getDescription());
+    updatedPolicy.setEnabled(seededPolicy.getEnabled());
+    updatedPolicy.setRules(seededPolicy.getRules());
+    JsonPatch patch = JsonUtils.getJsonPatch(originalJson, JsonUtils.pojoToJson(updatedPolicy));
+    if (!patch.toJsonArray().isEmpty()) {
+      repository.patch(null, existingPolicy.getId(), Entity.ADMIN_USER_NAME, patch);
+      LOG.info("Reconciled BasicConsumerPolicy from the image seed data");
+    }
   }
 
   @Override

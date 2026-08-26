@@ -12,9 +12,9 @@
  */
 
 import Icon from '@ant-design/icons';
-import { Button, Dropdown } from 'antd';
+import { Button, Dropdown, InputNumber } from 'antd';
 import classNames from 'classnames';
-import { FC } from 'react';
+import { FC, FocusEvent, KeyboardEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ArrowRightOutlined } from '../../../assets/svg/arrow-right.svg';
 import { ReactComponent as DownOutlined } from '../../../assets/svg/ic-arrow-down.svg';
@@ -44,7 +44,18 @@ const NextPrevious: FC<NextPreviousProps> = ({
     onShowSizeChange,
   } = (pagingProps ?? {}) as PagingProps;
 
-  const onNextHandler = () => {
+  const totalPages = useMemo(
+    () => computeTotalPages(pageSize, paging?.total ?? 0),
+    [pageSize, paging?.total]
+  );
+
+  const [inputPage, setInputPage] = useState<number | null>(currentPage);
+
+  useEffect(() => {
+    setInputPage(currentPage);
+  }, [currentPage]);
+
+  const onNextHandler = useCallback(() => {
     if (isNumberBased) {
       pagingHandler({ currentPage: currentPage + 1 });
     } else {
@@ -53,9 +64,9 @@ const NextPrevious: FC<NextPreviousProps> = ({
         currentPage: currentPage + 1,
       });
     }
-  };
+  }, [isNumberBased, currentPage, pagingHandler]);
 
-  const onPreviousHandler = () => {
+  const onPreviousHandler = useCallback(() => {
     if (isNumberBased) {
       pagingHandler({ currentPage: currentPage - 1 });
     } else {
@@ -64,23 +75,67 @@ const NextPrevious: FC<NextPreviousProps> = ({
         currentPage: currentPage - 1,
       });
     }
+  }, [isNumberBased, currentPage, pagingHandler]);
+
+  const handlePageCommit = useCallback(
+    (targetPage: number | string | null | undefined) => {
+      const num =
+        typeof targetPage === 'string'
+          ? parseInt(targetPage, 10)
+          : targetPage;
+
+      if (num == null || isNaN(num)) {
+        setInputPage(currentPage);
+
+        return;
+      }
+      const maxPage = totalPages > 0 ? totalPages : 1;
+      const sanitizedPage = Math.max(1, Math.min(num, maxPage));
+      setInputPage(sanitizedPage);
+
+      if (sanitizedPage !== currentPage) {
+        if (isNumberBased) {
+          pagingHandler({ currentPage: sanitizedPage });
+        } else {
+          const diff = sanitizedPage - currentPage;
+          if (diff === 1) {
+            onNextHandler();
+          } else if (diff === -1) {
+            onPreviousHandler();
+          } else {
+            pagingHandler({ currentPage: sanitizedPage });
+          }
+        }
+      }
+    },
+    [currentPage, isNumberBased, onNextHandler, onPreviousHandler, pagingHandler, totalPages]
+  );
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const val = (e.target as HTMLInputElement).value;
+      handlePageCommit(val ? parseInt(val, 10) : inputPage);
+    }
+  };
+
+  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    handlePageCommit(val ? parseInt(val, 10) : inputPage);
   };
 
   const computePrevDisableState = () => {
     if (isNumberBased) {
       return currentPage === 1;
     } else {
-      return paging.before ? false : true;
+      return paging?.before ? false : true;
     }
   };
 
   const computeNextDisableState = () => {
     if (isNumberBased) {
-      const totalPages = computeTotalPages(pageSize, paging.total);
-
       return currentPage === totalPages;
     } else {
-      return paging.after ? false : true;
+      return paging?.after ? false : true;
     }
   };
 
@@ -105,12 +160,36 @@ const NextPrevious: FC<NextPreviousProps> = ({
         onClick={onPreviousHandler}>
         <span>{t('label.previous')}</span>
       </Button>
-      <span className="pagination-indicator" data-testid="page-indicator">{`${t(
-        'label.page'
-      )} ${currentPage} ${t('label.of')} ${computeTotalPages(
-        pageSize,
-        paging.total
-      )} `}</span>
+
+      {totalPages > 1 ? (
+        <span
+          className="pagination-indicator d-inline-flex items-center gap-1"
+          data-testid="page-indicator">
+          <span>{t('label.page')}</span>
+          <InputNumber
+            aria-label={t('label.page')}
+            className="pagination-page-input"
+            controls={false}
+            data-testid="page-number-input"
+            disabled={isLoading}
+            max={totalPages}
+            min={1}
+            size="small"
+            value={inputPage}
+            onBlur={handleBlur}
+            onChange={(value) => setInputPage(value)}
+            onKeyDown={handleKeyDown}
+          />
+          <span>{`${t('label.of')} ${totalPages}`}</span>
+        </span>
+      ) : (
+        <span
+          className="pagination-indicator"
+          data-testid="page-indicator">{`${t('label.page')} ${currentPage} ${t(
+          'label.of'
+        )} ${totalPages || 1}`}</span>
+      )}
+
       <Button
         className="pagination-button hover-button"
         data-testid="next"

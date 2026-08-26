@@ -70,6 +70,39 @@ class UserRepositoryDefaultPersonaTest {
   }
 
   @Test
+  void standardRolesReceiveTheirSeededPersonas() {
+    EntityReference dataStewardRole = reference("role", UserRepository.DATA_STEWARD_ROLE);
+    EntityReference dataStewardPersona = reference("persona", UserRepository.DATA_STEWARD_PERSONA);
+
+    EntityReference dataProposerRole = reference("role", UserRepository.DATA_PROPOSER_ROLE);
+    EntityReference dataProposerPersona = reference("persona", UserRepository.DATA_PROPOSER_PERSONA);
+
+    EntityReference dataConsumerRole = reference("role", UserRepository.DATA_CONSUMER_ROLE);
+    EntityReference dataConsumerPersona = reference("persona", UserRepository.DATA_CONSUMER_PERSONA);
+
+    java.util.Map<String, EntityReference> roleToPersonaMap =
+        java.util.Map.of(
+            UserRepository.DATA_STEWARD_ROLE, dataStewardPersona,
+            UserRepository.DATA_PROPOSER_ROLE, dataProposerPersona,
+            UserRepository.DATA_CONSUMER_ROLE, dataConsumerPersona);
+
+    assertSame(
+        dataStewardPersona,
+        UserRepository.resolveDefaultPersona(
+            false, List.of(dataStewardRole), null, roleToPersonaMap, null));
+
+    assertSame(
+        dataProposerPersona,
+        UserRepository.resolveDefaultPersona(
+            false, List.of(dataProposerRole), null, roleToPersonaMap, null));
+
+    assertSame(
+        dataConsumerPersona,
+        UserRepository.resolveDefaultPersona(
+            false, List.of(dataConsumerRole), null, roleToPersonaMap, null));
+  }
+
+  @Test
   void regularUserFallsBackToTheSystemDefaultWhenConfigured() {
     EntityReference systemDefault = reference("persona", "CompanyDefault");
     EntityReference basicPersona = reference("persona", UserRepository.BASIC_CONSUMER_PERSONA);

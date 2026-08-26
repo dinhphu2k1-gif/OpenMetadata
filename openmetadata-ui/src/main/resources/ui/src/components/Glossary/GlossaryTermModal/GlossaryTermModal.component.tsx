@@ -55,7 +55,9 @@ const GlossaryTermModal: FC<Props> = ({
           <div>
             {editMode
               ? t('label.edit-entity', { entity: 'CDE' })
-              : t('label.add-entity', { entity: 'CDE' })}
+              : t('label.add-entity', {
+                  entity: t('label.term'),
+                })}
           </div>
           <div className="cde-glossary-modal-subtitle">
             {t('cde.data-dictionary')}
@@ -151,11 +153,16 @@ const GlossaryTermModal: FC<Props> = ({
       cancelText={t('label.cancel')}
       className={`edit-glossary-modal ${
         isCDEGlossary ? 'cde-glossary-term-modal' : ''
+      } ${
+        isCDEGlossary && !editMode ? 'cde-glossary-term-modal--add' : ''
       }`}
       closable={isCDEGlossary}
       data-testid="edit-glossary-modal"
       footer={[
-        <Button key="cancel-btn" type="link" onClick={onCancel}>
+        <Button
+          key="cancel-btn"
+          type={isCDEGlossary && !editMode ? 'default' : 'link'}
+          onClick={onCancel}>
           {t('label.cancel')}
         </Button>,
         <Button
@@ -164,14 +171,18 @@ const GlossaryTermModal: FC<Props> = ({
           loading={saving}
           type="primary"
           onClick={form.submit}>
-          {t('label.save')}
+          {isCDEGlossary && !editMode
+            ? t('label.create-entity', {
+                entity: t('label.term'),
+              })
+            : t('label.save')}
         </Button>,
       ]}
       maskClosable={false}
       okText={t('label.save')}
       open={visible}
       title={dialogTitle}
-      width={isCDEGlossary ? 1000 : 800}
+      width={isCDEGlossary && !editMode ? 1240 : isCDEGlossary ? 1000 : 800}
       onCancel={onCancel}>
       <EntityAttachmentProvider
         entityFqn={glossaryTermFQN}

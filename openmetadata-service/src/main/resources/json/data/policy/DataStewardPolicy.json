@@ -2,22 +2,147 @@
   "name": "DataStewardPolicy",
   "displayName": "Data Steward Policy",
   "fullyQualifiedName": "DataStewardPolicy",
-  "description": "Policy for Data Steward Role to perform operations on metadata entities",
+  "description": "Strict Least-Privilege Policy for Data Steward (Checker / Reviewer): Review, approve, reject, or revoke business glossaries, metadata changes, and data quality rules. Explicit Deny on platform admin and destructive infrastructure mutations.",
   "enabled": true,
   "allowDelete": false,
   "provider": "system",
   "rules": [
     {
-      "name": "DataStewardPolicy-EditRule",
-      "resources" : ["all"],
-      "operations": ["ViewAll", "EditDescription", "EditDisplayName", "EditLineage", "EditOwners", "EditTags", "EditTier", "EditGlossaryTerms", "EditCertification"],
+      "name": "DataSteward-ViewAllRule",
+      "description": "Allow read-only view on all metadata assets",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
       "effect": "allow"
     },
     {
-      "name": "DataStewardPolicy-TriggerRule",
-      "resources": ["all"],
-      "operations": ["Trigger"],
+      "name": "DataSteward-ApprovalAndStatusRule",
+      "description": "Allow approving, changing status, and certifying metadata",
+      "resources": [
+        "classification",
+        "dataProduct",
+        "database",
+        "databaseSchema",
+        "domain",
+        "glossary",
+        "glossaryTerm",
+        "table",
+        "tag",
+        "testCase",
+        "testSuite"
+      ],
+      "operations": [
+        "EditCertification",
+        "EditCustomFields",
+        "EditDescription",
+        "EditGlossaryTerms",
+        "EditReviewers",
+        "EditStatus",
+        "EditTags",
+        "EditTier"
+      ],
       "effect": "allow"
+    },
+    {
+      "name": "DataSteward-TaskAndWorkflowRule",
+      "description": "Allow managing and resolving approval tasks and workflows",
+      "resources": [
+        "feed",
+        "suggestion",
+        "task",
+        "thread",
+        "workflow",
+        "workflowInstance",
+        "workflowInstanceState"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataSteward-TriggerRule",
+      "description": "Allow triggering metadata automations",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "Trigger"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataSteward-DenyAdminAndSecurityResources",
+      "description": "Explicitly deny managing platform security, roles, policies, bots, and app definitions",
+      "resources": [
+        "agentExecution",
+        "app",
+        "appMarketPlaceDefinition",
+        "auditLog",
+        "bot",
+        "eventsubscription",
+        "ingestionPipeline",
+        "mcpExecution",
+        "mcpServer",
+        "mcpService",
+        "notificationTemplate",
+        "policy",
+        "queryCostRecord",
+        "role",
+        "securityService",
+        "type"
+      ],
+      "operations": [
+        "All"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataSteward-DenyDestructiveInfrastructureOps",
+      "description": "Explicitly deny destructive operations on core infrastructure services and schemas",
+      "resources": [
+        "apiService",
+        "dashboardService",
+        "database",
+        "databaseSchema",
+        "databaseService",
+        "driveService",
+        "messagingService",
+        "metadataService",
+        "mlmodelService",
+        "pipelineService",
+        "searchService",
+        "storageService"
+      ],
+      "operations": [
+        "Delete",
+        "Deploy",
+        "Kill"
+      ],
+      "effect": "deny"
+    },
+    {
+      "name": "DataSteward-DenyDangerousGlobalOps",
+      "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "CreateScim",
+        "DeleteScim",
+        "EditPolicy",
+        "EditRole",
+        "EditScim",
+        "EditTeams",
+        "EditUsers",
+        "GenerateToken",
+        "Impersonate"
+      ],
+      "effect": "deny"
     }
   ]
 }

@@ -1,6 +1,0 @@
-{
-  "name": "GeneralUser",
-  "displayName": "Người dùng chung",
-  "description": "Optional general user persona; it is not applied globally by default",
-  "default": false
-}

@@ -12,8 +12,23 @@
  */
 
 import { TabSpecificField } from '../enums/entity.enum';
+import {
+  GlossaryTermRelationType,
+  RelationCategory,
+} from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityStatus } from '../generated/entity/data/glossaryTerm';
 import i18n from '../utils/i18next/LocalUtil';
+
+export const DEFAULT_GLOSSARY_TERM_RELATION_TYPES_FALLBACK: GlossaryTermRelationType[] =
+  [
+    {
+      name: 'relatedTo',
+      displayName: 'Related To',
+      description: 'General associative relationship',
+      isSymmetric: true,
+      category: RelationCategory.Associative,
+    },
+  ];
 
 export const GLOSSARY_TERM_TABLE_COLUMNS_KEYS = {
   NAME: 'name',
@@ -55,13 +70,12 @@ export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
   DISPLAY_NAME: 'cdeDisplayName',
   DATA_SOURCE: 'cdeDataSource',
   DESCRIPTION: 'cdeDescription',
+  ENTITY_RELATIONSHIP: 'cdeEntityRelationship',
   OWNERS: 'cdeOwners',
   DATA_CLASSIFICATION: 'cdeDataClassification',
-  QTDL_REVIEW: 'cdeQtdlReview',
   PERSONAL_DATA: 'cdePersonalData',
   RELATED_REGULATION: 'cdeRelatedRegulation',
   DATA_QUALITY_RULE: 'cdeDataQualityRule',
-  NOTE: 'cdeNote',
 };
 
 export const CDE_DEFAULT_VISIBLE_COLUMNS = Object.values(

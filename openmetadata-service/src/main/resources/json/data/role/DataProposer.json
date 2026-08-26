@@ -1,0 +1,13 @@
+{
+  "name": "DataProposer",
+  "displayName": "Data Proposer",
+  "description": "Vai trò Người đề xuất yêu cầu (Maker / Proposer - Chuyên viên TT QLDL): Soạn thảo, tạo mới thuật ngữ và đề xuất thay đổi siêu dữ liệu.",
+  "allowDelete": false,
+  "provider": "system",
+  "policies": [
+    {
+      "type": "policy",
+      "name": "DataProposerPolicy"
+    }
+  ]
+}

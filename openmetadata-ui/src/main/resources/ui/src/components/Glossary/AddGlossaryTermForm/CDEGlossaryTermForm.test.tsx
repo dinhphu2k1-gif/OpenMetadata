@@ -127,13 +127,13 @@ const mockGlossaryTerm: GlossaryTerm = {
   reviewers: [{ id: 'user-2', name: 'Steward User', type: 'user' }],
   tags: [
     {
-      tagFQN: 'Nguon_du_lieu.CoreBanking',
+      tagFQN: 'DataSource.CoreBanking',
       source: TagSource.Classification,
       labelType: LabelType.Manual,
       state: State.Confirmed,
     },
     {
-      tagFQN: 'Phan_loai_du_lieu.NoiBo',
+      tagFQN: 'DataClassification.NoiBo',
       source: TagSource.Classification,
       labelType: LabelType.Manual,
       state: State.Confirmed,
@@ -146,9 +146,9 @@ const mockGlossaryTerm: GlossaryTerm = {
     },
   ],
   extension: {
-    ghi_chu: 'Ghi chú quan trọng',
-    quy_dinh_chat_luong_du_lieu: true,
-    van_ban_quy_dinh_lien_quan: 'Quyết định 123/QĐ-NHNo',
+    entityRelationship: '1 KH - N TK',
+    dataQualityRules: ['Y'],
+    relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
   },
 };
 
@@ -181,12 +181,19 @@ const FormWrapper = ({
 
 describe('CDEGlossaryTermForm', () => {
   it('renders correctly in Add mode', () => {
-    render(<FormWrapper />);
+    const { container } = render(<FormWrapper />);
 
     expect(screen.getByTestId('cde-term-code')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-term-name')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-meaning')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-group')).toBeInTheDocument();
+    expect(
+      container.querySelector('.cde-glossary-term-form')
+    ).toHaveClass('cde-glossary-term-form--add');
+    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(12);
+    expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
+      0
+    );
   });
 
   it('submits a complete CDE in Add mode', async () => {
@@ -235,7 +242,9 @@ describe('CDEGlossaryTermForm', () => {
   });
 
   it('prefills fields correctly in Edit mode', () => {
-    render(<FormWrapper editMode glossaryTerm={mockGlossaryTerm} />);
+    const { container } = render(
+      <FormWrapper editMode glossaryTerm={mockGlossaryTerm} />
+    );
 
     expect(screen.getByTestId('cde-term-code')).toHaveValue('CDE_MA_KH');
     expect(screen.getByTestId('cde-business-term-name')).toHaveValue('Mã khách hàng');
@@ -243,6 +252,12 @@ describe('CDEGlossaryTermForm', () => {
       'Mã định danh duy nhất của khách hàng'
     );
     expect(screen.getByTestId('cde-business-group')).toHaveTextContent('Khách hàng');
+    expect(
+      container.querySelector('.cde-glossary-term-form')
+    ).toHaveClass('cde-glossary-term-form--edit');
+    expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
+      3
+    );
   });
 
   it('preserves non-CDE tags and submits all CDE data accurately', async () => {
@@ -272,14 +287,14 @@ describe('CDEGlossaryTermForm', () => {
     );
 
     expect(tagFqns).toContain('Tier.Tier1');
-    expect(tagFqns).toContain('Nguon_du_lieu.CoreBanking');
-    expect(tagFqns).toContain('Phan_loai_du_lieu.NoiBo');
+    expect(tagFqns).toContain('DataSource.CoreBanking');
+    expect(tagFqns).toContain('DataClassification.NoiBo');
 
     // Extension fields
     expect(savedData.extension).toEqual({
-      ghi_chu: 'Ghi chú quan trọng',
-      quy_dinh_chat_luong_du_lieu: true,
-      van_ban_quy_dinh_lien_quan: 'Quyết định 123/QĐ-NHNo',
+      entityRelationship: '1 KH - N TK',
+      dataQualityRules: ['Y'],
+      relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
     });
   });
 

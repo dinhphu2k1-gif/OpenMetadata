@@ -33,11 +33,13 @@ export interface CDEGlossaryTermFormValues {
   reviewers?: EntityReference[];
   dataSourceTags?: TagLabel[];
   dataClassificationTags?: TagLabel[];
-  qtdlReviewTags?: TagLabel[];
   personalDataTags?: TagLabel[];
-  ghi_chu?: string;
+  dataQualityRules?: string;
+  relatedRegulatoryDocuments?: string;
+  entityRelationship?: string;
   quy_dinh_chat_luong_du_lieu?: string;
   van_ban_quy_dinh_lien_quan?: string;
+  moi_quan_he_voi_thuc_the?: string;
 }
 
 const CDEGlossaryTermForm = ({
@@ -55,13 +57,13 @@ const CDEGlossaryTermForm = ({
   const reviewers = Form.useWatch<EntityReference[]>('reviewers', form) ?? [];
   const domainLabel = domains.length
     ? domains
-        .filter(Boolean)
-        .map(
-          (domain) =>
-            getEntityName(domain) || domain.fullyQualifiedName || ''
-        )
-        .filter(Boolean)
-        .join(', ') || t('label.select-entity', { entity: t('label.domain-plural') })
+      .filter(Boolean)
+      .map(
+        (domain) =>
+          getEntityName(domain) || domain.fullyQualifiedName || ''
+      )
+      .filter(Boolean)
+      .join(', ') || t('label.select-entity', { entity: t('label.domain-plural') })
     : t('label.select-entity', { entity: t('label.domain-plural') });
 
   useEffect(() => {
@@ -82,21 +84,38 @@ const CDEGlossaryTermForm = ({
             tag.tagFQN.split('.')[0] ===
             CDE_TAG_CLASSIFICATIONS.dataClassification
         ),
-        qtdlReviewTags: tags.filter(
-          (tag) => tag.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.qtdlReview
-        ),
         personalDataTags: tags.filter(
           (tag) =>
             tag.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.personalData
         ),
-        ghi_chu: glossaryTerm.extension?.ghi_chu,
-        quy_dinh_chat_luong_du_lieu:
-          glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== undefined &&
-          glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== null
-            ? String(Boolean(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu))
+        dataQualityRules:
+          glossaryTerm.extension?.dataQualityRules !== undefined &&
+          glossaryTerm.extension?.dataQualityRules !== null
+            ? String(
+                Array.isArray(glossaryTerm.extension.dataQualityRules)
+                  ? glossaryTerm.extension.dataQualityRules.includes('Y') ||
+                      glossaryTerm.extension.dataQualityRules.includes('true')
+                  : ['1', 'TRUE', 'Y', 'YES', 'CO', 'CÓ'].includes(
+                      String(glossaryTerm.extension.dataQualityRules).trim().toUpperCase()
+                    )
+              )
+            : glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== undefined &&
+              glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== null
+            ? String(
+                Array.isArray(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu)
+                  ? glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes('Y') ||
+                      glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes('true')
+                  : ['1', 'TRUE', 'Y', 'YES', 'CO', 'CÓ'].includes(
+                      String(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu).trim().toUpperCase()
+                    )
+              )
             : undefined,
-        van_ban_quy_dinh_lien_quan:
+        relatedRegulatoryDocuments:
+          glossaryTerm.extension?.relatedRegulatoryDocuments ??
           glossaryTerm.extension?.van_ban_quy_dinh_lien_quan,
+        entityRelationship:
+          glossaryTerm.extension?.entityRelationship ??
+          glossaryTerm.extension?.moi_quan_he_voi_thuc_the,
       });
     }
   }, [editMode, form, glossaryTerm]);
@@ -109,7 +128,6 @@ const CDEGlossaryTermForm = ({
     const formTags = [
       values.dataSourceTags,
       values.dataClassificationTags,
-      values.qtdlReviewTags,
       values.personalDataTags,
     ].flatMap((tags) => tags ?? []);
 
@@ -122,20 +140,29 @@ const CDEGlossaryTermForm = ({
 
     const allTags = [...existingNonCDETags, ...formTags];
 
+    const dataQualityVal =
+      values.dataQualityRules ?? values.quy_dinh_chat_luong_du_lieu;
+    const relatedDocsVal =
+      values.relatedRegulatoryDocuments ?? values.van_ban_quy_dinh_lien_quan;
+    const entityRelationshipVal =
+      values.entityRelationship ?? values.moi_quan_he_voi_thuc_the;
+
     const extension = {
-      ...(values.ghi_chu ? { ghi_chu: values.ghi_chu } : {}),
-      ...(values.quy_dinh_chat_luong_du_lieu !== undefined &&
-      values.quy_dinh_chat_luong_du_lieu !== null &&
-      values.quy_dinh_chat_luong_du_lieu !== ''
+      ...(entityRelationshipVal
         ? {
-            quy_dinh_chat_luong_du_lieu:
-              values.quy_dinh_chat_luong_du_lieu === 'true',
+            entityRelationship: entityRelationshipVal,
           }
         : {}),
-      ...(values.van_ban_quy_dinh_lien_quan
+      ...(dataQualityVal !== undefined &&
+      dataQualityVal !== null &&
+      dataQualityVal !== ''
         ? {
-            van_ban_quy_dinh_lien_quan:
-              values.van_ban_quy_dinh_lien_quan,
+            dataQualityRules: dataQualityVal === 'true' ? ['Y'] : ['N'],
+          }
+        : {}),
+      ...(relatedDocsVal
+        ? {
+            relatedRegulatoryDocuments: relatedDocsVal,
           }
         : {}),
     };
@@ -172,14 +199,17 @@ const CDEGlossaryTermForm = ({
 
   return (
     <Form<CDEGlossaryTermFormValues>
-      className="cde-glossary-term-form"
+      className={`cde-glossary-term-form cde-glossary-term-form--${editMode ? 'edit' : 'add'
+        }`}
       form={form}
       layout="vertical"
       onFinish={onFinish}>
       <section className="cde-form-section">
-        <div className="cde-form-section-title">
-          {t('cde.core-definition')}
-        </div>
+        {editMode && (
+          <div className="cde-form-section-title">
+            {t('cde.core-definition')}
+          </div>
+        )}
         <div className="cde-form-grid">
           <Form.Item
             required
@@ -208,12 +238,13 @@ const CDEGlossaryTermForm = ({
       </section>
 
       <section className="cde-form-section">
-        <div className="cde-form-section-title">
-          {t('cde.business-context')}
-        </div>
+        {editMode && (
+          <div className="cde-form-section-title">
+            {t('cde.business-context')}
+          </div>
+        )}
         <div className="cde-form-grid">
           <Form.Item
-            className="cde-form-field-full"
             label={t('cde.business-group')}
             name="domains">
             <DomainSelectableList
@@ -244,30 +275,6 @@ const CDEGlossaryTermForm = ({
             CDE_TAG_CLASSIFICATIONS.dataSource,
             'source'
           )}
-          {tagField(
-            'dataClassificationTags',
-            t('cde.data-classification'),
-            CDE_TAG_CLASSIFICATIONS.dataClassification,
-            'classification'
-          )}
-          {tagField(
-            'qtdlReviewTags',
-            t('cde.data-governance-review'),
-            CDE_TAG_CLASSIFICATIONS.qtdlReview,
-            'governance'
-          )}
-          {tagField(
-            'personalDataTags',
-            t('cde.personal-data'),
-            CDE_TAG_CLASSIFICATIONS.personalData,
-            'personal'
-          )}
-        </div>
-      </section>
-
-      <section className="cde-form-section">
-        <div className="cde-form-section-title">{t('label.governance')}</div>
-        <div className="cde-form-grid">
           <Form.Item label={t('cde.data-owner')} name="owners">
             <UserTeamSelectableListSearchInput
               hasPermission
@@ -280,7 +287,53 @@ const CDEGlossaryTermForm = ({
               onUpdate={async (value) => form.setFieldValue('owners', value)}
             />
           </Form.Item>
-          <Form.Item label={t('label.reviewer-plural')} name="reviewers">
+          {tagField(
+            'dataClassificationTags',
+            t('cde.data-classification'),
+            CDE_TAG_CLASSIFICATIONS.dataClassification,
+            'classification'
+          )}
+          {tagField(
+            'personalDataTags',
+            t('cde.personal-data'),
+            CDE_TAG_CLASSIFICATIONS.personalData,
+            'personal'
+          )}
+          <Form.Item
+            label={t('cde.data-quality-rules')}
+            name="dataQualityRules">
+            <Select
+              allowClear
+              options={[
+                { label: t('label.yes'), value: 'true' },
+                { label: t('label.no'), value: 'false' },
+              ]}
+            />
+          </Form.Item>
+        </div>
+      </section>
+
+      <section className="cde-form-section">
+        {editMode && (
+          <div className="cde-form-section-title">
+            {t('label.governance')}
+          </div>
+        )}
+        <div className="cde-form-grid">
+          <Form.Item
+            label={t('cde.entity-relationship')}
+            name="entityRelationship">
+            <Input data-testid="cde-entity-relationship" />
+          </Form.Item>
+          <Form.Item
+            label={t('cde.related-regulatory-documents')}
+            name="relatedRegulatoryDocuments">
+            <Input data-testid="cde-related-regulatory-documents" />
+          </Form.Item>
+          <Form.Item
+            className="cde-form-field-full"
+            label={t('label.reviewer-plural')}
+            name="reviewers">
             <UserTeamSelectableListSearchInput
               hasPermission
               multiple={{ user: true, team: false }}
@@ -290,26 +343,6 @@ const CDEGlossaryTermForm = ({
                 form.setFieldValue('reviewers', value)
               }
             />
-          </Form.Item>
-          <Form.Item label={t('cde.notes')} name="ghi_chu">
-            <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} />
-          </Form.Item>
-          <Form.Item
-            label={t('cde.data-quality-rules')}
-            name="quy_dinh_chat_luong_du_lieu">
-            <Select
-              allowClear
-              options={[
-                { label: t('label.yes'), value: 'true' },
-                { label: t('label.no'), value: 'false' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            className="cde-form-field-full"
-            label={t('cde.related-regulatory-documents')}
-            name="van_ban_quy_dinh_lien_quan">
-            <Input />
           </Form.Item>
         </div>
       </section>

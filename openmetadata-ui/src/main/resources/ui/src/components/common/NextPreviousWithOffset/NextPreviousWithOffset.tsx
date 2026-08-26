@@ -16,8 +16,8 @@ import {
   ArrowRightOutlined,
   DownOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown } from 'antd';
-import { useCallback, useMemo } from 'react';
+import { Button, Dropdown, InputNumber } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PAGE_SIZE_BASE,
@@ -44,6 +44,17 @@ const NextPreviousWithOffset = ({
     onShowSizeChange,
   } = (pagingProps ?? {}) as PagingProps;
 
+  const totalPages = useMemo(
+    () => computeTotalPages(pageSize, paging?.total ?? 0),
+    [pageSize, paging?.total]
+  );
+
+  const [inputPage, setInputPage] = useState<number | null>(currentPage);
+
+  useEffect(() => {
+    setInputPage(currentPage);
+  }, [currentPage]);
+
   const onNextHandler = useCallback(() => {
     pagingHandler({
       offset: currentPage * pageSize,
@@ -58,10 +69,23 @@ const NextPreviousWithOffset = ({
     });
   }, [pagingHandler, currentPage, pageSize]);
 
-  const totalPages = useMemo(
-    () => computeTotalPages(pageSize, paging.total),
-    [pageSize, paging.total]
-  );
+  const handlePageCommit = (targetPage: number | null) => {
+    if (targetPage == null || isNaN(targetPage)) {
+      setInputPage(currentPage);
+
+      return;
+    }
+    const maxPage = totalPages > 0 ? totalPages : 1;
+    const sanitizedPage = Math.max(1, Math.min(targetPage, maxPage));
+    setInputPage(sanitizedPage);
+
+    if (sanitizedPage !== currentPage) {
+      pagingHandler({
+        offset: (sanitizedPage - 1) * pageSize,
+        page: sanitizedPage,
+      });
+    }
+  };
 
   const nextButtonDisabled = useMemo(() => {
     return currentPage === totalPages;
@@ -79,9 +103,31 @@ const NextPreviousWithOffset = ({
         onClick={onPreviousHandler}>
         <span>{t('label.previous')}</span>
       </Button>
-      <span data-testid="page-indicator">{`${currentPage}/${totalPages} ${t(
-        'label.page'
-      )}`}</span>
+      {totalPages > 1 ? (
+        <span
+          className="d-inline-flex items-center gap-1"
+          data-testid="page-indicator">
+          <InputNumber
+            aria-label={t('label.page')}
+            className="pagination-page-input"
+            controls={false}
+            data-testid="page-number-input"
+            disabled={isLoading}
+            max={totalPages}
+            min={1}
+            size="small"
+            value={inputPage}
+            onBlur={() => handlePageCommit(inputPage)}
+            onChange={(value) => setInputPage(value)}
+            onPressEnter={() => handlePageCommit(inputPage)}
+          />
+          <span>{`/${totalPages} ${t('label.page')}`}</span>
+        </span>
+      ) : (
+        <span data-testid="page-indicator">{`${currentPage}/${totalPages} ${t(
+          'label.page'
+        )}`}</span>
+      )}
       <Button
         ghost
         className="hover-button text-sm flex-center"
@@ -104,7 +150,10 @@ const NextPreviousWithOffset = ({
             })),
           }}>
           <Button
-            data-testid="page-size-change-button"
+            ghost
+            className="text-sm flex-center"
+            data-testid="page-size-selection-dropdown"
+            type="primary"
             onClick={(e) => e.preventDefault()}>
             {`${pageSize} / ${t('label.page')}`}
             <DownOutlined />

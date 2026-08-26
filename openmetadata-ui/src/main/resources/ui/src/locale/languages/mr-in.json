@@ -11,7 +11,8 @@
     "notes": "Notes",
     "personal-data": "Personal Data",
     "related-regulatory-documents": "Related Regulatory Documents",
-    "term-code": "Term Code"
+    "term-code": "Term Code",
+    "entity-relationship": "Entity Relationship"
   },
   "label": {
     "-with-colon": "{{text}}:",

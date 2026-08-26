@@ -31,6 +31,7 @@ import { TagLabel } from '../generated/type/tagLabel';
 import { WidgetConfig } from '../pages/CustomizablePage/CustomizablePage.interface';
 import { searchQuery } from '../rest/searchAPI';
 import { getTabLabelFromId } from './CustomizePage/CustomizePagePureUtils';
+import { getEntityName } from './EntityNameUtils';
 import i18n from './i18next/LocalUtil';
 import { getTermQuery } from './SearchUtils';
 import { escapeESReservedCharacters, getEncodedFqn } from './StringUtils';
@@ -105,7 +106,7 @@ class TagClassBase {
 
     return {
       data: res.hits.hits.map(({ _source }) => ({
-        label: _source.fullyQualifiedName ?? '',
+        label: getEntityName(_source) || _source.fullyQualifiedName || '',
         value: _source.fullyQualifiedName ?? '',
         data: _source,
       })),

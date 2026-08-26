@@ -47,6 +47,7 @@ import { PropertyValue } from './PropertyValue';
 
 export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
   entityType,
+  className,
   hasEditAccess,
   isVersionView,
   hasPermission,
@@ -54,6 +55,8 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
   isRenderedInRightPanel = false,
   layout = 'default',
   propertyDisplayNames,
+  includedProperties,
+  excludedProperties,
 }: CustomPropertyProps<T>) => {
   const { t } = useTranslation();
   const {
@@ -141,8 +144,19 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
   const { dataSource, dataSourceColumns } = useMemo(() => {
     const customProperties = entityTypeDetail?.customProperties ?? [];
 
-    const dataSource = Array.isArray(customProperties)
-      ? customProperties.slice(0, maxDataCap)
+    let filtered = customProperties;
+    if (includedProperties && includedProperties.length > 0) {
+      filtered = includedProperties
+        .map((name) => customProperties.find((prop) => prop.name === name))
+        .filter((prop): prop is NonNullable<typeof prop> => Boolean(prop));
+    } else if (excludedProperties && excludedProperties.length > 0) {
+      filtered = customProperties.filter(
+        (prop) => !excludedProperties.includes(prop.name)
+      );
+    }
+
+    const dataSource = Array.isArray(filtered)
+      ? filtered.slice(0, maxDataCap)
       : [];
 
     // Split dataSource into three equal parts
@@ -152,7 +166,12 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
     );
 
     return { dataSource, dataSourceColumns: columns };
-  }, [maxDataCap, entityTypeDetail?.customProperties]);
+  }, [
+    maxDataCap,
+    entityTypeDetail?.customProperties,
+    includedProperties,
+    excludedProperties,
+  ]);
 
   useEffect(() => {
     if (
@@ -314,8 +333,36 @@ export const CustomPropertyTable = <T extends ExtentionEntitiesKeys>({
     </div>
   );
 
+  if (layout === 'single-column') {
+    return (
+      <div
+        className={classNames('custom-properties-card', className)}
+        data-testid="custom-properties-card">
+        {dataSource.map(renderProperty)}
+      </div>
+    );
+  }
+
+  if (layout === 'two-column') {
+    return (
+      <div
+        className={classNames('custom-properties-card', className)}
+        data-testid="custom-properties-card">
+        <Row
+          className="custom-properties-two-column"
+          gutter={[16, 16]}>
+          {dataSource.map((record) => (
+            <Col key={record.name} lg={12} md={12} sm={24} xs={24}>
+              {renderProperty(record)}
+            </Col>
+          ))}
+        </Row>
+      </div>
+    );
+  }
+
   return (
-    <div className="custom-properties-card">
+    <div className={classNames('custom-properties-card', className)}>
       <Row
         className={classNames({
           'custom-properties-two-column-last-full-width':

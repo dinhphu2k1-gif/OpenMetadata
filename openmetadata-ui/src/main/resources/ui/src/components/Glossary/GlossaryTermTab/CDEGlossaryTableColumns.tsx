@@ -26,9 +26,12 @@ import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEdit
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
+  entityRelationship?: string;
+  relatedRegulatoryDocuments?: string;
+  dataQualityRules?: boolean | string | string[];
+  moi_quan_he_voi_thuc_the?: string;
   van_ban_quy_dinh_lien_quan?: string;
   quy_dinh_chat_luong_du_lieu?: boolean | string | string[];
-  ghi_chu?: string;
 };
 
 type CDEGlossaryTableColumnsProps = {
@@ -38,10 +41,9 @@ type CDEGlossaryTableColumnsProps = {
 };
 
 export const CDE_TAG_CLASSIFICATIONS = {
-  dataSource: 'Nguon_du_lieu',
-  dataClassification: 'Phan_loai_du_lieu',
-  qtdlReview: 'QTDL_ra_soat',
-  personalData: 'Du_lieu_ca_nhan',
+  dataSource: 'DataSource',
+  dataClassification: 'DataClassification',
+  personalData: 'PersonalData',
 };
 
 export const getCDEReferenceLabel = (reference: EntityReference) =>
@@ -98,7 +100,7 @@ const getTagLabel = (tag: TagLabel) =>
 export const renderCDEClassificationTags = (
   tags: TagLabel[] = [],
   classification: string,
-  variant: 'source' | 'classification' | 'review' | 'personal'
+  variant: 'source' | 'classification' | 'personal'
 ) => {
   const matchingTags = tags.filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
@@ -250,6 +252,20 @@ export const getCDEGlossaryTableColumns = ({
       record.isLoadMoreButton ? null : renderCDEMarkdown(description),
   },
   {
+    title: t('cde.entity-relationship'),
+    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.ENTITY_RELATIONSHIP,
+    width: 280,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : renderCDEMarkdown(
+            (record.extension as CDEExtension | undefined)
+              ?.entityRelationship ??
+              (record.extension as CDEExtension | undefined)
+                ?.moi_quan_he_voi_thuc_the
+          ),
+  },
+  {
     title: t('cde.data-owner'),
     dataIndex: 'owners',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.OWNERS,
@@ -269,20 +285,6 @@ export const getCDEGlossaryTableColumns = ({
             tags,
             CDE_TAG_CLASSIFICATIONS.dataClassification,
             'classification'
-          ),
-  },
-  {
-    title: t('cde.data-governance-review'),
-    dataIndex: 'tags',
-    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.QTDL_REVIEW,
-    width: 160,
-    render: (tags: TagLabel[] = [], record) =>
-      record.isLoadMoreButton
-        ? null
-        : renderCDEClassificationTags(
-            tags,
-            CDE_TAG_CLASSIFICATIONS.qtdlReview,
-            'review'
           ),
   },
   {
@@ -308,7 +310,9 @@ export const getCDEGlossaryTableColumns = ({
         ? null
         : renderCDEMarkdown(
             (record.extension as CDEExtension | undefined)
-              ?.van_ban_quy_dinh_lien_quan
+              ?.relatedRegulatoryDocuments ??
+              (record.extension as CDEExtension | undefined)
+                ?.van_ban_quy_dinh_lien_quan
           ),
   },
   {
@@ -320,19 +324,10 @@ export const getCDEGlossaryTableColumns = ({
         ? null
         : renderCDEQualityRule(
             (record.extension as CDEExtension | undefined)
-              ?.quy_dinh_chat_luong_du_lieu,
+              ?.dataQualityRules ??
+              (record.extension as CDEExtension | undefined)
+                ?.quy_dinh_chat_luong_du_lieu,
             t
-          ),
-  },
-  {
-    title: t('cde.notes'),
-    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NOTE,
-    width: 240,
-    render: (_, record) =>
-      record.isLoadMoreButton
-        ? null
-        : renderCDEMarkdown(
-            (record.extension as CDEExtension | undefined)?.ghi_chu
           ),
   },
 ];
