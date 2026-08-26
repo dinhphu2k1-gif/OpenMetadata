@@ -37,13 +37,7 @@
       ],
       "operations": [
         "EditCertification",
-        "EditCustomFields",
-        "EditDescription",
-        "EditGlossaryTerms",
-        "EditReviewers",
-        "EditStatus",
-        "EditTags",
-        "EditTier"
+        "EditStatus"
       ],
       "effect": "allow"
     },

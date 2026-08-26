@@ -34,7 +34,7 @@
     },
     {
       "name": "DataProposer-ManageUnapprovedRule",
-      "description": "Allow creator to edit/delete own draft/unapproved glossary terms and test cases",
+      "description": "Allow editing/deleting draft/unapproved glossary terms and test cases",
       "resources": [
         "glossaryTerm",
         "testCase",
@@ -44,7 +44,7 @@
         "All"
       ],
       "effect": "allow",
-      "condition": "isCreator() && notApproved()"
+      "condition": "notApproved()"
     },
     {
       "name": "DataProposer-CollaborativeEditRule",
@@ -105,8 +105,7 @@
       ],
       "operations": [
         "EditCertification",
-        "EditReviewers",
-        "EditStatus"
+        "EditReviewers"
       ],
       "effect": "deny"
     },

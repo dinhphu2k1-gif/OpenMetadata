@@ -64,18 +64,35 @@ finish_wip() {
         exit 1
     fi
     
-    echo "🔀 [1/3] Đang chuyển về và cập nhật nhánh chính '$MAIN_BRANCH'..."
+    echo "🔀 [1/4] Đang chuyển về nhánh chính '$MAIN_BRANCH' và đồng bộ từ GitHub..."
     git checkout "$MAIN_BRANCH"
-    git pull origin "$MAIN_BRANCH" --rebase
+    git fetch origin "$MAIN_BRANCH" 2>/dev/null || true
+    if git rev-parse --verify origin/"$MAIN_BRANCH" >/dev/null 2>&1; then
+        git reset --hard origin/"$MAIN_BRANCH"
+    fi
     
-    echo "🧹 [2/3] Đang gộp toàn bộ các commit nháp lại thành 1 (Squash merge)..."
-    git merge --squash "$WIP_BRANCH"
-    git commit -m "$COMMIT_MSG"
+    echo "🧹 [2/4] Đang nạp toàn bộ mã nguồn mới nhất từ '$WIP_BRANCH'..."
+    git checkout "$WIP_BRANCH" -- .
     
-    echo "🚀 [3/3] Đang đẩy commit chính thức lên GitHub..."
+    # Xoá các file đã bị xoá trên nhánh wip (nếu có)
+    deleted_files=$(git diff --name-only --diff-filter=D HEAD "$WIP_BRANCH" 2>/dev/null || true)
+    if [ -n "$deleted_files" ]; then
+        echo "$deleted_files" | xargs git rm -f 2>/dev/null || true
+    fi
+    
+    git add -A
+    
+    if git diff-index --quiet HEAD -- 2>/dev/null; then
+        echo "   (Không có thay đổi mới, tiếp tục)"
+    else
+        echo "📝 [3/4] Đang tạo commit chính thức..."
+        git commit -m "$COMMIT_MSG"
+    fi
+    
+    echo "🚀 [4/4] Đang đẩy commit chính thức lên GitHub..."
     git push origin "$MAIN_BRANCH"
     echo ""
-    echo "🎉 HOÀN THÀNH XUẤT SẮC! Chỉ có duy nhất 1 commit sạch đẹp trên '$MAIN_BRANCH'."
+    echo "🎉 HOÀN THÀNH XUẤT SẮC! Đã đồng bộ 1 commit sạch đẹp lên '$MAIN_BRANCH'."
 }
 
 # Hỗ trợ chạy trực tiếp tham số dòng lệnh: ./sync_wip.sh save | load | finish

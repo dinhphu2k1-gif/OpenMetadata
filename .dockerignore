@@ -1,2 +1,12 @@
+**/docker-volume
+**/docker-volume/**
+deploy/dev/docker-volume
 docker/development/docker-volume
 docker/docker-compose-quickstart/docker-volume
+.git
+.github
+.idea
+.vscode
+.venv
+**/node_modules
+*.log

@@ -253,7 +253,7 @@ const AddGlossary = ({
           type="primary"
         />
       ),
-      multiple: { user: true, team: false },
+      multiple: { user: true, team: true },
       previewSelected: true,
       label: t('label.reviewer-plural'),
     },

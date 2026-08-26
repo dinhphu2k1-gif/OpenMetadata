@@ -27,6 +27,8 @@ import { EntityType } from '../../../enums/entity.enum';
 import { SearchIndex } from '../../../enums/search.enum';
 import { EntityReference } from '../../../generated/entity/data/table';
 import { searchQuery } from '../../../rest/searchAPI';
+import { getTeams } from '../../../rest/teamsAPI';
+import { getUsers } from '../../../rest/userAPI';
 import {
   formatTeamsResponse,
   formatUsersResponse,
@@ -95,28 +97,71 @@ export const UserTeamSelectableList = ({
 
   const fetchUserOptions = async (searchText: string, after?: string) => {
     const afterPage = isNaN(Number(after)) ? 1 : Number(after);
+    if (searchText) {
+      try {
+        const res = await searchQuery({
+          query: searchText,
+          pageNumber: afterPage,
+          pageSize: PAGE_SIZE_MEDIUM,
+          queryFilter: getTermQuery({ isBot: 'false' }),
+          sortField: 'displayName.keyword',
+          sortOrder: 'asc',
+          searchIndex: SearchIndex.USER,
+        });
+
+        const users = formatUsersResponse(res.hits.hits);
+        if (users.length > 0) {
+          const data = getEntityReferenceListFromEntities(
+            users,
+            EntityType.USER
+          );
+          setCount((pre) => ({ ...pre, user: res.hits.total.value }));
+
+          return {
+            data,
+            paging: {
+              total: res.hits.total.value,
+              after: toString(afterPage + 1),
+            },
+          };
+        }
+      } catch (error) {
+        // Fallback to REST API
+      }
+    }
+
     try {
-      const res = await searchQuery({
-        query: searchText,
-        pageNumber: afterPage,
-        pageSize: PAGE_SIZE_MEDIUM,
-        queryFilter: getTermQuery({ isBot: 'false' }),
-        sortField: 'displayName.keyword',
-        sortOrder: 'asc',
-        searchIndex: SearchIndex.USER,
+      const { data, paging } = await getUsers({
+        limit: PAGE_SIZE_MEDIUM,
+        after: after ?? undefined,
+        isBot: false,
       });
 
-      const data = getEntityReferenceListFromEntities(
-        formatUsersResponse(res.hits.hits),
+      let filteredUsers = data;
+      if (searchText) {
+        const lowerSearch = searchText.toLowerCase();
+        filteredUsers = data.filter(
+          (user) =>
+            user.name.toLowerCase().includes(lowerSearch) ||
+            user.displayName?.toLowerCase().includes(lowerSearch)
+        );
+      }
+
+      const formattedData = getEntityReferenceListFromEntities(
+        filteredUsers,
         EntityType.USER
       );
-      setCount((pre) => ({ ...pre, user: res.hits.total.value }));
+
+      setCount((pre) => ({
+        ...pre,
+        user: paging?.total ?? formattedData.length,
+      }));
 
       return {
-        data,
+        data: formattedData,
         paging: {
-          total: res.hits.total.value,
-          after: toString(afterPage + 1),
+          total: paging?.total ?? formattedData.length,
+          after: paging?.after,
         },
       };
     } catch (error) {
@@ -127,31 +172,83 @@ export const UserTeamSelectableList = ({
   const fetchTeamOptions = async (searchText: string, after?: string) => {
     const afterPage = isNaN(Number(after)) ? 1 : Number(after);
 
-    try {
-      const res = await searchQuery({
-        query: searchText || '',
-        pageNumber: afterPage,
-        pageSize: PAGE_SIZE_MEDIUM,
-        queryFilter: getTermQuery({}, 'must', undefined, {
-          matchTerms: { teamType: 'Group' },
-        }),
-        sortField: 'displayName.keyword',
-        sortOrder: 'asc',
-        searchIndex: SearchIndex.TEAM,
-      });
+    if (searchText) {
+      try {
+        let res = await searchQuery({
+          query: searchText || '',
+          pageNumber: afterPage,
+          pageSize: PAGE_SIZE_MEDIUM,
+          queryFilter: getTermQuery({}, 'must', undefined, {
+            matchTerms: { teamType: 'Group' },
+          }),
+          sortField: 'displayName.keyword',
+          sortOrder: 'asc',
+          searchIndex: SearchIndex.TEAM,
+        });
 
-      const data = getEntityReferenceListFromEntities(
-        formatTeamsResponse(res.hits.hits),
+        if (res.hits.hits.length === 0) {
+          res = await searchQuery({
+            query: searchText || '',
+            pageNumber: afterPage,
+            pageSize: PAGE_SIZE_MEDIUM,
+            sortField: 'displayName.keyword',
+            sortOrder: 'asc',
+            searchIndex: SearchIndex.TEAM,
+          });
+        }
+
+        const teams = formatTeamsResponse(res.hits.hits);
+        if (teams.length > 0) {
+          const data = getEntityReferenceListFromEntities(
+            teams,
+            EntityType.TEAM
+          );
+          setCount((pre) => ({ ...pre, team: res.hits.total.value }));
+
+          return {
+            data,
+            paging: {
+              total: res.hits.total.value,
+              after: toString(afterPage + 1),
+            },
+          };
+        }
+      } catch (error) {
+        // Fallback to REST API
+      }
+    }
+
+    try {
+      const { data, paging } = await getTeams({
+        limit: PAGE_SIZE_MEDIUM,
+        after: after ?? undefined,
+      } as any);
+
+      let filteredTeams = data;
+      if (searchText) {
+        const lowerSearch = searchText.toLowerCase();
+        filteredTeams = data.filter(
+          (team) =>
+            team.name.toLowerCase().includes(lowerSearch) ||
+            team.displayName?.toLowerCase().includes(lowerSearch)
+        );
+      }
+
+      const formattedData = getEntityReferenceListFromEntities(
+        filteredTeams,
         EntityType.TEAM
       );
 
-      setCount((pre) => ({ ...pre, team: res.hits.total.value }));
+      setCount((pre) => ({
+        ...pre,
+        team: paging?.total ?? formattedData.length,
+      }));
 
       return {
-        data,
+        data: formattedData,
         paging: {
-          total: res.hits.total.value,
-          after: toString(afterPage + 1),
+          total: paging?.total ?? formattedData.length,
+          after: paging?.after,
         },
       };
     } catch (error) {
@@ -196,38 +293,83 @@ export const UserTeamSelectableList = ({
 
   // Fetch and store count for Users tab
   const getUserCount = async () => {
-    const res = await searchQuery({
-      query: '',
-      pageNumber: 1,
-      pageSize: 0,
-      queryFilter: getTermQuery({ isBot: 'false' }),
-      searchIndex: SearchIndex.USER,
-    });
+    try {
+      const res = await searchQuery({
+        query: '',
+        pageNumber: 1,
+        pageSize: 0,
+        queryFilter: getTermQuery({ isBot: 'false' }),
+        searchIndex: SearchIndex.USER,
+      });
 
-    setCount((pre) => ({ ...pre, user: res.hits.total.value }));
+      if (res?.hits?.total?.value > 0) {
+        setCount((pre) => ({ ...pre, user: res.hits.total.value }));
+
+        return;
+      }
+    } catch {
+      // Fallback below
+    }
+
+    try {
+      const { paging } = await getUsers({
+        limit: 0,
+        isBot: false,
+      });
+      setCount((pre) => ({ ...pre, user: paging?.total ?? 0 }));
+    } catch {
+      setCount((pre) => ({ ...pre, user: 0 }));
+    }
   };
-  const getTeamCount = async () => {
-    const res = await searchQuery({
-      query: '',
-      pageNumber: 1,
-      pageSize: 0,
-      queryFilter: getTermQuery({}, 'must', undefined, {
-        matchTerms: { teamType: 'Group' },
-      }),
-      searchIndex: SearchIndex.TEAM,
-    });
 
-    setCount((pre) => ({ ...pre, team: res.hits.total.value }));
+  const getTeamCount = async () => {
+    try {
+      let res = await searchQuery({
+        query: '',
+        pageNumber: 1,
+        pageSize: 0,
+        queryFilter: getTermQuery({}, 'must', undefined, {
+          matchTerms: { teamType: 'Group' },
+        }),
+        searchIndex: SearchIndex.TEAM,
+      });
+
+      if (res.hits.total.value === 0) {
+        res = await searchQuery({
+          query: '',
+          pageNumber: 1,
+          pageSize: 0,
+          searchIndex: SearchIndex.TEAM,
+        });
+      }
+
+      if (res?.hits?.total?.value > 0) {
+        setCount((pre) => ({ ...pre, team: res.hits.total.value }));
+
+        return;
+      }
+    } catch {
+      // Fallback below
+    }
+
+    try {
+      const { paging } = await getTeams({
+        limit: 0,
+      } as any);
+      setCount((pre) => ({ ...pre, team: paging?.total ?? 0 }));
+    } catch {
+      setCount((pre) => ({ ...pre, team: 0 }));
+    }
   };
 
   const init = async () => {
     if (popupVisible || popoverProps?.open) {
-      if (ownerType === EntityType.USER) {
-        await getTeamCount();
-        setActiveTab('users');
+      await Promise.all([getUserCount(), getTeamCount()]);
+
+      if (owner && owner.length > 0) {
+        setActiveTab(owner[0]?.type === EntityType.TEAM ? 'teams' : 'users');
       } else {
-        await getUserCount();
-        setActiveTab('teams');
+        setActiveTab('users');
       }
     }
   };
@@ -280,7 +422,7 @@ export const UserTeamSelectableList = ({
 
   useEffect(() => {
     init();
-  }, [popupVisible]);
+  }, [popupVisible, popoverProps?.open]);
 
   return (
     <Popover

@@ -391,6 +391,7 @@ const GlossaryPage = () => {
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+        throw error;
       }
     },
     [activeGlossary]

@@ -20,6 +20,7 @@ import static org.openmetadata.common.utils.CommonUtil.listOrEmpty;
 import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
 import static org.openmetadata.schema.type.EventType.ENTITY_CREATED;
 import static org.openmetadata.schema.type.Include.ALL;
+import static org.openmetadata.service.Entity.ADMIN_USER_NAME;
 import static org.openmetadata.service.Entity.FIELD_DOMAINS;
 import static org.openmetadata.service.Entity.FIELD_OWNERS;
 import static org.openmetadata.service.Entity.FIELD_REVIEWERS;
@@ -29,6 +30,7 @@ import static org.openmetadata.service.Entity.GLOSSARY_TERM;
 import static org.openmetadata.service.Entity.TEAM;
 import static org.openmetadata.service.exception.CatalogExceptionMessage.invalidGlossaryTermMove;
 import static org.openmetadata.service.exception.CatalogExceptionMessage.notReviewer;
+import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import static org.openmetadata.service.resources.tags.TagLabelUtil.checkMutuallyExclusive;
 import static org.openmetadata.service.resources.tags.TagLabelUtil.checkMutuallyExclusiveForParentAndSubField;
 import static org.openmetadata.service.resources.tags.TagLabelUtil.getUniqueTags;
@@ -1680,6 +1682,17 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   }
 
   public static void checkUpdatedByReviewer(GlossaryTerm term, String updatedBy) {
+    if (ADMIN_USER_NAME.equalsIgnoreCase(updatedBy)) {
+      return;
+    }
+    SubjectContext subjectContext = null;
+    try {
+      subjectContext = SubjectContext.getSubjectContext(updatedBy);
+    } catch (Exception ignored) {
+    }
+    if (subjectContext != null && (subjectContext.isAdmin() || subjectContext.isBot())) {
+      return;
+    }
     // Only list of allowed reviewers can change the status from DRAFT to APPROVED
     List<EntityReference> reviewers = term.getReviewers();
     if (nullOrEmpty(reviewers)) {
@@ -1696,23 +1709,28 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     }
     if (!nullOrEmpty(reviewers)) {
       // Updating user must be one of the reviewers
-      boolean isReviewer =
-          reviewers.stream()
-              .anyMatch(
-                  e -> {
-                    if (e.getType().equals(TEAM)) {
-                      Team team =
-                          Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
-                      return team.getUsers().stream()
-                          .anyMatch(
-                              u ->
-                                  u.getName().equals(updatedBy)
-                                      || u.getFullyQualifiedName().equals(updatedBy));
-                    } else {
-                      return e.getName().equals(updatedBy)
-                          || e.getFullyQualifiedName().equals(updatedBy);
-                    }
-                  });
+      boolean isReviewer = false;
+      if (subjectContext != null) {
+        isReviewer = subjectContext.isReviewer(reviewers);
+      } else {
+        isReviewer =
+            reviewers.stream()
+                .anyMatch(
+                    e -> {
+                      if (e.getType().equals(TEAM)) {
+                        Team team =
+                            Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                        return team.getUsers().stream()
+                            .anyMatch(
+                                u ->
+                                    u.getName().equals(updatedBy)
+                                        || u.getFullyQualifiedName().equals(updatedBy));
+                      } else {
+                        return e.getName().equals(updatedBy)
+                            || e.getFullyQualifiedName().equals(updatedBy);
+                      }
+                    });
+      }
       if (!isReviewer) {
         throw new AuthorizationException(notReviewer(updatedBy));
       }

@@ -2405,7 +2405,9 @@
     "your-entity": "{{entity}} của bạn",
     "z-to-a": "Z đến A",
     "zoom-in": "Phóng to",
-    "zoom-out": "Thu nhỏ"
+    "zoom-out": "Thu nhỏ",
+    "revoke-approval": "Hủy duyệt",
+    "submit-for-review": "Gửi duyệt"
   },
   "message": {
     "access-block-time-message": "Truy cập sẽ bị chặn trong vài mili giây sau khi thực hiện quá số lần đăng nhập sai tối đa.",
@@ -3382,7 +3384,23 @@
     "write-your-announcement-lowercase": "viết thông báo của bạn",
     "write-your-description": "Viết mô tả của bạn",
     "write-your-text": "Viết {{text}} của bạn",
-    "you-can-also-set-up-the-metadata-ingestion": "Bạn cũng có thể thiết lập việc thu nạp siêu dữ liệu."
+    "you-can-also-set-up-the-metadata-ingestion": "Bạn cũng có thể thiết lập việc thu nạp siêu dữ liệu.",
+    "revoke-approval-help": "Hủy phê duyệt và chuyển thuật ngữ này về trạng thái Bản nháp (Draft)",
+    "confirm-revoke-approval-title": "Hủy duyệt thuật ngữ",
+    "confirm-revoke-approval-message": "Bạn có chắc chắn muốn hủy duyệt thuật ngữ?",
+    "revoke-approval-success": "Hủy duyệt thuật ngữ thành công",
+    "submit-for-review-help": "Gửi thuật ngữ này để chuyển sang trạng thái Đang duyệt (In Review)",
+    "confirm-submit-for-review-title": "Gửi duyệt thuật ngữ",
+    "confirm-submit-for-review-message": "Bạn có chắc chắn muốn gửi duyệt thuật ngữ?",
+    "submit-for-review-success": "Gửi duyệt thuật ngữ thành công",
+    "approve-entity-help": "Phê duyệt và chuyển thuật ngữ này sang trạng thái Đã duyệt (Approved)",
+    "reject-entity-help": "Từ chối và chuyển thuật ngữ này về trạng thái Bản nháp (Draft)",
+    "confirm-approve-glossary-term-title": "Phê duyệt thuật ngữ",
+    "confirm-approve-glossary-term-message": "Bạn có chắc chắn muốn phê duyệt thuật ngữ này?",
+    "confirm-reject-glossary-term-title": "Từ chối thuật ngữ",
+    "confirm-reject-glossary-term-message": "Bạn có chắc chắn muốn từ chối thuật ngữ này?",
+    "entity-approved-success": "{{entity}} đã được phê duyệt thành công",
+    "entity-rejected-success": "{{entity}} đã bị từ chối"
   },
   "server": {
     "account-verify-success": "Xác minh email thành công",

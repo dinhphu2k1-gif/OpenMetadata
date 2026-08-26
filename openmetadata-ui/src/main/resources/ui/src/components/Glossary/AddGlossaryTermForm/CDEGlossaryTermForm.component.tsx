@@ -336,7 +336,7 @@ const CDEGlossaryTermForm = ({
             name="reviewers">
             <UserTeamSelectableListSearchInput
               hasPermission
-              multiple={{ user: true, team: false }}
+              multiple={{ user: true, team: true }}
               owner={reviewers}
               placeholder={t('label.select')}
               onUpdate={async (value) =>

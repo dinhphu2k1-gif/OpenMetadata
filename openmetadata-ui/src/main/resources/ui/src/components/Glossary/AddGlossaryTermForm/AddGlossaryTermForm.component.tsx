@@ -357,7 +357,7 @@ const AddGlossaryTermForm = ({
       hasPermission: true,
       filterCurrentUser: true,
       popoverProps: { placement: 'topLeft' },
-      multiple: { user: true, team: false },
+      multiple: { user: true, team: true },
       previewSelected: true,
       label: t('label.reviewer-plural'),
       children: (

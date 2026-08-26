@@ -24,6 +24,8 @@ import {
 import type { Domain } from '../generated/entity/domains/domain';
 import type { Thread } from '../generated/entity/feed/thread';
 import type { User } from '../generated/entity/teams/user';
+import type { EntityReference } from '../generated/entity/type';
+import type { OperationPermission } from '../context/PermissionProvider/PermissionProvider.interface';
 import Fqn from './Fqn';
 import i18n from './i18next/LocalUtil';
 import { calculatePercentageFromValue } from './NumberUtils';
@@ -338,7 +340,9 @@ export const getGlossaryEntityLink = (glossaryTermFQN: string) =>
 export const permissionForApproveOrReject = (
   record: ModifiedGlossaryTerm,
   currentUser: User,
-  termTaskThreads: Record<string, Thread[]>
+  termTaskThreads: Record<string, Thread[]>,
+  glossaryReviewers?: EntityReference[],
+  permissions?: OperationPermission
 ) => {
   const entityLink = getGlossaryEntityLink(record.fullyQualifiedName ?? '');
   const taskThread = termTaskThreads[entityLink]?.find(
@@ -346,17 +350,29 @@ export const permissionForApproveOrReject = (
   );
   const currentUserId = currentUser?.id;
 
-  const isReviewer = record.reviewers?.some(
+  const isDirectReviewer = record.reviewers?.some(
     (reviewer) => reviewer.id === currentUserId
   );
+  const isGlossaryReviewer = glossaryReviewers?.some(
+    (reviewer) => reviewer.id === currentUserId
+  );
+  const isReviewer = Boolean(isDirectReviewer || isGlossaryReviewer);
+
   const isTaskAssignee = taskThread?.task?.assignees?.some(
     (assignee) => assignee.id === currentUserId
   );
   const hasTaskAssignees = Boolean(taskThread?.task?.assignees?.length);
 
+  const isReviewerOrAdmin = Boolean(
+    currentUser?.isAdmin ||
+      permissions?.EditAll ||
+      permissions?.EditStatus ||
+      isReviewer
+  );
+
   const permission = hasTaskAssignees
     ? Boolean(isTaskAssignee)
-    : Boolean(taskThread && (isTaskAssignee || isReviewer));
+    : Boolean(taskThread ? (isTaskAssignee || isReviewer) : isReviewerOrAdmin);
 
   return {
     permission,

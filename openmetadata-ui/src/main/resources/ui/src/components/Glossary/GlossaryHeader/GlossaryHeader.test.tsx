@@ -13,6 +13,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { EntityType } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import {
   mockedGlossaryTerms,
   MOCK_GLOSSARY,
@@ -20,6 +21,7 @@ import {
 import { mockUserData } from '../../../mocks/MyDataPage.mock';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
+import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import GlossaryHeader from './GlossaryHeader.component';
 
 const mockGlossaryTermPermission = {
@@ -167,10 +169,11 @@ jest.mock('../../../rest/glossaryAPI', () => ({
 
 const mockOnDelete = jest.fn();
 const mockOnUpdateVote = jest.fn();
+const mockOnUpdate = jest.fn();
 
 const mockContext = {
   data: { displayName: 'glossaryTest' } as Glossary,
-  onUpdate: jest.fn(),
+  onUpdate: mockOnUpdate,
   isVersionView: false,
   type: EntityType.GLOSSARY,
   permissions: DEFAULT_ENTITY_PERMISSION,
@@ -321,5 +324,192 @@ describe('GlossaryHeader component', () => {
     expect(
       screen.queryByText('ChangeParentHierarchyComponent')
     ).not.toBeInTheDocument();
+  });
+
+  it('should render revoke approval menu item for approved glossary term and handle confirm', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        entityStatus: 'Approved',
+      },
+      onUpdate: mockOnUpdate,
+      isVersionView: false,
+      permissions: {
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditAll: true,
+      },
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('label.revoke-approval')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.revoke-approval'));
+    });
+
+    // ConfirmationModal should be visible
+    expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('save-button'));
+    });
+
+    expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityStatus: 'Draft',
+      })
+    );
+  });
+
+  it('should render Submit for Review button in manage menu when term is Draft and trigger submit', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        entityStatus: 'Draft',
+      },
+      onUpdate: mockOnUpdate,
+      isVersionView: false,
+      permissions: {
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditDescription: true,
+      },
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.submit-for-review'));
+    });
+
+    // ConfirmationModal should be visible
+    expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('save-button'));
+    });
+
+    expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityStatus: EntityStatus.InReview,
+      })
+    );
+  });
+
+  it('should render Approve and Reject buttons in manage menu when term is InReview and trigger approve', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.InReview,
+        reviewers: [{ id: 'mock-user-id', type: 'user' }],
+      },
+      onUpdate: mockOnUpdate,
+      isVersionView: false,
+      permissions: {
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditStatus: true,
+      },
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('label.approve')).toBeInTheDocument();
+    expect(screen.getByText('label.reject')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.approve'));
+    });
+
+    expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('save-button'));
+    });
+
+    expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityStatus: EntityStatus.Approved,
+      })
+    );
+  });
+
+  it('should trigger reject when reject button is clicked in manage menu', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.InReview,
+        reviewers: [{ id: 'mock-user-id', type: 'user' }],
+      },
+      onUpdate: mockOnUpdate,
+      isVersionView: false,
+      permissions: {
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditStatus: true,
+      },
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.reject'));
+    });
+
+    expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('save-button'));
+    });
+
+    expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityStatus: EntityStatus.Draft,
+      })
+    );
   });
 });

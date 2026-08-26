@@ -8322,11 +8322,111 @@ public abstract class EntityRepository<T extends EntityInterface> {
                 || updated.getEntityStatus() == EntityStatus.REJECTED)) {
           checkUpdatedByReviewer(original, updated.getUpdatedBy());
         }
+        // Reviewers, owners, or admins can revoke approval (APPROVED -> DRAFT/IN_REVIEW/REJECTED)
+        if (!consolidatingChanges
+            && original.getEntityStatus() == EntityStatus.APPROVED
+            && (updated.getEntityStatus() == EntityStatus.DRAFT
+                || updated.getEntityStatus() == EntityStatus.REJECTED
+                || updated.getEntityStatus() == EntityStatus.IN_REVIEW)) {
+          checkUpdatedByReviewerOrOwner(original, updated.getUpdatedBy());
+        }
         recordChange("entityStatus", original.getEntityStatus(), updated.getEntityStatus());
       }
     }
 
+    public static void checkUpdatedByReviewerOrOwner(EntityInterface entity, String updatedBy) {
+      if (ADMIN_USER_NAME.equalsIgnoreCase(updatedBy)) {
+        return;
+      }
+      SubjectContext subjectContext = null;
+      try {
+        subjectContext = SubjectContext.getSubjectContext(updatedBy);
+      } catch (Exception ignored) {
+      }
+      if (subjectContext != null && (subjectContext.isAdmin() || subjectContext.isBot())) {
+        return;
+      }
+      List<EntityReference> reviewers = entity.getReviewers();
+      if (nullOrEmpty(reviewers)) {
+        try {
+          EntityRepository repo = Entity.getEntityRepository(entity.getEntityReference().getType());
+          if (repo.isSupportsReviewers()) {
+            EntityInterface parent = repo.getParentEntity(entity, "reviewers");
+            if (parent != null && !nullOrEmpty(parent.getReviewers())) {
+              reviewers = parent.getReviewers();
+            }
+          }
+        } catch (Exception e) {
+          LOG.warn("Failed to inherit reviewers in checkUpdatedByReviewerOrOwner: {}", e.getMessage());
+        }
+      }
+      if (nullOrEmpty(reviewers)) {
+        return;
+      }
+      boolean isReviewer = false;
+      if (subjectContext != null) {
+        isReviewer = subjectContext.isReviewer(reviewers);
+      } else {
+        isReviewer =
+            reviewers.stream()
+                .anyMatch(
+                    e -> {
+                      if (e.getType().equals(TEAM)) {
+                        Team team =
+                            Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                        return team.getUsers().stream()
+                            .anyMatch(
+                                u ->
+                                    u.getName().equals(updatedBy)
+                                        || u.getFullyQualifiedName().equals(updatedBy));
+                      } else {
+                        return e.getName().equals(updatedBy)
+                            || e.getFullyQualifiedName().equals(updatedBy);
+                      }
+                    });
+      }
+      List<EntityReference> owners = entity.getOwners();
+      boolean isOwner = false;
+      if (!nullOrEmpty(owners)) {
+        if (subjectContext != null) {
+          isOwner = subjectContext.isOwner(owners);
+        } else {
+          isOwner =
+              owners.stream()
+                  .anyMatch(
+                      e -> {
+                        if (e.getType().equals(TEAM)) {
+                          Team team =
+                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                          return team.getUsers().stream()
+                              .anyMatch(
+                                  u ->
+                                      u.getName().equals(updatedBy)
+                                          || u.getFullyQualifiedName().equals(updatedBy));
+                        } else {
+                          return e.getName().equals(updatedBy)
+                              || e.getFullyQualifiedName().equals(updatedBy);
+                        }
+                      });
+        }
+      }
+      if (!isReviewer && !isOwner) {
+        throw new AuthorizationException(notReviewer(updatedBy));
+      }
+    }
+
     public static void checkUpdatedByReviewer(EntityInterface entity, String updatedBy) {
+      if (ADMIN_USER_NAME.equalsIgnoreCase(updatedBy)) {
+        return;
+      }
+      SubjectContext subjectContext = null;
+      try {
+        subjectContext = SubjectContext.getSubjectContext(updatedBy);
+      } catch (Exception ignored) {
+      }
+      if (subjectContext != null && (subjectContext.isAdmin() || subjectContext.isBot())) {
+        return;
+      }
       // Only list of allowed reviewers can change the status from DRAFT to APPROVED
       List<EntityReference> reviewers = entity.getReviewers();
       if (nullOrEmpty(reviewers)) {
@@ -8344,23 +8444,28 @@ public abstract class EntityRepository<T extends EntityInterface> {
       }
       if (!nullOrEmpty(reviewers)) {
         // Updating user must be one of the reviewers
-        boolean isReviewer =
-            reviewers.stream()
-                .anyMatch(
-                    e -> {
-                      if (e.getType().equals(TEAM)) {
-                        Team team =
-                            Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
-                        return team.getUsers().stream()
-                            .anyMatch(
-                                u ->
-                                    u.getName().equals(updatedBy)
-                                        || u.getFullyQualifiedName().equals(updatedBy));
-                      } else {
-                        return e.getName().equals(updatedBy)
-                            || e.getFullyQualifiedName().equals(updatedBy);
-                      }
-                    });
+        boolean isReviewer = false;
+        if (subjectContext != null) {
+          isReviewer = subjectContext.isReviewer(reviewers);
+        } else {
+          isReviewer =
+              reviewers.stream()
+                  .anyMatch(
+                      e -> {
+                        if (e.getType().equals(TEAM)) {
+                          Team team =
+                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                          return team.getUsers().stream()
+                              .anyMatch(
+                                  u ->
+                                      u.getName().equals(updatedBy)
+                                          || u.getFullyQualifiedName().equals(updatedBy));
+                        } else {
+                          return e.getName().equals(updatedBy)
+                              || e.getFullyQualifiedName().equals(updatedBy);
+                        }
+                      });
+        }
         if (!isReviewer) {
           throw new AuthorizationException(notReviewer(updatedBy));
         }
