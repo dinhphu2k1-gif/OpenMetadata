@@ -83,6 +83,7 @@ import org.openmetadata.service.jdbi3.ListFilter;
 import org.openmetadata.service.limits.Limits;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.resources.EntityResource;
+import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
 import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
@@ -90,6 +91,7 @@ import org.openmetadata.service.security.Authorizer;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContextInterface;
+import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.Fields;
@@ -290,11 +292,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                 parentTermParam.toString(), glossaryIdParam));
       }
     }
+    String effectiveEntityStatus = resolveEffectiveEntityStatus(securityContext, entityStatus);
     ListFilter filter =
         new ListFilter(include)
             .addQueryParam("parent", fqn)
             .addQueryParam("directChildrenOf", parentTermFQNParam)
-            .addQueryParam("entityStatus", entityStatus);
+            .addQueryParam("entityStatus", effectiveEntityStatus);
 
     ResultList<GlossaryTerm> terms;
     if (before != null) { // Reverse paging
@@ -378,32 +381,51 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             new AuthRequest(glossaryTermOperationContext, glossaryTermResourceContext));
     authorizer.authorizeRequests(securityContext, authRequests, AuthorizationLogic.ANY);
 
+    String effectiveEntityStatus = resolveEffectiveEntityStatus(securityContext, entityStatus);
     ResultList<GlossaryTerm> result;
     if (glossaryId != null) {
       result =
           repository.searchGlossaryTermsById(
-              glossaryId, query, limitParam, offsetParam, fieldsParam, include, entityStatus);
+              glossaryId, query, limitParam, offsetParam, fieldsParam, include, effectiveEntityStatus);
     } else if (glossaryFqn != null) {
       result =
           repository.searchGlossaryTermsByFQN(
-              glossaryFqn, query, limitParam, offsetParam, fieldsParam, include, entityStatus);
+              glossaryFqn, query, limitParam, offsetParam, fieldsParam, include, effectiveEntityStatus);
     } else if (parentId != null) {
       result =
           repository.searchGlossaryTermsByParentId(
-              parentId, query, limitParam, offsetParam, fieldsParam, include, entityStatus);
+              parentId, query, limitParam, offsetParam, fieldsParam, include, effectiveEntityStatus);
     } else if (parentFqn != null) {
       result =
           repository.searchGlossaryTermsByParentFQN(
-              parentFqn, query, limitParam, offsetParam, fieldsParam, include, entityStatus);
+              parentFqn, query, limitParam, offsetParam, fieldsParam, include, effectiveEntityStatus);
     } else {
       // Search across all glossary terms without parent filter
       // Uses efficient database-level search and pagination
       result =
           repository.searchGlossaryTermsByParentFQN(
-              null, query, limitParam, offsetParam, fieldsParam, include, entityStatus);
+              null, query, limitParam, offsetParam, fieldsParam, include, effectiveEntityStatus);
     }
 
     return addHref(uriInfo, result);
+  }
+
+  private String resolveEffectiveEntityStatus(
+      SecurityContext securityContext, String requestedEntityStatus) {
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    if (!subjectContext.isAdmin() && !subjectContext.isBot()) {
+      boolean isElevatedRole =
+          subjectContext.hasAnyRole("DataSteward")
+              || subjectContext.hasAnyRole("DataProposer")
+              || subjectContext.hasAnyRole("Admin")
+              || subjectContext.hasAnyRole("Organization");
+      if (!isElevatedRole
+          && (subjectContext.hasAnyRole("BasicConsumer")
+              || subjectContext.hasAnyRole("DataConsumer"))) {
+        return "Approved";
+      }
+    }
+    return requestedEntityStatus;
   }
 
   @GET

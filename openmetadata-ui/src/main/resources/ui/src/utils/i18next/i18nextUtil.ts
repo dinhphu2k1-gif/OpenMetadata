@@ -47,40 +47,12 @@ export const getInitOptions = (): InitOptions => {
 
 // Returns the current locale to use in cronstrue
 export const getCurrentLocaleForConstrue = () => {
-  // For cronstrue, we need to pass the locale in the format 'pt_BR' and not 'pt-BR'
-  // for some selected languages
-  if (
-    [
-      SupportedLocales['Português (Brasil)'],
-      SupportedLocales['Português (Portugal)'],
-      SupportedLocales.简体中文,
-      SupportedLocales.繁體中文,
-    ].includes(i18next.resolvedLanguage as SupportedLocales)
-  ) {
-    return i18next.resolvedLanguage.replaceAll('-', '_');
-  }
-
-  return i18next.resolvedLanguage.split('-')[0];
+  return i18next.resolvedLanguage?.split('-')[0] ?? 'en';
 };
 
 // Map common language codes to supported locales
 export const languageMap: Record<string, SupportedLocales> = {
-  mr: SupportedLocales.मराठी, // Marathi
   en: SupportedLocales.English,
-  ko: SupportedLocales.한국어,
-  fr: SupportedLocales.Français,
-  zh: SupportedLocales.简体中文,
-  ja: SupportedLocales.日本語,
-  pt: SupportedLocales['Português (Brasil)'], // Default to Brazilian Portuguese
-  es: SupportedLocales.Español,
-  gl: SupportedLocales.Galego,
-  ru: SupportedLocales.Русский,
-  de: SupportedLocales.Deutsch,
-  he: SupportedLocales.Hebrew,
-  nl: SupportedLocales.Nederlands,
-  pr: SupportedLocales.Persian,
-  th: SupportedLocales.Thai,
-  tr: SupportedLocales.Türkçe,
-  ar: SupportedLocales.العربية,
   vi: SupportedLocales['Tiếng Việt'],
 };
+

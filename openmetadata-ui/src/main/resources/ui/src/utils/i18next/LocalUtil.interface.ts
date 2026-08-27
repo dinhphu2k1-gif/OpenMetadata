@@ -13,23 +13,6 @@
 // to remove circular dependency
 export enum SupportedLocales {
   English = 'en-US',
-  한국어 = 'ko-KR',
-  Français = 'fr-FR',
-  简体中文 = 'zh-CN',
-  繁體中文 = 'zh-TW',
-  日本語 = 'ja-JP',
-  'Português (Brasil)' = 'pt-BR',
-  'Português (Portugal)' = 'pt-PT',
-  Español = 'es-ES',
-  Galego = 'gl-ES',
-  Русский = 'ru-RU',
-  Deutsch = 'de-DE',
-  Hebrew = 'he-HE',
-  Nederlands = 'nl-NL',
-  Persian = 'pr-PR',
-  Thai = 'th-TH',
-  मराठी = 'mr-IN',
-  Türkçe = 'tr-TR',
-  العربية = 'ar-SA',
   'Tiếng Việt' = 'vi-VN',
 }
+

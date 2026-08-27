@@ -16,7 +16,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { FEED_COUNT_INITIAL_DATA } from '../../../constants/entity.constants';
 import { EntityField } from '../../../constants/Feeds.constants';
-import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
 import { EntityTabs, EntityType } from '../../../enums/entity.enum';
 import { SearchIndex } from '../../../enums/search.enum';
 import {
@@ -61,6 +64,7 @@ import { EntityDetailsObjectInterface } from '../../Explore/ExplorePage.interfac
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
+import DQGlossaryTermOverview from './DQGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
@@ -199,6 +203,16 @@ const GlossaryTermsV1 = ({
     [glossaryTerm]
   );
 
+  const isDQGlossaryTerm = useMemo(
+    () =>
+      isDataQualityGlossary(
+        glossaryTerm.fullyQualifiedName,
+        glossaryTerm.glossary?.name,
+        glossaryTerm.glossary?.displayName
+      ),
+    [glossaryTerm]
+  );
+
   const tabItems = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
@@ -229,18 +243,29 @@ const GlossaryTermsV1 = ({
       isVersionView
     );
 
-    if (!isCDEGlossaryTerm) {
-      return detailTabs;
+    if (isDQGlossaryTerm) {
+      return detailTabs.map((tab) =>
+        tab.key === EntityTabs.OVERVIEW
+          ? {
+              ...tab,
+              children: <DQGlossaryTermOverview glossaryTerm={glossaryTerm} />,
+            }
+          : tab
+      );
     }
 
-    return detailTabs.map((tab) =>
-      tab.key === EntityTabs.OVERVIEW
-        ? {
-            ...tab,
-            children: <CDEGlossaryTermOverview glossaryTerm={glossaryTerm} />,
-          }
-        : tab
-    );
+    if (isCDEGlossaryTerm) {
+      return detailTabs.map((tab) =>
+        tab.key === EntityTabs.OVERVIEW
+          ? {
+              ...tab,
+              children: <CDEGlossaryTermOverview glossaryTerm={glossaryTerm} />,
+            }
+          : tab
+      );
+    }
+
+    return detailTabs;
   }, [
     customizedTabs,
     glossaryTerm,
@@ -256,6 +281,7 @@ const GlossaryTermsV1 = ({
     previewAsset,
     handleAssetClick,
     isCDEGlossaryTerm,
+    isDQGlossaryTerm,
   ]);
 
   useEffect(() => {

@@ -17,6 +17,27 @@
     "data-quality-rules": "Quy định về chất lượng dữ liệu",
     "notes": "Ghi chú"
   },
+  "dq": {
+    "data-quality": "Chất lượng dữ liệu",
+    "rule-code": "Mã quy tắc",
+    "cde-code": "Mã CDE",
+    "cde-name": "Tên thành tố",
+    "dimension": "Tiêu chí chất lượng dữ liệu",
+    "business-rule": "Quy tắc nghiệp vụ",
+    "quality-threshold": "Ngưỡng chất lượng dữ liệu",
+    "data-source": "Hệ thống nguồn",
+    "frequency": "Tần suất",
+    "target-population": "Tập dữ liệu kiểm tra",
+    "method": "Hình thức kiểm tra",
+    "rule-explanation": "Diễn giải quy tắc nghiệp vụ",
+    "other-constraints": "Ràng buộc / Yêu cầu khác",
+    "exceptions": "Dấu hiệu ngoại lệ",
+    "owners": "Chủ sở hữu",
+    "search-placeholder": "Tìm kiếm mã hoặc tên quy tắc chất lượng dữ liệu",
+    "section-business-rule": "Khối 1: Thông tin Quy tắc Nghiệp vụ",
+    "section-evaluation-scope": "Khối 2: Điều kiện & Phạm vi Đánh giá",
+    "section-governance": "Khối 3: Quản trị & Phê duyệt"
+  },
   "label": {
     "-with-colon": "{{text}}:",
     "1-day": "1 ngày",

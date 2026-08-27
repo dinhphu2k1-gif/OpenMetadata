@@ -33,6 +33,19 @@
       "effect": "allow"
     },
     {
+      "name": "DataConsumer-DenyUnapprovedGlossaryTerms",
+      "description": "Deny viewing glossary terms that are not in Approved status",
+      "resources": [
+        "glossaryTerm"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
+      "effect": "deny",
+      "condition": "notApproved()"
+    },
+    {
       "name": "DataConsumer-DenyAllNonReadOperations",
       "description": "Explicitly deny all mutating, editing, deleting, deploying, and triggering operations when not owner",
       "resources": [

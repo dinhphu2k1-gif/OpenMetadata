@@ -31,6 +31,19 @@
       "effect": "allow"
     },
     {
+      "name": "BasicConsumerPolicy-DenyUnapprovedGlossaryTerms",
+      "description": "Deny viewing glossary terms that are not in Approved status",
+      "resources": [
+        "glossaryTerm"
+      ],
+      "operations": [
+        "ViewAll",
+        "ViewBasic"
+      ],
+      "effect": "deny",
+      "condition": "notApproved()"
+    },
+    {
       "name": "BasicConsumerPolicy-DenyNonReadOperations",
       "description": "Explicitly deny all mutating operations on allowed business resources when not owner",
       "resources": [
