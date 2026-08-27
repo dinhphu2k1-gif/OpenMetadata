@@ -64,6 +64,59 @@ export const isDataDictionaryGlossary = (
       identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
   );
 
+export const DATA_QUALITY_GLOSSARY_NAME = 'Data Quality';
+export const DATA_QUALITY_GLOSSARY_DISPLAY_NAME = 'Chất lượng dữ liệu';
+
+export const isDataQualityGlossary = (
+  ...identifiers: Array<string | undefined>
+) =>
+  identifiers.some(
+    (identifier) =>
+      identifier === DATA_QUALITY_GLOSSARY_NAME ||
+      identifier === DATA_QUALITY_GLOSSARY_DISPLAY_NAME ||
+      identifier?.startsWith(`${DATA_QUALITY_GLOSSARY_NAME}.`) ||
+      identifier?.startsWith(`${DATA_QUALITY_GLOSSARY_DISPLAY_NAME}.`)
+  );
+
+export const DQ_GLOSSARY_TERM_FIELDS = [
+  TabSpecificField.CHILDREN_COUNT,
+  TabSpecificField.OWNERS,
+  TabSpecificField.REVIEWERS,
+  TabSpecificField.TAGS,
+  TabSpecificField.EXTENSION,
+  TabSpecificField.RELATED_TERMS,
+];
+
+export const DQ_GLOSSARY_TABLE_COLUMNS_KEYS = {
+  NAME: 'name',
+  CDE_CODE: 'dqCdeCode',
+  CDE_NAME: 'dqCdeName',
+  DIMENSION: 'dqDimension',
+  DESCRIPTION: 'dqDescription',
+  RULE_EXPLANATION: 'dqRuleExplanation',
+  OTHER_CONSTRAINTS: 'dqOtherConstraints',
+  EXCEPTIONS: 'dqExceptions',
+  TARGET_POPULATION: 'dqTargetPopulation',
+  METHOD: 'dqMethod',
+  FREQUENCY: 'dqFrequency',
+  QUALITY_THRESHOLD: 'dqQualityThreshold',
+  DATA_SOURCE: 'dqDataSource',
+};
+
+export const DQ_DEFAULT_VISIBLE_COLUMNS = Object.values(
+  DQ_GLOSSARY_TABLE_COLUMNS_KEYS
+)
+  .filter((key) => key !== DQ_GLOSSARY_TABLE_COLUMNS_KEYS.NAME)
+  .concat(GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS);
+
+export const DQ_STATIC_VISIBLE_COLUMNS = [
+  DQ_GLOSSARY_TABLE_COLUMNS_KEYS.NAME,
+  GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
+  GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
+];
+
+export const DQ_GLOSSARY_TABLE_PREFERENCE_KEY = 'dqGlossaryTerm';
+
 export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
   NAME: 'name',
   DOMAINS: 'cdeDomains',

@@ -62,9 +62,14 @@ import {
   CDE_GLOSSARY_TERM_FIELDS,
   CDE_STATIC_VISIBLE_COLUMNS,
   DEFAULT_VISIBLE_COLUMNS,
+  DQ_DEFAULT_VISIBLE_COLUMNS,
+  DQ_GLOSSARY_TABLE_PREFERENCE_KEY,
+  DQ_GLOSSARY_TERM_FIELDS,
+  DQ_STATIC_VISIBLE_COLUMNS,
   GLOSSARY_TERM_STATUS_OPTIONS,
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS,
   isDataDictionaryGlossary,
+  isDataQualityGlossary,
   STATIC_VISIBLE_COLUMNS,
 } from '../../../constants/Glossary.contant';
 import { TABLE_CONSTANTS } from '../../../constants/Teams.constants';
@@ -119,6 +124,7 @@ import TagButton from '../../common/TagButton/TagButton.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
 import { getCDEGlossaryTableColumns } from './CDEGlossaryTableColumns';
+import { getDQGlossaryTableColumns } from './DQGlossaryTableColumns';
 import {
   GlossaryTermTabProps,
   ModifiedGlossaryTerm,
@@ -151,6 +157,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       activeGlossary.fullyQualifiedName
     );
   }, [activeGlossary, isGlossary]);
+  const isDQGlossary = useMemo(() => {
+    const glossary = isGlossary
+      ? activeGlossary
+      : (activeGlossary as unknown as GlossaryTerm).glossary;
+
+    return isDataQualityGlossary(
+      glossary?.name,
+      glossary?.displayName,
+      activeGlossary.fullyQualifiedName
+    );
+  }, [activeGlossary, isGlossary]);
   const [termTaskThreads, setTermTaskThreads] = useState<
     Record<string, Thread[]>
   >({});
@@ -166,6 +183,21 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     };
   }, [glossaryChildTerms, findExpandableKeysForArray]);
 
+  const isConsumer = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return false;
+    }
+    const userRoles = currentUser?.roles?.map((r) => r.name) ?? [];
+    const isElevated = userRoles.some((r) =>
+      ['DataSteward', 'DataProposer', 'Admin', 'Organization'].includes(r)
+    );
+
+    return (
+      !isElevated &&
+      userRoles.some((r) => ['BasicConsumer', 'DataConsumer'].includes(r))
+    );
+  }, [currentUser]);
+
   const [movedGlossaryTerm, setMovedGlossaryTerm] =
     useState<MoveGlossaryTermType>();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -176,10 +208,23 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     useState<boolean>(false);
   const [statusDropdownSelection, setStatusDropdownSelection] = useState<
     string[]
-  >([EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]);
-  const [selectedStatus, setSelectedStatus] = useState<string[]>([
-    ...statusDropdownSelection,
-  ]);
+  >(() =>
+    isConsumer
+      ? [EntityStatus.Approved]
+      : [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
+  );
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(() =>
+    isConsumer
+      ? [EntityStatus.Approved]
+      : [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
+  );
+
+  useEffect(() => {
+    if (isConsumer) {
+      setStatusDropdownSelection([EntityStatus.Approved]);
+      setSelectedStatus([EntityStatus.Approved]);
+    }
+  }, [isConsumer]);
   const [confirmCheckboxChecked, setConfirmCheckboxChecked] = useState(false);
   const [totalTermsCount, setTotalTermsCount] = useState<number>(0);
 
@@ -221,7 +266,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const fetchChildTerms = async (parentFQN: string, after?: string) => {
     setLoadingChildren((prev) => ({ ...prev, [parentFQN]: true }));
     try {
-      const response = isCDEGlossary
+      const response = isDQGlossary
+        ? await getGlossaryTermChildrenLazy(
+            parentFQN,
+            50,
+            after,
+            DQ_GLOSSARY_TERM_FIELDS
+          )
+        : isCDEGlossary
         ? await getGlossaryTermChildrenLazy(
             parentFQN,
             50,
@@ -242,26 +294,32 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       ): ModifiedGlossary[] => {
         return terms.map((term) => {
           if (term.fullyQualifiedName === parentFQN) {
-            const existingChildren = after
-              ? ((term.children ?? []) as ModifiedGlossary[])
-              : [];
-            const newChildren = data as ModifiedGlossary[];
+            // Merge existing children with new children, avoiding duplicates
+            const existingChildren = term.children || [];
+            const newChildren = (data as ModifiedGlossary[]) || [];
+            const mergedChildren = [...existingChildren];
+
+            newChildren.forEach((newChild) => {
+              if (
+                !mergedChildren.some(
+                  (existing) =>
+                    existing.fullyQualifiedName === newChild.fullyQualifiedName
+                )
+              ) {
+                mergedChildren.push(newChild);
+              }
+            });
 
             return {
               ...term,
-              children: [...existingChildren, ...newChildren],
-              hasMoreChildren: !!paging?.after,
-              childrenPagingAfter: paging?.after,
+              children: mergedChildren,
+              childrenCount: paging?.total ?? term.childrenCount,
+              paging,
             };
-          }
-
-          // Check if this term has children and recursively update them
-          if (term.children && term.children.length > 0) {
+          } else if (term.children && term.children.length > 0) {
             return {
               ...term,
-              children: updateNestedTerms(
-                term.children as ModifiedGlossary[]
-              ) as ModifiedGlossaryTerm[],
+              children: updateNestedTerms(term.children as ModifiedGlossary[]),
             };
           }
 
@@ -269,8 +327,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         }) as ModifiedGlossary[];
       };
 
-      const updatedTerms = updateNestedTerms(glossaryChildTerms);
-      setGlossaryChildTerms(updatedTerms);
+      setGlossaryChildTerms(updateNestedTerms(glossaryChildTerms));
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
@@ -278,33 +335,35 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     }
   };
 
-  const initializeLoadingStates = () => {
+  const fetchAllTerms = async (
+    pagingCursor: PagingHandlerParams = {
+      cursorType: null,
+      cursorValue: undefined,
+    }
+  ) => {
+    if (!activeGlossary?.fullyQualifiedName) {
+      return;
+    }
+
     setIsTableLoading(true);
-  };
-
-  const fetchAllTerms = async () => {
-    initializeLoadingStates();
-
     try {
-      let data;
+      let data: ModifiedGlossary[] = [];
       let pagingResponse: Paging | undefined;
 
-      const isStatusFilterActive = !selectedStatus.includes('all');
-      const entityStatusParam = isStatusFilterActive
-        ? selectedStatus.filter((s) => s !== 'all').join(',')
-        : undefined;
+      const entityStatusParam = isConsumer
+        ? [EntityStatus.Approved]
+        : selectedStatus.length === 0
+        ? [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
+        : selectedStatus.includes('all')
+        ? undefined
+        : (selectedStatus as EntityStatus[]);
 
       // Use search API if search term is present
-      if (searchTerm) {
-        const currentOffset = (currentPage - 1) * pageSize;
+      if (searchTerm.trim()) {
         const response = await searchGlossaryTermsPaginated({
           q: searchTerm,
-          glossaryFqn: activeGlossary?.fullyQualifiedName,
+          glossaryFqn: activeGlossary.fullyQualifiedName,
           limit: pageSize,
-          offset: currentOffset,
-          fields:
-            'children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount',
-          entityStatus: entityStatusParam,
         });
         data = response.data;
         pagingResponse = response.paging;
@@ -319,12 +378,21 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             : undefined;
 
         // Use regular listing API when no search term
-        const response = isCDEGlossary
+        const response = isDQGlossary
           ? await getFirstLevelGlossaryTermsPaginated(
               activeGlossary?.fullyQualifiedName || '',
               pageSize,
               after,
-              entityStatusParam,
+              entityStatusParam?.join(','),
+              DQ_GLOSSARY_TERM_FIELDS,
+              before
+            )
+          : isCDEGlossary
+          ? await getFirstLevelGlossaryTermsPaginated(
+              activeGlossary?.fullyQualifiedName || '',
+              pageSize,
+              after,
+              entityStatusParam?.join(','),
               CDE_GLOSSARY_TERM_FIELDS,
               before
             )
@@ -332,7 +400,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               activeGlossary?.fullyQualifiedName || '',
               pageSize,
               after,
-              entityStatusParam,
+              entityStatusParam?.join(','),
               undefined,
               before
             );
@@ -340,20 +408,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         pagingResponse = response.paging;
       }
 
-      if (!data || !Array.isArray(data)) {
-        return;
-      }
-
-      if (data.length === 0 && isStatusFilterActive) {
-        const countResponse = await getFirstLevelGlossaryTermsPaginated(
-          activeGlossary?.fullyQualifiedName || '',
-          0
-        );
-        setTotalTermsCount(countResponse.paging?.total ?? 0);
-      } else {
-        setTotalTermsCount(pagingResponse?.total ?? data.length);
-      }
-
+      setTotalTermsCount(pagingResponse?.total ?? data.length);
       handlePagingChange(pagingResponse ?? { total: data.length });
       setGlossaryChildTerms(data as ModifiedGlossary[]);
       setExpandedRowKeys([]);
@@ -376,7 +431,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         TabSpecificField.PARENT,
         TabSpecificField.CHILDREN,
         TabSpecificField.REVIEWERS,
-        ...(isCDEGlossary
+        ...(isDQGlossary
+          ? [
+              TabSpecificField.TAGS,
+              TabSpecificField.EXTENSION,
+              TabSpecificField.RELATED_TERMS,
+            ]
+          : isCDEGlossary
           ? [
               TabSpecificField.TAGS,
               TabSpecificField.DOMAINS,
@@ -384,6 +445,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             ]
           : []),
       ],
+      ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
     });
     setGlossaryChildTerms(buildTree(data) as ModifiedGlossary[]);
     const keys = data.reduce((prev, curr) => {
@@ -954,15 +1016,81 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       });
     }
 
+    if (isDQGlossary) {
+      const governanceColumnKeys = new Set([
+        GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
+        GLOSSARY_TERM_TABLE_COLUMNS_KEYS.REVIEWERS,
+        GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
+      ]);
+      const governanceColumns = data
+        .filter((column) => governanceColumnKeys.has(String(column.key)))
+        .map((column) => {
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS) {
+            return {
+              ...column,
+              width: 120,
+              align: 'center' as const,
+            };
+          }
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.REVIEWERS) {
+            return {
+              ...column,
+              width: 180,
+            };
+          }
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS) {
+            return {
+              ...column,
+              width: 80,
+              align: 'center' as const,
+            };
+          }
+
+          return column;
+        });
+
+      return [
+        ...getDQGlossaryTableColumns({
+          handleLoadMoreChildren,
+          loadingChildren,
+          t,
+        }),
+        ...governanceColumns,
+      ];
+    }
+
     if (isCDEGlossary) {
       const governanceColumnKeys = new Set([
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.REVIEWERS,
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
       ]);
-      const governanceColumns = data.filter((column) =>
-        governanceColumnKeys.has(String(column.key))
-      );
+      const governanceColumns = data
+        .filter((column) => governanceColumnKeys.has(String(column.key)))
+        .map((column) => {
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS) {
+            return {
+              ...column,
+              width: 120,
+              align: 'center' as const,
+            };
+          }
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.REVIEWERS) {
+            return {
+              ...column,
+              width: 180,
+            };
+          }
+          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS) {
+            return {
+              ...column,
+              width: 80,
+              align: 'center' as const,
+            };
+          }
+
+          return column;
+        });
 
       return [
         ...getCDEGlossaryTableColumns({
@@ -983,6 +1111,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     handleRejectGlossaryTerm,
     handleLoadMoreChildren,
     isCDEGlossary,
+    isDQGlossary,
     loadingChildren,
     t,
   ]);
@@ -1062,6 +1191,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     return expandedRowKeys.length === expandableKeys.length;
   }, [expandedRowKeys, expandableKeys]);
 
+  const availableStatusOptions = useMemo(() => {
+    if (isConsumer) {
+      return [
+        {
+          value: EntityStatus.Approved,
+          text: EntityStatus.Approved,
+        },
+      ];
+    }
+
+    return GLOSSARY_TERM_STATUS_OPTIONS;
+  }, [isConsumer]);
+
   const statusDropdownMenu: MenuProps = useMemo(
     () => ({
       items: [
@@ -1072,10 +1214,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               <Checkbox.Group
                 className="glossary-col-sel-checkbox-group"
                 value={statusDropdownSelection}>
-                {GLOSSARY_TERM_STATUS_OPTIONS.map((option) => (
+                {availableStatusOptions.map((option) => (
                   <div key={option.value}>
                     <Checkbox
                       className="custom-glossary-col-sel-checkbox"
+                      disabled={isConsumer}
                       value={option.value}
                       onChange={(e) =>
                         handleCheckboxChange(option.value, e.target.checked)
@@ -1158,13 +1301,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           allowClear
           data-testid="search-glossary-terms-input"
           placeholder={
-            isCDEGlossary
+            isDQGlossary
+              ? t('dq.search-placeholder')
+              : isCDEGlossary
               ? 'Tìm kiếm mã hoặc tên thuật ngữ'
               : t('label.search-entity', {
                   entity: t('label.term-plural'),
                 })
           }
-          style={{ width: isCDEGlossary ? 280 : 250 }}
+          style={{ width: isDQGlossary ? 330 : isCDEGlossary ? 280 : 250 }}
           value={searchInput}
           onChange={handleSearchChange}
         />
@@ -1192,6 +1337,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         <Button
           className={classNames('text-primary remove-button-background-hover', {
             'cde-toolbar-collapse-action': isCDEGlossary,
+            'dq-toolbar-collapse-action': isDQGlossary,
           })}
           data-testid="expand-collapse-all-button"
           disabled={isExpandingAll}
@@ -1218,6 +1364,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     isExpandingAll,
     isStatusDropdownVisible,
     isCDEGlossary,
+    isDQGlossary,
     statusDropdownMenu,
     searchInput,
     toggleExpandAll,
@@ -1569,28 +1716,43 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                 resizableColumns
                 className={classNames('drop-over-background', {
                   'cde-glossary-terms-table': isCDEGlossary,
+                  'dq-glossary-terms-table': isDQGlossary,
                   'drop-over-table': isTableHovered,
                 })}
                 columns={columns}
                 components={TABLE_CONSTANTS}
                 containerClassName={
-                  isCDEGlossary ? 'cde-glossary-table-container' : undefined
+                  isDQGlossary
+                    ? 'dq-glossary-table-container'
+                    : isCDEGlossary
+                    ? 'cde-glossary-table-container'
+                    : undefined
                 }
                 customPaginationProps={paginationProps}
                 data-testid="glossary-terms-table"
                 dataSource={filteredGlossaryTerms}
                 defaultVisibleColumns={
-                  isCDEGlossary
+                  isDQGlossary
+                    ? DQ_DEFAULT_VISIBLE_COLUMNS
+                    : isCDEGlossary
                     ? CDE_DEFAULT_VISIBLE_COLUMNS
                     : DEFAULT_VISIBLE_COLUMNS
                 }
                 entityType={
-                  isCDEGlossary ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY : undefined
+                  isDQGlossary
+                    ? DQ_GLOSSARY_TABLE_PREFERENCE_KEY
+                    : isCDEGlossary
+                    ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
+                    : undefined
                 }
                 expandable={expandableConfig}
                 extraTableFilters={extraTableFilters}
                 extraTableFiltersClassName={
-                  isCDEGlossary ? 'cde-glossary-table-toolbar' : undefined
+                  isDQGlossary
+                    ? 'dq-glossary-table-toolbar'
+                    : isCDEGlossary
+                    ? 'cde-glossary-table-toolbar'
+                    : undefined
                 }
                 loading={isTableLoading || isExpandingAll}
                 pagination={false}
@@ -1598,7 +1760,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                 rowKey="fullyQualifiedName"
                 size="small"
                 staticVisibleColumns={
-                  isCDEGlossary
+                  isDQGlossary
+                    ? DQ_STATIC_VISIBLE_COLUMNS
+                    : isCDEGlossary
                     ? CDE_STATIC_VISIBLE_COLUMNS
                     : STATIC_VISIBLE_COLUMNS
                 }
@@ -1613,27 +1777,42 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               resizableColumns
               className={classNames('glossary-terms-table', {
                 'cde-glossary-terms-table': isCDEGlossary,
+                'dq-glossary-terms-table': isDQGlossary,
               })}
               columns={columns}
               components={TABLE_CONSTANTS}
               containerClassName={
-                isCDEGlossary ? 'cde-glossary-table-container' : undefined
+                isDQGlossary
+                  ? 'dq-glossary-table-container'
+                  : isCDEGlossary
+                  ? 'cde-glossary-table-container'
+                  : undefined
               }
               customPaginationProps={paginationProps}
               data-testid="glossary-terms-table"
               dataSource={[]}
               defaultVisibleColumns={
-                isCDEGlossary
+                isDQGlossary
+                  ? DQ_DEFAULT_VISIBLE_COLUMNS
+                  : isCDEGlossary
                   ? CDE_DEFAULT_VISIBLE_COLUMNS
                   : DEFAULT_VISIBLE_COLUMNS
               }
               entityType={
-                isCDEGlossary ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY : undefined
+                isDQGlossary
+                  ? DQ_GLOSSARY_TABLE_PREFERENCE_KEY
+                  : isCDEGlossary
+                  ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
+                  : undefined
               }
               expandable={expandableConfig}
               extraTableFilters={extraTableFilters}
               extraTableFiltersClassName={
-                isCDEGlossary ? 'cde-glossary-table-toolbar' : undefined
+                isDQGlossary
+                  ? 'dq-glossary-table-toolbar'
+                  : isCDEGlossary
+                  ? 'cde-glossary-table-toolbar'
+                  : undefined
               }
               loading={isTableLoading}
               locale={{
@@ -1650,7 +1829,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               rowKey="fullyQualifiedName"
               size="small"
               staticVisibleColumns={
-                isCDEGlossary
+                isDQGlossary
+                  ? DQ_STATIC_VISIBLE_COLUMNS
+                  : isCDEGlossary
                   ? CDE_STATIC_VISIBLE_COLUMNS
                   : STATIC_VISIBLE_COLUMNS
               }

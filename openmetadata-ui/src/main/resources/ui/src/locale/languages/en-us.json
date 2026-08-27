@@ -17,6 +17,27 @@
     "related-regulatory-documents": "Related Regulatory Documents",
     "term-code": "Term Code"
   },
+  "dq": {
+    "data-quality": "Data Quality",
+    "rule-code": "Rule Code",
+    "cde-code": "CDE Code",
+    "cde-name": "CDE Name",
+    "dimension": "Data Quality Dimension",
+    "business-rule": "Business Rule",
+    "quality-threshold": "Quality Threshold",
+    "data-source": "Data Source",
+    "frequency": "Frequency",
+    "target-population": "Target Population",
+    "method": "Inspection Method",
+    "rule-explanation": "Rule Explanation",
+    "other-constraints": "Other Constraints",
+    "exceptions": "Exceptions",
+    "owners": "Owners",
+    "search-placeholder": "Search by rule code or name",
+    "section-business-rule": "Section 1: Business Rule Information",
+    "section-evaluation-scope": "Section 2: Evaluation Scope & Conditions",
+    "section-governance": "Section 3: Governance & Ownership"
+  },
   "label": {
     "-with-colon": "{{text}}:",
     "1-day": "1 day",
