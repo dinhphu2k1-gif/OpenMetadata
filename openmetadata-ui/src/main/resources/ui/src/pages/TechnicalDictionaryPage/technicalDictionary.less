@@ -1,0 +1,275 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+.tech-dict-page-container {
+  padding: 20px 24px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+
+  .tech-dict-header-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #edf0f2;
+
+    .tech-dict-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1f2937;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+
+      .tech-dict-icon-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(165, 28, 48, 0.08);
+        color: #A51C30;
+      }
+    }
+
+    .tech-dict-subheading {
+      color: #6b7280;
+      font-size: 13.5px;
+      margin-bottom: 16px;
+    }
+
+    .tech-dict-stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #f1f5f9;
+
+      .tech-stat-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+        min-width: 180px;
+
+        .tech-stat-icon {
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 8px;
+
+          &.primary {
+            background: rgba(165, 28, 48, 0.1);
+            color: #A51C30;
+          }
+          &.blue {
+            background: rgba(24, 144, 255, 0.1);
+            color: #1890ff;
+          }
+          &.green {
+            background: rgba(0, 131, 118, 0.1);
+            color: #008376;
+          }
+          &.purple {
+            background: rgba(114, 46, 209, 0.1);
+            color: #722ed1;
+          }
+        }
+
+        .tech-stat-info {
+          .tech-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.2;
+          }
+          .tech-stat-label {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 500;
+          }
+        }
+      }
+    }
+  }
+
+  .tech-dict-content-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #edf0f2;
+
+    .tech-dict-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+
+      .tech-dict-search-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+
+        .tech-search-input {
+          max-width: 320px;
+          min-width: 240px;
+          border-radius: 6px;
+        }
+
+        .tech-filter-select {
+          min-width: 150px;
+          border-radius: 6px;
+        }
+      }
+
+      .tech-dict-actions-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    }
+  }
+}
+
+/* Custom Table Font & Badges */
+.tech-code-font {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12.5px;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.tech-code-link {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1890ff;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #096dd9;
+    text-decoration: underline;
+  }
+}
+
+.tech-cde-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #d1fae5 !important;
+    border-color: #34d399 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(6, 95, 70, 0.1);
+  }
+}
+
+.tech-type-pill {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 11.5px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.tech-pill {
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+
+  &.tech-pill-atomic {
+    background: #f5f3ff;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+  }
+
+  &.tech-pill-transformed {
+    background: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+  }
+
+  &.tech-pill-system-generated {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+  }
+
+  &.tech-pill-system-derived {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+  }
+
+  &.tech-pill-manual {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+
+  &.tech-pill-upload {
+    background: #fdf2f8;
+    color: #9d174d;
+    border: 1px solid #fbcfe8;
+  }
+}
+
+.tech-pill-time {
+  background: #ecfeff;
+  color: #155e75;
+  border: 1px solid #a5f3fc;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+}
+
+.tech-source-pill {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11.5px;
+}

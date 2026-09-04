@@ -198,6 +198,7 @@ public class TableRepository extends EntityRepository<Table> {
     fieldFetchers.put(CUSTOM_METRICS, this::fetchAndSetCustomMetrics);
     fieldFetchers.put(FIELD_TAGS, this::fetchAndSetColumnTags);
     fieldFetchers.put("pipelineObservability", this::fetchAndSetPipelineObservability);
+    fieldFetchers.put("extension", this::fetchAndSetColumnExtensions);
   }
 
   @Override
@@ -315,6 +316,55 @@ public class TableRepository extends EntityRepository<Table> {
     }
     setFieldFromMap(
         true, tables, batchFetchPipelineObservability(tables), Table::setPipelineObservability);
+  }
+
+  private void fetchAndSetColumnExtensions(List<Table> tables, Fields fields) {
+    if (!fields.contains("extension") || tables == null || tables.isEmpty()) {
+      return;
+    }
+
+    if (fields.contains(COLUMN_FIELD)) {
+      List<String> tableIds = entityListToStrings(tables);
+      List<CollectionDAO.ExtensionRecordWithId> records =
+          daoCollection
+              .entityExtensionDAO()
+              .getExtensionsByJsonSchemaBatch(tableIds, COLUMN_EXTENSION_JSON_SCHEMA);
+
+      if (records == null || records.isEmpty()) {
+        return;
+      }
+
+      Map<UUID, Map<String, Object>> extensionsByTableAndColumn = new HashMap<>();
+      for (CollectionDAO.ExtensionRecordWithId record : records) {
+        try {
+          Object extObj = JsonUtils.readValue(record.extensionJson(), Object.class);
+          extensionsByTableAndColumn
+              .computeIfAbsent(record.id(), k -> new HashMap<>())
+              .put(record.extensionName(), extObj);
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to deserialize column extension for table {} extensionKey {}: {}",
+              record.id(),
+              record.extensionName(),
+              e.getMessage());
+        }
+      }
+
+      for (Table table : tables) {
+        Map<String, Object> colExtMap = extensionsByTableAndColumn.get(table.getId());
+        if (colExtMap != null && table.getColumns() != null) {
+          for (Column column : table.getColumns()) {
+            if (column.getFullyQualifiedName() != null) {
+              String colHash = FullyQualifiedName.buildHash(column.getFullyQualifiedName());
+              Object ext = colExtMap.get(colHash);
+              if (ext != null) {
+                column.setExtension(ext);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   @Override

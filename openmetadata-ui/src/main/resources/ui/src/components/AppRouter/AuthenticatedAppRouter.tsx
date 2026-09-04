@@ -81,6 +81,15 @@ const GlossaryTermRouter = withSuspenseFallback(
   React.lazy(() => import('./GlossaryTermRouter/GlossaryTermRouter'))
 );
 
+const TechnicalDictionaryPage = withSuspenseFallback(
+  React.lazy(
+    () =>
+      import(
+        '../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component'
+      )
+  )
+);
+
 const MyDataPage = withSuspenseFallback(
   React.lazy(() => import('../../pages/MyDataPage/MyDataPage.component'))
 );
@@ -768,6 +777,10 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
       <Route element={<TagPage />} path={ROUTES.TAG_ITEM_WITH_SUB_TAB} />
       <Route element={<GlossaryRouter />} path="/glossary/*" />
       <Route element={<GlossaryTermRouter />} path="/glossary-term/*" />
+      <Route
+        element={<TechnicalDictionaryPage />}
+        path={ROUTES.TECHNICAL_DICTIONARY}
+      />
       <Route element={<SettingsRouter />} path="/settings/*" />
       <Route element={<DomainRouter />} path="/domain/*" />
       <Route

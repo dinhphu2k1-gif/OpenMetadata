@@ -56,6 +56,10 @@ import { Style } from '../../../generated/type/tagLabel';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
+import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
   getGlossaryTermsById,
@@ -282,6 +286,15 @@ const GlossaryHeader = ({
     setIsStyleEditing(false);
   };
 
+  const isSteward = useMemo(() => {
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    return (
+      userRoles.some((r) => r.includes('steward')) ||
+      Boolean(currentUser?.isAdmin)
+    );
+  }, [currentUser]);
+
   const canRevokeApproval = useMemo(() => {
     if (isGlossary || glossaryTermStatus !== EntityStatus.Approved) {
       return false;
@@ -298,9 +311,17 @@ const GlossaryHeader = ({
       Boolean(permissions?.EditAll) ||
       Boolean(permissions?.EditStatus) ||
       Boolean(isReviewer) ||
-      Boolean(isOwner)
+      Boolean(isOwner) ||
+      Boolean(isSteward)
     );
-  }, [isGlossary, glossaryTermStatus, currentUser, permissions, selectedData]);
+  }, [
+    isGlossary,
+    glossaryTermStatus,
+    currentUser,
+    permissions,
+    selectedData,
+    isSteward,
+  ]);
 
   const handleRevokeApproval = async () => {
     try {
@@ -378,9 +399,10 @@ const GlossaryHeader = ({
       Boolean(currentUser?.isAdmin) ||
       Boolean(permissions?.EditAll) ||
       Boolean(permissions?.EditStatus) ||
-      Boolean(isReviewer)
+      Boolean(isReviewer) ||
+      Boolean(isSteward)
     );
-  }, [isGlossary, isVersionView, currentUser, permissions, selectedData]);
+  }, [isGlossary, isVersionView, currentUser, permissions, selectedData, isSteward]);
 
   const canApproveOrReject = useMemo(() => {
     return isReviewerOrAdmin && glossaryTermStatus === EntityStatus.InReview;

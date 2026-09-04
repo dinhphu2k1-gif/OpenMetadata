@@ -1549,6 +1549,21 @@ public interface CollectionDAO {
     List<ExtensionRecord> getExtensionsByJsonSchema(
         @BindUUID("id") UUID id, @Bind("jsonSchema") String jsonSchema);
 
+    @SqlQuery(
+        "SELECT id, extension, json "
+            + "FROM entity_extension "
+            + "WHERE id IN (<ids>) AND jsonschema = :jsonSchema "
+            + "ORDER BY id, extension")
+    @RegisterRowMapper(ExtensionRecordWithIdMapper.class)
+    List<ExtensionRecordWithId> getExtensionsByJsonSchemaBatchInternal(
+        @BindList("ids") List<String> ids, @Bind("jsonSchema") String jsonSchema);
+
+    default List<ExtensionRecordWithId> getExtensionsByJsonSchemaBatch(
+        List<String> ids, String jsonSchema) {
+      return EntityDAO.queryInChunks(
+          ids, chunk -> getExtensionsByJsonSchemaBatchInternal(chunk, jsonSchema));
+    }
+
     @ConnectionAwareSqlQuery(
         value =
             "SELECT json FROM ("

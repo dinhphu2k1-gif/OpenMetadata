@@ -224,6 +224,7 @@ export const ROUTES = {
   ADD_DATA_PRODUCT: '/dataProduct/add',
 
   GLOSSARY: '/glossary',
+  TECHNICAL_DICTIONARY: '/technical-dictionary',
   ADD_GLOSSARY: '/glossary/add',
   GLOSSARY_DETAILS: `/glossary/${PLACEHOLDER_ROUTE_FQN}`,
   GLOSSARY_DETAILS_WITH_ACTION: `/glossary/${PLACEHOLDER_ROUTE_FQN}/action/${PLACEHOLDER_ACTION}`,

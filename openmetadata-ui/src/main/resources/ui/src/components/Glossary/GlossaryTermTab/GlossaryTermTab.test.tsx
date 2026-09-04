@@ -622,7 +622,7 @@ describe('Test GlossaryTermTab component', () => {
       });
     });
 
-    it('should show approval actions in the status column for permitted reviewers', async () => {
+    it('should render status badge and avoid showing inline approval actions for CDE terms to prevent overlap', async () => {
       const inReviewTerm = {
         ...cdeTerm,
         entityStatus: EntityStatus.InReview,
@@ -661,19 +661,10 @@ describe('Test GlossaryTermTab component', () => {
       });
 
       expect(
-        await screen.findByTestId('CDE102-approve-btn')
+        await screen.findByTestId('Data Dictionary.CDE102-status')
       ).toBeInTheDocument();
-      expect(screen.getByTestId('CDE102-reject-btn')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByTestId('CDE102-approve-btn'));
-
-      await waitFor(() => {
-        expect(mockUpdateTask).toHaveBeenCalledWith(
-          'resolve',
-          'task-id',
-          expect.objectContaining({ newValue: 'approved' })
-        );
-      });
+      expect(screen.queryByTestId('CDE102-approve-btn')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('CDE102-reject-btn')).not.toBeInTheDocument();
     });
 
     it('should not show or submit approval actions without task permission', async () => {
