@@ -70,6 +70,7 @@ import {
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS,
   isDataDictionaryGlossary,
   isDataQualityGlossary,
+  isTechnicalDictionaryGlossary,
   STATIC_VISIBLE_COLUMNS,
 } from '../../../constants/Glossary.contant';
 import { TABLE_CONSTANTS } from '../../../constants/Teams.constants';
@@ -125,6 +126,7 @@ import { useGenericContext } from '../../Customization/GenericProvider/GenericPr
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
 import { getCDEGlossaryTableColumns } from './CDEGlossaryTableColumns';
 import { getDQGlossaryTableColumns } from './DQGlossaryTableColumns';
+import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
 import {
   GlossaryTermTabProps,
   ModifiedGlossaryTerm,
@@ -163,6 +165,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       : (activeGlossary as unknown as GlossaryTerm).glossary;
 
     return isDataQualityGlossary(
+      glossary?.name,
+      glossary?.displayName,
+      activeGlossary.fullyQualifiedName
+    );
+  }, [activeGlossary, isGlossary]);
+  const isTechGlossary = useMemo(() => {
+    const glossary = isGlossary
+      ? activeGlossary
+      : (activeGlossary as unknown as GlossaryTerm).glossary;
+
+    return isTechnicalDictionaryGlossary(
       glossary?.name,
       glossary?.displayName,
       activeGlossary.fullyQualifiedName
@@ -876,7 +889,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             permissions
           );
 
-          if (status === EntityStatus.InReview && permission) {
+          if (
+            !isCDEGlossary &&
+            !isDQGlossary &&
+            status === EntityStatus.InReview &&
+            permission
+          ) {
             return (
               <StatusAction
                 dataTestId={record.name}
@@ -1672,6 +1690,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
     return 'No Glossary Terms';
   }, [isSearchActive, isStatusFilterActive, searchTerm]);
+
+  if (isTechGlossary) {
+    return <TechnicalDictionaryPage />;
+  }
 
   if (
     hasNoTerms &&

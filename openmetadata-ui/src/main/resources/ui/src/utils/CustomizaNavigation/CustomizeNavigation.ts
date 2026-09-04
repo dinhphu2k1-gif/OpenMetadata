@@ -307,9 +307,20 @@ const enhanceNavigationItem = (
     ?.map((child) => enhanceNavigationItem(child, sidebarMap))
     .filter((item): item is LeftSidebarItem => item !== null);
 
+  const baseChildren = sidebarItem.children ?? [];
+  const navChildIds = new Set(navItem.children?.map((c) => c.id) ?? []);
+  const missingBaseChildren = baseChildren.filter(
+    (bc) => !navChildIds.has(bc.key)
+  );
+
+  const finalChildren = [
+    ...(childrenItems ?? []),
+    ...missingBaseChildren,
+  ];
+
   return {
     ...sidebarItem,
-    children: isEmpty(childrenItems) ? undefined : childrenItems,
+    children: isEmpty(finalChildren) ? undefined : finalChildren,
   };
 };
 

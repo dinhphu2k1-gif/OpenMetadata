@@ -16,15 +16,9 @@ import { ROUTES } from '../../constants/constants';
 import { EntityReference } from '../../generated/entity/type';
 
 export const BASIC_CONSUMER_PERSONA_NAME = 'BasicConsumerPersona';
-export const DATA_CONSUMER_PERSONA_NAME = 'DataConsumerPersona';
-export const DATA_PROPOSER_PERSONA_NAME = 'DataProposerPersona';
-export const DATA_STEWARD_PERSONA_NAME = 'DataStewardPersona';
 
 export const RESTRICTED_PERSONA_NAMES = new Set([
   BASIC_CONSUMER_PERSONA_NAME,
-  DATA_CONSUMER_PERSONA_NAME,
-  DATA_PROPOSER_PERSONA_NAME,
-  DATA_STEWARD_PERSONA_NAME,
 ]);
 
 export const isBasicConsumerPersona = (
@@ -40,13 +34,23 @@ export const isBasicConsumerPersona = (
 export const hideBasicConsumerMarketplaceOverview = (
   items: LeftSidebarItem[]
 ): LeftSidebarItem[] =>
-  items.map((item) =>
-    item.key === ROUTES.DATA_MARKETPLACE_SECTION
-      ? {
-          ...item,
-          children: item.children?.filter(
-            (child) => child.key !== ROUTES.DATA_MARKETPLACE
-          ),
-        }
-      : item
-  );
+  items.map((item) => {
+    if (item.key === 'governance') {
+      return {
+        ...item,
+        children: item.children?.filter(
+          (child) => child.key !== ROUTES.TECHNICAL_DICTIONARY
+        ),
+      };
+    }
+    if (item.key === ROUTES.DATA_MARKETPLACE_SECTION) {
+      return {
+        ...item,
+        children: item.children?.filter(
+          (child) => child.key !== ROUTES.DATA_MARKETPLACE
+        ),
+      };
+    }
+
+    return item;
+  });

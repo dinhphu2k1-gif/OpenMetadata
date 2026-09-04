@@ -163,6 +163,13 @@ export const SIDEBAR_LIST: Array<LeftSidebarItem> = [
         dataTestId: `app-bar-item-${SidebarItem.GLOSSARY}`,
       },
       {
+        key: ROUTES.TECHNICAL_DICTIONARY,
+        title: 'label.technical-dictionary',
+        redirect_url: ROUTES.TECHNICAL_DICTIONARY,
+        icon: ColumnBulkIcon,
+        dataTestId: 'app-bar-item-technical-dictionary',
+      },
+      {
         key: ROUTES.ONTOLOGY_EXPLORER,
         title: 'label.ontology-explorer',
         redirect_url: ROUTES.ONTOLOGY_EXPLORER,

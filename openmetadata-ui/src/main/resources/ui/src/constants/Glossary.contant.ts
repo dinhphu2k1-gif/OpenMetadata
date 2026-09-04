@@ -78,6 +78,20 @@ export const isDataQualityGlossary = (
       identifier?.startsWith(`${DATA_QUALITY_GLOSSARY_DISPLAY_NAME}.`)
   );
 
+export const TECHNICAL_DICTIONARY_GLOSSARY_NAME = 'Technical Dictionary';
+export const TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME = 'Từ điển kỹ thuật';
+
+export const isTechnicalDictionaryGlossary = (
+  ...identifiers: Array<string | undefined>
+) =>
+  identifiers.some(
+    (identifier) =>
+      identifier === TECHNICAL_DICTIONARY_GLOSSARY_NAME ||
+      identifier === TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
+      identifier?.startsWith(`${TECHNICAL_DICTIONARY_GLOSSARY_NAME}.`) ||
+      identifier?.startsWith(`${TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
+  );
+
 export const DQ_GLOSSARY_TERM_FIELDS = [
   TabSpecificField.CHILDREN_COUNT,
   TabSpecificField.OWNERS,

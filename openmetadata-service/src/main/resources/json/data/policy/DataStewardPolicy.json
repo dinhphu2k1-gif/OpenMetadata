@@ -21,23 +21,40 @@
     },
     {
       "name": "DataSteward-ApprovalAndStatusRule",
-      "description": "Allow approving, changing status, and certifying metadata",
+      "description": "Allow Data Steward to review, approve, reject, revoke, curate metadata changes, tags, glossaries, custom fields, and status",
       "resources": [
+        "apiEndpoint",
+        "chart",
         "classification",
+        "container",
+        "dashboard",
         "dataProduct",
         "database",
         "databaseSchema",
         "domain",
         "glossary",
         "glossaryTerm",
+        "mlmodel",
+        "pipeline",
+        "searchIndex",
+        "storedProcedure",
         "table",
         "tag",
         "testCase",
-        "testSuite"
+        "testSuite",
+        "topic"
       ],
       "operations": [
         "EditCertification",
-        "EditStatus"
+        "EditCustomFields",
+        "EditDescription",
+        "EditDisplayName",
+        "EditGlossaryTerms",
+        "EditOwners",
+        "EditReviewers",
+        "EditStatus",
+        "EditTags",
+        "EditTier"
       ],
       "effect": "allow"
     },

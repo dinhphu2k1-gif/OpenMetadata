@@ -18,11 +18,11 @@ import {
 } from './BasicConsumerNavigation';
 
 describe('BasicConsumerNavigation', () => {
-  it('recognizes the Basic Consumer and standard restricted personas by name or FQN', () => {
+  it('recognizes only the Basic Consumer persona by name or FQN', () => {
     expect(isBasicConsumerPersona({ name: 'BasicConsumerPersona' })).toBe(true);
-    expect(isBasicConsumerPersona({ name: 'DataConsumerPersona' })).toBe(true);
-    expect(isBasicConsumerPersona({ name: 'DataProposerPersona' })).toBe(true);
-    expect(isBasicConsumerPersona({ name: 'DataStewardPersona' })).toBe(true);
+    expect(isBasicConsumerPersona({ name: 'DataConsumerPersona' })).toBe(false);
+    expect(isBasicConsumerPersona({ name: 'DataProposerPersona' })).toBe(false);
+    expect(isBasicConsumerPersona({ name: 'DataStewardPersona' })).toBe(false);
     expect(
       isBasicConsumerPersona({
         fullyQualifiedName: 'persona.BasicConsumerPersona',
@@ -32,12 +32,32 @@ describe('BasicConsumerNavigation', () => {
       isBasicConsumerPersona({
         fullyQualifiedName: 'persona.DataConsumerPersona',
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(isBasicConsumerPersona({ name: 'GeneralUser' })).toBe(false);
   });
 
-  it('hides only the marketplace overview child', () => {
+  it('hides marketplace overview and technical dictionary for basic consumer', () => {
     const items = [
+      {
+        key: 'governance',
+        title: 'label.govern',
+        icon: 'svg-mock' as unknown as SvgComponent,
+        dataTestId: 'governance',
+        children: [
+          {
+            key: ROUTES.GLOSSARY,
+            title: 'label.glossary',
+            icon: 'svg-mock' as unknown as SvgComponent,
+            dataTestId: 'glossary',
+          },
+          {
+            key: ROUTES.TECHNICAL_DICTIONARY,
+            title: 'label.technical-dictionary',
+            icon: 'svg-mock' as unknown as SvgComponent,
+            dataTestId: 'technical-dictionary',
+          },
+        ],
+      },
       {
         key: ROUTES.DATA_MARKETPLACE_SECTION,
         title: 'label.data-marketplace-section',
@@ -63,6 +83,9 @@ describe('BasicConsumerNavigation', () => {
     const result = hideBasicConsumerMarketplaceOverview(items);
 
     expect(result[0].children?.map((child) => child.key)).toEqual([
+      ROUTES.GLOSSARY,
+    ]);
+    expect(result[1].children?.map((child) => child.key)).toEqual([
       ROUTES.DOMAIN,
     ]);
   });
