@@ -41,7 +41,7 @@
         "ViewBasic"
       ],
       "effect": "deny",
-      "condition": "notApproved()"
+      "condition": "neverApproved()"
     },
     {
       "name": "BasicConsumerPolicy-DenyNonReadOperations",

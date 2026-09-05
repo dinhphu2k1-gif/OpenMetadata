@@ -30,7 +30,7 @@ docker compose -f docker-compose.dev.yml up -d openmetadata-server openmetadata_
 ### Buoc 2: Chay Vite Dev Server tren may host
 ```bash
 cd /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui
-NODE_ENV=production yarn start
+NODE_OPTIONS="--max-old-space-size=2048" NODE_ENV=production yarn start
 ```
 Truy cap: http://localhost:3000
 

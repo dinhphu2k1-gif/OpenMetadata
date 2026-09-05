@@ -16,8 +16,10 @@ import { isEmpty, toString } from 'lodash';
 import { forwardRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
 import { useLimitStore } from '../../../context/LimitsProvider/useLimitsStore';
 import { EntityHistory } from '../../../generated/type/entityHistory';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { useUserProfile } from '../../../hooks/user-profile/useUserProfile';
 import { formatDateTime } from '../../../utils/date-time/DateTimeUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
@@ -52,7 +54,30 @@ export const VersionButton = forwardRef<
     name: updatedBy,
   });
 
-  const versionText = `v${parseFloat(versionNumber).toFixed(1)}`;
+  const isCDE = Boolean(
+    isDataDictionaryGlossary(
+      version?.fullyQualifiedName,
+      typeof glossary === 'string' ? glossary : glossary?.name,
+      typeof glossary === 'string' ? undefined : glossary?.displayName
+    ) || version?.extension?.cdeVersion != null
+  );
+
+  const cdeVersionNumber = useMemo(() => {
+    if (!isCDE) {
+      return null;
+    }
+    const raw = String(
+      version?.extension?.cdeVersion ??
+      version?.extension?.phien_ban ??
+      '1.0'
+    ).trim();
+
+    return raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+  }, [isCDE, version?.extension]);
+
+  const versionText = cdeVersionNumber
+    ? `v${cdeVersionNumber}`
+    : `v${parseFloat(versionNumber).toFixed(1)}`;
 
   return (
     <div
@@ -62,7 +87,7 @@ export const VersionButton = forwardRef<
       )}
       data-testid={`version-entry-${versionText}`}
       ref={ref}
-      onClick={() => onVersionSelect(toString(versionNumber))}>
+      onClick={() => onVersionSelect(cdeVersionNumber ?? toString(versionNumber))}>
       <div className="timeline-wrapper">
         <span
           className={classNames(
@@ -126,6 +151,8 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
   versionHandler,
   onBack,
   entityType,
+  isCDE: isCDEProp,
+  currentCdeVersion: currentCdeVersionProp,
 }) => {
   const { t } = useTranslation();
 
@@ -138,37 +165,164 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
   const { configuredLimit: { maxVersions } = { maxVersions: -1 } } =
     resourceLimit[entityType ?? ''] ?? {};
 
+  const { isCDE, filteredVersions, activeCdeVersion } = useMemo(() => {
+    const rawList = versionList.versions ?? [];
+    if (!rawList.length) {
+      return { isCDE: false, filteredVersions: [], activeCdeVersion: null };
+    }
+
+    const firstParsed =
+      typeof rawList[0] === 'string' ? JSON.parse(rawList[0]) : rawList[0];
+
+    const detectedCDE =
+      isCDEProp ??
+      Boolean(
+        isDataDictionaryGlossary(
+          firstParsed?.fullyQualifiedName,
+          typeof firstParsed?.glossary === 'string'
+            ? firstParsed.glossary
+            : firstParsed?.glossary?.name,
+          typeof firstParsed?.glossary === 'string'
+            ? undefined
+            : firstParsed?.glossary?.displayName
+        ) || firstParsed?.extension?.cdeVersion != null
+      );
+
+    if (!detectedCDE) {
+      return {
+        isCDE: false,
+        filteredVersions: rawList,
+        activeCdeVersion: null,
+      };
+    }
+
+    // Helper to check if a snapshot has been approved
+    const isApprovedSnapshot = (p: any): boolean => {
+      const status = p?.entityStatus ?? p?.status ?? EntityStatus.Approved;
+
+      return String(status).toLowerCase() === 'approved';
+    };
+
+    // Filter to unique CDE versions (retaining the latest snapshot for each unique CDE version that was approved)
+    const seenCdeVersions = new Set<string>();
+    const uniqueList: any[] = [];
+
+    for (const v of rawList) {
+      const p = typeof v === 'string' ? JSON.parse(v) : v;
+      if (!isApprovedSnapshot(p)) {
+        continue;
+      }
+      const raw = String(
+        p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+      ).trim();
+      const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+
+      if (!seenCdeVersions.has(clean)) {
+        seenCdeVersions.add(clean);
+        uniqueList.push(v);
+      }
+    }
+
+    let activeCde: string | null = currentCdeVersionProp ?? null;
+    if (!activeCde) {
+      const currentParsed = uniqueList.find((v) => {
+        const p = typeof v === 'string' ? JSON.parse(v) : v;
+
+        return toString(p.version) === currentVersion;
+      });
+
+      if (currentParsed) {
+        const p =
+          typeof currentParsed === 'string'
+            ? JSON.parse(currentParsed)
+            : currentParsed;
+        const raw = String(
+          p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+        ).trim();
+        activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+      } else if (uniqueList.length > 0) {
+        const firstApproved =
+          typeof uniqueList[0] === 'string'
+            ? JSON.parse(uniqueList[0])
+            : uniqueList[0];
+        const raw = String(
+          firstApproved?.extension?.cdeVersion ??
+            firstApproved?.extension?.phien_ban ??
+            '1.0'
+        ).trim();
+        activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+      }
+    }
+
+    return {
+      isCDE: true,
+      filteredVersions: uniqueList,
+      activeCdeVersion: activeCde,
+    };
+  }, [
+    versionList.versions,
+    currentVersion,
+    isCDEProp,
+    currentCdeVersionProp,
+  ]);
+
   const versions = useMemo(() => {
     const maxAllowed = maxVersions ?? -1;
-    let versions = versionList.versions ?? [];
+    let versionsList = filteredVersions;
 
-    let hiddenVersions = [];
+    let hiddenVersions: any[] = [];
 
     if (maxAllowed > 0) {
-      versions = versionList.versions?.slice(0, maxAllowed) ?? [];
-      hiddenVersions = versionList.versions?.slice(maxAllowed) ?? [];
+      versionsList = filteredVersions.slice(0, maxAllowed);
+      hiddenVersions = filteredVersions.slice(maxAllowed);
     }
+
+    const renderButton = (v: any) => {
+      const parsed = typeof v === 'string' ? JSON.parse(v) : v;
+      let isSelected = toString(parsed.version) === currentVersion;
+      if (isCDE && activeCdeVersion) {
+        const raw = String(
+          parsed?.extension?.cdeVersion ??
+          parsed?.extension?.phien_ban ??
+          '1.0'
+        ).trim();
+        const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+        isSelected = clean === activeCdeVersion;
+      }
+
+      return renderVersionButton(
+        v,
+        currentVersion,
+        versionHandler,
+        undefined,
+        isSelected
+      );
+    };
 
     return (
       <div className="relative h-full">
-        {versions.length ? (
+        {versionsList.length ? (
           <div className="timeline-content cursor-pointer">
             <div className="timeline-wrapper">
               <span className="timeline-line-se" />
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div
+            className="p-md text-center text-grey-muted"
+            data-testid="no-approved-versions">
+            {t('message.no-approved-versions-available', {
+              defaultValue: 'Chưa có phiên bản nào được phê duyệt',
+            })}
+          </div>
+        )}
 
-        {versions?.map((v) => {
-          return renderVersionButton(v, currentVersion, versionHandler);
-        })}
+        {versionsList?.map(renderButton)}
         {hiddenVersions?.length > 0 ? (
           <>
             <Tooltip title={`+${hiddenVersions.length} more versions`}>
               <div className="version-hidden">
-                {hiddenVersions.map((v) =>
-                  renderVersionButton(v, currentVersion, versionHandler)
-                )}
+                {hiddenVersions.map(renderButton)}
               </div>
             </Tooltip>
             <div className="version-pricing-reached">
@@ -191,7 +345,14 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
         ) : null}
       </div>
     );
-  }, [versionList, currentVersion, versionHandler]);
+  }, [
+    filteredVersions,
+    currentVersion,
+    versionHandler,
+    maxVersions,
+    isCDE,
+    activeCdeVersion,
+  ]);
 
   return (
     <Drawer

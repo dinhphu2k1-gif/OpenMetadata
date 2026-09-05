@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 import Icon, { DownOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Space, Tooltip, Typography } from 'antd';
+import { Button, Dropdown, Input, Modal, Space, Tooltip, Typography } from 'antd';
 import ButtonGroup from 'antd/lib/button/button-group';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
 import { AxiosError } from 'axios';
@@ -55,10 +55,7 @@ import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
-import {
-  isDataDictionaryGlossary,
-  isDataQualityGlossary,
-} from '../../../constants/Glossary.contant';
+import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
 import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
@@ -76,6 +73,7 @@ import {
 } from '../../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { EntityStatusBadge } from '../../Entity/EntityStatusBadge/EntityStatusBadge.component';
@@ -85,6 +83,20 @@ import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangePare
 import StyleModal from '../../Modals/StyleModal/StyleModal.component';
 import { GlossaryHeaderProps } from './GlossaryHeader.interface';
 import './glossery-header.less';
+
+export const suggestNextVersion = (ver: string): string => {
+  const trimmed = ver.trim();
+  const match = trimmed.match(/^(\d+)\.(\d+)$/);
+  if (match) {
+    const major = parseInt(match[1], 10);
+    const minor = parseInt(match[2], 10);
+
+    return `${major}.${minor + 1}`;
+  }
+
+  return trimmed ? `${trimmed}.1` : '1.1';
+};
+
 const GlossaryHeader = ({
   onDelete,
   onAssetAdd,
@@ -94,7 +106,7 @@ const GlossaryHeader = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { fqn } = useFqn();
-  const { currentUser } = useApplicationStore();
+  const { currentUser, selectedPersona } = useApplicationStore();
   const {
     onUpdate,
     data: selectedData,
@@ -124,12 +136,17 @@ const GlossaryHeader = ({
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
   const [isSubmitForReviewModalOpen, setIsSubmitForReviewModalOpen] =
     useState<boolean>(false);
+  const [submitVersion, setSubmitVersion] = useState<string>('');
   const [isSubmittingForReview, setIsSubmittingForReview] =
     useState<boolean>(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] =
+    useState<boolean>(false);
+  const [draftVersion, setDraftVersion] = useState<string>('');
+  const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
   const isGlossary = entityType === EntityType.GLOSSARY;
   const { permissions: globalPermissions } = usePermissionProvider();
 
@@ -180,9 +197,74 @@ const GlossaryHeader = ({
     return null;
   }, [isGlossary, selectedData]);
 
+  const isSteward = useMemo(() => {
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      userRoles.some((r) => r.includes('steward')) ||
+      personaName.includes('steward') ||
+      Boolean(currentUser?.isAdmin)
+    );
+  }, [currentUser, selectedPersona]);
+
+  const isProposer = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return false;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      !isSteward &&
+      (userRoles.some((r) => r.includes('proposer')) ||
+        personaName.includes('proposer'))
+    );
+  }, [currentUser, selectedPersona, isSteward]);
+
   const editDisplayNamePermission = useMemo(() => {
+    if (isSteward && !currentUser?.isAdmin) {
+      return false;
+    }
+
     return permissions.EditAll || permissions.EditDisplayName;
-  }, [permissions]);
+  }, [permissions, isSteward, currentUser?.isAdmin]);
+
+  const isCDEGlossaryTerm = useMemo(() => {
+    if (isGlossary) {
+      return false;
+    }
+    const term = selectedData as GlossaryTerm;
+
+    return isDataDictionaryGlossary(
+      term?.fullyQualifiedName,
+      term?.glossary?.name,
+      term?.glossary?.displayName
+    );
+  }, [isGlossary, selectedData]);
+
+  const cdeVersion = useMemo(() => {
+    if (!isCDEGlossaryTerm) {
+      return null;
+    }
+    const term = selectedData as GlossaryTerm;
+
+    return (
+      term?.extension?.cdeVersion ??
+      term?.extension?.phien_ban ??
+      '1.0'
+    );
+  }, [isCDEGlossaryTerm, selectedData]);
 
   const voteStatus = useMemo(
     () => getEntityVoteStatus(currentUser?.id ?? '', selectedData.votes),
@@ -237,15 +319,13 @@ const GlossaryHeader = ({
     if (isVersionView) {
       path = getGlossaryPath(latestGlossaryData?.fullyQualifiedName);
     } else {
+      const targetVersion = isCDEGlossaryTerm
+        ? String(cdeVersion ?? '1.0').trim().replace(/^(version:?\s*|v)/i, '')
+        : toString(selectedData.version);
+
       path = isGlossary
-        ? getGlossaryVersionsPath(
-            selectedData.id,
-            toString(selectedData.version)
-          )
-        : getGlossaryTermsVersionsPath(
-            selectedData.id,
-            toString(selectedData.version)
-          );
+        ? getGlossaryVersionsPath(selectedData.id, targetVersion)
+        : getGlossaryTermsVersionsPath(selectedData.id, targetVersion);
     }
 
     navigate(path);
@@ -286,17 +366,11 @@ const GlossaryHeader = ({
     setIsStyleEditing(false);
   };
 
-  const isSteward = useMemo(() => {
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    return (
-      userRoles.some((r) => r.includes('steward')) ||
-      Boolean(currentUser?.isAdmin)
-    );
-  }, [currentUser]);
-
   const canRevokeApproval = useMemo(() => {
     if (isGlossary || glossaryTermStatus !== EntityStatus.Approved) {
+      return false;
+    }
+    if (isProposer && !currentUser?.isAdmin) {
       return false;
     }
     const currentUserId = currentUser?.id;
@@ -306,6 +380,7 @@ const GlossaryHeader = ({
     const isOwner = selectedData?.owners?.some(
       (owner) => owner.id === currentUserId
     );
+
     return (
       Boolean(currentUser?.isAdmin) ||
       Boolean(permissions?.EditAll) ||
@@ -321,7 +396,56 @@ const GlossaryHeader = ({
     permissions,
     selectedData,
     isSteward,
+    isProposer,
   ]);
+
+  const canCreateDraft = useMemo(() => {
+    if (
+      isGlossary ||
+      isVersionView ||
+      !isCDEGlossaryTerm ||
+      glossaryTermStatus !== EntityStatus.Approved
+    ) {
+      return false;
+    }
+
+    return isProposer || Boolean(currentUser?.isAdmin);
+  }, [
+    isGlossary,
+    isVersionView,
+    isCDEGlossaryTerm,
+    glossaryTermStatus,
+    isProposer,
+    currentUser?.isAdmin,
+  ]);
+
+  const handleCreateDraft = async () => {
+    try {
+      setIsCreatingDraft(true);
+      const cleanVer = draftVersion?.trim().replace(/^(version:?\s*|v)/i, '');
+      const currentExtension =
+        (selectedData as GlossaryTerm)?.extension ?? {};
+      const updatedDetails = {
+        ...selectedData,
+        entityStatus: EntityStatus.Draft,
+        ...(cleanVer
+          ? {
+              extension: {
+                ...currentExtension,
+                cdeVersion: cleanVer,
+              },
+            }
+          : {}),
+      };
+      await onUpdate(updatedDetails);
+      showSuccessToast(t('message.create-draft-success'));
+      setIsCreateDraftModalOpen(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsCreatingDraft(false);
+    }
+  };
 
   const handleRevokeApproval = async () => {
     try {
@@ -349,10 +473,14 @@ const GlossaryHeader = ({
     ) {
       return false;
     }
+    if (isSteward && !currentUser?.isAdmin) {
+      return false;
+    }
     const currentUserId = currentUser?.id;
     const isOwner = selectedData?.owners?.some(
       (owner) => owner.id === currentUserId
     );
+
     return (
       Boolean(currentUser?.isAdmin) ||
       Boolean(permissions?.EditAll) ||
@@ -368,14 +496,26 @@ const GlossaryHeader = ({
     currentUser,
     permissions,
     selectedData,
+    isSteward,
   ]);
 
   const handleSubmitForReview = async () => {
     try {
       setIsSubmittingForReview(true);
+      const cleanVer = submitVersion?.trim().replace(/^(version:?\s*|v)/i, '');
+      const currentExtension =
+        (selectedData as GlossaryTerm)?.extension ?? {};
       const updatedDetails = {
         ...selectedData,
         entityStatus: EntityStatus.InReview,
+        ...(isCDEGlossaryTerm && cleanVer
+          ? {
+              extension: {
+                ...currentExtension,
+                cdeVersion: cleanVer,
+              },
+            }
+          : {}),
       };
       await onUpdate(updatedDetails);
       showSuccessToast(t('message.submit-for-review-success'));
@@ -391,10 +531,14 @@ const GlossaryHeader = ({
     if (isGlossary || isVersionView) {
       return false;
     }
+    if (isProposer && !currentUser?.isAdmin) {
+      return false;
+    }
     const currentUserId = currentUser?.id;
     const isReviewer = selectedData?.reviewers?.some(
       (reviewer) => reviewer.id === currentUserId
     );
+
     return (
       Boolean(currentUser?.isAdmin) ||
       Boolean(permissions?.EditAll) ||
@@ -402,7 +546,15 @@ const GlossaryHeader = ({
       Boolean(isReviewer) ||
       Boolean(isSteward)
     );
-  }, [isGlossary, isVersionView, currentUser, permissions, selectedData, isSteward]);
+  }, [
+    isGlossary,
+    isVersionView,
+    currentUser,
+    permissions,
+    selectedData,
+    isSteward,
+    isProposer,
+  ]);
 
   const canApproveOrReject = useMemo(() => {
     return isReviewerOrAdmin && glossaryTermStatus === EntityStatus.InReview;
@@ -595,6 +747,15 @@ const GlossaryHeader = ({
             key: 'submit-for-review-button',
             onClick: (e) => {
               e.domEvent.stopPropagation();
+              if (isCDEGlossaryTerm) {
+                const currentVer =
+                  (selectedData as GlossaryTerm)?.extension?.cdeVersion ??
+                  (selectedData as GlossaryTerm)?.extension?.phien_ban ??
+                  '1.0';
+                setSubmitVersion(
+                  String(currentVer).trim().replace(/^(version:?\s*|v)/i, '')
+                );
+              }
               setIsSubmitForReviewModalOpen(true);
               setShowActions(false);
             },
@@ -637,6 +798,35 @@ const GlossaryHeader = ({
             onClick: (e) => {
               e.domEvent.stopPropagation();
               setIsRejectModalOpen(true);
+              setShowActions(false);
+            },
+          },
+        ] as ItemType[])
+      : []),
+
+    ...(canCreateDraft
+      ? ([
+          {
+            label: (
+              <ManageButtonItemLabel
+                description={t('message.create-draft-help')}
+                icon={EditIcon}
+                id="create-draft-button"
+                name={t('label.create-draft')}
+              />
+            ),
+            key: 'create-draft-button',
+            onClick: (e) => {
+              e.domEvent.stopPropagation();
+              const currentVer =
+                (selectedData as GlossaryTerm)?.extension?.cdeVersion ??
+                (selectedData as GlossaryTerm)?.extension?.phien_ban ??
+                '1.0';
+              const cleanVer = String(currentVer)
+                .trim()
+                .replace(/^(version:?\s*|v)/i, '');
+              setDraftVersion(suggestNextVersion(cleanVer));
+              setIsCreateDraftModalOpen(true);
               setShowActions(false);
             },
           },
@@ -696,8 +886,51 @@ const GlossaryHeader = ({
   const statusBadge = useMemo(() => {
     const entityStatus = selectedData.entityStatus ?? EntityStatus.Approved;
 
+    if (!isGlossary && isCDEGlossaryTerm) {
+      const statusClass = getEntityStatusClass(entityStatus);
+      const rawVersion = String(cdeVersion ?? '1.0').trim();
+      const cleanVersion = rawVersion.replace(/^(version:?\s*)/i, '');
+      const versionLabel = `Version: ${cleanVersion}`;
+
+      return (
+        <Space align="center" size={8}>
+          <EntityStatusBadge showDivider status={entityStatus} />
+          <Tooltip
+            title={t(
+              `label.${
+                isVersionView
+                  ? 'exit-version-history'
+                  : 'version-plural-history'
+              }`
+            )}>
+            <button
+              className={classNames(
+                'status-badge cde-header-version-badge',
+                statusClass
+              )}
+              data-testid="version-button"
+              type="button"
+              onClick={handleVersionClick}>
+              <Icon component={VersionIcon} />
+              <span className={`status-badge-label ${statusClass}`}>
+                {versionLabel}
+              </span>
+            </button>
+          </Tooltip>
+        </Space>
+      );
+    }
+
     return <EntityStatusBadge showDivider status={entityStatus} />;
-  }, [selectedData]);
+  }, [
+    selectedData,
+    isGlossary,
+    isCDEGlossaryTerm,
+    cdeVersion,
+    isVersionView,
+    handleVersionClick,
+    t,
+  ]);
 
   const createButtons = useMemo(() => {
     if (permissions.Create || createGlossaryTermPermission) {
@@ -818,7 +1051,7 @@ const GlossaryHeader = ({
                 />
               )}
 
-              {selectedData?.version && (
+              {!isCDEGlossaryTerm && selectedData?.version && (
                 <Tooltip
                   title={t(
                     `label.${
@@ -941,16 +1174,102 @@ const GlossaryHeader = ({
         onConfirm={handleRevokeApproval}
       />
 
-      <ConfirmationModal
-        bodyText={t('message.confirm-submit-for-review-message')}
-        cancelText={t('label.cancel')}
-        confirmText={t('label.submit-for-review')}
-        header={t('message.confirm-submit-for-review-title')}
-        isLoading={isSubmittingForReview}
-        visible={isSubmitForReviewModalOpen}
-        onCancel={() => setIsSubmitForReviewModalOpen(false)}
-        onConfirm={handleSubmitForReview}
-      />
+      <Modal
+        centered
+        destroyOnClose
+        closable={false}
+        confirmLoading={isCreatingDraft}
+        data-testid="cde-create-draft-modal"
+        maskClosable={false}
+        okButtonProps={{ disabled: !draftVersion?.trim() }}
+        okText={t('label.create-draft')}
+        open={isCreateDraftModalOpen}
+        title={
+          <Typography.Text strong data-testid="modal-header">
+            {t('message.confirm-create-draft-title')}
+          </Typography.Text>
+        }
+        onCancel={() => setIsCreateDraftModalOpen(false)}
+        onOk={handleCreateDraft}>
+        <div className="d-flex flex-col gap-3">
+          <Typography.Text>
+            {t('message.confirm-create-draft-message')}
+          </Typography.Text>
+          <div>
+            <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
+              <span className="text-red-500">* </span>
+              {t('cde.version')}
+            </label>
+            <Input
+              autoFocus
+              data-testid="cde-draft-version-input"
+              placeholder="Ví dụ: 1.1, 2.0..."
+              value={draftVersion}
+              onChange={(e) => setDraftVersion(e.target.value)}
+              onPressEnter={() => {
+                if (draftVersion?.trim() && !isCreatingDraft) {
+                  handleCreateDraft();
+                }
+              }}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {isCDEGlossaryTerm ? (
+        <Modal
+          centered
+          destroyOnClose
+          closable={false}
+          confirmLoading={isSubmittingForReview}
+          data-testid="cde-submit-for-review-modal"
+          maskClosable={false}
+          okButtonProps={{ disabled: !submitVersion?.trim() }}
+          okText={t('label.submit-for-review')}
+          open={isSubmitForReviewModalOpen}
+          title={
+            <Typography.Text strong data-testid="modal-header">
+              {t('message.confirm-submit-for-review-title')}
+            </Typography.Text>
+          }
+          onCancel={() => setIsSubmitForReviewModalOpen(false)}
+          onOk={handleSubmitForReview}>
+          <div className="d-flex flex-col gap-3">
+            <Typography.Text>
+              {t('message.confirm-submit-for-review-message')}
+            </Typography.Text>
+            <div>
+              <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
+                <span className="text-red-500">* </span>
+                {t('cde.version')}
+              </label>
+              <Input
+                autoFocus
+                data-testid="cde-submit-version-input"
+                placeholder="Ví dụ: 1.1, 2.0-Primary..."
+                value={submitVersion}
+                onChange={(e) => setSubmitVersion(e.target.value)}
+                onPressEnter={() => {
+                  if (submitVersion?.trim() && !isSubmittingForReview) {
+                    handleSubmitForReview();
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </Modal>
+      ) : (
+        <ConfirmationModal
+          bodyText={t('message.confirm-submit-for-review-message')}
+          cancelText={t('label.cancel')}
+          confirmText={t('label.submit-for-review')}
+          header={t('message.confirm-submit-for-review-title')}
+          isLoading={isSubmittingForReview}
+          visible={isSubmitForReviewModalOpen}
+          onCancel={() => setIsSubmitForReviewModalOpen(false)}
+          onConfirm={handleSubmitForReview}
+        />
+      )}
 
       <ConfirmationModal
         bodyText={t('message.confirm-approve-glossary-term-message')}

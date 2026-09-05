@@ -132,6 +132,7 @@
   .ant-tabs-tabpane {
     height: @glossary-page-height;
     overflow-y: auto;
+    overflow-x: hidden;
 
     .activity-feed-tab {
       height: 100%;
@@ -148,6 +149,7 @@
   .ant-tabs-tabpane {
     height: @glossary-term-page-height;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .activity-feed-tab {
@@ -242,7 +244,8 @@
 }
 
 .cde-glossary-table-container {
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: visible;
   border: 1px solid @grey-300;
   border-radius: 10px;
   background: @white;
@@ -463,6 +466,23 @@
 .cde-value-pill-neutral {
   background: @grey-100;
   color: @grey-500;
+}
+
+.cde-header-version-badge {
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  box-shadow: none;
+  transition: opacity 0.2s ease-in-out;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:focus,
+  &:active {
+    outline: none;
+  }
 }
 
 .cde-glossary-term-overview {
@@ -892,7 +912,8 @@
    ========================================================================== */
 
 .dq-glossary-table-container {
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: visible;
   border: 1px solid @grey-300;
   border-radius: 10px;
   background: @white;

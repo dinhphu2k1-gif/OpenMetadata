@@ -146,6 +146,7 @@ const mockGlossaryTerm: GlossaryTerm = {
     },
   ],
   extension: {
+    cdeVersion: '1.0',
     entityRelationship: '1 KH - N TK',
     dataQualityRules: ['Y'],
     relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
@@ -185,12 +186,13 @@ describe('CDEGlossaryTermForm', () => {
 
     expect(screen.getByTestId('cde-term-code')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-term-name')).toBeInTheDocument();
+    expect(screen.getByTestId('cde-version')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-meaning')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-group')).toBeInTheDocument();
     expect(
       container.querySelector('.cde-glossary-term-form')
     ).toHaveClass('cde-glossary-term-form--add');
-    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(12);
+    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(13);
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
       0
     );
@@ -205,6 +207,9 @@ describe('CDEGlossaryTermForm', () => {
     });
     fireEvent.change(screen.getByTestId('cde-business-term-name'), {
       target: { value: 'New CDE' },
+    });
+    fireEvent.change(screen.getByTestId('cde-version'), {
+      target: { value: '1.0' },
     });
     fireEvent.change(screen.getByTestId('cde-business-meaning'), {
       target: { value: 'Meaning for the new CDE' },
@@ -237,6 +242,9 @@ describe('CDEGlossaryTermForm', () => {
             tagFQN: `${CDE_TAG_CLASSIFICATIONS.dataSource}.Tag1`,
           }),
         ],
+        extension: expect.objectContaining({
+          cdeVersion: '1.0',
+        }),
       })
     );
   });
@@ -248,6 +256,7 @@ describe('CDEGlossaryTermForm', () => {
 
     expect(screen.getByTestId('cde-term-code')).toHaveValue('CDE_MA_KH');
     expect(screen.getByTestId('cde-business-term-name')).toHaveValue('Mã khách hàng');
+    expect(screen.getByTestId('cde-version')).toHaveValue('1.0');
     expect(screen.getByTestId('cde-business-meaning')).toHaveValue(
       'Mã định danh duy nhất của khách hàng'
     );
@@ -292,6 +301,7 @@ describe('CDEGlossaryTermForm', () => {
 
     // Extension fields
     expect(savedData.extension).toEqual({
+      cdeVersion: '1.0',
       entityRelationship: '1 KH - N TK',
       dataQualityRules: ['Y'],
       relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',

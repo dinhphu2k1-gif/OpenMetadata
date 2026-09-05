@@ -234,12 +234,13 @@ export const getSummary = ({
 };
 
 export const renderVersionButton = (
-  version: string,
+  version: string | any,
   current: string,
   versionHandler: (version: string) => void,
-  className?: string
+  className?: string,
+  isSelected?: boolean
 ) => {
-  const currV = JSON.parse(version);
+  const currV = typeof version === 'string' ? JSON.parse(version) : version;
 
   const majorVersionChecks = () => {
     return Pure.isMajorVersion(
@@ -255,7 +256,11 @@ export const renderVersionButton = (
       <VersionButton
         className={className}
         isMajorVersion={majorVersionChecks()}
-        selected={toString(currV.version) === current}
+        selected={
+          isSelected !== undefined
+            ? isSelected
+            : toString(currV.version) === current
+        }
         version={currV}
         onVersionSelect={versionHandler}
       />

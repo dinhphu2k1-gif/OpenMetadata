@@ -19,10 +19,11 @@ import {
   MOCK_GLOSSARY,
 } from '../../../mocks/Glossary.mock';
 import { mockUserData } from '../../../mocks/MyDataPage.mock';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
-import GlossaryHeader from './GlossaryHeader.component';
+import GlossaryHeader, { suggestNextVersion } from './GlossaryHeader.component';
 
 const mockGlossaryTermPermission = {
   All: true,
@@ -72,9 +73,12 @@ jest.mock('../../common/EntityDescription/DescriptionV1', () => {
 });
 
 jest.mock('../../Entity/EntityHeader/EntityHeader.component', () => ({
-  EntityHeader: jest
-    .fn()
-    .mockReturnValue(<div data-testid="entity-header">EntityHeader</div>),
+  EntityHeader: jest.fn().mockImplementation(({ badge }) => (
+    <div data-testid="entity-header">
+      EntityHeader
+      {badge}
+    </div>
+  )),
 }));
 
 jest.mock(
@@ -511,5 +515,327 @@ describe('GlossaryHeader component', () => {
         entityStatus: EntityStatus.Draft,
       })
     );
+  });
+
+  it('should render Version badge with status tone and prompt for version when submitting CDE for review', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        entityStatus: EntityStatus.InReview,
+        extension: { cdeVersion: '2.0-Primary' },
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true },
+      isVersionView: false,
+    }));
+
+    render(
+      <GlossaryHeader
+        isGlossary={false}
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    const versionBtn = screen.getByTestId('version-button');
+
+    expect(versionBtn).toBeInTheDocument();
+    expect(versionBtn).toHaveClass('inReview');
+    expect(versionBtn).toHaveTextContent('Version: 2.0-Primary');
+  });
+
+  it('should prompt for version when submitting CDE for review and save version', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        entityStatus: EntityStatus.Draft,
+        owners: [{ id: 'mock-user-id', type: 'user' }],
+        extension: { cdeVersion: '1.0' },
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true },
+      isVersionView: false,
+    }));
+
+    render(
+      <GlossaryHeader
+        isGlossary={false}
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.submit-for-review'));
+    });
+
+    expect(screen.getByTestId('cde-submit-for-review-modal')).toBeInTheDocument();
+
+    const versionInput = screen.getByTestId('cde-submit-version-input');
+
+    expect(versionInput).toHaveValue('1.0');
+
+    fireEvent.change(versionInput, { target: { value: '1.1-Beta' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByText('label.submit-for-review')[1]);
+    });
+
+    expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityStatus: EntityStatus.InReview,
+        extension: expect.objectContaining({
+          cdeVersion: '1.1-Beta',
+        }),
+      })
+    );
+  });
+
+  it('should not render Approve, Reject, or Revoke buttons for Data Proposer role', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+      currentUser: {
+        ...mockUserData,
+        isAdmin: false,
+        roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+      },
+      selectedPersona: { name: 'DataProposerPersona' },
+    }));
+
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.InReview,
+      },
+      onUpdate: mockOnUpdate,
+      isVersionView: false,
+      permissions: {
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditStatus: true,
+        EditAll: true,
+      },
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('manage-button'));
+    });
+
+    expect(screen.queryByText('label.approve')).not.toBeInTheDocument();
+    expect(screen.queryByText('label.reject')).not.toBeInTheDocument();
+    expect(screen.queryByText('label.revoke-approval')).not.toBeInTheDocument();
+  });
+
+  describe('suggestNextVersion', () => {
+    it('should increment minor version correctly', () => {
+      expect(suggestNextVersion('1.0')).toBe('1.1');
+      expect(suggestNextVersion('1.1')).toBe('1.2');
+      expect(suggestNextVersion('2.9')).toBe('2.10');
+      expect(suggestNextVersion('0.1')).toBe('0.2');
+    });
+
+    it('should handle non-standard version strings gracefully', () => {
+      expect(suggestNextVersion('1.0-alpha')).toBe('1.0-alpha.1');
+      expect(suggestNextVersion('')).toBe('1.1');
+    });
+  });
+
+  describe('Create Draft (Tạo bản nháp)', () => {
+    it('should show "Tạo bản nháp" for Data Proposer on Approved CDE and create draft on submit', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        },
+        selectedPersona: { name: 'DataProposerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          entityStatus: EntityStatus.Approved,
+          extension: { cdeVersion: '1.0' },
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('label.create-draft'));
+      });
+
+      expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
+
+      const versionInput = screen.getByTestId('cde-draft-version-input');
+      expect(versionInput).toHaveValue('1.1');
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByText('label.create-draft')[1]);
+      });
+
+      expect(mockOnUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityStatus: EntityStatus.Draft,
+          extension: expect.objectContaining({
+            cdeVersion: '1.1',
+          }),
+        })
+      );
+    });
+
+    it('should show "Tạo bản nháp" for Admin on Approved CDE', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: true,
+          roles: [{ id: 'role-admin', name: 'Admin' }],
+        },
+        selectedPersona: undefined,
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          entityStatus: EntityStatus.Approved,
+          extension: { cdeVersion: '1.0' },
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+    });
+
+    it('should NOT show "Tạo bản nháp" for Data Steward role', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-steward', name: 'DataSteward' }],
+        },
+        selectedPersona: { name: 'DataStewardPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          entityStatus: EntityStatus.Approved,
+          extension: { cdeVersion: '1.0' },
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.queryByText('label.create-draft')).not.toBeInTheDocument();
+    });
+
+    it('should NOT show "Tạo bản nháp" when CDE is not in Approved status', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        },
+        selectedPersona: { name: 'DataProposerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          entityStatus: EntityStatus.Draft,
+          extension: { cdeVersion: '1.0' },
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true, EditAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.queryByText('label.create-draft')).not.toBeInTheDocument();
+    });
   });
 });

@@ -33,6 +33,18 @@
       "effect": "allow"
     },
     {
+      "name": "DataProposer-CreateDraftFromApprovedRule",
+      "description": "Allow Data Proposers to create drafts and upgrade versions for glossary terms",
+      "resources": [
+        "glossaryTerm"
+      ],
+      "operations": [
+        "EditCustomFields",
+        "EditStatus"
+      ],
+      "effect": "allow"
+    },
+    {
       "name": "DataProposer-ManageUnapprovedRule",
       "description": "Allow editing/deleting draft/unapproved glossary terms and test cases",
       "resources": [

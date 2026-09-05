@@ -167,6 +167,11 @@ public class ListFilter extends Filter<ListFilter> {
 
     // glossary_term_entity has indexed entityStatus column, use it directly
     if (Entity.getCollectionDAO().glossaryTermDAO().getTableName().equals(tableName)) {
+      if (statusValues.contains(EntityStatus.APPROVED.value())) {
+        return String.format(
+            "(entityStatus IN (%s) OR id IN (SELECT id FROM entity_extension WHERE extension LIKE 'glossaryTerm.version.%%%%'))",
+            inCondition);
+      }
       return String.format("entityStatus IN (%s)", inCondition);
     }
 

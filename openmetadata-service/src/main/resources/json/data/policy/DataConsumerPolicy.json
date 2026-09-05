@@ -43,7 +43,7 @@
         "ViewBasic"
       ],
       "effect": "deny",
-      "condition": "notApproved()"
+      "condition": "neverApproved()"
     },
     {
       "name": "DataConsumer-DenyAllNonReadOperations",

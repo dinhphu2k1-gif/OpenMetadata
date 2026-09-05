@@ -2495,6 +2495,30 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         .delete(from, GLOSSARY_TERM, to, GLOSSARY_TERM, Relationship.RELATED_TO.ordinal());
   }
 
+  public GlossaryTerm getLatestApprovedSnapshot(UUID id) {
+    if (id == null) {
+      return null;
+    }
+    String extensionPrefix = org.openmetadata.service.util.EntityUtil.getVersionExtensionPrefix(GLOSSARY_TERM);
+    List<CollectionDAO.ExtensionRecord> records =
+        daoCollection.entityExtensionDAO().getExtensions(id, extensionPrefix);
+    if (records == null || records.isEmpty()) {
+      return null;
+    }
+    List<CollectionDAO.EntityVersionPair> oldVersions = new ArrayList<>();
+    records.forEach(r -> oldVersions.add(new CollectionDAO.EntityVersionPair(r)));
+    oldVersions.sort(org.openmetadata.service.util.EntityUtil.compareVersion.reversed());
+    for (CollectionDAO.EntityVersionPair pair : oldVersions) {
+      String json = pair.getEntityJson();
+      if (json != null
+          && (json.contains("\"entityStatus\":\"Approved\"")
+              || json.contains("\"entityStatus\": \"Approved\""))) {
+        return JsonUtils.readValue(json, GlossaryTerm.class);
+      }
+    }
+    return null;
+  }
+
   public ResultList<GlossaryTerm> searchGlossaryTermsById(
       UUID glossaryId,
       String query,
@@ -2582,7 +2606,22 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         filter.addQueryParam("entityStatus", entityStatus);
       }
 
-      return listAfterWithOffset(null, getFields(fieldsParam), filter, limit, offset);
+      ResultList<GlossaryTerm> res = listAfterWithOffset(null, getFields(fieldsParam), filter, limit, offset);
+      if (entityStatus != null && entityStatus.contains("Approved") && res != null && res.getData() != null) {
+        List<GlossaryTerm> resolved = new ArrayList<>();
+        for (GlossaryTerm t : res.getData()) {
+          if (t.getEntityStatus() != EntityStatus.APPROVED) {
+            GlossaryTerm approved = getLatestApprovedSnapshot(t.getId());
+            if (approved != null) {
+              resolved.add(approved);
+            }
+          } else {
+            resolved.add(t);
+          }
+        }
+        res.setData(resolved);
+      }
+      return res;
     }
 
     // For search queries, fetch limit+1 to determine if there are more pages
@@ -2591,6 +2630,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
 
     // Build status condition (validate against enum to prevent SQL injection)
     String statusCondition = "";
+    boolean filterOnlyApproved = false;
     if (entityStatus != null && !entityStatus.isBlank()) {
       Set<String> validStatuses =
           Arrays.stream(EntityStatus.values()).map(EntityStatus::value).collect(Collectors.toSet());
@@ -2602,7 +2642,13 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
               .map(s -> "'" + s + "'")
               .collect(Collectors.joining(","));
       if (!validatedStatuses.isEmpty()) {
-        statusCondition = "AND entityStatus IN (" + validatedStatuses + ")";
+        if ("'Approved'".equals(validatedStatuses)) {
+          filterOnlyApproved = true;
+          statusCondition =
+              "AND (entityStatus IN ('Approved') OR id IN (SELECT id FROM entity_extension WHERE extension LIKE 'glossaryTerm.version.%'))";
+        } else {
+          statusCondition = "AND entityStatus IN (" + validatedStatuses + ")";
+        }
       }
     }
 
@@ -2620,7 +2666,14 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     List<GlossaryTerm> terms = new ArrayList<>();
     for (String json : jsons) {
       GlossaryTerm term = JsonUtils.readValue(json, GlossaryTerm.class);
-      terms.add(term);
+      if (filterOnlyApproved && term.getEntityStatus() != EntityStatus.APPROVED) {
+        GlossaryTerm approved = getLatestApprovedSnapshot(term.getId());
+        if (approved != null) {
+          terms.add(approved);
+        }
+      } else {
+        terms.add(term);
+      }
     }
 
     // Use bulk method for efficient field fetching

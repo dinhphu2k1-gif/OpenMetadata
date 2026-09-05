@@ -48,6 +48,9 @@ const MOCK_VERSION = {
   mutuallyExclusive: false,
 };
 
+const mockGetGlossaryTermsVersionsList = jest.fn();
+const mockGetGlossaryTermsVersion = jest.fn();
+
 jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryVersionsList: jest
     .fn()
@@ -55,6 +58,10 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryVersion: jest
     .fn()
     .mockImplementation(() => Promise.resolve(MOCK_VERSION)),
+  getGlossaryTermsVersionsList: (...args: any[]) =>
+    mockGetGlossaryTermsVersionsList(...args),
+  getGlossaryTermsVersion: (...args: any[]) =>
+    mockGetGlossaryTermsVersion(...args),
 }));
 
 jest.mock('../GlossaryV1.component', () => {
@@ -70,6 +77,10 @@ jest.mock('../../Entity/EntityVersionTimeLine/EntityVersionTimeLine', () => {
 });
 
 describe('GlossaryVersion', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('renders glossary version', async () => {
     const glossaryName = '305b0130-b9c1-4441-a0fc-6463fd019540';
     const version = '0.1';
@@ -91,5 +102,63 @@ describe('GlossaryVersion', () => {
 
     // Check that the version timeline is displayed
     expect(screen.getByText('Version timeline')).toBeInTheDocument();
+  });
+
+  it('maps approved CDE version and filters out unapproved version', async () => {
+    const termId = 'cde-term-id';
+    const mockCdeHistory = {
+      entityType: 'glossaryTerm',
+      versions: [
+        // v1.2 is In Review (unapproved)
+        JSON.stringify({
+          id: termId,
+          name: 'CDE_01',
+          version: '1.5',
+          extension: { cdeVersion: '1.2' },
+          glossary: { name: 'Data Dictionary' },
+          entityStatus: 'In Review',
+        }),
+        // v1.1 is Approved (revision 1.3)
+        JSON.stringify({
+          id: termId,
+          name: 'CDE_01',
+          version: '1.3',
+          extension: { cdeVersion: '1.1' },
+          glossary: { name: 'Data Dictionary' },
+          entityStatus: 'Approved',
+        }),
+      ],
+    };
+
+    mockGetGlossaryTermsVersionsList.mockResolvedValue(mockCdeHistory);
+    mockGetGlossaryTermsVersion.mockResolvedValue({
+      id: termId,
+      name: 'CDE_01',
+      version: '1.3',
+      extension: { cdeVersion: '1.1' },
+      glossary: { name: 'Data Dictionary' },
+      entityStatus: 'Approved',
+    });
+
+    // User navigates to unapproved version 1.2
+    render(
+      <MemoryRouter initialEntries={[`/glossary-term/${termId}/versions/1.2/overview`]}>
+        <Routes>
+          <Route
+            element={<GlossaryVersion />}
+            path="/glossary-term/:id/versions/:version/:tab"
+          />
+          <Route
+            element={<GlossaryVersion />}
+            path="/glossary/:id/versions/:version"
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Glossary component')).toBeInTheDocument();
+
+    // Should fetch the latest approved snapshot (1.3), not unapproved snapshot (1.5)
+    expect(mockGetGlossaryTermsVersion).toHaveBeenCalledWith(termId, '1.3');
   });
 });
