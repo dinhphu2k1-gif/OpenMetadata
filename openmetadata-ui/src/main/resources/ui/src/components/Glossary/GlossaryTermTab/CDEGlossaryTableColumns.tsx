@@ -26,6 +26,8 @@ import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEdit
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
+  cdeVersion?: string;
+  phien_ban?: string;
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
   dataQualityRules?: boolean | string | string[];
