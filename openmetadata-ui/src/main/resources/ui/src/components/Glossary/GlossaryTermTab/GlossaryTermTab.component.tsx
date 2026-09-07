@@ -377,6 +377,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           q: searchTerm,
           glossaryFqn: activeGlossary.fullyQualifiedName,
           limit: pageSize,
+          entityStatus: entityStatusParam?.join(','),
         });
         data = response.data;
         pagingResponse = response.paging;

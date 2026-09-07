@@ -20,6 +20,8 @@ export type EntityVersionTimelineProps = {
   versionHandler: (v: string) => void;
   onBack: () => void;
   entityType?: EntityType;
+  isCDE?: boolean;
+  currentCdeVersion?: string;
 };
 
 export type EntityVersionButtonProps = {
@@ -28,7 +30,9 @@ export type EntityVersionButtonProps = {
     version: string;
     changeDescription: ChangeDescription;
     updatedAt: number;
-    glossary: string;
+    glossary?: any;
+    extension?: any;
+    fullyQualifiedName?: string;
   };
   onVersionSelect: (v: string) => void;
   selected: boolean;

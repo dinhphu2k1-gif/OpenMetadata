@@ -28,6 +28,8 @@ export interface CDEGlossaryTermFormValues {
   name?: string;
   displayName?: string;
   description?: string;
+  cdeVersion?: string;
+  phien_ban?: string;
   domains?: EntityReference[];
   owners?: EntityReference[];
   reviewers?: EntityReference[];
@@ -116,6 +118,10 @@ const CDEGlossaryTermForm = ({
         entityRelationship:
           glossaryTerm.extension?.entityRelationship ??
           glossaryTerm.extension?.moi_quan_he_voi_thuc_the,
+        cdeVersion:
+          glossaryTerm.extension?.cdeVersion ??
+          glossaryTerm.extension?.phien_ban ??
+          '1.0',
       });
     }
   }, [editMode, form, glossaryTerm]);
@@ -147,7 +153,10 @@ const CDEGlossaryTermForm = ({
     const entityRelationshipVal =
       values.entityRelationship ?? values.moi_quan_he_voi_thuc_the;
 
+    const versionVal = values.cdeVersion?.trim();
+
     const extension = {
+      ...(versionVal ? { cdeVersion: versionVal } : {}),
       ...(entityRelationshipVal
         ? {
             entityRelationship: entityRelationshipVal,
@@ -202,6 +211,7 @@ const CDEGlossaryTermForm = ({
       className={`cde-glossary-term-form cde-glossary-term-form--${editMode ? 'edit' : 'add'
         }`}
       form={form}
+      initialValues={{ cdeVersion: '1.0' }}
       layout="vertical"
       onFinish={onFinish}>
       <section className="cde-form-section">
@@ -220,6 +230,13 @@ const CDEGlossaryTermForm = ({
           </Form.Item>
           <Form.Item label={t('cde.business-term-name')} name="displayName">
             <Input data-testid="cde-business-term-name" />
+          </Form.Item>
+          <Form.Item
+            required
+            label={t('cde.version')}
+            name="cdeVersion"
+            rules={[{ required: true, whitespace: true }]}>
+            <Input data-testid="cde-version" placeholder="1.0" />
           </Form.Item>
           <Form.Item
             required

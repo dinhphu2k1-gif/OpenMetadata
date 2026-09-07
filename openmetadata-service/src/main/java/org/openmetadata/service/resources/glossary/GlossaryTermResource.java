@@ -53,7 +53,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.openmetadata.schema.type.EntityStatus;
+import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.api.AddGlossaryToAssetsRequest;
 import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
@@ -307,6 +310,22 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     } else { // Forward paging or first page
       terms = repository.listAfter(uriInfo, fields, filter, limitParam, after);
     }
+    if (("Approved".equals(effectiveEntityStatus) || isConsumer(securityContext))
+        && terms != null
+        && terms.getData() != null) {
+      List<GlossaryTerm> resolved = new ArrayList<>();
+      for (GlossaryTerm t : terms.getData()) {
+        if (t.getEntityStatus() != EntityStatus.APPROVED) {
+          GlossaryTerm approved = repository.getLatestApprovedSnapshot(t.getId());
+          if (approved != null) {
+            resolved.add(approved);
+          }
+        } else {
+          resolved.add(t);
+        }
+      }
+      terms.setData(resolved);
+    }
     return addHref(uriInfo, terms);
   }
 
@@ -428,6 +447,21 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return requestedEntityStatus;
   }
 
+  private boolean isConsumer(SecurityContext securityContext) {
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    if (subjectContext == null || subjectContext.isAdmin() || subjectContext.isBot()) {
+      return false;
+    }
+    boolean isElevatedRole =
+        subjectContext.hasAnyRole("DataSteward")
+            || subjectContext.hasAnyRole("DataProposer")
+            || subjectContext.hasAnyRole("Admin")
+            || subjectContext.hasAnyRole("Organization");
+    return !isElevatedRole
+        && (subjectContext.hasAnyRole("BasicConsumer")
+            || subjectContext.hasAnyRole("DataConsumer"));
+  }
+
   @GET
   @Path("/relationTypes/usage")
   @Operation(
@@ -524,7 +558,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               schema = @Schema(type = "string", example = "owners:non-deleted,followers:all"))
           @QueryParam("includeRelations")
           String includeRelations) {
-    return getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
+    GlossaryTerm term = getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
+    if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
+      GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
+      if (snapshot != null) {
+        return addHref(uriInfo, snapshot);
+      }
+    }
+    return term;
   }
 
   @GET
@@ -582,8 +623,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     List<GlossaryTerm> result = new ArrayList<>(ids.size());
     for (UUID id : ids) {
       try {
-        result.add(
-            getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations));
+        GlossaryTerm term =
+            getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
+        if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
+          GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
+          if (snapshot != null) {
+            term = addHref(uriInfo, snapshot);
+          }
+        }
+        result.add(term);
       } catch (EntityNotFoundException | AuthorizationException ex) {
         // Expected per-id misses — silently omit so a single bad Id doesn't
         // 404/403 the whole batch. Matches the documented contract and the
@@ -670,7 +718,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               schema = @Schema(type = "string", example = "owners:non-deleted,followers:all"))
           @QueryParam("includeRelations")
           String includeRelations) {
-    return getByNameInternal(uriInfo, securityContext, fqn, fieldsParam, include, includeRelations);
+    GlossaryTerm term =
+        getByNameInternal(uriInfo, securityContext, fqn, fieldsParam, include, includeRelations);
+    if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
+      GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
+      if (snapshot != null) {
+        return addHref(uriInfo, snapshot);
+      }
+    }
+    return term;
   }
 
   @GET
@@ -694,7 +750,28 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Parameter(description = "Id of the glossary term", schema = @Schema(type = "UUID"))
           @PathParam("id")
           UUID id) {
-    return super.listVersionsInternal(securityContext, id);
+    EntityHistory history = super.listVersionsInternal(securityContext, id);
+    if (isConsumer(securityContext) && history != null && history.getVersions() != null) {
+      List<Object> approvedVersions =
+          history.getVersions().stream()
+              .filter(
+                  v -> {
+                    try {
+                      GlossaryTerm t =
+                          (v instanceof GlossaryTerm)
+                              ? (GlossaryTerm) v
+                              : (v instanceof String)
+                                  ? JsonUtils.readValue((String) v, GlossaryTerm.class)
+                                  : JsonUtils.readValue(JsonUtils.pojoToJson(v), GlossaryTerm.class);
+                      return t.getEntityStatus() == EntityStatus.APPROVED;
+                    } catch (Exception e) {
+                      return false;
+                    }
+                  })
+              .collect(Collectors.toList());
+      history.setVersions(approvedVersions);
+    }
+    return history;
   }
 
   @GET
@@ -726,7 +803,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               schema = @Schema(type = "string", example = "0.1 or 1.1"))
           @PathParam("version")
           String version) {
-    return super.getVersionInternal(securityContext, id, version);
+    GlossaryTerm termVersion = super.getVersionInternal(securityContext, id, version);
+    if (isConsumer(securityContext)
+        && termVersion != null
+        && termVersion.getEntityStatus() != EntityStatus.APPROVED) {
+      throw new AuthorizationException("Not authorized to view unapproved version");
+    }
+    return termVersion;
   }
 
   @POST

@@ -158,6 +158,47 @@ public class RuleEvaluator {
   }
 
   @Function(
+      name = "neverApproved",
+      input = "none",
+      description =
+          "Returns true if the entity has never been in Approved status across all versions",
+      examples = {"neverApproved()", "!neverApproved()"})
+  public boolean neverApproved() {
+    if (expressionValidation) {
+      return false;
+    }
+    if (resourceContext == null || resourceContext.getEntity() == null) {
+      return false;
+    }
+    EntityInterface entity = resourceContext.getEntity();
+    if (entity.getEntityStatus() == org.openmetadata.schema.type.EntityStatus.APPROVED) {
+      return false;
+    }
+    if (entity.getId() != null) {
+      try {
+        String entityType = entity.getEntityReference().getType();
+        String extensionPrefix = org.openmetadata.service.util.EntityUtil.getVersionExtensionPrefix(entityType);
+        List<org.openmetadata.service.jdbi3.CollectionDAO.ExtensionRecord> records =
+            Entity.getCollectionDAO()
+                .entityExtensionDAO()
+                .getExtensions(entity.getId(), extensionPrefix);
+        if (records != null) {
+          for (org.openmetadata.service.jdbi3.CollectionDAO.ExtensionRecord record : records) {
+            String json = record.extensionJson();
+            if (json != null
+                && (json.contains("\"entityStatus\":\"Approved\"")
+                    || json.contains("\"entityStatus\": \"Approved\""))) {
+              return false;
+            }
+          }
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return true;
+  }
+
+  @Function(
       name = "hasDomain",
       input = "none",
       description =

@@ -8343,7 +8343,10 @@ public abstract class EntityRepository<T extends EntityInterface> {
         subjectContext = SubjectContext.getSubjectContext(updatedBy);
       } catch (Exception ignored) {
       }
-      if (subjectContext != null && (subjectContext.isAdmin() || subjectContext.isBot())) {
+      if (subjectContext != null
+          && (subjectContext.isAdmin()
+              || subjectContext.isBot()
+              || subjectContext.hasAnyRole("DataProposer"))) {
         return;
       }
       List<EntityReference> reviewers = entity.getReviewers();

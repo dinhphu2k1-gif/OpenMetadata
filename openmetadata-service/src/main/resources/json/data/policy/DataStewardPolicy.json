@@ -2,7 +2,7 @@
   "name": "DataStewardPolicy",
   "displayName": "Data Steward Policy",
   "fullyQualifiedName": "DataStewardPolicy",
-  "description": "Strict Least-Privilege Policy for Data Steward (Checker / Reviewer): Review, approve, reject, or revoke business glossaries, metadata changes, and data quality rules. Explicit Deny on platform admin and destructive infrastructure mutations.",
+  "description": "Strict Least-Privilege Policy for Data Steward (Checker / Reviewer): Review, approve, reject, or revoke business glossaries, metadata changes, and data quality rules. Explicit Deny on editing, creating, platform admin, and destructive infrastructure mutations.",
   "enabled": true,
   "allowDelete": false,
   "provider": "system",
@@ -21,7 +21,7 @@
     },
     {
       "name": "DataSteward-ApprovalAndStatusRule",
-      "description": "Allow Data Steward to review, approve, reject, revoke, curate metadata changes, tags, glossaries, custom fields, and status",
+      "description": "Allow Data Steward to review, approve, reject, revoke glossary and metadata status. Explicitly restricted from editing content.",
       "resources": [
         "apiEndpoint",
         "chart",
@@ -45,6 +45,19 @@
         "topic"
       ],
       "operations": [
+        "EditStatus"
+      ],
+      "effect": "allow"
+    },
+    {
+      "name": "DataSteward-DenyEditOperations",
+      "description": "Explicitly deny all editing and creation operations for Data Steward (Checker role: only review, approve, reject, revoke)",
+      "resources": [
+        "all"
+      ],
+      "operations": [
+        "Create",
+        "EditAll",
         "EditCertification",
         "EditCustomFields",
         "EditDescription",
@@ -52,11 +65,10 @@
         "EditGlossaryTerms",
         "EditOwners",
         "EditReviewers",
-        "EditStatus",
         "EditTags",
         "EditTier"
       ],
-      "effect": "allow"
+      "effect": "deny"
     },
     {
       "name": "DataSteward-TaskAndWorkflowRule",

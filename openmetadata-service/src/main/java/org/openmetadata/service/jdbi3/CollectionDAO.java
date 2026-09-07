@@ -4409,7 +4409,7 @@ public interface CollectionDAO {
 
     @Override
     default int listCount(ListFilter filter) {
-      String condition = filter.getCondition();
+      String condition = filter.getCondition(getTableName());
       String directChildrenOf = filter.getQueryParam("directChildrenOf");
 
       if (!nullOrEmpty(directChildrenOf)) {
@@ -4427,7 +4427,7 @@ public interface CollectionDAO {
     @Override
     default List<String> listBefore(
         ListFilter filter, int limit, String beforeName, String beforeId) {
-      String condition = filter.getCondition();
+      String condition = filter.getCondition(getTableName());
       String directChildrenOf = filter.getQueryParam("directChildrenOf");
 
       if (!nullOrEmpty(directChildrenOf)) {
@@ -4445,7 +4445,7 @@ public interface CollectionDAO {
 
     @Override
     default List<String> listAfter(ListFilter filter, int limit, String afterName, String afterId) {
-      String condition = filter.getCondition();
+      String condition = filter.getCondition(getTableName());
       String directChildrenOf = filter.getQueryParam("directChildrenOf");
 
       if (!nullOrEmpty(directChildrenOf)) {
