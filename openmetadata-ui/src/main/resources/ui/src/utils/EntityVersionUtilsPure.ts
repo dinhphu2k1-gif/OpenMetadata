@@ -64,6 +64,7 @@ import type {
 import { t } from './i18next/LocalUtil';
 import { isValidJSONString } from './StringUtils';
 import { getTagsWithoutTier, getTierTags } from './TablePureUtils';
+import { getEntityStatusLabel } from './EntityStatusUtils';
 
 type EntityColumn = TableColumn | ContainerColumn | Field;
 
@@ -163,14 +164,9 @@ export const getGlossaryTermApprovalText = (fieldsChanged: FieldChange[]) => {
   let approvalText = '';
 
   if (statusFieldDiff) {
-    let statusLabel: string;
-    if (statusFieldDiff.newValue === 'Approved') {
-      statusLabel = t('label.approved');
-    } else if (statusFieldDiff.newValue === 'In Review') {
-      statusLabel = t('label.in-review');
-    } else {
-      statusLabel = t('label.rejected');
-    }
+    const statusLabel = getEntityStatusLabel(
+      statusFieldDiff.newValue as string
+    );
     approvalText = t('message.glossary-term-status', { status: statusLabel });
   }
 

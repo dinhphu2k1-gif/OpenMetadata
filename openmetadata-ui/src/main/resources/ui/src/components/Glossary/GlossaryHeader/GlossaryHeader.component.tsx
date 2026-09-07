@@ -910,7 +910,7 @@ const GlossaryHeader = ({
       const statusClass = getEntityStatusClass(entityStatus);
       const rawVersion = String(cdeVersion ?? '1.0').trim();
       const cleanVersion = rawVersion.replace(/^(version:?\s*)/i, '');
-      const versionLabel = `Version: ${cleanVersion}`;
+      const versionLabel = `${t('label.version')}: ${cleanVersion}`;
 
       return (
         <Space align="center" size={8}>
@@ -1008,17 +1008,27 @@ const GlossaryHeader = ({
 
     const arr = !isGlossary ? Fqn.split(fqn) : [];
     const dataFQN: Array<string> = [];
+    const glossaryDisplayName = (selectedData as GlossaryTerm)?.glossary
+      ?.displayName;
+    const glossaryName = (selectedData as GlossaryTerm)?.glossary?.name;
+
     const newData = [
       {
-        name: 'Glossaries',
+        name: t('label.glossary-plural'),
         url: getGlossaryPath(arr[0]),
         activeTitle: false,
       },
-      ...arr.slice(0, -1).map((d) => {
+      ...arr.slice(0, -1).map((d, index) => {
         dataFQN.push(d);
+        const nameToDisplay =
+          index === 0 &&
+          glossaryDisplayName &&
+          (d === glossaryName || d === glossaryDisplayName)
+            ? glossaryDisplayName
+            : d;
 
         return {
-          name: d,
+          name: nameToDisplay,
           url: getGlossaryPath(dataFQN.join(FQN_SEPARATOR_CHAR)),
           activeTitle: false,
         };
@@ -1031,7 +1041,11 @@ const GlossaryHeader = ({
   useEffect(() => {
     const { fullyQualifiedName, name } = selectedData;
     handleBreadcrumb(fullyQualifiedName ?? name);
-  }, [selectedData?.fullyQualifiedName, selectedData?.name]);
+  }, [
+    selectedData?.fullyQualifiedName,
+    selectedData?.name,
+    (selectedData as GlossaryTerm)?.glossary?.displayName,
+  ]);
 
   useEffect(() => {
     if (isVersionView) {

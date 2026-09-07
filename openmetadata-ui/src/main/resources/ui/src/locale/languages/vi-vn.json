@@ -16,6 +16,7 @@
     "related-regulatory-documents": "Văn bản quy định liên quan",
     "data-quality-rules": "Quy định về chất lượng dữ liệu",
     "version": "Phiên bản",
+    "search-placeholder": "Tìm kiếm mã hoặc tên thuật ngữ",
     "notes": "Ghi chú"
   },
   "dq": {
@@ -699,6 +700,7 @@
     "deployed": "Đã triển khai",
     "deployed-lowercase": "đã triển khai",
     "deploying-lowercase": "đang triển khai",
+    "deprecated": "Ngừng sử dụng",
     "depth": "Độ sâu",
     "derived": "Phái sinh",
     "derived-from": "Phái sinh từ",
@@ -756,6 +758,7 @@
     "downloading-log-plural": "Đang tải xuống nhật ký",
     "downstream": "Hạ nguồn",
     "downstream-depth": "Độ sâu hạ nguồn",
+    "draft": "Bản nháp",
     "drag-and-drop-nodes": "Kéo và thả các nút",
     "drag-and-drop-the-nodes-here": "Kéo và thả các nút vào đây",
     "drive": "Ổ đĩa",

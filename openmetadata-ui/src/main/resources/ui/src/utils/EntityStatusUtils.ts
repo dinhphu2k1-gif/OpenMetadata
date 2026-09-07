@@ -14,6 +14,7 @@
 import { isNil } from 'lodash';
 import { StatusType } from '../components/common/StatusBadge/StatusBadge.interface';
 import { EntityStatus } from '../generated/entity/data/glossaryTerm';
+import i18n from './i18next/LocalUtil';
 
 export const EntityStatusClass: Record<EntityStatus, StatusType> = {
   [EntityStatus.Approved]: StatusType.Success,
@@ -25,6 +26,34 @@ export const EntityStatusClass: Record<EntityStatus, StatusType> = {
   [EntityStatus.Archived]: StatusType.Archived,
 };
 
+export const ENTITY_STATUS_TRANSLATION_KEYS: Record<EntityStatus, string> = {
+  [EntityStatus.Approved]: 'label.approved',
+  [EntityStatus.Draft]: 'label.draft',
+  [EntityStatus.Rejected]: 'label.rejected',
+  [EntityStatus.Deprecated]: 'label.deprecated',
+  [EntityStatus.InReview]: 'label.in-review',
+  [EntityStatus.Unprocessed]: 'label.unprocessed',
+  [EntityStatus.Archived]: 'label.archived',
+};
+
+export const isEntityStatus = (status: unknown): status is EntityStatus => {
+  return (
+    typeof status === 'string' &&
+    Object.values(EntityStatus).includes(status as EntityStatus)
+  );
+};
+
+export const getEntityStatusLabel = (
+  status?: EntityStatus | string
+): string => {
+  if (!status) {
+    return '';
+  }
+  const key = ENTITY_STATUS_TRANSLATION_KEYS[status as EntityStatus];
+
+  return key ? i18n.t(key) : String(status);
+};
+
 export const getEntityStatusClass = (status: EntityStatus): StatusType => {
   return EntityStatusClass[status] ?? StatusType.Pending;
 };
@@ -34,3 +63,4 @@ export const isDeleted = (deleted: unknown): boolean => {
     ? false
     : true;
 };
+

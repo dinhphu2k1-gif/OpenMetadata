@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ReactComponent as IconTerm } from '../../../assets/svg/book.svg';
 import { ReactComponent as GlossaryIcon } from '../../../assets/svg/glossary.svg';
 import { DE_ACTIVE_COLOR } from '../../../constants/constants';
@@ -22,6 +23,7 @@ export const GlossaryHeaderWidget = ({
 }: {
   isGlossary?: boolean;
 }) => {
+  const { t } = useTranslation();
   const icon = useMemo(() => {
     if (isGlossary) {
       return (
@@ -51,8 +53,8 @@ export const GlossaryHeaderWidget = ({
       <EntityHeader
         showName
         breadcrumb={[
-          { name: 'Glossaries', url: '#', activeTitle: false },
-          { name: 'Glossary Term', url: '#', activeTitle: false },
+          { name: t('label.glossary-plural'), url: '#', activeTitle: false },
+          { name: t('label.glossary-term'), url: '#', activeTitle: false },
         ]}
         entityData={{ name: 'Glossary Term', displayName: 'Glossary Term' }}
         entityType={EntityType.GLOSSARY_TERM}

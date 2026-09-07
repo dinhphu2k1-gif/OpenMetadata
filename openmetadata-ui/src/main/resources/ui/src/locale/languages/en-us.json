@@ -16,6 +16,7 @@
     "personal-data": "Personal Data",
     "related-regulatory-documents": "Related Regulatory Documents",
     "version": "Version",
+    "search-placeholder": "Search by term code or name",
     "term-code": "Term Code"
   },
   "dq": {
@@ -685,6 +686,7 @@
     "deployed": "Deployed",
     "deployed-lowercase": "deployed",
     "deploying-lowercase": "deploying",
+    "deprecated": "Deprecated",
     "depth": "Depth",
     "derived": "Derived",
     "derived-from": "Derived From",
@@ -756,6 +758,7 @@
     "dp-type-raw-data": "Raw Data",
     "dp-type-reports": "Reports",
     "dp-type-visualisation-3d": "3D Visualisation",
+    "draft": "Draft",
     "drag-and-drop-nodes": "Drag and drop nodes",
     "drag-and-drop-the-nodes-here": "Drag and Drop the nodes here",
     "drive": "Drive",

@@ -17,6 +17,7 @@ import {
   RelationCategory,
 } from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityStatus } from '../generated/entity/data/glossaryTerm';
+import { getEntityStatusLabel } from '../utils/EntityStatusUtils';
 import i18n from '../utils/i18next/LocalUtil';
 
 export const DEFAULT_GLOSSARY_TERM_RELATION_TYPES_FALLBACK: GlossaryTermRelationType[] =
@@ -180,15 +181,42 @@ export const STATIC_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
 ];
 
+export const getGlossaryTermStatusOptions = () => [
+  {
+    value: 'all',
+    text: i18n.t('label.all'),
+  },
+  {
+    value: EntityStatus.Draft,
+    text: getEntityStatusLabel(EntityStatus.Draft),
+  },
+  {
+    value: EntityStatus.InReview,
+    text: getEntityStatusLabel(EntityStatus.InReview),
+  },
+  {
+    value: EntityStatus.Approved,
+    text: getEntityStatusLabel(EntityStatus.Approved),
+  },
+];
+
 export const GLOSSARY_TERM_STATUS_OPTIONS = [
   {
     value: 'all',
     text: i18n.t('label.all'),
   },
-  ...Object.values(EntityStatus).map((status) => ({
-    value: status,
-    text: status,
-  })),
+  {
+    value: EntityStatus.Draft,
+    text: getEntityStatusLabel(EntityStatus.Draft),
+  },
+  {
+    value: EntityStatus.InReview,
+    text: getEntityStatusLabel(EntityStatus.InReview),
+  },
+  {
+    value: EntityStatus.Approved,
+    text: getEntityStatusLabel(EntityStatus.Approved),
+  },
 ];
 
 export const GLOSSARY_TERM_APPROVAL_WORKFLOW_DEFINITION_NAME =

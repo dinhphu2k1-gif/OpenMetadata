@@ -14,11 +14,16 @@
 import Icon from '@ant-design/icons';
 import classNames from 'classnames';
 import { AllStatusTypes, icons } from '../../../constants/StatusBadge.constant';
+import {
+  getEntityStatusLabel,
+  isEntityStatus,
+} from '../../../utils/EntityStatusUtils';
 import './status-badge.less';
 import { StatusBadgeProps } from './StatusBadge.interface';
 
 const StatusBadge = ({
   label,
+  displayLabel,
   status,
   dataTestId,
   className,
@@ -28,12 +33,16 @@ const StatusBadge = ({
       icons[label.toLowerCase() as AllStatusTypes]
     : undefined;
 
+  const renderedLabel =
+    displayLabel ??
+    (isEntityStatus(label) ? getEntityStatusLabel(label) : label);
+
   return (
     <div
       className={classNames('status-badge', status, className)}
       data-testid={dataTestId}>
       {StatusIcon && <Icon component={StatusIcon} />}
-      <span className={`status-badge-label ${status}`}>{label}</span>
+      <span className={`status-badge-label ${status}`}>{renderedLabel}</span>
     </div>
   );
 };

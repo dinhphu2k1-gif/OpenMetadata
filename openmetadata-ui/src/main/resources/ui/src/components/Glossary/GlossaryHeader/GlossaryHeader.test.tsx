@@ -544,7 +544,7 @@ describe('GlossaryHeader component', () => {
 
     expect(versionBtn).toBeInTheDocument();
     expect(versionBtn).toHaveClass('inReview');
-    expect(versionBtn).toHaveTextContent('Version: 2.0-Primary');
+    expect(versionBtn).toHaveTextContent('label.version: 2.0-Primary');
   });
 
   it('should prompt for version when submitting CDE for review and save version', async () => {
@@ -873,7 +873,7 @@ describe('GlossaryHeader component', () => {
       const versionBtn = screen.getByTestId('version-button');
 
       expect(versionBtn).toBeInTheDocument();
-      expect(versionBtn).toHaveTextContent('Version: 1.0');
+      expect(versionBtn).toHaveTextContent('label.version: 1.0');
 
       await act(async () => {
         fireEvent.click(screen.getByTestId('manage-button'));
