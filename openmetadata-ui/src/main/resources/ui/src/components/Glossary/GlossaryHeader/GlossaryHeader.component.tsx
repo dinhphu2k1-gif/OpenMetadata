@@ -55,7 +55,10 @@ import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
-import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
 import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
@@ -253,18 +256,34 @@ const GlossaryHeader = ({
     );
   }, [isGlossary, selectedData]);
 
+  const isDQGlossaryTerm = useMemo(() => {
+    if (isGlossary) {
+      return false;
+    }
+    const term = selectedData as GlossaryTerm;
+
+    return isDataQualityGlossary(
+      term?.fullyQualifiedName,
+      term?.glossary?.name,
+      term?.glossary?.displayName
+    );
+  }, [isGlossary, selectedData]);
+
+  const isCustomManagedTerm = isCDEGlossaryTerm || isDQGlossaryTerm;
+
   const cdeVersion = useMemo(() => {
-    if (!isCDEGlossaryTerm) {
+    if (!isCustomManagedTerm) {
       return null;
     }
     const term = selectedData as GlossaryTerm;
 
     return (
       term?.extension?.cdeVersion ??
+      term?.extension?.version ??
       term?.extension?.phien_ban ??
       '1.0'
     );
-  }, [isCDEGlossaryTerm, selectedData]);
+  }, [isCustomManagedTerm, selectedData]);
 
   const voteStatus = useMemo(
     () => getEntityVoteStatus(currentUser?.id ?? '', selectedData.votes),
@@ -319,7 +338,7 @@ const GlossaryHeader = ({
     if (isVersionView) {
       path = getGlossaryPath(latestGlossaryData?.fullyQualifiedName);
     } else {
-      const targetVersion = isCDEGlossaryTerm
+      const targetVersion = isCustomManagedTerm
         ? String(cdeVersion ?? '1.0').trim().replace(/^(version:?\s*|v)/i, '')
         : toString(selectedData.version);
 
@@ -403,7 +422,7 @@ const GlossaryHeader = ({
     if (
       isGlossary ||
       isVersionView ||
-      !isCDEGlossaryTerm ||
+      !isCustomManagedTerm ||
       glossaryTermStatus !== EntityStatus.Approved
     ) {
       return false;
@@ -413,7 +432,7 @@ const GlossaryHeader = ({
   }, [
     isGlossary,
     isVersionView,
-    isCDEGlossaryTerm,
+    isCustomManagedTerm,
     glossaryTermStatus,
     isProposer,
     currentUser?.isAdmin,
@@ -508,7 +527,7 @@ const GlossaryHeader = ({
       const updatedDetails = {
         ...selectedData,
         entityStatus: EntityStatus.InReview,
-        ...(isCDEGlossaryTerm && cleanVer
+        ...(isCustomManagedTerm && cleanVer
           ? {
               extension: {
                 ...currentExtension,
@@ -747,9 +766,10 @@ const GlossaryHeader = ({
             key: 'submit-for-review-button',
             onClick: (e) => {
               e.domEvent.stopPropagation();
-              if (isCDEGlossaryTerm) {
+              if (isCustomManagedTerm) {
                 const currentVer =
                   (selectedData as GlossaryTerm)?.extension?.cdeVersion ??
+                  (selectedData as GlossaryTerm)?.extension?.version ??
                   (selectedData as GlossaryTerm)?.extension?.phien_ban ??
                   '1.0';
                 setSubmitVersion(
@@ -886,7 +906,7 @@ const GlossaryHeader = ({
   const statusBadge = useMemo(() => {
     const entityStatus = selectedData.entityStatus ?? EntityStatus.Approved;
 
-    if (!isGlossary && isCDEGlossaryTerm) {
+    if (!isGlossary && isCustomManagedTerm) {
       const statusClass = getEntityStatusClass(entityStatus);
       const rawVersion = String(cdeVersion ?? '1.0').trim();
       const cleanVersion = rawVersion.replace(/^(version:?\s*)/i, '');
@@ -925,7 +945,7 @@ const GlossaryHeader = ({
   }, [
     selectedData,
     isGlossary,
-    isCDEGlossaryTerm,
+    isCustomManagedTerm,
     cdeVersion,
     isVersionView,
     handleVersionClick,
@@ -1051,7 +1071,7 @@ const GlossaryHeader = ({
                 />
               )}
 
-              {!isCDEGlossaryTerm && selectedData?.version && (
+              {!isCustomManagedTerm && selectedData?.version && (
                 <Tooltip
                   title={t(
                     `label.${
@@ -1216,7 +1236,7 @@ const GlossaryHeader = ({
         </div>
       </Modal>
 
-      {isCDEGlossaryTerm ? (
+      {isCustomManagedTerm ? (
         <Modal
           centered
           destroyOnClose

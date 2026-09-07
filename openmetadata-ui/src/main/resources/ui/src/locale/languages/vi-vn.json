@@ -34,10 +34,19 @@
     "other-constraints": "Ràng buộc / Yêu cầu khác",
     "exceptions": "Dấu hiệu ngoại lệ",
     "owners": "Chủ sở hữu",
+    "rule": "Quy tắc CLDL",
+    "rule-name": "Tên quy tắc",
+    "rule-statement": "Quy tắc nghiệp vụ về CLDL",
     "search-placeholder": "Tìm kiếm mã hoặc tên quy tắc chất lượng dữ liệu",
     "section-business-rule": "Khối 1: Thông tin Quy tắc Nghiệp vụ",
     "section-evaluation-scope": "Khối 2: Điều kiện & Phạm vi Đánh giá",
-    "section-governance": "Khối 3: Quản trị & Phê duyệt"
+    "section-governance": "Khối 3: Quản trị & Phê duyệt",
+    "section": {
+      "business-rule-info": "Thông tin quy tắc nghiệp vụ",
+      "assessment-scope": "Điều kiện & Phạm vi đánh giá",
+      "explanation-and-constraints": "Diễn giải & Ràng buộc",
+      "governance": "Quản trị & Phê duyệt"
+    }
   },
   "tech": {
     "technical-dictionary": "Từ điển kỹ thuật",

@@ -67,16 +67,26 @@ export const isDataDictionaryGlossary = (
 export const DATA_QUALITY_GLOSSARY_NAME = 'Data Quality';
 export const DATA_QUALITY_GLOSSARY_DISPLAY_NAME = 'Chất lượng dữ liệu';
 
+const DATA_QUALITY_ALIASES = [
+  DATA_QUALITY_GLOSSARY_NAME,
+  DATA_QUALITY_GLOSSARY_DISPLAY_NAME,
+  'Kiểm tra chất lượng dữ liệu',
+  'Quy tắc chất lượng dữ liệu',
+  'DataQuality',
+];
+
 export const isDataQualityGlossary = (
   ...identifiers: Array<string | undefined>
 ) =>
-  identifiers.some(
-    (identifier) =>
-      identifier === DATA_QUALITY_GLOSSARY_NAME ||
-      identifier === DATA_QUALITY_GLOSSARY_DISPLAY_NAME ||
-      identifier?.startsWith(`${DATA_QUALITY_GLOSSARY_NAME}.`) ||
-      identifier?.startsWith(`${DATA_QUALITY_GLOSSARY_DISPLAY_NAME}.`)
-  );
+  identifiers.some((identifier) => {
+    if (!identifier) {
+      return false;
+    }
+
+    return DATA_QUALITY_ALIASES.some(
+      (alias) => identifier === alias || identifier.startsWith(`${alias}.`)
+    );
+  });
 
 export const TECHNICAL_DICTIONARY_GLOSSARY_NAME = 'Technical Dictionary';
 export const TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME = 'Từ điển kỹ thuật';

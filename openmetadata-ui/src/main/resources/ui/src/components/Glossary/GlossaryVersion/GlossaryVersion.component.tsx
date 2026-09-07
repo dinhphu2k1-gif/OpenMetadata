@@ -35,7 +35,10 @@ import {
 } from '../../../utils/RouterUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
-import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
 import Loader from '../../common/Loader/Loader';
 import EntityVersionTimeLine from '../../Entity/EntityVersionTimeLine/EntityVersionTimeLine';
 import PageLayoutV1 from '../../PageLayoutV1/PageLayoutV1';
@@ -91,7 +94,18 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
             typeof first?.glossary === 'string'
               ? undefined
               : first?.glossary?.displayName
-          ) || first?.extension?.cdeVersion != null
+          ) ||
+          isDataQualityGlossary(
+            first?.fullyQualifiedName,
+            typeof first?.glossary === 'string'
+              ? first.glossary
+              : first?.glossary?.name,
+            typeof first?.glossary === 'string'
+              ? undefined
+              : first?.glossary?.displayName
+          ) ||
+          first?.extension?.cdeVersion != null ||
+          first?.extension?.version != null
         );
 
         if (isCDEEntity) {
@@ -145,7 +159,18 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
               typeof first?.glossary === 'string'
                 ? undefined
                 : first?.glossary?.displayName
-            ) || first?.extension?.cdeVersion != null
+            ) ||
+            isDataQualityGlossary(
+              first?.fullyQualifiedName,
+              typeof first?.glossary === 'string'
+                ? first.glossary
+                : first?.glossary?.name,
+              typeof first?.glossary === 'string'
+                ? undefined
+                : first?.glossary?.displayName
+            ) ||
+            first?.extension?.cdeVersion != null ||
+            first?.extension?.version != null
           );
 
           if (isCDEEntity) {
@@ -161,7 +186,10 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                 continue;
               }
               const raw = String(
-                p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+                p?.extension?.cdeVersion ??
+                p?.extension?.version ??
+                p?.extension?.phien_ban ??
+                '1.0'
               ).trim();
               const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
 
@@ -189,7 +217,10 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                     : firstApproved;
                 targetVersion = toString(p.version);
                 const raw = String(
-                  p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+                  p?.extension?.cdeVersion ??
+                  p?.extension?.version ??
+                  p?.extension?.phien_ban ??
+                  '1.0'
                 ).trim();
                 matchedCdeVer = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
               } else if (first?.version) {
@@ -232,10 +263,17 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
     }
     const term = selectedData as GlossaryTerm;
 
-    return isDataDictionaryGlossary(
-      term?.fullyQualifiedName,
-      term?.glossary?.name,
-      term?.glossary?.displayName
+    return (
+      isDataDictionaryGlossary(
+        term?.fullyQualifiedName,
+        term?.glossary?.name,
+        term?.glossary?.displayName
+      ) ||
+      isDataQualityGlossary(
+        term?.fullyQualifiedName,
+        term?.glossary?.name,
+        term?.glossary?.displayName
+      )
     );
   }, [isGlossary, selectedData]);
 
@@ -245,7 +283,10 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
     }
     const term = selectedData as GlossaryTerm;
     const raw = String(
-      term?.extension?.cdeVersion ?? term?.extension?.phien_ban ?? '1.0'
+      term?.extension?.cdeVersion ??
+      term?.extension?.version ??
+      term?.extension?.phien_ban ??
+      '1.0'
     ).trim();
 
     return raw.replace(/^(version:?\s*|v)/i, '') || '1.0';

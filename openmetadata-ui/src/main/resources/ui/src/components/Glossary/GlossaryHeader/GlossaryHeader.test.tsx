@@ -837,5 +837,56 @@ describe('GlossaryHeader component', () => {
 
       expect(screen.queryByText('label.create-draft')).not.toBeInTheDocument();
     });
+
+    it('should show "Tạo bản nháp" and custom Version badge for Data Quality terms', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        },
+        selectedPersona: { name: 'DataProposerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Quality.DQ1_1',
+          glossary: { name: 'Data Quality', displayName: 'Chất lượng dữ liệu' },
+          entityStatus: EntityStatus.Approved,
+          extension: { cdeVersion: '1.0' },
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true, EditAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      const versionBtn = screen.getByTestId('version-button');
+
+      expect(versionBtn).toBeInTheDocument();
+      expect(versionBtn).toHaveTextContent('Version: 1.0');
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('label.create-draft'));
+      });
+
+      expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
+      expect(screen.getByTestId('cde-draft-version-input')).toHaveValue('1.1');
+    });
   });
 });

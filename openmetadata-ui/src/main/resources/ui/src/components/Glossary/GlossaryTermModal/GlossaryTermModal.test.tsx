@@ -46,6 +46,10 @@ jest.mock('../AddGlossaryTermForm/CDEGlossaryTermForm.component', () =>
   jest.fn().mockReturnValue(<div data-testid="cde-term-form" />)
 );
 
+jest.mock('../AddGlossaryTermForm/DQGlossaryTermForm.component', () =>
+  jest.fn().mockReturnValue(<div data-testid="dq-term-form" />)
+);
+
 const defaultProps = {
   editMode: false,
   isCDEGlossary: true,
@@ -116,5 +120,28 @@ describe('GlossaryTermModal', () => {
 
     expect(modal).not.toHaveClass('cde-glossary-term-modal--add');
     expect(modal).toHaveStyle({ width: '800px' });
+  });
+
+  it('renders DQGlossaryTermForm with wide layout when isDQGlossary is true', async () => {
+    render(
+      <GlossaryTermModal
+        {...defaultProps}
+        isCDEGlossary={false}
+        isDQGlossary
+      />
+    );
+
+    expect(await screen.findByTestId('dq-term-form')).toBeInTheDocument();
+    expect(screen.getByText('dq.data-quality')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'label.create-entity:dq.rule',
+      })
+    ).toBeInTheDocument();
+
+    const modal = document.querySelector('.ant-modal');
+
+    expect(modal).toHaveClass('cde-glossary-term-modal--add');
+    expect(modal).toHaveStyle({ width: '1240px' });
   });
 });
