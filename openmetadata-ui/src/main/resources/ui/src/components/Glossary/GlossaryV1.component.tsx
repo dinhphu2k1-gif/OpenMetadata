@@ -39,7 +39,7 @@ import {
 } from '../../rest/glossaryAPI';
 import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
 import { updateGlossaryTermByFqn } from '../../utils/GlossaryUtils';
-import { isDataDictionaryGlossary } from '../../constants/Glossary.contant';
+import { isDataDictionaryGlossary, isDataQualityGlossary } from '../../constants/Glossary.contant';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
@@ -507,6 +507,11 @@ const GlossaryV1 = ({
           isCDEGlossary={isDataDictionaryGlossary(
             activeGlossary?.name,
             activeGlossary?.displayName
+          )}
+          isDQGlossary={isDataQualityGlossary(
+            activeGlossary?.name,
+            activeGlossary?.displayName,
+            activeGlossary?.fullyQualifiedName
           )}
           visible={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}

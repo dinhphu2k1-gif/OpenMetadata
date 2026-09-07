@@ -16,7 +16,10 @@ import { isEmpty, toString } from 'lodash';
 import { forwardRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
 import { useLimitStore } from '../../../context/LimitsProvider/useLimitsStore';
 import { EntityHistory } from '../../../generated/type/entityHistory';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -59,7 +62,14 @@ export const VersionButton = forwardRef<
       version?.fullyQualifiedName,
       typeof glossary === 'string' ? glossary : glossary?.name,
       typeof glossary === 'string' ? undefined : glossary?.displayName
-    ) || version?.extension?.cdeVersion != null
+    ) ||
+    isDataQualityGlossary(
+      version?.fullyQualifiedName,
+      typeof glossary === 'string' ? glossary : glossary?.name,
+      typeof glossary === 'string' ? undefined : glossary?.displayName
+    ) ||
+    version?.extension?.cdeVersion != null ||
+    version?.extension?.version != null
   );
 
   const cdeVersionNumber = useMemo(() => {
@@ -68,6 +78,7 @@ export const VersionButton = forwardRef<
     }
     const raw = String(
       version?.extension?.cdeVersion ??
+      version?.extension?.version ??
       version?.extension?.phien_ban ??
       '1.0'
     ).trim();
@@ -185,7 +196,18 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
           typeof firstParsed?.glossary === 'string'
             ? undefined
             : firstParsed?.glossary?.displayName
-        ) || firstParsed?.extension?.cdeVersion != null
+        ) ||
+        isDataQualityGlossary(
+          firstParsed?.fullyQualifiedName,
+          typeof firstParsed?.glossary === 'string'
+            ? firstParsed.glossary
+            : firstParsed?.glossary?.name,
+          typeof firstParsed?.glossary === 'string'
+            ? undefined
+            : firstParsed?.glossary?.displayName
+        ) ||
+        firstParsed?.extension?.cdeVersion != null ||
+        firstParsed?.extension?.version != null
       );
 
     if (!detectedCDE) {
@@ -213,7 +235,10 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
         continue;
       }
       const raw = String(
-        p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+        p?.extension?.cdeVersion ??
+        p?.extension?.version ??
+        p?.extension?.phien_ban ??
+        '1.0'
       ).trim();
       const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
 
@@ -237,7 +262,10 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             ? JSON.parse(currentParsed)
             : currentParsed;
         const raw = String(
-          p?.extension?.cdeVersion ?? p?.extension?.phien_ban ?? '1.0'
+          p?.extension?.cdeVersion ??
+          p?.extension?.version ??
+          p?.extension?.phien_ban ??
+          '1.0'
         ).trim();
         activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
       } else if (uniqueList.length > 0) {
@@ -247,8 +275,9 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             : uniqueList[0];
         const raw = String(
           firstApproved?.extension?.cdeVersion ??
-            firstApproved?.extension?.phien_ban ??
-            '1.0'
+          firstApproved?.extension?.version ??
+          firstApproved?.extension?.phien_ban ??
+          '1.0'
         ).trim();
         activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
       }
@@ -283,6 +312,7 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
       if (isCDE && activeCdeVersion) {
         const raw = String(
           parsed?.extension?.cdeVersion ??
+          parsed?.extension?.version ??
           parsed?.extension?.phien_ban ??
           '1.0'
         ).trim();

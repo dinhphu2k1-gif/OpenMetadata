@@ -23,6 +23,7 @@ import { EntityAttachmentProvider } from '../../common/EntityDescription/EntityA
 import Loader from '../../common/Loader/Loader';
 import AddGlossaryTermForm from '../AddGlossaryTermForm/AddGlossaryTermForm.component';
 import CDEGlossaryTermForm from '../AddGlossaryTermForm/CDEGlossaryTermForm.component';
+import DQGlossaryTermForm from '../AddGlossaryTermForm/DQGlossaryTermForm.component';
 import { GlossaryTermForm } from '../AddGlossaryTermForm/AddGlossaryTermForm.interface';
 
 interface Props {
@@ -32,6 +33,7 @@ interface Props {
   visible: boolean;
   editMode: boolean;
   isCDEGlossary?: boolean;
+  isDQGlossary?: boolean;
 }
 
 const GlossaryTermModal: FC<Props> = ({
@@ -41,6 +43,7 @@ const GlossaryTermModal: FC<Props> = ({
   onSave,
   onCancel,
   isCDEGlossary = false,
+  isDQGlossary = false,
 }) => {
   const { t } = useTranslation();
   const [form] = useForm();
@@ -48,7 +51,26 @@ const GlossaryTermModal: FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [glossaryTerm, setGlossaryTerm] = useState<GlossaryTerm>();
 
+  const isCustomModal = isCDEGlossary || isDQGlossary;
+
   const dialogTitle = useMemo(() => {
+    if (isDQGlossary) {
+      return (
+        <div className="cde-glossary-modal-title">
+          <div>
+            {editMode
+              ? t('label.edit-entity', { entity: t('dq.rule', 'Quy tắc CLDL') })
+              : t('label.add-entity', {
+                  entity: t('dq.rule', 'Quy tắc CLDL'),
+                })}
+          </div>
+          <div className="cde-glossary-modal-subtitle">
+            {t('dq.data-quality', 'Chất lượng dữ liệu')}
+          </div>
+        </div>
+      );
+    }
+
     if (isCDEGlossary) {
       return (
         <div className="cde-glossary-modal-title">
@@ -69,11 +91,11 @@ const GlossaryTermModal: FC<Props> = ({
     return editMode
       ? t('label.edit-entity', { entity: t('label.glossary-term') })
       : t('label.add-entity', { entity: t('label.glossary-term') });
-  }, [editMode, isCDEGlossary, t]);
+  }, [editMode, isCDEGlossary, isDQGlossary, t]);
 
   const fetchCurrentEntity = useCallback(async () => {
     try {
-      const fields = isCDEGlossary
+      const fields = isCustomModal
         ? [
             TabSpecificField.OWNERS,
             TabSpecificField.REVIEWERS,
@@ -97,7 +119,7 @@ const GlossaryTermModal: FC<Props> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [glossaryTermFQN, isCDEGlossary]);
+  }, [glossaryTermFQN, isCustomModal]);
 
   const handleSave = async (values: GlossaryTermForm) => {
     setSaving(true);
@@ -152,16 +174,16 @@ const GlossaryTermModal: FC<Props> = ({
       destroyOnClose
       cancelText={t('label.cancel')}
       className={`edit-glossary-modal ${
-        isCDEGlossary ? 'cde-glossary-term-modal' : ''
+        isCustomModal ? 'cde-glossary-term-modal' : ''
       } ${
-        isCDEGlossary && !editMode ? 'cde-glossary-term-modal--add' : ''
+        isCustomModal && !editMode ? 'cde-glossary-term-modal--add' : ''
       }`}
-      closable={isCDEGlossary}
+      closable={isCustomModal}
       data-testid="edit-glossary-modal"
       footer={[
         <Button
           key="cancel-btn"
-          type={isCDEGlossary && !editMode ? 'default' : 'link'}
+          type={isCustomModal && !editMode ? 'default' : 'link'}
           onClick={onCancel}>
           {t('label.cancel')}
         </Button>,
@@ -171,9 +193,11 @@ const GlossaryTermModal: FC<Props> = ({
           loading={saving}
           type="primary"
           onClick={form.submit}>
-          {isCDEGlossary && !editMode
+          {isCustomModal && !editMode
             ? t('label.create-entity', {
-                entity: t('label.term'),
+                entity: isDQGlossary
+                  ? t('dq.rule', 'Quy tắc')
+                  : t('label.term'),
               })
             : t('label.save')}
         </Button>,
@@ -182,31 +206,37 @@ const GlossaryTermModal: FC<Props> = ({
       okText={t('label.save')}
       open={visible}
       title={dialogTitle}
-      width={isCDEGlossary && !editMode ? 1240 : isCDEGlossary ? 1000 : 800}
+      width={isCustomModal && !editMode ? 1240 : isCustomModal ? 1000 : 800}
       onCancel={onCancel}>
       <EntityAttachmentProvider
         entityFqn={glossaryTermFQN}
         entityType={EntityType.GLOSSARY_TERM}>
         {isLoading ? (
           <Loader />
+        ) : isCDEGlossary ? (
+          <CDEGlossaryTermForm
+            editMode={editMode}
+            formRef={form}
+            glossaryTerm={glossaryTerm}
+            onCancel={onCancel}
+            onSave={handleSave}
+          />
+        ) : isDQGlossary ? (
+          <DQGlossaryTermForm
+            editMode={editMode}
+            formRef={form}
+            glossaryTerm={glossaryTerm}
+            onCancel={onCancel}
+            onSave={handleSave}
+          />
         ) : (
-          isCDEGlossary ? (
-            <CDEGlossaryTermForm
-              editMode={editMode}
-              formRef={form}
-              glossaryTerm={glossaryTerm}
-              onCancel={onCancel}
-              onSave={handleSave}
-            />
-          ) : (
-            <AddGlossaryTermForm
-              editMode={editMode}
-              formRef={form}
-              glossaryTerm={glossaryTerm}
-              onCancel={onCancel}
-              onSave={handleSave}
-            />
-          )
+          <AddGlossaryTermForm
+            editMode={editMode}
+            formRef={form}
+            glossaryTerm={glossaryTerm}
+            onCancel={onCancel}
+            onSave={handleSave}
+          />
         )}
       </EntityAttachmentProvider>
     </Modal>

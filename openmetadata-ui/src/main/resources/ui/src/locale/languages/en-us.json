@@ -34,10 +34,19 @@
     "other-constraints": "Other Constraints",
     "exceptions": "Exceptions",
     "owners": "Owners",
+    "rule": "DQ Rule",
+    "rule-name": "Rule Name",
+    "rule-statement": "Data Quality Business Rule",
     "search-placeholder": "Search by rule code or name",
     "section-business-rule": "Section 1: Business Rule Information",
     "section-evaluation-scope": "Section 2: Evaluation Scope & Conditions",
-    "section-governance": "Section 3: Governance & Ownership"
+    "section-governance": "Section 3: Governance & Ownership",
+    "section": {
+      "business-rule-info": "Business Rule Information",
+      "assessment-scope": "Assessment Scope & Conditions",
+      "explanation-and-constraints": "Explanation & Constraints",
+      "governance": "Governance & Ownership"
+    }
   },
   "tech": {
     "technical-dictionary": "Technical Dictionary",
