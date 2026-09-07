@@ -169,26 +169,31 @@ jest.mock('../../../hooks/useApplicationStore', () => ({
   }),
 }));
 
-jest.mock('../../../utils/EntityStatusUtils', () => ({
-  EntityStatusClass: {
-    Draft: 'warning',
-    InReview: 'info',
-    Rejected: 'error',
-    Approved: 'success',
-    Deprecated: 'warning',
-  },
-  getEntityStatusClass: jest.fn((status) => {
-    const statusMap = {
+jest.mock('../../../utils/EntityStatusUtils', () => {
+  const actual = jest.requireActual('../../../utils/EntityStatusUtils');
+
+  return {
+    ...actual,
+    EntityStatusClass: {
       Draft: 'warning',
       InReview: 'info',
       Rejected: 'error',
       Approved: 'success',
       Deprecated: 'warning',
-    };
+    },
+    getEntityStatusClass: jest.fn((status) => {
+      const statusMap = {
+        Draft: 'warning',
+        InReview: 'info',
+        Rejected: 'error',
+        Approved: 'success',
+        Deprecated: 'warning',
+      };
 
-    return statusMap[status] || 'warning';
-  }),
-}));
+      return statusMap[status] || 'warning';
+    }),
+  };
+});
 
 jest.mock('../../common/ErrorWithPlaceholder/ErrorPlaceHolder', () =>
   jest

@@ -26,6 +26,7 @@ import type { Thread } from '../generated/entity/feed/thread';
 import type { User } from '../generated/entity/teams/user';
 import type { EntityReference } from '../generated/entity/type';
 import type { OperationPermission } from '../context/PermissionProvider/PermissionProvider.interface';
+import { getEntityStatusLabel } from './EntityStatusUtils';
 import Fqn from './Fqn';
 import i18n from './i18next/LocalUtil';
 import { calculatePercentageFromValue } from './NumberUtils';
@@ -113,9 +114,9 @@ export const getQueryFilterToIncludeApprovedTerm = () => {
   };
 };
 
-export const StatusClass = {
+export const StatusClass: Record<EntityStatus, StatusType> = {
   [EntityStatus.Approved]: StatusType.Success,
-  [EntityStatus.Draft]: StatusType.Pending,
+  [EntityStatus.Draft]: StatusType.Draft,
   [EntityStatus.Rejected]: StatusType.Failure,
   [EntityStatus.Deprecated]: StatusType.Deprecated,
   [EntityStatus.InReview]: StatusType.InReview,
@@ -125,7 +126,7 @@ export const StatusClass = {
 export const StatusFilters = Object.values(EntityStatus)
   .filter((status) => status !== EntityStatus.Deprecated)
   .map((status) => ({
-    text: status,
+    text: getEntityStatusLabel(status),
     value: status,
   }));
 
@@ -134,7 +135,7 @@ export const getGlossaryBreadcrumbs = (fqn: string) => {
   const dataFQN: Array<string> = [];
   const breadcrumbList = [
     {
-      name: 'Glossaries',
+      name: i18n.t('label.glossary-plural'),
       url: getGlossaryPath(''),
       activeTitle: false,
     },

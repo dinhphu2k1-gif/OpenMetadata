@@ -103,7 +103,10 @@ import {
 import { getBulkEditButton } from '../../../utils/EntityBulkEdit/EntityBulkEditUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityBulkEditPath } from '../../../utils/EntityPureUtils';
-import { EntityStatusClass } from '../../../utils/EntityStatusUtils';
+import {
+  EntityStatusClass,
+  getEntityStatusLabel,
+} from '../../../utils/EntityStatusUtils';
 import Fqn from '../../../utils/Fqn';
 import {
   buildTree,
@@ -224,12 +227,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   >(() =>
     isConsumer
       ? [EntityStatus.Approved]
-      : [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
+      : ['all', EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
   );
   const [selectedStatus, setSelectedStatus] = useState<string[]>(() =>
     isConsumer
       ? [EntityStatus.Approved]
-      : [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
+      : ['all', EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
   );
 
   useEffect(() => {
@@ -363,13 +366,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       let data: ModifiedGlossary[] = [];
       let pagingResponse: Paging | undefined;
 
+      const rawStatuses = selectedStatus.filter((s) => s !== 'all');
       const entityStatusParam = isConsumer
         ? [EntityStatus.Approved]
-        : selectedStatus.length === 0
-        ? [EntityStatus.Approved, EntityStatus.Draft, EntityStatus.InReview]
-        : selectedStatus.includes('all')
-        ? undefined
-        : (selectedStatus as EntityStatus[]);
+        : rawStatuses.length === 0 || selectedStatus.includes('all')
+        ? [EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
+        : (rawStatuses as EntityStatus[]);
 
       // Use search API if search term is present
       if (searchTerm.trim()) {
@@ -1137,14 +1139,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   const handleCheckboxChange = useCallback(
     (key: string, checked: boolean) => {
-      const optionsToUse = GLOSSARY_TERM_STATUS_OPTIONS;
+      const statusValues = [
+        EntityStatus.Draft,
+        EntityStatus.InReview,
+        EntityStatus.Approved,
+      ];
 
       if (key === 'all') {
         if (checked) {
-          setStatusDropdownSelection([
-            'all',
-            ...optionsToUse.map((option) => option.value),
-          ]);
+          setStatusDropdownSelection(['all', ...statusValues]);
         } else {
           setStatusDropdownSelection([]);
         }
@@ -1152,14 +1155,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         setStatusDropdownSelection((prev: string[]) => {
           const newCheckedList = checked
             ? [...prev, key]
-            : prev.filter((item) => item !== key);
+            : prev.filter((item) => item !== key && item !== 'all');
 
-          const allChecked = (optionsToUse as { value: string }[]).every(
-            (opt) => newCheckedList.includes(opt.value ?? '')
+          const allStatusChecked = statusValues.every((status) =>
+            newCheckedList.includes(status)
           );
 
-          if (allChecked) {
-            return ['all', ...newCheckedList];
+          if (allStatusChecked) {
+            return ['all', ...statusValues];
           }
 
           return newCheckedList.filter((item) => item !== 'all');
@@ -1215,7 +1218,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return [
         {
           value: EntityStatus.Approved,
-          text: EntityStatus.Approved,
+          text: getEntityStatusLabel(EntityStatus.Approved),
         },
       ];
     }
@@ -1323,7 +1326,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             isDQGlossary
               ? t('dq.search-placeholder')
               : isCDEGlossary
-              ? 'Tìm kiếm mã hoặc tên thuật ngữ'
+              ? t('cde.search-placeholder')
               : t('label.search-entity', {
                   entity: t('label.term-plural'),
                 })
@@ -1683,14 +1686,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   const glossaryPlaceholderText = useMemo(() => {
     if (isSearchActive && searchTerm) {
-      return `No Glossary Term found for "${searchTerm}"`;
+      return t('message.no-entity-found-for-name', {
+        entity: t('label.glossary-term'),
+        name: searchTerm,
+      });
     }
     if (isSearchActive || isStatusFilterActive) {
-      return 'No Glossary Term found';
+      return t('label.no-data-found');
     }
 
-    return 'No Glossary Terms';
-  }, [isSearchActive, isStatusFilterActive, searchTerm]);
+    return t('message.no-entity-available', {
+      entity: t('label.glossary-term-plural'),
+    });
+  }, [isSearchActive, isStatusFilterActive, searchTerm, t]);
 
   if (isTechGlossary) {
     return <TechnicalDictionaryPage />;

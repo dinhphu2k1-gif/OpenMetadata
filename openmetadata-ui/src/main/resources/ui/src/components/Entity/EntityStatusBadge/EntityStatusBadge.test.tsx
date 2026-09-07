@@ -12,13 +12,16 @@
  */
 import { render, screen } from '@testing-library/react';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
+import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
 import { EntityStatusBadge } from './EntityStatusBadge.component';
 
 describe('EntityStatusBadge', () => {
   it('should render status badge with divider by default', () => {
     render(<EntityStatusBadge status={EntityStatus.Approved} />);
 
-    expect(screen.getByText(EntityStatus.Approved)).toBeInTheDocument();
+    expect(
+      screen.getByText(getEntityStatusLabel(EntityStatus.Approved))
+    ).toBeInTheDocument();
   });
 
   it('should render status badge without divider when showDivider is false', () => {
@@ -26,7 +29,9 @@ describe('EntityStatusBadge', () => {
       <EntityStatusBadge showDivider={false} status={EntityStatus.Draft} />
     );
 
-    expect(screen.getByText(EntityStatus.Draft)).toBeInTheDocument();
+    expect(
+      screen.getByText(getEntityStatusLabel(EntityStatus.Draft))
+    ).toBeInTheDocument();
     expect(container.querySelector('.ant-divider')).not.toBeInTheDocument();
   });
 
@@ -45,7 +50,9 @@ describe('EntityStatusBadge', () => {
         <EntityStatusBadge showDivider={false} status={status} />
       );
 
-      expect(screen.getByText(status)).toBeInTheDocument();
+      expect(
+        screen.getByText(getEntityStatusLabel(status))
+      ).toBeInTheDocument();
 
       unmount();
     });
