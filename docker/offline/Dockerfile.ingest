@@ -1,0 +1,24 @@
+# Dockerfile.ingest - offline build of the OpenMetadata ingestion image.
+#
+# Build with the repo root as context:
+#   docker build -f docker/offline/Dockerfile.ingest \
+#     --build-arg INGEST_BASE_IMAGE=<registry>/openmetadata-ingest-base:latest \
+#     -t openmetadata-ingestion .
+#
+# openmetadata-ingest-base already has the full "all" extra dependency set
+# installed (see minimal-ctx/INGEST.md), so installing the local package
+# itself needs no network: --no-deps skips dependency resolution entirely
+# and just registers ingestion/src/metadata's console scripts / entry
+# points against the packages already on site-packages.
+
+ARG INGEST_BASE_IMAGE=openmetadata-ingest:base
+
+FROM ${INGEST_BASE_IMAGE}
+
+WORKDIR /opt/openmetadata/ingestion
+COPY ingestion/ .
+
+RUN pip install --no-cache-dir --no-deps --no-build-isolation .
+
+WORKDIR /workspace
+ENTRYPOINT ["metadata"]

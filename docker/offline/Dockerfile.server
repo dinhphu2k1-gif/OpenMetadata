@@ -1,0 +1,91 @@
+# Dockerfile.server - offline build of the OpenMetadata server image.
+#
+# Build with the repo root as context:
+#   docker build -f docker/offline/Dockerfile.server \
+#     --build-arg BE_BASE_IMAGE=<registry>/openmetadata-be-base:latest \
+#     --build-arg FE_BASE_IMAGE=<registry>/openmetadata-fe-base:latest \
+#     -t openmetadata-server .
+#
+# Backend and frontend are built as two independent stages against the
+# *-base images (pre-warmed Maven/Yarn caches, no network needed) and then
+# assembled into one runtime image - see docker/offline/README.md for why
+# this doesn't just run `mvn clean package` on the full reactor.
+
+ARG BE_BASE_IMAGE=10.0.142.13:8443/cicd/openmetadata-be:base
+ARG FE_BASE_IMAGE=10.0.142.13:8443/cicd/openmetadata-fe:base
+
+# ---------------------------------------------------------------------------
+# Backend: full Maven build minus the openmetadata-ui module. -DonlyBackend
+# activates openmetadata-dist's "only-backend" profile, which assembles the
+# dist tarball without depending on the openmetadata-ui artifact (the same
+# supported dev flow documented in OpenMetadata/CLAUDE.md:
+# `mvn clean package -DonlyBackend -pl !openmetadata-ui`). Skipping that
+# module means Maven never invokes frontend-maven-plugin, which would
+# otherwise try to download its own Node/Yarn from the internet.
+# ---------------------------------------------------------------------------
+FROM ${BE_BASE_IMAGE} AS backend-build
+WORKDIR /opt/openmetadata
+COPY . .
+RUN mvn -B -DskipTests -DonlyBackend clean package -pl '!openmetadata-ui'
+
+# ---------------------------------------------------------------------------
+# Frontend: real (script-enabled) yarn install + build. This runs the same
+# preinstall chain frontend-maven-plugin would have (root workspace install,
+# then build the linked openmetadata-ui-core-components package), entirely
+# offline against fe-base's warmed $YARN_CACHE_FOLDER.
+# ---------------------------------------------------------------------------
+FROM ${FE_BASE_IMAGE} AS frontend-build
+WORKDIR /opt/openmetadata
+COPY . .
+WORKDIR /opt/openmetadata/openmetadata-ui/src/main/resources/ui
+RUN yarn install --frozen-lockfile
+RUN yarn run build
+
+# ---------------------------------------------------------------------------
+# Package the built UI as a plain jar (assets/ prefix) - see
+# package-ui-assets.sh for why this substitutes for
+# openmetadata-ui's own Maven-built jar without needing Maven/Node
+# together in one stage. Needs a JDK for `jar`, so reuse the backend image.
+# ---------------------------------------------------------------------------
+FROM ${BE_BASE_IMAGE} AS ui-jar
+COPY docker/offline/package-ui-assets.sh /usr/local/bin/package-ui-assets.sh
+RUN chmod +x /usr/local/bin/package-ui-assets.sh
+COPY --from=frontend-build /opt/openmetadata/openmetadata-ui/src/main/resources/ui/dist /tmp/ui-dist
+RUN package-ui-assets.sh /tmp/ui-dist /tmp/openmetadata-ui-assets.jar
+
+# ---------------------------------------------------------------------------
+# Final runtime image - mirrors
+# docker/docker-compose-quickstart/Dockerfile, but assembled from the local
+# build stages above instead of downloading a GitHub release tarball.
+# ---------------------------------------------------------------------------
+FROM alpine:3
+ARG RI_VERSION="1.13.5"
+ARG BUILD_DATE
+ARG COMMIT_ID
+LABEL maintainer="OpenMetadata"
+LABEL org.open-metadata.image.authors="support@openmetadata.org"
+LABEL org.open-metadata.vendor="OpenMetadata"
+LABEL org.open-metadata.release-version="$RI_VERSION"
+LABEL org.open-metadata.description="OpenMetadata is an open source platform for metadata management and discovery."
+LABEL org.open-metadata.build-date=$BUILD_DATE
+LABEL org.open-metadata.commit-id=$COMMIT_ID
+
+EXPOSE 8585 8586
+RUN adduser -D openmetadata && apk update && \
+    apk upgrade && \
+    apk add --update --no-cache bash openjdk21-jre
+
+COPY --from=backend-build /opt/openmetadata/openmetadata-dist/target/*.tar.gz /tmp/
+RUN mkdir -p /opt/openmetadata && \
+    tar zxf /tmp/openmetadata-*.tar.gz -C /opt/openmetadata --strip-components 1 && \
+    rm -f /tmp/openmetadata-*.tar.gz
+
+COPY --from=ui-jar /tmp/openmetadata-ui-assets.jar /opt/openmetadata/libs/openmetadata-ui-assets.jar
+
+COPY --chmod=755 docker/openmetadata-start.sh ./
+RUN chown -R openmetadata:openmetadata /opt/openmetadata
+USER openmetadata
+
+WORKDIR /opt/openmetadata
+ENTRYPOINT [ "/bin/bash" ]
+CMD ["/openmetadata-start.sh"]
