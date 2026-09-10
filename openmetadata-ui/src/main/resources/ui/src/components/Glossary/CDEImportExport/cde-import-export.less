@@ -1,0 +1,40 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+@import (reference) '../../../styles/variables.less';
+
+.cde-import-modal {
+  .file-dragger-wrapper {
+    padding: @padding-lg;
+    background: @white;
+    border-radius: 4px;
+
+    .browse-text {
+      color: @primary-color;
+    }
+  }
+
+  .cde-progress-step {
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .progress-box {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+  }
+}

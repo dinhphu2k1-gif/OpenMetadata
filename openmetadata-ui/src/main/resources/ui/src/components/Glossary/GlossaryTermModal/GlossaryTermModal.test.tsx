@@ -80,7 +80,7 @@ describe('GlossaryTermModal', () => {
     const modal = document.querySelector('.ant-modal');
 
     expect(modal).toHaveClass('cde-glossary-term-modal--add');
-    expect(modal).toHaveStyle({ width: '1240px' });
+    expect(modal).toHaveStyle({ width: '1000px' });
   });
 
   it('keeps the existing CDE edit mode presentation', async () => {

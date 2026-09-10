@@ -244,8 +244,7 @@
 }
 
 .cde-glossary-table-container {
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: visible;
   border: 1px solid @grey-300;
   border-radius: 10px;
   background: @white;
@@ -272,8 +271,10 @@
   .cde-glossary-table-toolbar {
     justify-content: flex-start !important;
     gap: 12px !important;
+    flex-wrap: wrap;
 
-    .status-dropdown {
+    .status-dropdown,
+    .cde-filter-dropdown {
       min-height: 36px;
       padding: 0 12px;
       border: 1px solid @grey-300;
@@ -284,6 +285,30 @@
     .cde-toolbar-collapse-action {
       margin-left: auto;
     }
+  }
+}
+
+.cde-filter-options-scroll {
+  overflow-x: hidden;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+}
+
+.cde-filter-dropdown-overlay {
+  .ant-dropdown-menu {
+    max-height: calc(100vh - 100px);
+    overflow: hidden;
   }
 }
 
@@ -344,9 +369,9 @@
     border-bottom: 1px solid @grey-300;
     background: #f8fafc !important;
     color: #344054;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 18px;
+    line-height: 20px;
     white-space: normal !important;
     word-break: normal;
 
@@ -355,7 +380,7 @@
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: normal !important;
-      line-height: 16px !important;
+      line-height: 18px !important;
     }
 
     .ant-table-column-title {
@@ -363,7 +388,7 @@
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: normal !important;
-      line-height: 16px !important;
+      line-height: 18px !important;
       display: inline-block;
       width: 100%;
     }
@@ -377,8 +402,8 @@
     padding: 12px;
     border-bottom: 1px solid #eaecf0;
     color: #344054;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 20px;
     vertical-align: top;
 
     &:not(:last-child) {
@@ -398,6 +423,7 @@
 
   .cde-code-link {
     color: @primary-color;
+    font-size: 14px;
     font-weight: 600;
   }
 
@@ -426,20 +452,54 @@
   .cde-owner-name {
     overflow: hidden;
     color: #344054;
+    font-size: 14px;
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .rich-text-editor-container {
+    .markdown-parser {
+      .om-block-editor,
+      .tiptap.ProseMirror {
+        font-size: 14px;
+        line-height: 20px;
+
+        p {
+          font-size: 14px;
+          line-height: 20px;
+          margin-bottom: 0;
+        }
+
+        a {
+          font-size: 14px;
+          line-height: 20px;
+        }
+
+        ul,
+        ol,
+        li {
+          font-size: 14px;
+          line-height: 20px;
+        }
+      }
+    }
+
+    .view-more-less-button.ant-btn {
+      font-size: 13px;
+      line-height: 20px;
+    }
   }
 }
 
 .cde-value-pill.ant-tag {
   margin: 0;
-  padding: 2px 9px;
+  padding: 2px 10px;
   border: 0 !important;
   border-radius: 999px !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 20px;
   white-space: nowrap;
 }
 
@@ -714,41 +774,48 @@
 .cde-glossary-term-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-
-  .cde-form-section {
-    padding: 16px;
-    background: @white;
-    border: 1px solid @grey-200;
-    border-radius: 8px;
-  }
-
-  .cde-form-section-title {
-    margin-bottom: 10px;
-    color: @text-color;
-    font-size: 15px;
-    font-weight: 600;
-  }
+  gap: 14px;
 
   .cde-form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 16px;
+    gap: 14px 20px;
   }
 
   .ant-form-item {
     margin: 0;
 
     .ant-form-item-label {
+      height: 26px;
       padding: 0 0 6px;
+      margin: 0;
+      display: flex;
+      align-items: center;
     }
 
     .ant-form-item-label > label {
-      height: 18px;
+      height: 20px;
       color: @text-color;
       font-size: 13px;
       font-weight: 600;
-      line-height: 18px;
+      line-height: 20px;
+      display: inline-flex;
+      align-items: center;
+
+      &.ant-form-item-required::before {
+        display: none !important;
+      }
+
+      &.ant-form-item-required::after {
+        display: inline-flex !important;
+        align-items: center !important;
+        height: 20px !important;
+        line-height: 20px !important;
+        margin-left: 4px;
+        font-size: 14px;
+        font-family: inherit;
+        content: '*';
+      }
     }
   }
 
@@ -758,17 +825,39 @@
     border-radius: 6px;
   }
 
-  .cde-form-business-meaning {
+  .ant-input {
+    height: 36px;
+
+    &::placeholder {
+      color: @grey-400;
+      font-size: 13px;
+    }
+  }
+
+  .ant-select-single:not(.ant-select-customize-input) .ant-select-selector {
+    height: 36px;
+    display: flex;
+    align-items: center;
+  }
+
+  .cde-form-business-meaning,
+  .cde-form-markdown-editor {
     .block-editor-wrapper {
       overflow: hidden;
       border-radius: 6px;
+      border: 1px solid @grey-300;
+
+      .om-block-editor {
+        min-height: 80px;
+        max-height: 120px;
+      }
     }
   }
 
   .cde-form-select-trigger {
     display: flex;
     width: 100%;
-    height: 34px;
+    height: 36px;
     align-items: center;
     justify-content: space-between;
     color: @grey-500;
@@ -813,23 +902,18 @@
 }
 
 .cde-glossary-term-form--add {
-  gap: 12px;
+  gap: 14px;
 
-  .cde-form-section {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-  }
-
-  .cde-form-business-meaning {
+  .cde-form-business-meaning,
+  .cde-form-markdown-editor {
     .block-editor-wrapper.block-editor-wrapper--bar-menu {
       .om-block-editor {
-        max-height: 132px;
-        min-height: 100px;
+        max-height: 120px;
+        min-height: 80px;
       }
 
       .om-block-editor > p:last-child {
-        padding-bottom: 56px;
+        padding-bottom: 40px;
       }
     }
   }
@@ -851,11 +935,29 @@
 
   .ant-modal-body {
     max-height: calc(100vh - 178px);
-    padding: 16px 24px;
+    padding: 16px 24px 20px;
   }
 
   .ant-modal-footer {
     padding: 12px 24px;
+
+    .ant-btn-default {
+      border: 1px solid @grey-300 !important;
+      color: @text-color !important;
+      border-radius: 6px;
+      font-weight: 500;
+
+      &:hover,
+      &:focus {
+        border-color: @primary-color !important;
+        color: @primary-color !important;
+      }
+    }
+
+    .ant-btn-primary {
+      border-radius: 6px;
+      font-weight: 500;
+    }
   }
 
   .cde-glossary-modal-title {
@@ -912,8 +1014,7 @@
    ========================================================================== */
 
 .dq-glossary-table-container {
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: visible;
   border: 1px solid @grey-300;
   border-radius: 10px;
   background: @white;
@@ -1012,9 +1113,9 @@
     border-bottom: 1px solid @grey-300;
     background: #f8fafc !important;
     color: #344054;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 18px;
+    line-height: 20px;
     vertical-align: middle !important;
     white-space: normal !important;
     word-break: normal;
@@ -1024,7 +1125,7 @@
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: normal !important;
-      line-height: 16px !important;
+      line-height: 18px !important;
     }
 
     .ant-table-column-title {
@@ -1032,7 +1133,7 @@
       overflow: visible !important;
       text-overflow: clip !important;
       word-break: normal !important;
-      line-height: 16px !important;
+      line-height: 18px !important;
       display: inline-block;
       width: 100%;
     }
@@ -1046,8 +1147,8 @@
     padding: 10px 10px;
     border-bottom: 1px solid #eaecf0;
     color: #344054;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 20px;
     vertical-align: top;
 
     &:not(:last-child) {
@@ -1067,7 +1168,41 @@
 
   .dq-code-link {
     color: @primary-color;
+    font-size: 14px;
     font-weight: 600;
+  }
+
+  .rich-text-editor-container {
+    .markdown-parser {
+      .om-block-editor,
+      .tiptap.ProseMirror {
+        font-size: 14px;
+        line-height: 20px;
+
+        p {
+          font-size: 14px;
+          line-height: 20px;
+          margin-bottom: 0;
+        }
+
+        a {
+          font-size: 14px;
+          line-height: 20px;
+        }
+
+        ul,
+        ol,
+        li {
+          font-size: 14px;
+          line-height: 20px;
+        }
+      }
+    }
+
+    .view-more-less-button.ant-btn {
+      font-size: 13px;
+      line-height: 20px;
+    }
   }
 }
 
@@ -1094,6 +1229,7 @@
 .dq-owner-name {
   overflow: hidden;
   color: #344054;
+  font-size: 14px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1114,9 +1250,9 @@
   margin: 0;
   padding: 2px 10px;
   border-radius: 999px !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 20px;
   background: #f0f5ff;
   color: #1d39c4;
   border: 1px solid #adc6ff;
@@ -1133,12 +1269,12 @@
 
 .dq-value-pill.ant-tag {
   margin: 0;
-  padding: 2px 9px;
+  padding: 2px 10px;
   border: 0 !important;
   border-radius: 999px !important;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 20px;
   white-space: nowrap;
   text-align: left;
   display: inline-block;

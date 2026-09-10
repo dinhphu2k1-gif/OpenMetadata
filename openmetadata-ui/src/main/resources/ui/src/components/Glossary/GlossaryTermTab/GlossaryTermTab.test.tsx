@@ -21,6 +21,7 @@ import {
 import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import {
@@ -376,6 +377,29 @@ describe('Test GlossaryTermTab component', () => {
 
       expect(mockOnAddGlossaryTerm).toHaveBeenCalled();
     });
+
+    it('should keep the search and filter toolbar visible when filters return no records', async () => {
+      mockUseGlossaryStore.glossaryChildTerms = mockedGlossaryTerms;
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [],
+        paging: { after: null },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      const searchInput = screen.getByTestId('search-glossary-terms-input');
+      expect(searchInput).toBeInTheDocument();
+
+      fireEvent.change(searchInput, { target: { value: 'nonexistent-term' } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('search-glossary-terms-input')).toBeInTheDocument();
+        expect(screen.getByTestId('glossary-status-dropdown')).toBeInTheDocument();
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Table Rendering with Data', () => {
@@ -598,8 +622,8 @@ describe('Test GlossaryTermTab component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Mã thuật ngữ')).toBeInTheDocument();
-        expect(screen.getByText('Nhóm theo nghiệp vụ')).toBeInTheDocument();
-        expect(screen.getByText('Nguồn dữ liệu')).toBeInTheDocument();
+        expect(screen.getAllByText('Nhóm theo nghiệp vụ').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Nguồn dữ liệu').length).toBeGreaterThan(0);
         expect(screen.getByText('Mối quan hệ với thực thể')).toBeInTheDocument();
         expect(screen.getByText('Quan hệ 1-N với khách hàng')).toBeInTheDocument();
         expect(screen.getAllByText('label.status')).not.toHaveLength(0);
@@ -751,6 +775,21 @@ describe('Test GlossaryTermTab component', () => {
             .getByTestId('glossary-terms-table')
             .closest('.cde-glossary-terms-table')
         ).toBeInTheDocument();
+      });
+    });
+
+    it('should not show export and import buttons in filter toolbar', async () => {
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId('cde-export-excel-button')
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('cde-import-excel-button')
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -1468,6 +1507,139 @@ describe('Test GlossaryTermTab component', () => {
       await waitFor(() => {
         expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Bulk Actions', () => {
+    const mockBulkTerms = [
+      {
+        id: 'term-1',
+        name: 'Draft Term 1',
+        displayName: 'Draft Term 1',
+        fullyQualifiedName: 'glossary.term1',
+        entityStatus: EntityStatus.Draft,
+        description: 'Desc 1',
+      } as ModifiedGlossaryTerm,
+      {
+        id: 'term-2',
+        name: 'Review Term 2',
+        displayName: 'Review Term 2',
+        fullyQualifiedName: 'glossary.term2',
+        entityStatus: EntityStatus.InReview,
+        description: 'Desc 2',
+      } as ModifiedGlossaryTerm,
+    ];
+
+    beforeEach(() => {
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: mockBulkTerms,
+        paging: { after: null },
+      });
+      mockUseGlossaryStore.glossaryChildTerms = mockBulkTerms;
+    });
+
+    it('should render table row selection checkbox and show bulk action bar when rows are selected', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: { id: 'user-admin', name: 'admin', isAdmin: true },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+
+      const rowCheckboxes = container.querySelectorAll(
+        '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
+      );
+      expect(rowCheckboxes.length).toBeGreaterThan(0);
+
+      // Select first row checkbox
+      fireEvent.click(rowCheckboxes[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+
+      const clearBtn = screen.getByTestId('clear-selection-btn');
+      fireEvent.click(clearBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('glossary-bulk-action-bar')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should open bulk action modal when bulk submit for review is clicked', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: { id: 'user-admin', name: 'admin', isAdmin: true },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+
+      const rowCheckboxes = container.querySelectorAll(
+        '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
+      );
+      expect(rowCheckboxes.length).toBeGreaterThan(0);
+
+      fireEvent.click(rowCheckboxes[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('bulk-submit-for-review-btn'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('message.confirm-bulk-submit-title')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should not show bulk-submit-for-review-btn when user is Data Steward', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: {
+          id: 'user-steward',
+          name: 'steward',
+          isAdmin: false,
+          roles: [{ name: 'DataSteward' }],
+        },
+        selectedPersona: { name: 'DataSteward' },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary={false} />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+
+      const rowCheckboxes = container.querySelectorAll(
+        '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
+      );
+      expect(rowCheckboxes.length).toBeGreaterThan(0);
+
+      // Select first row (Draft)
+      fireEvent.click(rowCheckboxes[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId('bulk-submit-for-review-btn')
+      ).not.toBeInTheDocument();
     });
   });
 });

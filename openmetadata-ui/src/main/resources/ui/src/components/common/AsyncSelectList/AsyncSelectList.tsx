@@ -10,6 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import Icon from '@ant-design/icons/lib/components/Icon';
 import { CloseOutlined } from '@ant-design/icons';
 import {
   Button,
@@ -28,6 +29,7 @@ import { debounce, isEmpty, isUndefined, pick } from 'lodash';
 import { CustomTagProps } from 'rc-select/lib/BaseSelect';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ReactComponent as IconTagNew } from '../../../assets/svg/ic-tag-new.svg';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
 import { TAG_START_WITH } from '../../../constants/Tag.constants';
 import { Tag } from '../../../generated/entity/classification/tag';
@@ -131,17 +133,41 @@ const AsyncSelectList: FC<
         : displayName;
       parts.pop();
 
+      const tagColor = tag.data?.style?.color;
+
       return {
         label: tag.label,
         displayName: (
-          <Space className="w-full" direction="vertical" size={0}>
-            <Typography.Paragraph ellipsis className="text-grey-muted m-0 p-0">
-              {parts.join(FQN_SEPARATOR_CHAR)}
-            </Typography.Paragraph>
-            <Typography.Text ellipsis style={{ color: tag.data?.style?.color }}>
-              {lastPartOfTag}
-            </Typography.Text>
-          </Space>
+          <div className="async-select-option-item">
+            <span
+              className="async-select-option-tag-chip"
+              style={
+                tagColor
+                  ? {
+                      borderColor: tagColor,
+                      color: tagColor,
+                    }
+                  : undefined
+              }>
+              <Icon
+                component={IconTagNew}
+                style={{ fontSize: '11px', color: tagColor ?? undefined }}
+              />
+              <Typography.Text
+                ellipsis
+                className="async-select-option-name"
+                style={{ color: tagColor ?? undefined }}>
+                {lastPartOfTag}
+              </Typography.Text>
+            </span>
+            {parts.length > 0 && (
+              <Typography.Text
+                ellipsis
+                className="async-select-option-fqn text-grey-muted text-xs">
+                {parts.join(FQN_SEPARATOR_CHAR)}
+              </Typography.Text>
+            )}
+          </div>
         ),
         value: tag.value,
         data: tag.data,

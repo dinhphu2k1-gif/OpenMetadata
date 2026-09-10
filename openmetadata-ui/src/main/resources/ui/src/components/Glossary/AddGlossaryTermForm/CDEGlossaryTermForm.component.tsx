@@ -214,155 +214,177 @@ const CDEGlossaryTermForm = ({
       initialValues={{ cdeVersion: '1.0' }}
       layout="vertical"
       onFinish={onFinish}>
-      <section className="cde-form-section">
-        {editMode && (
-          <div className="cde-form-section-title">
-            {t('cde.core-definition')}
-          </div>
-        )}
-        <div className="cde-form-grid">
-          <Form.Item
-            required
-            label={t('cde.term-code')}
-            name="name"
-            rules={[{ required: true, whitespace: true }]}>
-            <Input data-testid="cde-term-code" />
-          </Form.Item>
-          <Form.Item label={t('cde.business-term-name')} name="displayName">
-            <Input data-testid="cde-business-term-name" />
-          </Form.Item>
-          <Form.Item
-            required
-            label={t('cde.version')}
-            name="cdeVersion"
-            rules={[{ required: true, whitespace: true }]}>
-            <Input data-testid="cde-version" placeholder="1.0" />
-          </Form.Item>
-          <Form.Item
-            required
-            className="cde-form-business-meaning cde-form-field-full"
+      <div className="cde-form-grid">
+        <Form.Item
+          required
+          label={t('cde.term-code')}
+          name="name"
+          rules={[{ required: true, whitespace: true }]}>
+          <Input
+            data-testid="cde-term-code"
+            placeholder={t('cde.term-code-placeholder', 'Ví dụ: CDE_CIF_001')}
+          />
+        </Form.Item>
+        <Form.Item label={t('cde.business-term-name')} name="displayName">
+          <Input
+            data-testid="cde-business-term-name"
+            placeholder={t(
+              'cde.business-term-name-placeholder',
+              'Ví dụ: Mã định danh khách hàng'
+            )}
+          />
+        </Form.Item>
+        <Form.Item
+          required
+          label={t('cde.version')}
+          name="cdeVersion"
+          rules={[{ required: true, whitespace: true }]}>
+          <Input data-testid="cde-version" placeholder="1.0" />
+        </Form.Item>
+        <Form.Item label={t('cde.business-group')} name="domains">
+          <DomainSelectableList
+            hasPermission
+            showAllDomains
+            multiple={entityRules.canAddMultipleDomains}
+            selectedDomain={domains}
+            wrapInButton={false}
+            onUpdate={async (value) =>
+              form.setFieldValue(
+                'domains',
+                value ? (Array.isArray(value) ? value : [value]) : []
+              )
+            }>
+            <Button
+              className="cde-form-select-trigger"
+              data-testid="cde-business-group">
+              <span className="cde-form-select-trigger-value">
+                {domainLabel}
+              </span>
+              <DownOutlined />
+            </Button>
+          </DomainSelectableList>
+        </Form.Item>
+        <Form.Item
+          required
+          className="cde-form-business-meaning cde-form-field-full"
+          initialValue={glossaryTerm?.description ?? ''}
+          label={t('cde.business-meaning')}
+          name="description"
+          rules={[{ required: true, whitespace: true }]}
+          trigger="onTextChange">
+          <RichTextEditor
+            data-testid="cde-business-meaning"
             initialValue={glossaryTerm?.description ?? ''}
-            label={t('cde.business-meaning')}
-            name="description"
-            rules={[{ required: true, whitespace: true }]}
-            trigger="onTextChange">
-            <RichTextEditor
-              data-testid="cde-business-meaning"
-              initialValue={glossaryTerm?.description ?? ''}
-            />
-          </Form.Item>
-        </div>
-      </section>
-
-      <section className="cde-form-section">
-        {editMode && (
-          <div className="cde-form-section-title">
-            {t('cde.business-context')}
-          </div>
+          />
+        </Form.Item>
+        {tagField(
+          'dataSourceTags',
+          t('cde.data-source'),
+          CDE_TAG_CLASSIFICATIONS.dataSource,
+          'source'
         )}
-        <div className="cde-form-grid">
-          <Form.Item
-            label={t('cde.business-group')}
-            name="domains">
-            <DomainSelectableList
-              hasPermission
-              showAllDomains
-              multiple={entityRules.canAddMultipleDomains}
-              selectedDomain={domains}
-              wrapInButton={false}
-              onUpdate={async (value) =>
-                form.setFieldValue(
-                  'domains',
-                  value ? (Array.isArray(value) ? value : [value]) : []
-                )
-              }>
-              <Button
-                className="cde-form-select-trigger"
-                data-testid="cde-business-group">
-                <span className="cde-form-select-trigger-value">
-                  {domainLabel}
-                </span>
-                <DownOutlined />
-              </Button>
-            </DomainSelectableList>
-          </Form.Item>
-          {tagField(
-            'dataSourceTags',
-            t('cde.data-source'),
-            CDE_TAG_CLASSIFICATIONS.dataSource,
-            'source'
-          )}
-          <Form.Item label={t('cde.data-owner')} name="owners">
-            <UserTeamSelectableListSearchInput
-              hasPermission
-              multiple={{
-                user: entityRules.canAddMultipleUserOwners,
-                team: entityRules.canAddMultipleTeamOwner,
-              }}
-              owner={owners}
-              placeholder={t('label.select')}
-              onUpdate={async (value) => form.setFieldValue('owners', value)}
-            />
-          </Form.Item>
-          {tagField(
-            'dataClassificationTags',
-            t('cde.data-classification'),
-            CDE_TAG_CLASSIFICATIONS.dataClassification,
-            'classification'
-          )}
-          {tagField(
-            'personalDataTags',
-            t('cde.personal-data'),
-            CDE_TAG_CLASSIFICATIONS.personalData,
-            'personal'
-          )}
-          <Form.Item
-            label={t('cde.data-quality-rules')}
-            name="dataQualityRules">
-            <Select
-              allowClear
-              options={[
-                { label: t('label.yes'), value: 'true' },
-                { label: t('label.no'), value: 'false' },
-              ]}
-            />
-          </Form.Item>
-        </div>
-      </section>
-
-      <section className="cde-form-section">
-        {editMode && (
-          <div className="cde-form-section-title">
-            {t('label.governance')}
-          </div>
+        {tagField(
+          'dataClassificationTags',
+          t('cde.data-classification'),
+          CDE_TAG_CLASSIFICATIONS.dataClassification,
+          'classification'
         )}
-        <div className="cde-form-grid">
-          <Form.Item
-            label={t('cde.entity-relationship')}
-            name="entityRelationship">
-            <Input data-testid="cde-entity-relationship" />
-          </Form.Item>
-          <Form.Item
-            label={t('cde.related-regulatory-documents')}
-            name="relatedRegulatoryDocuments">
-            <Input data-testid="cde-related-regulatory-documents" />
-          </Form.Item>
-          <Form.Item
-            className="cde-form-field-full"
-            label={t('label.reviewer-plural')}
-            name="reviewers">
-            <UserTeamSelectableListSearchInput
-              hasPermission
-              multiple={{ user: true, team: true }}
-              owner={reviewers}
-              placeholder={t('label.select')}
-              onUpdate={async (value) =>
-                form.setFieldValue('reviewers', value)
-              }
-            />
-          </Form.Item>
-        </div>
-      </section>
+        {tagField(
+          'personalDataTags',
+          t('cde.personal-data'),
+          CDE_TAG_CLASSIFICATIONS.personalData,
+          'personal'
+        )}
+        <Form.Item
+          label={t('cde.data-quality-rules')}
+          name="dataQualityRules">
+          <Select
+            allowClear
+            options={[
+              { label: t('label.yes'), value: 'true' },
+              { label: t('label.no'), value: 'false' },
+            ]}
+            placeholder={t('label.select')}
+          />
+        </Form.Item>
+        <Form.Item label={t('cde.data-owner')} name="owners">
+          <UserTeamSelectableListSearchInput
+            hasPermission
+            multiple={{
+              user: entityRules.canAddMultipleUserOwners,
+              team: entityRules.canAddMultipleTeamOwner,
+            }}
+            owner={owners}
+            placeholder={t('label.select')}
+            popoverProps={{
+              placement: 'topLeft',
+            }}
+            onUpdate={async (value) => form.setFieldValue('owners', value)}
+          />
+        </Form.Item>
+        <Form.Item
+          label={t('label.reviewer-plural')}
+          name="reviewers">
+          <UserTeamSelectableListSearchInput
+            hasPermission
+            multiple={{ user: true, team: true }}
+            owner={reviewers}
+            placeholder={t('label.select')}
+            popoverProps={{
+              placement: 'topLeft',
+            }}
+            onUpdate={async (value) =>
+              form.setFieldValue('reviewers', value)
+            }
+          />
+        </Form.Item>
+        <Form.Item
+          className="cde-form-markdown-editor"
+          initialValue={
+            glossaryTerm?.extension?.entityRelationship ??
+            glossaryTerm?.extension?.moi_quan_he_voi_thuc_the ??
+            ''
+          }
+          label={t('cde.entity-relationship')}
+          name="entityRelationship"
+          trigger="onTextChange">
+          <RichTextEditor
+            data-testid="cde-entity-relationship"
+            initialValue={
+              glossaryTerm?.extension?.entityRelationship ??
+              glossaryTerm?.extension?.moi_quan_he_voi_thuc_the ??
+              ''
+            }
+            placeHolder={t(
+              'cde.entity-relationship-placeholder',
+              'Mô tả mối quan hệ với thực thể...'
+            )}
+          />
+        </Form.Item>
+        <Form.Item
+          className="cde-form-markdown-editor"
+          initialValue={
+            glossaryTerm?.extension?.relatedRegulatoryDocuments ??
+            glossaryTerm?.extension?.van_ban_quy_dinh_lien_quan ??
+            ''
+          }
+          label={t('cde.related-regulatory-documents')}
+          name="relatedRegulatoryDocuments"
+          trigger="onTextChange">
+          <RichTextEditor
+            data-testid="cde-related-regulatory-documents"
+            initialValue={
+              glossaryTerm?.extension?.relatedRegulatoryDocuments ??
+              glossaryTerm?.extension?.van_ban_quy_dinh_lien_quan ??
+              ''
+            }
+            placeHolder={t(
+              'cde.related-regulatory-documents-placeholder',
+              'Nhập văn bản quy định liên quan...'
+            )}
+          />
+        </Form.Item>
+      </div>
     </Form>
   );
 };

@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { SUPPORTED_BULK_IMPORT_EDIT_ENTITY } from '../../constants/BulkImport.constant';
 import { ROUTES } from '../../constants/constants';
@@ -19,6 +19,8 @@ import { ResourceEntity } from '../../context/PermissionProvider/PermissionProvi
 import { useFqn } from '../../hooks/useFqn';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { useRequiredParams } from '../../utils/useRequiredParams';
+import { isDataDictionaryGlossary, isDataQualityGlossary } from '../../constants/Glossary.contant';
+import { useApplicationStore } from '../../hooks/useApplicationStore';
 import withSuspenseFallback from './withSuspenseFallback';
 
 const BulkEntityImportPage = withSuspenseFallback(
@@ -30,15 +32,59 @@ const BulkEntityImportPage = withSuspenseFallback(
   )
 );
 
+const CDEImportPage = withSuspenseFallback(
+  React.lazy(() => import('../../pages/CDEImportPage/CDEImportPage'))
+);
+
+const DQImportPage = withSuspenseFallback(
+  React.lazy(() => import('../../pages/DQImportPage/DQImportPage'))
+);
+
 const EntityImportRouter = () => {
   const navigate = useNavigate();
   const { fqn } = useFqn();
   const { entityType } = useRequiredParams<{ entityType: ResourceEntity }>();
   const { getEntityPermissionByFqn, permissions } = usePermissionProvider();
+  const { currentUser, selectedPersona } = useApplicationStore();
   const [isLoading, setIsLoading] = useState(true);
   const [entityPermission, setEntityPermission] = useState(
     DEFAULT_ENTITY_PERMISSION
   );
+
+  const isSteward = useMemo(() => {
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      (userRoles.some((r) => r.includes('steward')) ||
+        personaName.includes('steward')) &&
+      !currentUser?.isAdmin
+    );
+  }, [currentUser, selectedPersona]);
+
+  const isProposer = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return false;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      !isSteward &&
+      (userRoles.some((r) => r.includes('proposer')) ||
+        personaName.includes('proposer'))
+    );
+  }, [currentUser, selectedPersona, isSteward]);
 
   const fetchResourcePermission = useCallback(async () => {
     if (!entityType) {
@@ -57,6 +103,8 @@ const EntityImportRouter = () => {
     try {
       const entityPermission = await getEntityPermissionByFqn(entityType, fqn);
       setEntityPermission(entityPermission);
+    } catch {
+      setEntityPermission(DEFAULT_ENTITY_PERMISSION);
     } finally {
       setIsLoading(false);
     }
@@ -70,14 +118,49 @@ const EntityImportRouter = () => {
     }
   }, [fqn, entityType, fetchResourcePermission]);
 
+  const isCDE = useMemo(() => {
+    return (
+      entityType === ResourceEntity.GLOSSARY && isDataDictionaryGlossary(fqn)
+    );
+  }, [entityType, fqn]);
+
+  const isDQ = useMemo(() => {
+    return (
+      entityType === ResourceEntity.GLOSSARY && isDataQualityGlossary(fqn)
+    );
+  }, [entityType, fqn]);
+
+  const canImport = useMemo(() => {
+    if (isCDE || isDQ) {
+      return (
+        Boolean(currentUser?.isAdmin) ||
+        isProposer ||
+        Boolean(entityPermission.EditAll)
+      );
+    }
+
+    return Boolean(entityPermission.EditAll);
+  }, [isCDE, isDQ, currentUser?.isAdmin, isProposer, entityPermission.EditAll]);
+
   if (isLoading) {
     return null;
   }
 
   return (
     <Routes>
-      {entityPermission.EditAll && (
-        <Route element={<BulkEntityImportPage />} path="*" />
+      {canImport && (
+        <Route
+          element={
+            isDQ ? (
+              <DQImportPage />
+            ) : isCDE ? (
+              <CDEImportPage />
+            ) : (
+              <BulkEntityImportPage />
+            )
+          }
+          path="*"
+        />
       )}
       <Route element={<Navigate to={ROUTES.NOT_FOUND} />} path="*" />
     </Routes>

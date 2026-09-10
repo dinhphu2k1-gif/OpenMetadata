@@ -62,8 +62,14 @@ import {
 import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
+  getGlossaryTerms,
   getGlossaryTermsById,
 } from '../../../rest/glossaryAPI';
+import { API_RES_MAX_SIZE } from '../../../constants/constants';
+import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
+import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
+import { exportDQToExcel } from '../DQImportExport/DQImportExport.utils';
+
 import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import { getEntityVoteStatus } from '../../../utils/EntityVoteUtils';
@@ -243,6 +249,74 @@ const GlossaryHeader = ({
     return permissions.EditAll || permissions.EditDisplayName;
   }, [permissions, isSteward, currentUser?.isAdmin]);
 
+
+
+  const isCDEGlossary = useMemo(() => {
+    if (!isGlossary) {
+      return false;
+    }
+
+    return isDataDictionaryGlossary(
+      selectedData?.name,
+      selectedData?.displayName,
+      selectedData?.fullyQualifiedName
+    );
+  }, [isGlossary, selectedData]);
+
+  const isDQGlossary = useMemo(() => {
+    if (!isGlossary) {
+      return false;
+    }
+
+    return isDataQualityGlossary(
+      selectedData?.name,
+      selectedData?.displayName,
+      selectedData?.fullyQualifiedName
+    );
+  }, [isGlossary, selectedData]);
+
+  const canImportCDE = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+
+    return isProposer;
+  }, [currentUser, isProposer]);
+
+  const canImportDQ = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+
+    return isProposer;
+  }, [currentUser, isProposer]);
+
+  const handleCDEExportClick = useCallback(async () => {
+    try {
+      const { data } = await getGlossaryTerms({
+        glossary: selectedData.id,
+        limit: API_RES_MAX_SIZE,
+        fields: CDE_GLOSSARY_TERM_FIELDS,
+      });
+      exportCDEToExcel(data);
+    } catch (err) {
+      showErrorToast(err as AxiosError);
+    }
+  }, [selectedData.id]);
+
+  const handleDQExportClick = useCallback(async () => {
+    try {
+      const { data } = await getGlossaryTerms({
+        glossary: selectedData.id,
+        limit: API_RES_MAX_SIZE,
+        fields: CDE_GLOSSARY_TERM_FIELDS,
+      });
+      exportDQToExcel(data);
+    } catch (err) {
+      showErrorToast(err as AxiosError);
+    }
+  }, [selectedData.id]);
+
   const isCDEGlossaryTerm = useMemo(() => {
     if (isGlossary) {
       return false;
@@ -331,7 +405,12 @@ const GlossaryHeader = ({
   }, [fqn]);
 
   const handleGlossaryImport = () =>
-    navigate(getEntityImportPath(EntityType.GLOSSARY, fqn));
+    navigate(
+      getEntityImportPath(
+        EntityType.GLOSSARY,
+        selectedData?.fullyQualifiedName || fqn
+      )
+    );
 
   const handleVersionClick = async () => {
     let path: string;
@@ -645,7 +724,7 @@ const GlossaryHeader = ({
   }, [selectedData]);
 
   const manageButtonContent: ItemType[] = [
-    ...(isGlossary && importExportPermissions
+    ...(isGlossary && (isCDEGlossary || isDQGlossary || importExportPermissions)
       ? ([
           {
             label: (
@@ -655,34 +734,60 @@ const GlossaryHeader = ({
                 })}
                 icon={ExportIcon}
                 id="export-button"
-                name={t('label.export')}
+                name={
+                  isDQGlossary
+                    ? t('dq.export-excel', 'Xuất Excel')
+                    : isCDEGlossary
+                    ? t('cde.export-excel', 'Xuất Excel')
+                    : t('label.export')
+                }
               />
             ),
             key: 'export-button',
             onClick: (e) => {
               e.domEvent.stopPropagation();
-              handleGlossaryExportClick();
+              if (isDQGlossary) {
+                handleDQExportClick();
+              } else if (isCDEGlossary) {
+                handleCDEExportClick();
+              } else {
+                handleGlossaryExportClick();
+              }
               setShowActions(false);
             },
           },
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.import-entity-help', {
-                  entity: t('label.glossary-term-lowercase'),
-                })}
-                icon={ImportIcon}
-                id="import-button"
-                name={t('label.import')}
-              />
-            ),
-            key: 'import-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              handleGlossaryImport();
-              setShowActions(false);
-            },
-          },
+          ...((isDQGlossary
+            ? canImportDQ
+            : isCDEGlossary
+            ? canImportCDE
+            : importExportPermissions)
+            ? [
+                {
+                  label: (
+                    <ManageButtonItemLabel
+                      description={t('message.import-entity-help', {
+                        entity: t('label.glossary-term-lowercase'),
+                      })}
+                      icon={ImportIcon}
+                      id="import-button"
+                      name={
+                        isDQGlossary
+                          ? t('dq.import-excel', 'Nhập Excel')
+                          : isCDEGlossary
+                          ? t('cde.import-excel', 'Nhập Excel')
+                          : t('label.import')
+                      }
+                    />
+                  ),
+                  key: 'import-button',
+                  onClick: (e) => {
+                    e.domEvent.stopPropagation();
+                    handleGlossaryImport();
+                    setShowActions(false);
+                  },
+                },
+              ]
+            : []),
         ] as ItemType[])
       : []),
     ...(editDisplayNamePermission
@@ -1326,6 +1431,8 @@ const GlossaryHeader = ({
         onCancel={() => setIsRejectModalOpen(false)}
         onConfirm={handleRejectTerm}
       />
+
+
     </>
   );
 };

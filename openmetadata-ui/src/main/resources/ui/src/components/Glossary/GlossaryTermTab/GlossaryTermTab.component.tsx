@@ -11,7 +11,12 @@
  *  limitations under the License.
  */
 
-import { DownOutlined, WarningOutlined } from '@ant-design/icons';
+import {
+  DownloadOutlined,
+  DownOutlined,
+  UploadOutlined,
+  WarningOutlined,
+} from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
 import {
   Button,
@@ -26,7 +31,11 @@ import {
   TableProps,
   Tooltip,
 } from 'antd';
-import { ColumnsType, ExpandableConfig } from 'antd/lib/table/interface';
+import {
+  ColumnsType,
+  ExpandableConfig,
+  TableRowSelection,
+} from 'antd/lib/table/interface';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { compare } from 'fast-json-patch';
@@ -127,18 +136,29 @@ import Table from '../../common/Table/Table';
 import TagButton from '../../common/TagButton/TagButton.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
-import { getCDEGlossaryTableColumns } from './CDEGlossaryTableColumns';
+import {
+  CDE_TAG_CLASSIFICATIONS,
+  getCDEGlossaryTableColumns,
+  getCDEReferenceLabel,
+} from './CDEGlossaryTableColumns';
+import CDEFilterDropdown from './CDEFilterDropdown.component';
 import { getDQGlossaryTableColumns } from './DQGlossaryTableColumns';
 import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
+import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
+import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import {
   GlossaryTermTabProps,
   ModifiedGlossaryTerm,
   MoveGlossaryTermType,
 } from './GlossaryTermTab.interface';
+import GlossaryBulkActionBar from './GlossaryBulkActionBar/GlossaryBulkActionBar.component';
+import GlossaryBulkActionModal, {
+  BulkActionType,
+} from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
 const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const navigate = useNavigate();
-  const { currentUser } = useApplicationStore();
+  const { currentUser, selectedPersona } = useApplicationStore();
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const {
@@ -162,6 +182,30 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       activeGlossary.fullyQualifiedName
     );
   }, [activeGlossary, isGlossary]);
+
+  const canImportCDE = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    const isSteward =
+      userRoles.some((r) => r.includes('steward')) ||
+      personaName.includes('steward');
+
+    const isProposer =
+      !isSteward &&
+      (userRoles.some((r) => r.includes('proposer')) ||
+        personaName.includes('proposer'));
+
+    return isProposer;
+  }, [currentUser, selectedPersona]);
   const isDQGlossary = useMemo(() => {
     const glossary = isGlossary
       ? activeGlossary
@@ -214,6 +258,232 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     );
   }, [currentUser]);
 
+  const isUserSteward = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      userRoles.some((r) => r.includes('steward')) ||
+      personaName.includes('steward')
+    );
+  }, [currentUser, selectedPersona]);
+
+  const isUserProposer = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+    if (isUserSteward) {
+      return false;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    return (
+      userRoles.some((r) => r.includes('proposer')) ||
+      personaName.includes('proposer')
+    );
+  }, [currentUser, selectedPersona, isUserSteward]);
+
+  const isGlossaryReviewer = useMemo(() => {
+    return Boolean(
+      activeGlossary.reviewers?.some((r) => r.id === currentUser?.id)
+    );
+  }, [activeGlossary.reviewers, currentUser?.id]);
+
+  const canSubmitForReview = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+
+    if (isUserSteward) {
+      return false;
+    }
+
+    return isUserProposer;
+  }, [currentUser?.isAdmin, isUserProposer, isUserSteward]);
+
+  const canApproveOrReject = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return true;
+    }
+
+    return isUserSteward || isGlossaryReviewer;
+  }, [currentUser?.isAdmin, isUserSteward, isGlossaryReviewer]);
+
+  const canSelectRows = useMemo(() => {
+    if (isConsumer) {
+      return false;
+    }
+
+    return canSubmitForReview || canApproveOrReject;
+  }, [isConsumer, canSubmitForReview, canApproveOrReject]);
+
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [selectedTermsMap, setSelectedTermsMap] = useState<
+    Map<string, ModifiedGlossaryTerm>
+  >(new Map());
+
+  const selectedTerms = useMemo(() => {
+    return Array.from(selectedTermsMap.values());
+  }, [selectedTermsMap]);
+
+  const [bulkModalConfig, setBulkModalConfig] = useState<{
+    open: boolean;
+    actionType: BulkActionType;
+    terms: ModifiedGlossaryTerm[];
+  }>({
+    open: false,
+    actionType: 'submitForReview',
+    terms: [],
+  });
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedRowKeys([]);
+    setSelectedTermsMap(new Map());
+  }, []);
+
+  useEffect(() => {
+    handleClearSelection();
+  }, [activeGlossary?.fullyQualifiedName, handleClearSelection]);
+
+  const handleRowSelectionChange = useCallback(
+    (newKeys: React.Key[], newSelectedRows: ModifiedGlossaryTerm[]) => {
+      setSelectedRowKeys(newKeys);
+      setSelectedTermsMap((prevMap) => {
+        const nextMap = new Map(prevMap);
+        const newKeySet = new Set(newKeys);
+        for (const key of nextMap.keys()) {
+          if (!newKeySet.has(key)) {
+            nextMap.delete(key);
+          }
+        }
+        newSelectedRows.forEach((row) => {
+          if (row && !row.isLoadMoreButton && row.fullyQualifiedName) {
+            nextMap.set(row.fullyQualifiedName, row);
+          }
+        });
+
+        return nextMap;
+      });
+    },
+    []
+  );
+
+  const rowSelection: TableRowSelection<ModifiedGlossaryTerm> | undefined =
+    useMemo(() => {
+      if (!canSelectRows) {
+        return undefined;
+      }
+
+      return {
+        type: 'checkbox',
+        selectedRowKeys,
+        onChange: handleRowSelectionChange,
+        getCheckboxProps: (record: ModifiedGlossaryTerm) => ({
+          disabled: Boolean(record.isLoadMoreButton),
+        }),
+      };
+    }, [canSelectRows, selectedRowKeys, handleRowSelectionChange]);
+
+  const handleBulkSubmitForReview = useCallback(
+    (termsToSubmit?: ModifiedGlossaryTerm[]) => {
+      const draftTerms =
+        termsToSubmit && termsToSubmit.length > 0
+          ? termsToSubmit
+          : selectedTerms.filter(
+              (term) => term.entityStatus === EntityStatus.Draft
+            );
+      if (draftTerms.length === 0) {
+        return;
+      }
+      setBulkModalConfig({
+        open: true,
+        actionType: 'submitForReview',
+        terms: draftTerms,
+      });
+    },
+    [selectedTerms]
+  );
+
+  const handleBulkApprove = useCallback(
+    (termsToApprove?: ModifiedGlossaryTerm[]) => {
+      const inReviewTerms =
+        termsToApprove && termsToApprove.length > 0
+          ? termsToApprove
+          : selectedTerms.filter(
+              (term) => term.entityStatus === EntityStatus.InReview
+            );
+      if (inReviewTerms.length === 0) {
+        return;
+      }
+      setBulkModalConfig({
+        open: true,
+        actionType: 'approve',
+        terms: inReviewTerms,
+      });
+    },
+    [selectedTerms]
+  );
+
+  const handleBulkReject = useCallback(
+    (termsToReject?: ModifiedGlossaryTerm[]) => {
+      const inReviewTerms =
+        termsToReject && termsToReject.length > 0
+          ? termsToReject
+          : selectedTerms.filter(
+              (term) => term.entityStatus === EntityStatus.InReview
+            );
+      if (inReviewTerms.length === 0) {
+        return;
+      }
+      setBulkModalConfig({
+        open: true,
+        actionType: 'reject',
+        terms: inReviewTerms,
+      });
+    },
+    [selectedTerms]
+  );
+
+  const handleBulkRevoke = useCallback(
+    (termsToRevoke?: ModifiedGlossaryTerm[]) => {
+      const approvedTerms =
+        termsToRevoke && termsToRevoke.length > 0
+          ? termsToRevoke
+          : selectedTerms.filter(
+              (term) =>
+                (term.entityStatus ?? EntityStatus.Approved) ===
+                EntityStatus.Approved
+            );
+      if (approvedTerms.length === 0) {
+        return;
+      }
+      setBulkModalConfig({
+        open: true,
+        actionType: 'revoke',
+        terms: approvedTerms,
+      });
+    },
+    [selectedTerms]
+  );
+
+  const handleCloseBulkModal = useCallback(() => {
+    setBulkModalConfig((prev) => ({ ...prev, open: false, terms: [] }));
+  }, []);
+
   const [movedGlossaryTerm, setMovedGlossaryTerm] =
     useState<MoveGlossaryTermType>();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -243,6 +513,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [isConsumer]);
   const [confirmCheckboxChecked, setConfirmCheckboxChecked] = useState(false);
   const [totalTermsCount, setTotalTermsCount] = useState<number>(0);
+
+  // CDE Column Filters
+  const [selectedCdeDomains, setSelectedCdeDomains] = useState<string[]>(['all']);
+  const [selectedCdeDataSources, setSelectedCdeDataSources] = useState<string[]>(['all']);
+  const [selectedCdeOwners, setSelectedCdeOwners] = useState<string[]>(['all']);
+  const [selectedCdeClassifications, setSelectedCdeClassifications] = useState<string[]>(['all']);
+  const [allCdeTerms, setAllCdeTerms] = useState<ModifiedGlossaryTerm[]>([]);
 
   const {
     currentPage,
@@ -278,6 +555,176 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const debouncedSetSearchTerm = useCallback(debounce(handleSearch, 500), [
     handleSearch,
   ]);
+
+  // Reset CDE filters when active glossary changes
+  useEffect(() => {
+    setSelectedCdeDomains(['all']);
+    setSelectedCdeDataSources(['all']);
+    setSelectedCdeOwners(['all']);
+    setSelectedCdeClassifications(['all']);
+  }, [activeGlossary?.fullyQualifiedName]);
+
+  // Fetch full list of CDE terms for options and comprehensive client-side filtering
+  const fetchAllCdeTerms = useCallback(async () => {
+    if (!activeGlossary?.id || !isCDEGlossary) {
+      return;
+    }
+    try {
+      const key = isGlossary ? 'glossary' : 'parent';
+      const { data } = await getGlossaryTerms({
+        [key]: activeGlossary.id,
+        limit: API_RES_MAX_SIZE,
+        fields: CDE_GLOSSARY_TERM_FIELDS,
+        ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
+      });
+      setAllCdeTerms(data as ModifiedGlossaryTerm[]);
+    } catch (error) {
+      // fallback to glossaryChildTerms
+    }
+  }, [activeGlossary?.id, isCDEGlossary, isGlossary, isConsumer]);
+
+  useEffect(() => {
+    if (isCDEGlossary && activeGlossary?.id) {
+      fetchAllCdeTerms();
+    }
+  }, [fetchAllCdeTerms, isCDEGlossary, activeGlossary?.id]);
+
+  const handleBulkActionSuccess = useCallback(() => {
+    handleCloseBulkModal();
+    handleClearSelection();
+    refreshGlossaryTerms?.();
+    if (isCDEGlossary) {
+      fetchAllCdeTerms();
+    }
+  }, [
+    handleCloseBulkModal,
+    handleClearSelection,
+    refreshGlossaryTerms,
+    isCDEGlossary,
+    fetchAllCdeTerms,
+  ]);
+
+  const hasActiveCdeFilters = useMemo(
+    () =>
+      !selectedCdeDomains.includes('all') ||
+      !selectedCdeDataSources.includes('all') ||
+      !selectedCdeOwners.includes('all') ||
+      !selectedCdeClassifications.includes('all'),
+    [
+      selectedCdeDomains,
+      selectedCdeDataSources,
+      selectedCdeOwners,
+      selectedCdeClassifications,
+    ]
+  );
+
+  const sourceTermsForOptions = useMemo(() => {
+    if (allCdeTerms.length > 0) {
+      return allCdeTerms;
+    }
+    if (Array.isArray(glossaryChildTerms)) {
+      return glossaryChildTerms as ModifiedGlossaryTerm[];
+    }
+
+    return [];
+  }, [allCdeTerms, glossaryChildTerms]);
+
+  const cdeDomainOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceTermsForOptions.forEach((term) => {
+      term.domains?.forEach((d) => {
+        const label = d.displayName || d.name || '';
+        if (label) {
+          map.set(label, label);
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceTermsForOptions]);
+
+  const cdeDataSourceOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceTermsForOptions]);
+
+  const cdeOwnerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceTermsForOptions.forEach((term) => {
+      term.owners?.forEach((o) => {
+        const label = getCDEReferenceLabel(o);
+        const val = o.id || o.fullyQualifiedName || o.name || '';
+        if (label && val) {
+          map.set(val, label);
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceTermsForOptions]);
+
+  const cdeClassificationOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (
+          t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataClassification
+        ) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceTermsForOptions]);
+
+  const availableCdeDomains = useMemo(() => {
+    const domainMap = new Map<string, EntityReference>();
+    (activeGlossary.domains ?? []).forEach((d) => {
+      if (d.fullyQualifiedName) {
+        domainMap.set(d.fullyQualifiedName, d);
+      }
+    });
+    sourceTermsForOptions.forEach((term) => {
+      term.domains?.forEach((d) => {
+        if (d.fullyQualifiedName) {
+          domainMap.set(d.fullyQualifiedName, d);
+        }
+      });
+    });
+
+    return Array.from(domainMap.values());
+  }, [activeGlossary.domains, sourceTermsForOptions]);
 
   const fetchChildTerms = async (parentFQN: string, after?: string) => {
     setLoadingChildren((prev) => ({ ...prev, [parentFQN]: true }));
@@ -1049,7 +1496,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS) {
             return {
               ...column,
-              width: 120,
+              width: 140,
               align: 'center' as const,
             };
           }
@@ -1092,7 +1539,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS) {
             return {
               ...column,
-              width: 120,
+              width: 140,
               align: 'center' as const,
             };
           }
@@ -1306,91 +1753,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     [debouncedSetSearchTerm]
   );
 
-  const extraTableFilters = useMemo(() => {
-    let expandCollapseLabel = '';
 
-    if (isExpandingAll) {
-      expandCollapseLabel = t('label.loading');
-    } else if (isAllExpanded) {
-      expandCollapseLabel = t('label.collapse-all');
-    } else {
-      expandCollapseLabel = t('label.expand-all');
-    }
-
-    return (
-      <>
-        <Input
-          allowClear
-          data-testid="search-glossary-terms-input"
-          placeholder={
-            isDQGlossary
-              ? t('dq.search-placeholder')
-              : isCDEGlossary
-              ? t('cde.search-placeholder')
-              : t('label.search-entity', {
-                  entity: t('label.term-plural'),
-                })
-          }
-          style={{ width: isDQGlossary ? 330 : isCDEGlossary ? 280 : 250 }}
-          value={searchInput}
-          onChange={handleSearchChange}
-        />
-
-        <Dropdown
-          className="custom-glossary-dropdown-menu status-dropdown"
-          menu={statusDropdownMenu}
-          open={isStatusDropdownVisible}
-          trigger={['click']}
-          onOpenChange={setIsStatusDropdownVisible}>
-          <Button
-            className="text-primary remove-button-background-hover"
-            data-testid="glossary-status-dropdown"
-            size="small"
-            type="text">
-            <Space>
-              {t('label.status')}
-              <DownOutlined />
-            </Space>
-          </Button>
-        </Dropdown>
-
-        {getBulkEditButton(permissions.EditAll, handleEditGlossary)}
-
-        <Button
-          className={classNames('text-primary remove-button-background-hover', {
-            'cde-toolbar-collapse-action': isCDEGlossary,
-            'dq-toolbar-collapse-action': isDQGlossary,
-          })}
-          data-testid="expand-collapse-all-button"
-          disabled={isExpandingAll}
-          size="small"
-          type="text"
-          onClick={toggleExpandAll}>
-          <Space align="center" size={4}>
-            {isExpandingAll ? (
-              <Loader size="small" />
-            ) : (
-              <Icon
-                className="text-primary"
-                component={isAllExpanded ? DownUpArrowIcon : UpDownArrowIcon}
-                height="14px"
-              />
-            )}
-            {expandCollapseLabel}
-          </Space>
-        </Button>
-      </>
-    );
-  }, [
-    isAllExpanded,
-    isExpandingAll,
-    isStatusDropdownVisible,
-    isCDEGlossary,
-    isDQGlossary,
-    statusDropdownMenu,
-    searchInput,
-    toggleExpandAll,
-  ]);
 
   const handleAddGlossaryTermClick = () => {
     onAddGlossaryTerm(
@@ -1610,8 +1973,137 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return [];
     }
 
+    if (isCDEGlossary && hasActiveCdeFilters) {
+      const sourceList: ModifiedGlossaryTerm[] =
+        allCdeTerms.length > 0
+          ? (buildTree(allCdeTerms) as ModifiedGlossaryTerm[])
+          : glossaryTerms;
+
+      const filterPredicate = (term: ModifiedGlossaryTerm): boolean => {
+        if (!selectedCdeDomains.includes('all')) {
+          const termDomains =
+            term.domains?.map((d) => d.displayName || d.name || '') || [];
+          if (!selectedCdeDomains.some((d) => termDomains.includes(d))) {
+            return false;
+          }
+        }
+
+        if (!selectedCdeDataSources.includes('all')) {
+          const termSources =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource
+              )
+              .map((t) => t.tagFQN) || [];
+          if (!selectedCdeDataSources.some((s) => termSources.includes(s))) {
+            return false;
+          }
+        }
+
+        if (!selectedCdeOwners.includes('all')) {
+          const termOwners =
+            term.owners?.map(
+              (o) =>
+                o.id ||
+                o.fullyQualifiedName ||
+                o.name ||
+                getCDEReferenceLabel(o)
+            ) || [];
+          if (!selectedCdeOwners.some((o) => termOwners.includes(o))) {
+            return false;
+          }
+        }
+
+        if (!selectedCdeClassifications.includes('all')) {
+          const termClasses =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] ===
+                  CDE_TAG_CLASSIFICATIONS.dataClassification
+              )
+              .map((t) => t.tagFQN) || [];
+          if (
+            !selectedCdeClassifications.some((c) => termClasses.includes(c))
+          ) {
+            return false;
+          }
+        }
+
+        if (searchTerm.trim()) {
+          const termLower = searchTerm.toLowerCase();
+          const nameMatch = term.name?.toLowerCase().includes(termLower);
+          const dispMatch = term.displayName
+            ?.toLowerCase()
+            .includes(termLower);
+          if (!nameMatch && !dispMatch) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      const filterRecursive = (
+        nodes: ModifiedGlossaryTerm[]
+      ): ModifiedGlossaryTerm[] => {
+        const result: ModifiedGlossaryTerm[] = [];
+
+        for (const node of nodes) {
+          const selfMatches = filterPredicate(node);
+          const matchingChildren = node.children?.length
+            ? filterRecursive(node.children as ModifiedGlossaryTerm[])
+            : [];
+
+          if (selfMatches || matchingChildren.length > 0) {
+            result.push({
+              ...node,
+              children:
+                matchingChildren.length > 0 ? matchingChildren : node.children,
+              childrenCount:
+                matchingChildren.length > 0
+                  ? matchingChildren.length
+                  : node.childrenCount,
+            });
+          }
+        }
+
+        return result;
+      };
+
+      return processTermsWithLoadMore(filterRecursive(sourceList));
+    }
+
     return processTermsWithLoadMore(glossaryTerms);
-  }, [glossaryTerms, processTermsWithLoadMore]);
+  }, [
+    glossaryTerms,
+    processTermsWithLoadMore,
+    isCDEGlossary,
+    hasActiveCdeFilters,
+    allCdeTerms,
+    selectedCdeDomains,
+    selectedCdeDataSources,
+    selectedCdeOwners,
+    selectedCdeClassifications,
+    searchTerm,
+  ]);
+
+  useEffect(() => {
+    if (
+      isCDEGlossary &&
+      hasActiveCdeFilters &&
+      filteredGlossaryTerms.length > 0
+    ) {
+      const keys = findExpandableKeysForArray(filteredGlossaryTerms);
+      setExpandedRowKeys((prev) => Array.from(new Set([...prev, ...keys])));
+    }
+  }, [
+    isCDEGlossary,
+    hasActiveCdeFilters,
+    filteredGlossaryTerms,
+    findExpandableKeysForArray,
+  ]);
 
   useEffect(() => {
     if (!tableContainerRef.current) {
@@ -1619,6 +2111,138 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     }
     setContainerWidth(tableContainerRef.current.offsetWidth);
   }, []);
+
+  const extraTableFilters = useMemo(() => {
+    let expandCollapseLabel = '';
+
+    if (isExpandingAll) {
+      expandCollapseLabel = t('label.loading');
+    } else if (isAllExpanded) {
+      expandCollapseLabel = t('label.collapse-all');
+    } else {
+      expandCollapseLabel = t('label.expand-all');
+    }
+
+    return (
+      <>
+        <Input
+          allowClear
+          data-testid="search-glossary-terms-input"
+          placeholder={
+            isDQGlossary
+              ? t('dq.search-placeholder')
+              : isCDEGlossary
+              ? t('cde.search-placeholder')
+              : t('label.search-entity', {
+                  entity: t('label.term-plural'),
+                })
+          }
+          style={{ width: isDQGlossary ? 330 : isCDEGlossary ? 280 : 250 }}
+          value={searchInput}
+          onChange={handleSearchChange}
+        />
+
+        <Dropdown
+          className="custom-glossary-dropdown-menu status-dropdown"
+          menu={statusDropdownMenu}
+          open={isStatusDropdownVisible}
+          trigger={['click']}
+          onOpenChange={setIsStatusDropdownVisible}>
+          <Button
+            className="text-primary remove-button-background-hover"
+            data-testid="glossary-status-dropdown"
+            size="small"
+            type="text">
+            <Space>
+              {t('label.status')}
+              <DownOutlined />
+            </Space>
+          </Button>
+        </Dropdown>
+
+        {isCDEGlossary && (
+          <>
+            <CDEFilterDropdown
+              dataTestId="cde-domain-filter"
+              label={t('cde.business-group')}
+              options={cdeDomainOptions}
+              selectedValues={selectedCdeDomains}
+              onChange={setSelectedCdeDomains}
+            />
+            <CDEFilterDropdown
+              dataTestId="cde-datasource-filter"
+              label={t('cde.data-source')}
+              options={cdeDataSourceOptions}
+              selectedValues={selectedCdeDataSources}
+              onChange={setSelectedCdeDataSources}
+            />
+            <CDEFilterDropdown
+              dataTestId="cde-owner-filter"
+              label={t('cde.data-owner')}
+              options={cdeOwnerOptions}
+              selectedValues={selectedCdeOwners}
+              onChange={setSelectedCdeOwners}
+            />
+            <CDEFilterDropdown
+              dataTestId="cde-classification-filter"
+              label={t('cde.data-classification')}
+              options={cdeClassificationOptions}
+              selectedValues={selectedCdeClassifications}
+              onChange={setSelectedCdeClassifications}
+            />
+          </>
+        )}
+
+        {getBulkEditButton(permissions.EditAll, handleEditGlossary)}
+
+        <Button
+          className={classNames('text-primary remove-button-background-hover', {
+            'cde-toolbar-collapse-action': isCDEGlossary,
+            'dq-toolbar-collapse-action': isDQGlossary,
+          })}
+          data-testid="expand-collapse-all-button"
+          disabled={isExpandingAll}
+          size="small"
+          type="text"
+          onClick={toggleExpandAll}>
+          <Space align="center" size={4}>
+            {isExpandingAll ? (
+              <Loader size="small" />
+            ) : (
+              <Icon
+                className="text-primary"
+                component={isAllExpanded ? DownUpArrowIcon : UpDownArrowIcon}
+                height="14px"
+              />
+            )}
+            {expandCollapseLabel}
+          </Space>
+        </Button>
+      </>
+    );
+  }, [
+    isAllExpanded,
+    isExpandingAll,
+    isStatusDropdownVisible,
+    isCDEGlossary,
+    isDQGlossary,
+    statusDropdownMenu,
+    searchInput,
+    handleSearchChange,
+    toggleExpandAll,
+    cdeDomainOptions,
+    cdeDataSourceOptions,
+    cdeOwnerOptions,
+    cdeClassificationOptions,
+    selectedCdeDomains,
+    selectedCdeDataSources,
+    selectedCdeOwners,
+    selectedCdeClassifications,
+    filteredGlossaryTerms,
+    allCdeTerms,
+    t,
+    permissions.EditAll,
+  ]);
 
   const fetchKey = useMemo(
     () =>
@@ -1680,25 +2304,36 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   );
 
   // Check if this is due to search or filter returning no results
-  const isSearchActive = Boolean(searchTerm && searchTerm.trim().length > 0);
+  const isSearchActive = Boolean(
+    (searchTerm && searchTerm.trim().length > 0) ||
+    (searchInput && searchInput.trim().length > 0)
+  );
   const isStatusFilterActive = !selectedStatus.includes('all');
   const hasNoTerms = isEmpty(glossaryTerms);
 
+  const isAnyFilterActive =
+    isSearchActive || isStatusFilterActive || hasActiveCdeFilters;
+
+  const totalGlossaryTermsCount =
+    activeGlossary?.termCount ??
+    activeGlossary?.childrenCount ??
+    allCdeTerms.length;
+
   const glossaryPlaceholderText = useMemo(() => {
-    if (isSearchActive && searchTerm) {
+    if (isSearchActive && (searchTerm || searchInput)) {
       return t('message.no-entity-found-for-name', {
         entity: t('label.glossary-term'),
-        name: searchTerm,
+        name: searchTerm || searchInput,
       });
     }
-    if (isSearchActive || isStatusFilterActive) {
+    if (isAnyFilterActive) {
       return t('label.no-data-found');
     }
 
     return t('message.no-entity-available', {
       entity: t('label.glossary-term-plural'),
     });
-  }, [isSearchActive, isStatusFilterActive, searchTerm, t]);
+  }, [isSearchActive, isAnyFilterActive, searchTerm, searchInput, t]);
 
   if (isTechGlossary) {
     return <TechnicalDictionaryPage />;
@@ -1706,7 +2341,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   if (
     hasNoTerms &&
-    !isSearchActive &&
+    !isAnyFilterActive &&
     totalTermsCount === 0 &&
     !isTableLoading
   ) {
@@ -1741,6 +2376,18 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           style={{
             position: 'relative',
           }}>
+          {canSelectRows && selectedRowKeys.length > 0 && (
+            <GlossaryBulkActionBar
+              canApproveOrReject={canApproveOrReject}
+              canSubmitForReview={canSubmitForReview}
+              selectedTerms={selectedTerms}
+              onApprove={handleBulkApprove}
+              onClearSelection={handleClearSelection}
+              onReject={handleBulkReject}
+              onRevokeApproval={handleBulkRevoke}
+              onSubmitForReview={handleBulkSubmitForReview}
+            />
+          )}
           {glossaryTerms.length > 0 ? (
             <>
               <Table
@@ -1786,9 +2433,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                     : undefined
                 }
                 loading={isTableLoading || isExpandingAll}
+                locale={{
+                  emptyText: (
+                    <ErrorPlaceHolder
+                      className="p-md"
+                      placeholderText={glossaryPlaceholderText}
+                      type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
+                    />
+                  ),
+                }}
                 pagination={false}
                 rowClassName={getRowClassName}
                 rowKey="fullyQualifiedName"
+                rowSelection={rowSelection}
                 size="small"
                 staticVisibleColumns={
                   isDQGlossary
@@ -1858,6 +2515,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               pagination={false}
               rowClassName={getRowClassName}
               rowKey="fullyQualifiedName"
+              rowSelection={rowSelection}
               size="small"
               staticVisibleColumns={
                 isDQGlossary
@@ -1932,6 +2590,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             </div>
           )}
         </Modal>
+
+        {bulkModalConfig.open && (
+          <GlossaryBulkActionModal
+            actionType={bulkModalConfig.actionType}
+            open={bulkModalConfig.open}
+            terms={bulkModalConfig.terms}
+            onCancel={handleCloseBulkModal}
+            onSuccess={handleBulkActionSuccess}
+          />
+        )}
       </Col>
     </Row>
   );

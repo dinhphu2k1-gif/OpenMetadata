@@ -183,7 +183,7 @@ const GlossaryTermModal: FC<Props> = ({
       footer={[
         <Button
           key="cancel-btn"
-          type={isCustomModal && !editMode ? 'default' : 'link'}
+          type={isCustomModal ? 'default' : 'link'}
           onClick={onCancel}>
           {t('label.cancel')}
         </Button>,
@@ -206,7 +206,7 @@ const GlossaryTermModal: FC<Props> = ({
       okText={t('label.save')}
       open={visible}
       title={dialogTitle}
-      width={isCustomModal && !editMode ? 1240 : isCustomModal ? 1000 : 800}
+      width={isDQGlossary && !editMode ? 1240 : isCustomModal ? 1000 : 800}
       onCancel={onCancel}>
       <EntityAttachmentProvider
         entityFqn={glossaryTermFQN}

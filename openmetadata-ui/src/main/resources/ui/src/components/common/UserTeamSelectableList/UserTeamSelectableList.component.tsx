@@ -70,7 +70,15 @@ export const UserTeamSelectableList = ({
 }: UserSelectDropdownProps) => {
   const { t } = useTranslation();
   const [popupVisible, setPopupVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'teams' | 'users'>('teams');
+  const defaultTab = useMemo(() => {
+    if (owner && owner.length > 0) {
+      return owner[0]?.type === EntityType.TEAM ? 'teams' : 'users';
+    }
+
+    return 'users';
+  }, [owner]);
+
+  const [activeTab, setActiveTab] = useState<'teams' | 'users'>(defaultTab);
   const [count, setCount] = useState({ team: 0, user: 0 });
 
   const [selectedUsers, setSelectedUsers] = useState<EntityReference[]>([]);
@@ -364,13 +372,13 @@ export const UserTeamSelectableList = ({
 
   const init = async () => {
     if (popupVisible || popoverProps?.open) {
-      await Promise.all([getUserCount(), getTeamCount()]);
-
       if (owner && owner.length > 0) {
         setActiveTab(owner[0]?.type === EntityType.TEAM ? 'teams' : 'users');
       } else {
         setActiveTab('users');
       }
+
+      await Promise.all([getUserCount(), getTeamCount()]);
     }
   };
 
@@ -418,6 +426,11 @@ export const UserTeamSelectableList = ({
   useEffect(() => {
     const activeOwners = isArray(owner) ? owner : owner ? [owner] : [];
     setSelectedUsers(activeOwners);
+    if (activeOwners.length > 0) {
+      setActiveTab(
+        activeOwners[0]?.type === EntityType.TEAM ? 'teams' : 'users'
+      );
+    }
   }, [owner]);
 
   useEffect(() => {

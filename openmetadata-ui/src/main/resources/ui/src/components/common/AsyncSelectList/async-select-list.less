@@ -37,3 +37,102 @@
     }
   }
 }
+
+.async-select-list-dropdown {
+  padding: 6px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid @grey-200 !important;
+
+  .ant-select-item {
+    min-height: 36px;
+    padding: 6px 8px !important;
+    margin: 2px 0;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+  }
+
+  .ant-select-item-option-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+    background-color: #f0f7ff !important;
+  }
+
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+    background-color: #e6f4ff !important;
+
+    .ant-select-item-option-state {
+      color: @primary-color;
+    }
+  }
+
+  .rc-virtual-list-scrollbar {
+    width: 6px !important;
+
+    .rc-virtual-list-scrollbar-thumb {
+      background: @grey-300 !important;
+      border-radius: 3px !important;
+
+      &:hover {
+        background: @grey-400 !important;
+      }
+    }
+  }
+
+  .async-select-option-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .async-select-option-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #f5f7fa;
+    border: 1px solid @grey-200;
+    font-size: 13px;
+    line-height: 20px;
+    color: @grey-800;
+    transition: all 0.15s ease;
+
+    .anticon {
+      font-size: 11px;
+      color: @grey-500;
+    }
+  }
+
+  .ant-select-item-option-active .async-select-option-tag-chip {
+    background: #e8f3ff;
+    border-color: @primary-color;
+
+    .anticon {
+      color: @primary-color;
+    }
+  }
+
+  .ant-select-item-option-selected .async-select-option-tag-chip {
+    background: #dbeafe;
+    border-color: @primary-color;
+    font-weight: 500;
+
+    .anticon {
+      color: @primary-color;
+    }
+  }
+
+  .async-select-option-fqn {
+    color: @grey-400;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
