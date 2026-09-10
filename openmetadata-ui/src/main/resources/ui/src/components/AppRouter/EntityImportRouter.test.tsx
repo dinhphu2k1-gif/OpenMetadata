@@ -36,6 +36,32 @@ jest.mock(
   }
 );
 
+jest.mock('../../pages/CDEImportPage/CDEImportPage', () => {
+  return jest.fn(() => (
+    <div data-testid="cde-import-page">CDEImportPage</div>
+  ));
+});
+
+jest.mock('../../pages/DQImportPage/DQImportPage', () => {
+  return jest.fn(() => (
+    <div data-testid="dq-import-page">DQImportPage</div>
+  ));
+});
+
+let mockCurrentUser = {
+  id: 'admin-id',
+  isAdmin: true,
+  roles: [],
+};
+let mockSelectedPersona: any = undefined;
+
+jest.mock('../../hooks/useApplicationStore', () => ({
+  useApplicationStore: () => ({
+    currentUser: mockCurrentUser,
+    selectedPersona: mockSelectedPersona,
+  }),
+}));
+
 const mockGetEntityPermissionByFqn = jest.fn();
 const mockPermissions = {
   testCase: { ...DEFAULT_ENTITY_PERMISSION, EditAll: true },
@@ -135,6 +161,54 @@ describe('EntityImportRouter', () => {
         expect(
           screen.getByText(`Redirected to ${ROUTES.NOT_FOUND}`)
         ).toBeInTheDocument();
+      });
+    });
+
+    it('should render CDEImportPage for Data Proposer without EditAll permission on CDE glossary', async () => {
+      mockEntityType = ResourceEntity.GLOSSARY;
+      mockFqn = 'Data Dictionary';
+      mockCurrentUser = {
+        id: 'proposer-id',
+        isAdmin: false,
+        roles: [{ name: 'DataProposer' }],
+      };
+      mockGetEntityPermissionByFqn.mockResolvedValue({
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditAll: false,
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/glossary/Data%20Dictionary/import']}>
+          <EntityImportRouter />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('cde-import-page')).toBeInTheDocument();
+      });
+    });
+
+    it('should render DQImportPage for Data Proposer without EditAll permission on Data Quality glossary', async () => {
+      mockEntityType = ResourceEntity.GLOSSARY;
+      mockFqn = 'Data Quality';
+      mockCurrentUser = {
+        id: 'proposer-id',
+        isAdmin: false,
+        roles: [{ name: 'DataProposer' }],
+      };
+      mockGetEntityPermissionByFqn.mockResolvedValue({
+        ...DEFAULT_ENTITY_PERMISSION,
+        EditAll: false,
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/glossary/Data%20Quality/import']}>
+          <EntityImportRouter />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('dq-import-page')).toBeInTheDocument();
       });
     });
   });

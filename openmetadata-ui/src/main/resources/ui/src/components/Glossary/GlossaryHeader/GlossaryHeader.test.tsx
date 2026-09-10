@@ -889,4 +889,260 @@ describe('GlossaryHeader component', () => {
       expect(screen.getByTestId('cde-draft-version-input')).toHaveValue('1.1');
     });
   });
+
+  describe('CDE Import and Export permissions in GlossaryHeader', () => {
+    const cdeGlossaryData = {
+      ...MOCK_GLOSSARY,
+      name: 'Data Dictionary',
+      displayName: 'Từ điển dữ liệu dùng chung',
+      fullyQualifiedName: 'Data Dictionary',
+    };
+
+    it('should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-consumer', name: 'DataConsumer' }],
+        },
+        selectedPersona: { name: 'DataConsumerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: cdeGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: false, EditAll: false },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+      expect(screen.queryByText('cde.import-excel')).not.toBeInTheDocument();
+    });
+
+    it('should show Nhập Excel and Xuất Excel for Admin on CDE glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: true,
+          roles: [],
+        },
+        selectedPersona: undefined,
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: cdeGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true, EditAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+      expect(screen.getByText('cde.import-excel')).toBeInTheDocument();
+    });
+
+    it('should show Nhập Excel and Xuất Excel for Data Proposer on CDE glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        },
+        selectedPersona: { name: 'DataProposerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: cdeGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: false, EditAll: false },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+      expect(screen.getByText('cde.import-excel')).toBeInTheDocument();
+    });
+
+    it('should hide Nhập Excel for Data Steward on CDE glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-steward', name: 'DataSteward' }],
+        },
+        selectedPersona: { name: 'DataStewardPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: cdeGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: false, EditAll: false },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+      expect(screen.queryByText('cde.import-excel')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('DQ Import and Export permissions in GlossaryHeader', () => {
+    const dqGlossaryData = {
+      ...MOCK_GLOSSARY,
+      name: 'Data Quality',
+      displayName: 'Chất lượng dữ liệu',
+      fullyQualifiedName: 'Data Quality',
+    };
+
+    it('should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel on DQ glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-consumer', name: 'DataConsumer' }],
+        },
+        selectedPersona: { name: 'DataConsumerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: dqGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: false, EditAll: false },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('dq.export-excel')).toBeInTheDocument();
+      expect(screen.queryByText('dq.import-excel')).not.toBeInTheDocument();
+    });
+
+    it('should show Nhập Excel and Xuất Excel for Admin on DQ glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: true,
+          roles: [],
+        },
+        selectedPersona: undefined,
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: dqGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true, EditAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('dq.export-excel')).toBeInTheDocument();
+      expect(screen.getByText('dq.import-excel')).toBeInTheDocument();
+    });
+
+    it('should show Nhập Excel and Xuất Excel for Data Proposer on DQ glossary', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
+        currentUser: {
+          ...mockUserData,
+          isAdmin: false,
+          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        },
+        selectedPersona: { name: 'DataProposerPersona' },
+      }));
+
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: dqGlossaryData,
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: false, EditAll: false },
+        isVersionView: false,
+        type: EntityType.GLOSSARY,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('manage-button'));
+      });
+
+      expect(screen.getByText('dq.export-excel')).toBeInTheDocument();
+      expect(screen.getByText('dq.import-excel')).toBeInTheDocument();
+    });
+  });
 });

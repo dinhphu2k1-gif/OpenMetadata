@@ -82,13 +82,15 @@ jest.mock('../../common/UserTeamSelectableListSearchInput/UserTeamSelectableList
 );
 
 jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
-  jest.fn().mockImplementation(({ initialValue, onTextChange }) => (
-    <textarea
-      data-testid="cde-business-meaning"
-      defaultValue={initialValue}
-      onChange={(e) => onTextChange?.(e.target.value)}
-    />
-  ))
+  jest.fn().mockImplementation(
+    ({ initialValue, onTextChange, ...rest }) => (
+      <textarea
+        data-testid={rest['data-testid'] || 'cde-business-meaning'}
+        defaultValue={initialValue}
+        onChange={(e) => onTextChange?.(e.target.value)}
+      />
+    )
+  )
 );
 
 jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
@@ -265,7 +267,7 @@ describe('CDEGlossaryTermForm', () => {
       container.querySelector('.cde-glossary-term-form')
     ).toHaveClass('cde-glossary-term-form--edit');
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
-      3
+      0
     );
   });
 

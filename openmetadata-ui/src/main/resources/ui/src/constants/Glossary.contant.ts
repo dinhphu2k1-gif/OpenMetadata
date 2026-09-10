@@ -57,13 +57,28 @@ export const DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME =
 export const isDataDictionaryGlossary = (
   ...identifiers: Array<string | undefined>
 ) =>
-  identifiers.some(
-    (identifier) =>
+  identifiers.some((identifier) => {
+    if (!identifier) {
+      return false;
+    }
+    let decoded = identifier;
+    try {
+      decoded = decodeURIComponent(identifier);
+    } catch {
+      // ignore
+    }
+
+    return (
       identifier === DATA_DICTIONARY_GLOSSARY_NAME ||
       identifier === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
+      decoded === DATA_DICTIONARY_GLOSSARY_NAME ||
+      decoded === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
       identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
-      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
-  );
+      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`) ||
+      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
+      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
+    );
+  });
 
 export const DATA_QUALITY_GLOSSARY_NAME = 'Data Quality';
 export const DATA_QUALITY_GLOSSARY_DISPLAY_NAME = 'Chất lượng dữ liệu';

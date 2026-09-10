@@ -18,10 +18,12 @@
   padding: @padding-xss @padding-xs;
   text-align: center;
   max-width: fit-content;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   border: 1px solid;
 
   &.success {
@@ -114,8 +116,14 @@
     border-color: @purple-5;
   }
 
+  .anticon {
+    display: inline-flex;
+    align-items: center;
+  }
+
   svg {
     font-size: 12px;
+    flex-shrink: 0;
   }
 }
 
@@ -123,6 +131,7 @@
   font-weight: 500;
   font-size: 12px;
   line-height: 20px;
+  white-space: nowrap;
 }
 
 .status-badge-v2 {

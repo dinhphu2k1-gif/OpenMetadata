@@ -38,9 +38,10 @@ const UserTeamSelectableListSearchInput: React.FC<
   multiple,
   label,
   previewSelected = false,
-  listHeight,
+  listHeight = 180,
   tooltipText,
   placeholder,
+  popoverProps,
 }) => {
   const [popoverVisible, setPopoverVisible] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<EntityReference[]>([]);
@@ -143,34 +144,27 @@ const UserTeamSelectableListSearchInput: React.FC<
   }, [owner]);
 
   return (
-    <>
-      {popoverVisible && (
-        <UserTeamSelectableList
-          hasPermission={hasPermission}
-          label={label}
-          listHeight={listHeight}
-          multiple={multiple}
-          overlayClassName="user-team-selectable-list-search-input-popover"
-          owner={selectedUsers}
-          popoverProps={{
-            open: popoverVisible,
-            onOpenChange: handlePopoverVisibleChange,
-            trigger: 'click',
-            placement: 'bottomLeft',
-          }}
-          previewSelected={previewSelected}
-          tooltipText={tooltipText}
-          onClose={handleClose}
-          onUpdate={handleUpdate}>
-          {/* Have to pass the selectInput as children, so popover can become targetComponent 
-            and popover don't overflow on it */}
-          {selectInput}
-        </UserTeamSelectableList>
-      )}
-      {/* Conditionally render the select input, to avoid the UserTeamSelectableList component
-         render unnecessarily */}
-      {!popoverVisible && selectInput}
-    </>
+    <UserTeamSelectableList
+      hasPermission={hasPermission}
+      label={label}
+      listHeight={listHeight}
+      multiple={multiple}
+      overlayClassName="user-team-selectable-list-search-input-popover"
+      owner={selectedUsers}
+      popoverProps={{
+        open: popoverVisible,
+        onOpenChange: handlePopoverVisibleChange,
+        trigger: 'click',
+        placement: 'topLeft',
+        autoAdjustOverflow: false,
+        ...popoverProps,
+      }}
+      previewSelected={previewSelected}
+      tooltipText={tooltipText}
+      onClose={handleClose}
+      onUpdate={handleUpdate}>
+      {selectInput}
+    </UserTeamSelectableList>
   );
 };
 

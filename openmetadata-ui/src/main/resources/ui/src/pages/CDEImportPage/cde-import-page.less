@@ -1,0 +1,235 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+@import '../../styles/variables.less';
+@import '../../styles/components/om-rdg.less';
+
+.cde-import-page-container {
+  padding: 0 24px 36px 24px;
+  width: 100%;
+}
+
+.cde-import-rdg {
+  &.om-rdg {
+    .rdg {
+      border: none;
+      height: calc(100vh - 340px);
+      min-height: 260px;
+      max-height: 560px;
+      background-color: @grey-9;
+    }
+
+    // Tăng khoảng đệm lề trái cho cột đầu tiên (Mã CDE quy chiếu) tránh bị sát góc bo viền
+    .rdg-cell.cde-first-column-header,
+    .rdg-header-row .rdg-cell[aria-colindex='1'],
+    .rdg-header-row .rdg-cell:first-child {
+      padding-left: 20px !important;
+    }
+
+    .rdg-cell.cde-first-column-cell,
+    .rdg-row .rdg-cell[aria-colindex='1'],
+    .rdg-row .rdg-cell:first-child {
+      padding-left: 20px !important;
+
+      &.rdg-editor-container {
+        padding-left: 0 !important;
+
+        .rdg-text-editor {
+          padding-left: 18px !important;
+        }
+      }
+    }
+  }
+}
+
+.cde-import-rdg-step3 {
+  &.om-rdg {
+    .rdg {
+      border: none;
+      height: calc(100vh - 390px);
+      min-height: 220px;
+      max-height: 520px;
+      background-color: @grey-9;
+    }
+
+    // Cột 1: Trạng thái (đệm lề trái & phải để không sát viền và không dính vào cột Chi tiết)
+    .rdg-header-row .rdg-cell[aria-colindex='1'],
+    .rdg-header-row .rdg-cell.cde-status-column-header {
+      padding-left: 20px !important;
+      padding-right: 16px !important;
+    }
+
+    .rdg-row .rdg-cell[aria-colindex='1'],
+    .rdg-row .rdg-cell.cde-status-column-cell {
+      padding-left: 20px !important;
+      padding-right: 16px !important;
+    }
+
+    // Cột 2: Chi tiết thẩm định (đệm lề trái rõ ràng, phân cách với cột Trạng thái)
+    .rdg-header-row .rdg-cell[aria-colindex='2'],
+    .rdg-header-row .rdg-cell.cde-details-column-header {
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+    }
+
+    .rdg-row .rdg-cell[aria-colindex='2'],
+    .rdg-row .rdg-cell.cde-details-column-cell {
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+    }
+  }
+}
+
+.cde-import-footer {
+  margin-top: 16px;
+  padding-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+
+  &.justify-end {
+    justify-content: flex-end;
+  }
+
+  .cde-action-btn {
+    min-width: 96px;
+  }
+}
+
+// Bộ lọc trạng thái chuẩn OpenMetadata Segmented Control
+.cde-status-filter-segmented.ant-segmented {
+  background-color: #f3f4f6;
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+
+  .ant-segmented-group {
+    gap: 2px;
+  }
+
+  .ant-segmented-item {
+    border-radius: 4px;
+    color: @text-color;
+    font-size: 12px;
+    transition: all 0.2s ease-in-out;
+
+    &:hover:not(.ant-segmented-item-selected) {
+      color: @text-color;
+      background-color: rgba(255, 255, 255, 0.6);
+    }
+
+    &-selected {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  .filter-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 6px;
+    user-select: none;
+  }
+
+  .filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 9px;
+    background-color: #e5e7eb;
+    color: #4b5563;
+    transition: all 0.2s ease;
+
+    &-error {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+
+    &-success {
+      background-color: #dcfce7;
+      color: #16a34a;
+    }
+  }
+
+  .ant-segmented-item-selected {
+    .filter-count {
+      background-color: #e5e7eb;
+      color: #1f2937;
+
+      &-error {
+        background-color: #ef4444;
+        color: #ffffff;
+      }
+
+      &-success {
+        background-color: #16a34a;
+        color: #ffffff;
+      }
+    }
+  }
+
+  .filter-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+
+    &.dot-error {
+      background-color: #ef4444;
+    }
+
+    &.dot-success {
+      background-color: #22c55e;
+    }
+  }
+}
+
+// Banner tóm tắt trạng thái thẩm định tại Bước 3
+.cde-validation-header {
+  margin-bottom: 12px;
+}
+
+.cde-validation-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: all 0.2s ease-in-out;
+
+  &.has-error {
+    background-color: #fff1f0;
+    border: 1px solid #ffccc7;
+    color: #cf1322;
+  }
+
+  &.is-success {
+    background-color: #f6ffed;
+    border: 1px solid #b7eb8f;
+    color: #389e0d;
+  }
+}
+
