@@ -1642,4 +1642,145 @@ describe('Test GlossaryTermTab component', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe('Data Quality glossary table and toolbar filters', () => {
+    const mockDqTerms = [
+      {
+        id: 'dq-term-1',
+        name: 'DQ01',
+        displayName: 'Quy tắc 01',
+        fullyQualifiedName: 'DataQuality.DQ01',
+        entityStatus: EntityStatus.Draft,
+        description: 'Kiểm tra tính đầy đủ',
+        tags: [
+          {
+            tagFQN: 'DataQualityDimension.Completeness',
+            displayName: 'Tính đầy đủ',
+          },
+          {
+            tagFQN: 'DataSource.CoreBanking',
+            displayName: 'Core Banking',
+          },
+          {
+            tagFQN: 'DataQualityMethod.Automated',
+            displayName: 'Tự động',
+          },
+          {
+            tagFQN: 'DataQualityTargetPopulation.AllRecords',
+            displayName: 'Toàn bộ dữ liệu',
+          },
+        ],
+        owners: [
+          {
+            id: 'owner-1',
+            name: 'admin',
+            displayName: 'Admin User',
+            type: 'user',
+          },
+        ],
+        extension: {
+          cdeCode: 'CDE01',
+          cdeName: 'Mã khách hàng',
+          qualityThreshold: '100%',
+        },
+      } as unknown as ModifiedGlossaryTerm,
+    ];
+
+    beforeEach(() => {
+      mockUseGlossaryStore.activeGlossary = {
+        id: 'dq-glossary-id',
+        name: 'Data Quality',
+        displayName: 'Chất lượng dữ liệu',
+        fullyQualifiedName: 'Data Quality',
+      } as ModifiedGlossary;
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: mockDqTerms,
+        paging: { after: null },
+      });
+      mockUseGlossaryStore.glossaryChildTerms = mockDqTerms;
+    });
+
+    it('should render the DQ table and DQ filter dropdowns', async () => {
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+        expect(
+          screen
+            .getByTestId('glossary-terms-table')
+            .closest('.dq-glossary-terms-table')
+        ).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('dq-dimension-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('dq-datasource-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('dq-owner-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('dq-method-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('dq-target-population-filter')).toBeInTheDocument();
+    });
+
+    it('should show bulk action bar when row is selected on DQ table', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: { id: 'admin-id', name: 'admin', isAdmin: true },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+
+      const rowCheckboxes = container.querySelectorAll(
+        '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
+      );
+      expect(rowCheckboxes.length).toBeGreaterThan(0);
+
+      fireEvent.click(rowCheckboxes[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+    });
+
+    it('should not show bulk-submit-for-review-btn when Data Steward selects row on DQ table', async () => {
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: {
+          id: 'steward-id',
+          name: 'steward',
+          isAdmin: false,
+          roles: [{ name: 'DataSteward' }],
+        },
+        selectedPersona: { name: 'DataSteward' },
+      });
+
+      const { container } = render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
+      });
+
+      const rowCheckboxes = container.querySelectorAll(
+        '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
+      );
+      expect(rowCheckboxes.length).toBeGreaterThan(0);
+
+      fireEvent.click(rowCheckboxes[0]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId('bulk-submit-for-review-btn')
+      ).not.toBeInTheDocument();
+    });
+  });
 });

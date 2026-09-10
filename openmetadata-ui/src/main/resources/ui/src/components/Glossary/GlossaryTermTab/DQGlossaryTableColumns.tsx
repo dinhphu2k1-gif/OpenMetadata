@@ -286,7 +286,6 @@ export const getDQGlossaryTableColumns = ({
   {
     title: t('dq.cde-name'),
     key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.CDE_NAME,
-    fixed: 'left',
     width: 180,
     render: (_, record) => {
       if (record.isLoadMoreButton) {

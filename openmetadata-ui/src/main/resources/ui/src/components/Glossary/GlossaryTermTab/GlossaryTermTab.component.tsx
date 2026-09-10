@@ -142,7 +142,11 @@ import {
   getCDEReferenceLabel,
 } from './CDEGlossaryTableColumns';
 import CDEFilterDropdown from './CDEFilterDropdown.component';
-import { getDQGlossaryTableColumns } from './DQGlossaryTableColumns';
+import {
+  DQ_TAG_CLASSIFICATIONS,
+  getDQGlossaryTableColumns,
+  getDQReferenceLabel,
+} from './DQGlossaryTableColumns';
 import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
 import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
@@ -521,6 +525,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [selectedCdeClassifications, setSelectedCdeClassifications] = useState<string[]>(['all']);
   const [allCdeTerms, setAllCdeTerms] = useState<ModifiedGlossaryTerm[]>([]);
 
+  // DQ Column Filters
+  const [selectedDqDimensions, setSelectedDqDimensions] = useState<string[]>(['all']);
+  const [selectedDqDataSources, setSelectedDqDataSources] = useState<string[]>(['all']);
+  const [selectedDqOwners, setSelectedDqOwners] = useState<string[]>(['all']);
+  const [selectedDqMethods, setSelectedDqMethods] = useState<string[]>(['all']);
+  const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] = useState<string[]>(['all']);
+  const [allDqTerms, setAllDqTerms] = useState<ModifiedGlossaryTerm[]>([]);
+
   const {
     currentPage,
     handlePageChange,
@@ -556,12 +568,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     handleSearch,
   ]);
 
-  // Reset CDE filters when active glossary changes
+  // Reset CDE & DQ filters when active glossary changes
   useEffect(() => {
     setSelectedCdeDomains(['all']);
     setSelectedCdeDataSources(['all']);
     setSelectedCdeOwners(['all']);
     setSelectedCdeClassifications(['all']);
+    setSelectedDqDimensions(['all']);
+    setSelectedDqDataSources(['all']);
+    setSelectedDqOwners(['all']);
+    setSelectedDqMethods(['all']);
+    setSelectedDqTargetPopulations(['all']);
   }, [activeGlossary?.fullyQualifiedName]);
 
   // Fetch full list of CDE terms for options and comprehensive client-side filtering
@@ -589,20 +606,31 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     }
   }, [fetchAllCdeTerms, isCDEGlossary, activeGlossary?.id]);
 
-  const handleBulkActionSuccess = useCallback(() => {
-    handleCloseBulkModal();
-    handleClearSelection();
-    refreshGlossaryTerms?.();
-    if (isCDEGlossary) {
-      fetchAllCdeTerms();
+  // Fetch full list of DQ terms for options and comprehensive client-side filtering
+  const fetchAllDqTerms = useCallback(async () => {
+    if (!activeGlossary?.id || !isDQGlossary) {
+      return;
     }
-  }, [
-    handleCloseBulkModal,
-    handleClearSelection,
-    refreshGlossaryTerms,
-    isCDEGlossary,
-    fetchAllCdeTerms,
-  ]);
+    try {
+      const key = isGlossary ? 'glossary' : 'parent';
+      const { data } = await getGlossaryTerms({
+        [key]: activeGlossary.id,
+        limit: API_RES_MAX_SIZE,
+        fields: DQ_GLOSSARY_TERM_FIELDS,
+        ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
+      });
+      setAllDqTerms(data as ModifiedGlossaryTerm[]);
+    } catch (error) {
+      // fallback to glossaryChildTerms
+    }
+  }, [activeGlossary?.id, isDQGlossary, isGlossary, isConsumer]);
+
+  useEffect(() => {
+    if (isDQGlossary && activeGlossary?.id) {
+      fetchAllDqTerms();
+    }
+  }, [fetchAllDqTerms, isDQGlossary, activeGlossary?.id]);
+
 
   const hasActiveCdeFilters = useMemo(
     () =>
@@ -618,6 +646,22 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     ]
   );
 
+  const hasActiveDqFilters = useMemo(
+    () =>
+      !selectedDqDimensions.includes('all') ||
+      !selectedDqDataSources.includes('all') ||
+      !selectedDqOwners.includes('all') ||
+      !selectedDqMethods.includes('all') ||
+      !selectedDqTargetPopulations.includes('all'),
+    [
+      selectedDqDimensions,
+      selectedDqDataSources,
+      selectedDqOwners,
+      selectedDqMethods,
+      selectedDqTargetPopulations,
+    ]
+  );
+
   const sourceTermsForOptions = useMemo(() => {
     if (allCdeTerms.length > 0) {
       return allCdeTerms;
@@ -628,6 +672,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
     return [];
   }, [allCdeTerms, glossaryChildTerms]);
+
+  const sourceDqTermsForOptions = useMemo(() => {
+    if (allDqTerms.length > 0) {
+      return allDqTerms;
+    }
+    if (Array.isArray(glossaryChildTerms)) {
+      return glossaryChildTerms as ModifiedGlossaryTerm[];
+    }
+
+    return [];
+  }, [allDqTerms, glossaryChildTerms]);
 
   const cdeDomainOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -707,6 +762,113 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       .map(([value, label]) => ({ label, value }))
       .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [sourceTermsForOptions]);
+
+  const dqDimensionOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDqTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dimension) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceDqTermsForOptions]);
+
+  const dqDataSourceOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDqTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceDqTermsForOptions]);
+
+  const dqOwnerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDqTermsForOptions.forEach((term) => {
+      term.owners?.forEach((o) => {
+        const label = getDQReferenceLabel(o);
+        const val = o.id || o.fullyQualifiedName || o.name || '';
+        if (label && val) {
+          map.set(val, label);
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceDqTermsForOptions]);
+
+  const dqMethodOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDqTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.method) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceDqTermsForOptions]);
+
+  const dqTargetPopulationOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDqTermsForOptions.forEach((term) => {
+      term.tags?.forEach((t) => {
+        if (
+          t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.targetPopulation
+        ) {
+          const label =
+            t.displayName ??
+            t.name ??
+            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
+            '';
+          if (label) {
+            map.set(t.tagFQN, label);
+          }
+        }
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [sourceDqTermsForOptions]);
 
   const availableCdeDomains = useMemo(() => {
     const domainMap = new Map<string, EntityReference>();
@@ -881,6 +1043,28 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       setIsTableLoading(false);
     }
   };
+
+  const handleBulkActionSuccess = useCallback(() => {
+    handleCloseBulkModal();
+    handleClearSelection();
+    refreshGlossaryTerms?.();
+    fetchAllTerms();
+    if (isCDEGlossary) {
+      fetchAllCdeTerms();
+    }
+    if (isDQGlossary) {
+      fetchAllDqTerms();
+    }
+  }, [
+    handleCloseBulkModal,
+    handleClearSelection,
+    refreshGlossaryTerms,
+    fetchAllTerms,
+    isCDEGlossary,
+    fetchAllCdeTerms,
+    isDQGlossary,
+    fetchAllDqTerms,
+  ]);
 
   const fetchExpadedTree = async () => {
     setIsTableLoading(true);
@@ -2075,6 +2259,145 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return processTermsWithLoadMore(filterRecursive(sourceList));
     }
 
+    if (isDQGlossary && hasActiveDqFilters) {
+      const sourceList: ModifiedGlossaryTerm[] =
+        allDqTerms.length > 0
+          ? (buildTree(allDqTerms) as ModifiedGlossaryTerm[])
+          : glossaryTerms;
+
+      const filterPredicate = (term: ModifiedGlossaryTerm): boolean => {
+        if (!selectedDqDimensions.includes('all')) {
+          const termDims =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dimension
+              )
+              .map((t) => t.tagFQN) || [];
+          if (!selectedDqDimensions.some((d) => termDims.includes(d))) {
+            return false;
+          }
+        }
+
+        if (!selectedDqDataSources.includes('all')) {
+          const termSources =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource
+              )
+              .map((t) => t.tagFQN) || [];
+          if (!selectedDqDataSources.some((s) => termSources.includes(s))) {
+            return false;
+          }
+        }
+
+        if (!selectedDqOwners.includes('all')) {
+          const termOwners =
+            term.owners?.map(
+              (o) =>
+                o.id ||
+                o.fullyQualifiedName ||
+                o.name ||
+                getDQReferenceLabel(o)
+            ) || [];
+          if (!selectedDqOwners.some((o) => termOwners.includes(o))) {
+            return false;
+          }
+        }
+
+        if (!selectedDqMethods.includes('all')) {
+          const termMethods =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.method
+              )
+              .map((t) => t.tagFQN) || [];
+          if (!selectedDqMethods.some((m) => termMethods.includes(m))) {
+            return false;
+          }
+        }
+
+        if (!selectedDqTargetPopulations.includes('all')) {
+          const termPops =
+            term.tags
+              ?.filter(
+                (t) =>
+                  t.tagFQN.split('.')[0] ===
+                  DQ_TAG_CLASSIFICATIONS.targetPopulation
+              )
+              .map((t) => t.tagFQN) || [];
+          if (!selectedDqTargetPopulations.some((p) => termPops.includes(p))) {
+            return false;
+          }
+        }
+
+        if (searchTerm.trim()) {
+          const termLower = searchTerm.toLowerCase();
+          const nameMatch = term.name?.toLowerCase().includes(termLower);
+          const dispMatch = term.displayName
+            ?.toLowerCase()
+            .includes(termLower);
+          const descMatch = term.description
+            ?.toLowerCase()
+            .includes(termLower);
+          const ext = term.extension as Record<string, unknown> | undefined;
+          const cdeCodeMatch = String(ext?.cdeCode ?? '')
+            .toLowerCase()
+            .includes(termLower);
+          const cdeNameMatch = String(ext?.cdeName ?? '')
+            .toLowerCase()
+            .includes(termLower);
+          const ruleExplMatch = String(ext?.ruleExplanation ?? '')
+            .toLowerCase()
+            .includes(termLower);
+
+          if (
+            !nameMatch &&
+            !dispMatch &&
+            !descMatch &&
+            !cdeCodeMatch &&
+            !cdeNameMatch &&
+            !ruleExplMatch
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      };
+
+      const filterRecursive = (
+        nodes: ModifiedGlossaryTerm[]
+      ): ModifiedGlossaryTerm[] => {
+        const result: ModifiedGlossaryTerm[] = [];
+
+        for (const node of nodes) {
+          const selfMatches = filterPredicate(node);
+          const matchingChildren = node.children?.length
+            ? filterRecursive(node.children as ModifiedGlossaryTerm[])
+            : [];
+
+          if (selfMatches || matchingChildren.length > 0) {
+            result.push({
+              ...node,
+              children:
+                matchingChildren.length > 0 ? matchingChildren : node.children,
+              childrenCount:
+                matchingChildren.length > 0
+                  ? matchingChildren.length
+                  : node.childrenCount,
+            });
+          }
+        }
+
+        return result;
+      };
+
+      return processTermsWithLoadMore(filterRecursive(sourceList));
+    }
+
     return processTermsWithLoadMore(glossaryTerms);
   }, [
     glossaryTerms,
@@ -2086,6 +2409,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedCdeDataSources,
     selectedCdeOwners,
     selectedCdeClassifications,
+    isDQGlossary,
+    hasActiveDqFilters,
+    allDqTerms,
+    selectedDqDimensions,
+    selectedDqDataSources,
+    selectedDqOwners,
+    selectedDqMethods,
+    selectedDqTargetPopulations,
     searchTerm,
   ]);
 
@@ -2101,6 +2432,22 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [
     isCDEGlossary,
     hasActiveCdeFilters,
+    filteredGlossaryTerms,
+    findExpandableKeysForArray,
+  ]);
+
+  useEffect(() => {
+    if (
+      isDQGlossary &&
+      hasActiveDqFilters &&
+      filteredGlossaryTerms.length > 0
+    ) {
+      const keys = findExpandableKeysForArray(filteredGlossaryTerms);
+      setExpandedRowKeys((prev) => Array.from(new Set([...prev, ...keys])));
+    }
+  }, [
+    isDQGlossary,
+    hasActiveDqFilters,
     filteredGlossaryTerms,
     findExpandableKeysForArray,
   ]);
@@ -2137,7 +2484,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   entity: t('label.term-plural'),
                 })
           }
-          style={{ width: isDQGlossary ? 330 : isCDEGlossary ? 280 : 250 }}
+          style={{ width: isDQGlossary ? 300 : isCDEGlossary ? 280 : 250 }}
           value={searchInput}
           onChange={handleSearchChange}
         />
@@ -2193,6 +2540,46 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           </>
         )}
 
+        {isDQGlossary && (
+          <>
+            <CDEFilterDropdown
+              dataTestId="dq-dimension-filter"
+              label={t('dq.dimension', 'Tiêu chí')}
+              options={dqDimensionOptions}
+              selectedValues={selectedDqDimensions}
+              onChange={setSelectedDqDimensions}
+            />
+            <CDEFilterDropdown
+              dataTestId="dq-datasource-filter"
+              label={t('dq.data-source', 'Hệ thống nguồn')}
+              options={dqDataSourceOptions}
+              selectedValues={selectedDqDataSources}
+              onChange={setSelectedDqDataSources}
+            />
+            <CDEFilterDropdown
+              dataTestId="dq-owner-filter"
+              label={t('dq.owners', 'Chủ sở hữu')}
+              options={dqOwnerOptions}
+              selectedValues={selectedDqOwners}
+              onChange={setSelectedDqOwners}
+            />
+            <CDEFilterDropdown
+              dataTestId="dq-method-filter"
+              label={t('dq.method', 'Hình thức kiểm tra')}
+              options={dqMethodOptions}
+              selectedValues={selectedDqMethods}
+              onChange={setSelectedDqMethods}
+            />
+            <CDEFilterDropdown
+              dataTestId="dq-target-population-filter"
+              label={t('dq.target-population', 'Tập dữ liệu kiểm tra')}
+              options={dqTargetPopulationOptions}
+              selectedValues={selectedDqTargetPopulations}
+              onChange={setSelectedDqTargetPopulations}
+            />
+          </>
+        )}
+
         {getBulkEditButton(permissions.EditAll, handleEditGlossary)}
 
         <Button
@@ -2238,8 +2625,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedCdeDataSources,
     selectedCdeOwners,
     selectedCdeClassifications,
+    dqDimensionOptions,
+    dqDataSourceOptions,
+    dqOwnerOptions,
+    dqMethodOptions,
+    dqTargetPopulationOptions,
+    selectedDqDimensions,
+    selectedDqDataSources,
+    selectedDqOwners,
+    selectedDqMethods,
+    selectedDqTargetPopulations,
     filteredGlossaryTerms,
     allCdeTerms,
+    allDqTerms,
     t,
     permissions.EditAll,
   ]);
@@ -2312,12 +2710,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const hasNoTerms = isEmpty(glossaryTerms);
 
   const isAnyFilterActive =
-    isSearchActive || isStatusFilterActive || hasActiveCdeFilters;
+    isSearchActive ||
+    isStatusFilterActive ||
+    hasActiveCdeFilters ||
+    hasActiveDqFilters;
 
   const totalGlossaryTermsCount =
     activeGlossary?.termCount ??
     activeGlossary?.childrenCount ??
-    allCdeTerms.length;
+    (isDQGlossary ? allDqTerms.length : allCdeTerms.length);
 
   const glossaryPlaceholderText = useMemo(() => {
     if (isSearchActive && (searchTerm || searchInput)) {
@@ -2392,6 +2793,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             <>
               <Table
                 resizableColumns
+                sticky={{ offsetScroll: 0 }}
                 className={classNames('drop-over-background', {
                   'cde-glossary-terms-table': isCDEGlossary,
                   'dq-glossary-terms-table': isDQGlossary,
@@ -2463,6 +2865,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             // This keeps the search bar and filters visible
             <Table
               resizableColumns
+              sticky={{ offsetScroll: 0 }}
               className={classNames('glossary-terms-table', {
                 'cde-glossary-terms-table': isCDEGlossary,
                 'dq-glossary-terms-table': isDQGlossary,
