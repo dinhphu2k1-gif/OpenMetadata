@@ -2737,7 +2737,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [isSearchActive, isAnyFilterActive, searchTerm, searchInput, t]);
 
   if (isTechGlossary) {
-    return <TechnicalDictionaryPage />;
+    return <TechnicalDictionaryPage isEmbedded />;
   }
 
   if (
@@ -2793,7 +2793,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             <>
               <Table
                 resizableColumns
-                sticky={{ offsetScroll: 0 }}
                 className={classNames('drop-over-background', {
                   'cde-glossary-terms-table': isCDEGlossary,
                   'dq-glossary-terms-table': isDQGlossary,
@@ -2865,7 +2864,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             // This keeps the search bar and filters visible
             <Table
               resizableColumns
-              sticky={{ offsetScroll: 0 }}
               className={classNames('glossary-terms-table', {
                 'cde-glossary-terms-table': isCDEGlossary,
                 'dq-glossary-terms-table': isDQGlossary,

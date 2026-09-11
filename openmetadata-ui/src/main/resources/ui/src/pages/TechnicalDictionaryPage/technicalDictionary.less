@@ -11,76 +11,77 @@
  *  limitations under the License.
  */
 
+@import (reference) '../../styles/variables.less';
+
 .tech-dict-page-container {
-  padding: 20px 24px;
-  background-color: #f8f9fa;
-  min-height: 100vh;
+  width: 100%;
 
   .tech-dict-header-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid #edf0f2;
+    background: @white;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+    border: 1px solid @grey-200;
 
     .tech-dict-title {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
-      color: #1f2937;
+      color: @text-color;
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
 
       .tech-dict-icon-wrapper {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
+        width: 34px;
+        height: 34px;
+        border-radius: 6px;
         background: rgba(165, 28, 48, 0.08);
-        color: #A51C30;
+        color: @primary-color;
       }
     }
 
     .tech-dict-subheading {
-      color: #6b7280;
-      font-size: 13.5px;
-      margin-bottom: 16px;
+      color: @text-color-tertiary;
+      font-size: 13px;
+      margin-bottom: 14px;
     }
 
     .tech-dict-stats-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 12px;
       padding-top: 12px;
-      border-top: 1px solid #f1f5f9;
+      border-top: 1px solid @grey-200;
 
       .tech-stat-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+        background: @white;
+        border: 1px solid @grey-200;
         border-radius: 8px;
-        padding: 10px 16px;
+        padding: 10px 14px;
         display: flex;
         align-items: center;
         gap: 12px;
         flex: 1;
-        min-width: 180px;
+        min-width: 170px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.02);
 
         .tech-stat-icon {
-          font-size: 20px;
+          font-size: 18px;
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 38px;
-          height: 38px;
-          border-radius: 8px;
+          width: 36px;
+          height: 36px;
+          border-radius: 6px;
 
           &.primary {
             background: rgba(165, 28, 48, 0.1);
-            color: #A51C30;
+            color: @primary-color;
           }
           &.blue {
             background: rgba(24, 144, 255, 0.1);
@@ -98,59 +99,102 @@
 
         .tech-stat-info {
           .tech-stat-value {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
-            color: #111827;
+            color: @text-color;
             line-height: 1.2;
           }
           .tech-stat-label {
             font-size: 12px;
-            color: #64748b;
+            color: @text-color-tertiary;
             font-weight: 500;
           }
         }
       }
     }
   }
+}
 
-  .tech-dict-content-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    border: 1px solid #edf0f2;
+.tech-dict-embedded-container {
+  width: 100%;
+  padding: 0;
+}
 
-    .tech-dict-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
+.tech-dict-content-card {
+  background: @white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+  border: 1px solid @grey-200;
+
+  &.tech-dict-content-card-embedded {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .table-container {
+    .p-x-md {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
+  .tech-dict-table-toolbar {
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    row-gap: 10px !important;
+    flex-wrap: wrap !important;
+
+    .ant-input-affix-wrapper,
+    .tech-dict-search-input {
+      min-height: 36px;
+      border-color: @grey-300;
+      border-radius: 6px;
+      width: 260px;
+      flex-shrink: 0;
+    }
+
+    .status-dropdown,
+    .cde-filter-dropdown {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid @grey-300;
+      border-radius: 6px;
+      color: #344054;
+      flex-shrink: 0;
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 18px;
 
-      .tech-dict-search-group {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
-        flex: 1;
-
-        .tech-search-input {
-          max-width: 320px;
-          min-width: 240px;
-          border-radius: 6px;
-        }
-
-        .tech-filter-select {
-          min-width: 150px;
-          border-radius: 6px;
-        }
+      &.active {
+        border-color: @primary-color;
+        background-color: rgba(165, 28, 48, 0.04);
       }
+    }
 
-      .tech-dict-actions-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .tech-dict-toolbar-actions {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+
+      .ant-btn {
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: 6px;
+      }
+    }
+
+    .custom-column-dropdown-menu {
+      flex-shrink: 0;
+
+      .ant-btn {
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: 6px;
       }
     }
   }
@@ -159,23 +203,23 @@
 /* Custom Table Font & Badges */
 .tech-code-font {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-  font-size: 12.5px;
-  background: #f1f5f9;
+  font-size: 12px;
+  background: @grey-50;
   padding: 2px 6px;
   border-radius: 4px;
-  border: 1px solid #e2e8f0;
-  color: #0f172a;
+  border: 1px solid @grey-200;
+  color: @text-color;
 }
 
 .tech-code-link {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: #1890ff;
+  color: @link-color;
   transition: all 0.2s ease;
 
   &:hover {
-    color: #096dd9;
+    color: @primary-color;
     text-decoration: underline;
   }
 }
@@ -184,18 +228,18 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #ecfdf5 !important;
-  color: #065f46 !important;
-  border: 1px solid #a7f3d0 !important;
-  border-radius: 6px !important;
-  padding: 2px 8px !important;
-  font-weight: 600 !important;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: #d1fae5 !important;
-    border-color: #34d399 !important;
+    background: #d1fae5;
+    border-color: #34d399;
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(6, 95, 70, 0.1);
   }
@@ -204,15 +248,15 @@
 .tech-type-pill {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 11.5px;
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #e5e7eb;
+  background: @grey-50;
+  color: @text-color;
+  border: 1px solid @grey-200;
   border-radius: 4px;
   padding: 1px 6px;
 }
 
 .tech-pill {
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 11.5px;
   font-weight: 500;
   padding: 2px 8px;

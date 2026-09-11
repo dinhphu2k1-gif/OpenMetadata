@@ -18,14 +18,22 @@ import {
   DatabaseOutlined,
   DownloadOutlined,
   ReloadOutlined,
+  SearchOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import { Button, Input, Select } from 'antd';
+import { Button, Input } from 'antd';
+import classNames from 'classnames';
 import { compare, Operation } from 'fast-json-patch';
-import { debounce, isEmpty } from 'lodash';
+import { isEmpty } from 'lodash';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg';
+import CDEFilterDropdown, {
+  FilterOption,
+} from '../../components/Glossary/GlossaryTermTab/CDEFilterDropdown.component';
+import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
+import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
+import { TitleBreadcrumbProps } from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import { Table } from '../../generated/entity/data/table';
 import { LabelType, State, TagLabel, TagSource } from '../../generated/type/tagLabel';
@@ -39,7 +47,9 @@ import TechnicalDictionaryTable, {
 import TechnicalDictionaryEditModal from './TechnicalDictionaryEditModal.component';
 import './technicalDictionary.less';
 
-const { Option } = Select;
+export interface TechnicalDictionaryPageProps {
+  isEmbedded?: boolean;
+}
 
 export const TECHNICAL_DICTIONARY_OVERRIDES_STORAGE_KEY =
   'om_technical_dictionary_overrides_v1';
@@ -374,7 +384,9 @@ export const rejectColumnMetadataOnBackend = async (
   }
 };
 
-export const TechnicalDictionaryPage: React.FC = () => {
+export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = ({
+  isEmbedded = false,
+}) => {
   const { t } = useTranslation();
   const { currentUser, selectedPersona } = useApplicationStore();
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -383,11 +395,33 @@ export const TechnicalDictionaryPage: React.FC = () => {
     Array<{ label: string; value: string; name: string }>
   >([]);
   const [searchText, setSearchText] = useState<string>('');
-  const [selectedSource, setSelectedSource] = useState<string>('ALL');
-  const [selectedElementType, setSelectedElementType] = useState<string>('ALL');
-  const [selectedGenType, setSelectedGenType] = useState<string>('ALL');
-  const [cdeFilter, setCdeFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedSources, setSelectedSources] = useState<string[]>(['all']);
+  const [selectedElementTypes, setSelectedElementTypes] = useState<string[]>([
+    'all',
+  ]);
+  const [selectedGenTypes, setSelectedGenTypes] = useState<string[]>(['all']);
+  const [selectedCdeFilters, setSelectedCdeFilters] = useState<string[]>([
+    'all',
+  ]);
+  const [selectedStatusFilters, setSelectedStatusFilters] = useState<string[]>([
+    'all',
+  ]);
+
+  const breadcrumbs: TitleBreadcrumbProps['titleLinks'] = useMemo(
+    () => [
+      {
+        name: t('label.governance'),
+        url: '',
+        activeTitle: false,
+      },
+      {
+        name: t('label.technical-dictionary'),
+        url: '',
+        activeTitle: true,
+      },
+    ],
+    [t]
+  );
 
   // Role permissions:
   // - Data Steward: canApprove/Reject = true, canEdit = false, canViewAllStatus = true
@@ -850,15 +884,6 @@ export const TechnicalDictionaryPage: React.FC = () => {
     [t]
   );
 
-  // Search handler with debounce
-  const handleSearchChange = useMemo(
-    () =>
-      debounce((val: string) => {
-        setSearchText(val.trim().toLowerCase());
-      }, 300),
-    []
-  );
-
   // Available data sources
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
@@ -871,19 +896,118 @@ export const TechnicalDictionaryPage: React.FC = () => {
     return Array.from(set).sort();
   }, [technicalFields]);
 
+  const sourceFilterOptions: FilterOption[] = useMemo(
+    () => sourceOptions.map((src) => ({ label: src, value: src })),
+    [sourceOptions]
+  );
+
+  const elementTypeOptions: FilterOption[] = useMemo(
+    () => [
+      {
+        label: t('label.atomic-data-element', {
+          defaultValue: 'Dữ liệu nguyên tố',
+        }),
+        value: 'AtomicDataElement',
+      },
+      {
+        label: t('label.transformed-data-element', {
+          defaultValue: 'Dữ liệu chuyển đổi',
+        }),
+        value: 'TransformedDataElement',
+      },
+    ],
+    [t]
+  );
+
+  const genTypeOptions: FilterOption[] = useMemo(
+    () => [
+      {
+        label: t('label.system-generated', {
+          defaultValue: 'Hệ thống tự sinh',
+        }),
+        value: 'SystemGenerated',
+      },
+      {
+        label: t('label.system-derived', {
+          defaultValue: 'Hệ thống tính toán',
+        }),
+        value: 'SystemDerived',
+      },
+      {
+        label: t('label.manual-input', {
+          defaultValue: 'Nhập thủ công',
+        }),
+        value: 'ManualInput',
+      },
+      {
+        label: t('label.file-upload', {
+          defaultValue: 'Tải lên',
+        }),
+        value: 'FileUpload',
+      },
+    ],
+    [t]
+  );
+
+  const cdeFilterOptions: FilterOption[] = useMemo(
+    () => [
+      {
+        label: t('label.cde-mapped-only', { defaultValue: 'Đã map CDE' }),
+        value: 'MAPPED',
+      },
+      {
+        label: t('label.cde-unmapped-only', { defaultValue: 'Chưa map CDE' }),
+        value: 'UNMAPPED',
+      },
+    ],
+    [t]
+  );
+
+  const statusFilterOptions: FilterOption[] = useMemo(
+    () => [
+      {
+        label: t('label.status-approved-opt', {
+          defaultValue: 'Đã phê duyệt',
+        }),
+        value: 'Approved',
+      },
+      {
+        label: t('label.status-in-review-opt', {
+          defaultValue: 'Chờ phê duyệt',
+        }),
+        value: 'In Review',
+      },
+      {
+        label: t('label.status-draft-opt', {
+          defaultValue: 'Bản nháp',
+        }),
+        value: 'Draft',
+      },
+      {
+        label: t('label.status-rejected-opt', {
+          defaultValue: 'Bị từ chối',
+        }),
+        value: 'Rejected',
+      },
+    ],
+    [t]
+  );
+
   // Filtered dataset
   const filteredData = useMemo(() => {
+    const search = searchText.trim().toLowerCase();
+
     return technicalFields.filter((item) => {
       // 1. Search text filter
-      if (searchText) {
-        const matchesDb = item.databaseName?.toLowerCase().includes(searchText);
-        const matchesSchema = item.schemaName?.toLowerCase().includes(searchText);
-        const matchesTable = item.tableName.toLowerCase().includes(searchText);
-        const matchesCol = item.columnName.toLowerCase().includes(searchText);
-        const matchesCde = item.cdeCode?.toLowerCase().includes(searchText);
-        const matchesCdeName = item.cdeName?.toLowerCase().includes(searchText);
-        const matchesType = item.dataTypeDisplay.toLowerCase().includes(searchText);
-        const matchesDesc = item.description?.toLowerCase().includes(searchText);
+      if (search) {
+        const matchesDb = item.databaseName?.toLowerCase().includes(search);
+        const matchesSchema = item.schemaName?.toLowerCase().includes(search);
+        const matchesTable = item.tableName.toLowerCase().includes(search);
+        const matchesCol = item.columnName.toLowerCase().includes(search);
+        const matchesCde = item.cdeCode?.toLowerCase().includes(search);
+        const matchesCdeName = item.cdeName?.toLowerCase().includes(search);
+        const matchesType = item.dataTypeDisplay.toLowerCase().includes(search);
+        const matchesDesc = item.description?.toLowerCase().includes(search);
 
         if (
           !matchesDb &&
@@ -900,36 +1024,59 @@ export const TechnicalDictionaryPage: React.FC = () => {
       }
 
       // 2. Source filter
-      if (selectedSource !== 'ALL' && item.serviceName !== selectedSource) {
+      const isAllSources =
+        selectedSources.length === 0 || selectedSources.includes('all');
+      if (!isAllSources && !selectedSources.includes(item.serviceName)) {
         return false;
       }
 
       // 3. Element Type filter
-      if (selectedElementType !== 'ALL') {
-        if (selectedElementType === 'AtomicDataElement') {
-          if (!item.elementType?.includes('Atomic') && !item.elementType?.includes('Nguyên')) {
-            return false;
-          }
-        } else if (selectedElementType === 'TransformedDataElement') {
-          if (!item.elementType?.includes('Transformed') && !item.elementType?.includes('Chuyển')) {
-            return false;
-          }
+      const isAllElementTypes =
+        selectedElementTypes.length === 0 ||
+        selectedElementTypes.includes('all');
+      if (!isAllElementTypes) {
+        const itemType = item.elementType || '';
+        const matchAtomic =
+          selectedElementTypes.includes('AtomicDataElement') &&
+          (itemType.includes('Atomic') || itemType.includes('Nguyên'));
+        const matchTransformed =
+          selectedElementTypes.includes('TransformedDataElement') &&
+          (itemType.includes('Transformed') || itemType.includes('Chuyển'));
+
+        if (!matchAtomic && !matchTransformed) {
+          return false;
         }
       }
 
       // 4. Generation Type filter
-      if (selectedGenType !== 'ALL') {
-        if (!item.generationType?.includes(selectedGenType)) {
+      const isAllGenTypes =
+        selectedGenTypes.length === 0 || selectedGenTypes.includes('all');
+      if (!isAllGenTypes) {
+        const itemGen = item.generationType || '';
+        const hasMatch = selectedGenTypes.some((gen) => itemGen.includes(gen));
+        if (!hasMatch) {
           return false;
         }
       }
 
       // 5. CDE mapping filter
-      if (cdeFilter === 'MAPPED' && !item.cdeCode) {
-        return false;
-      }
-      if (cdeFilter === 'UNMAPPED' && item.cdeCode) {
-        return false;
+      const isAllCde =
+        selectedCdeFilters.length === 0 || selectedCdeFilters.includes('all');
+      if (!isAllCde) {
+        if (
+          selectedCdeFilters.includes('MAPPED') &&
+          !selectedCdeFilters.includes('UNMAPPED') &&
+          !item.cdeCode
+        ) {
+          return false;
+        }
+        if (
+          selectedCdeFilters.includes('UNMAPPED') &&
+          !selectedCdeFilters.includes('MAPPED') &&
+          item.cdeCode
+        ) {
+          return false;
+        }
       }
 
       // 6. Status filter
@@ -939,18 +1086,26 @@ export const TechnicalDictionaryPage: React.FC = () => {
         if (itemStatus !== 'Approved') {
           return false;
         }
-      } else if (statusFilter !== 'ALL') {
-        const itemStatus = (item.status || 'Approved').trim();
-        if (statusFilter === 'In Review') {
-          if (
-            itemStatus !== 'In Review' &&
-            itemStatus !== 'InReview' &&
-            itemStatus !== 'Pending'
-          ) {
+      } else {
+        const isAllStatus =
+          selectedStatusFilters.length === 0 ||
+          selectedStatusFilters.includes('all');
+        if (!isAllStatus) {
+          const itemStatus = (item.status || 'Approved').trim();
+          const matches = selectedStatusFilters.some((s) => {
+            if (s === 'In Review') {
+              return (
+                itemStatus === 'In Review' ||
+                itemStatus === 'InReview' ||
+                itemStatus === 'Pending'
+              );
+            }
+
+            return itemStatus === s;
+          });
+          if (!matches) {
             return false;
           }
-        } else if (itemStatus !== statusFilter) {
-          return false;
         }
       }
 
@@ -959,11 +1114,11 @@ export const TechnicalDictionaryPage: React.FC = () => {
   }, [
     technicalFields,
     searchText,
-    selectedSource,
-    selectedElementType,
-    selectedGenType,
-    cdeFilter,
-    statusFilter,
+    selectedSources,
+    selectedElementTypes,
+    selectedGenTypes,
+    selectedCdeFilters,
+    selectedStatusFilters,
     userRoleInfo.canViewAllStatus,
   ]);
 
@@ -991,20 +1146,20 @@ export const TechnicalDictionaryPage: React.FC = () => {
     const headers = [
       'Database Name',
       'Schema Name',
-      'Tên Bảng',
-      'Tên Trường',
-      'Hệ thống nguồn',
-      'Mã CDE quy chiếu',
-      'Tên thành tố CDE',
-      'Kiểu dữ liệu',
-      'Độ dài',
-      'Số thập phân',
-      'Loại thành tố',
-      'Loại trường dữ liệu',
-      'Phương thức tạo',
-      'Thời gian sẵn sàng',
-      'Chủ sở hữu hệ thống',
-      'Mô tả trường',
+      t('label.table-name', { defaultValue: 'Tên Bảng' }),
+      t('label.column-name', { defaultValue: 'Tên Trường' }),
+      t('label.source', { defaultValue: 'Hệ thống nguồn' }),
+      t('label.cde-code-ref', { defaultValue: 'Mã CDE quy chiếu' }),
+      t('label.cde-name', { defaultValue: 'Tên thành tố CDE' }),
+      t('label.data-type', { defaultValue: 'Kiểu dữ liệu' }),
+      t('label.field-length-decimal', { defaultValue: 'Độ dài' }),
+      t('label.scale', { defaultValue: 'Số thập phân' }),
+      t('label.data-element-type', { defaultValue: 'Loại thành tố' }),
+      t('label.field-generation-type', { defaultValue: 'Loại trường dữ liệu' }),
+      t('label.data-creation-method', { defaultValue: 'Phương thức tạo' }),
+      t('label.timeliness', { defaultValue: 'Thời gian sẵn sàng' }),
+      t('label.system-owner', { defaultValue: 'Chủ sở hữu hệ thống' }),
+      t('label.description', { defaultValue: 'Mô tả trường' }),
     ];
 
     const rows = filteredData.map((item) => [
@@ -1039,185 +1194,233 @@ export const TechnicalDictionaryPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [filteredData]);
+  }, [filteredData, t]);
 
-  return (
-    <div className="tech-dict-page-container">
-      {/* Header Card */}
-      <div className="tech-dict-header-card">
-        <div className="tech-dict-title">
-          <div className="tech-dict-icon-wrapper">
-            <ColumnBulkIcon height={22} width={22} />
-          </div>
-          <span>{t('label.technical-dictionary', { defaultValue: 'Từ điển kỹ thuật' })}</span>
-        </div>
-        <div className="tech-dict-subheading">
-          {t('message.technical-dictionary-description', {
-            defaultValue:
-              'Danh mục ma trận đặc tả kỹ thuật từ Bảng, Cột, Hệ thống nguồn và ánh xạ quy chiếu về Thành tố dữ liệu dùng chung (CDE).',
+  const extraTableFilters = useMemo(
+    () => (
+      <>
+        <Input
+          allowClear
+          className="tech-dict-search-input"
+          data-testid="search-tech-dict-input"
+          placeholder={t('label.search-table-column-cde', {
+            defaultValue: 'Tìm kiếm tên bảng, cột, mã CDE, kiểu DL...',
           })}
-        </div>
-
-        {/* Stats Row */}
-        <div className="tech-dict-stats-row">
-          <div className="tech-stat-card">
-            <div className="tech-stat-icon primary">
-              <AppstoreOutlined />
-            </div>
-            <div className="tech-stat-info">
-              <div className="tech-stat-value">{stats.totalFields.toLocaleString()}</div>
-              <div className="tech-stat-label">Tổng Cột kỹ thuật</div>
-            </div>
-          </div>
-
-          <div className="tech-stat-card">
-            <div className="tech-stat-icon blue">
-              <TableOutlined />
-            </div>
-            <div className="tech-stat-info">
-              <div className="tech-stat-value">{stats.totalTables.toLocaleString()}</div>
-              <div className="tech-stat-label">Bảng dữ liệu</div>
-            </div>
-          </div>
-
-          <div className="tech-stat-card">
-            <div className="tech-stat-icon green">
-              <CheckCircleOutlined />
-            </div>
-            <div className="tech-stat-info">
-              <div className="tech-stat-value">{stats.totalMapped.toLocaleString()}</div>
-              <div className="tech-stat-label">Đã quy chiếu CDE</div>
-            </div>
-          </div>
-
-          <div className="tech-stat-card">
-            <div className="tech-stat-icon purple">
-              <DatabaseOutlined />
-            </div>
-            <div className="tech-stat-info">
-              <div className="tech-stat-value">{stats.totalSources.toLocaleString()}</div>
-              <div className="tech-stat-label">Hệ thống nguồn</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Card */}
-      <div className="tech-dict-content-card">
-        {/* Toolbar */}
-        <div className="tech-dict-toolbar">
-          <div className="tech-dict-search-group">
-            <Input.Search
-              allowClear
-              className="tech-search-input"
-              placeholder={t('label.search-table-column-cde', {
-                defaultValue: 'Tìm kiếm tên bảng, cột, mã CDE, kiểu DL...',
-              })}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
-
-            <Select
-              className="tech-filter-select"
-              defaultValue="ALL"
-              value={selectedSource}
-              onChange={setSelectedSource}>
-              <Option value="ALL">Nguồn: Tất cả ({sourceOptions.length})</Option>
-              {sourceOptions.map((src) => (
-                <Option key={src} value={src}>
-                  {src}
-                </Option>
-              ))}
-            </Select>
-
-            <Select
-              className="tech-filter-select"
-              defaultValue="ALL"
-              value={selectedElementType}
-              onChange={setSelectedElementType}>
-              <Option value="ALL">Loại thành tố: Tất cả</Option>
-              <Option value="AtomicDataElement">Dữ liệu nguyên tố</Option>
-              <Option value="TransformedDataElement">Dữ liệu chuyển đổi</Option>
-            </Select>
-
-            <Select
-              className="tech-filter-select"
-              defaultValue="ALL"
-              value={selectedGenType}
-              onChange={setSelectedGenType}>
-              <Option value="ALL">Loại trường: Tất cả</Option>
-              <Option value="SystemGenerated">Hệ thống tự sinh</Option>
-              <Option value="SystemDerived">Hệ thống tính toán</Option>
-              <Option value="ManualInput">Nhập thủ công</Option>
-              <Option value="FileUpload">Tải lên</Option>
-            </Select>
-
-            <Select
-              className="tech-filter-select"
-              defaultValue="ALL"
-              value={cdeFilter}
-              onChange={setCdeFilter}>
-              <Option value="ALL">Quy chiếu CDE: Tất cả</Option>
-              <Option value="MAPPED">Đã map CDE</Option>
-              <Option value="UNMAPPED">Chưa map CDE</Option>
-            </Select>
-
-            {userRoleInfo.canViewAllStatus && (
-              <Select
-                className="tech-filter-select"
-                defaultValue="ALL"
-                value={statusFilter}
-                onChange={setStatusFilter}>
-                <Option value="ALL">Trạng thái: Tất cả</Option>
-                <Option value="Approved">🟢 Đã phê duyệt (Approved)</Option>
-                <Option value="In Review">🟡 Chờ phê duyệt (In Review)</Option>
-                <Option value="Draft">⚪ Bản nháp (Draft)</Option>
-                <Option value="Rejected">🔴 Bị từ chối (Rejected)</Option>
-              </Select>
-            )}
-          </div>
-
-          <div className="tech-dict-actions-group">
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={handleExportCSV}>
-              {t('label.export-csv', { defaultValue: 'Xuất CSV' })}
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={fetchTechnicalMetadata}
-            />
-          </div>
-        </div>
-
-        {/* Matrix Table */}
-        <TechnicalDictionaryTable
-          canApprove={userRoleInfo.canApprove}
-          canEdit={userRoleInfo.canEdit}
-          canReject={userRoleInfo.canReject}
-          canRevoke={userRoleInfo.canRevoke}
-          data={filteredData}
-          isLoading={isLoading}
-          onApprove={handleApproveField}
-          onEdit={handleEditField}
-          onRefresh={fetchTechnicalMetadata}
-          onReject={handleRejectField}
-          onRevoke={handleRevokeField}
+          prefix={<SearchOutlined className="text-grey-muted" />}
+          style={{ width: 280 }}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
         />
-      </div>
 
-      {/* Edit Technical Field Modal */}
-      <TechnicalDictionaryEditModal
-        cdeOptions={cdeOptions}
-        fieldItem={editingField}
-        isSubmitting={isSubmittingEdit}
-        visible={isEditModalVisible}
-        onCancel={() => {
-          setIsEditModalVisible(false);
-          setEditingField(null);
-        }}
-        onSave={handleSaveField}
+        <CDEFilterDropdown
+          dataTestId="source-filter-dropdown"
+          label={t('label.source', { defaultValue: 'Hệ thống nguồn' })}
+          options={sourceFilterOptions}
+          selectedValues={selectedSources}
+          onChange={setSelectedSources}
+        />
+
+        <CDEFilterDropdown
+          dataTestId="element-type-filter-dropdown"
+          label={t('label.data-element-type', { defaultValue: 'Loại thành tố' })}
+          options={elementTypeOptions}
+          selectedValues={selectedElementTypes}
+          onChange={setSelectedElementTypes}
+        />
+
+        <CDEFilterDropdown
+          dataTestId="gen-type-filter-dropdown"
+          label={t('label.field-generation-type', { defaultValue: 'Loại trường' })}
+          options={genTypeOptions}
+          selectedValues={selectedGenTypes}
+          onChange={setSelectedGenTypes}
+        />
+
+        <CDEFilterDropdown
+          dataTestId="cde-filter-dropdown"
+          label={t('label.cde-code-ref', { defaultValue: 'Quy chiếu CDE' })}
+          options={cdeFilterOptions}
+          selectedValues={selectedCdeFilters}
+          onChange={setSelectedCdeFilters}
+        />
+
+        {userRoleInfo.canViewAllStatus && (
+          <CDEFilterDropdown
+            dataTestId="status-filter-dropdown"
+            label={t('label.status', { defaultValue: 'Trạng thái' })}
+            options={statusFilterOptions}
+            selectedValues={selectedStatusFilters}
+            onChange={setSelectedStatusFilters}
+          />
+        )}
+
+        <div className="tech-dict-toolbar-actions">
+          <Button
+            className="d-flex items-center gap-1"
+            data-testid="export-csv-btn"
+            icon={<DownloadOutlined />}
+            size="small"
+            onClick={handleExportCSV}>
+            {t('label.export-csv', { defaultValue: 'Xuất CSV' })}
+          </Button>
+          <Button
+            className="d-flex items-center justify-center"
+            data-testid="reload-btn"
+            icon={<ReloadOutlined />}
+            size="small"
+            title={t('label.reload', { defaultValue: 'Tải lại' })}
+            onClick={fetchTechnicalMetadata}
+          />
+        </div>
+      </>
+    ),
+    [
+      searchText,
+      sourceFilterOptions,
+      selectedSources,
+      elementTypeOptions,
+      selectedElementTypes,
+      genTypeOptions,
+      selectedGenTypes,
+      cdeFilterOptions,
+      selectedCdeFilters,
+      statusFilterOptions,
+      selectedStatusFilters,
+      userRoleInfo.canViewAllStatus,
+      handleExportCSV,
+      fetchTechnicalMetadata,
+      t,
+    ]
+  );
+
+  const mainTableContent = (
+    <div
+      className={classNames('tech-dict-content-card', {
+        'tech-dict-content-card-embedded': isEmbedded,
+      })}>
+      {/* Matrix Table */}
+      <TechnicalDictionaryTable
+        canApprove={userRoleInfo.canApprove}
+        canEdit={userRoleInfo.canEdit}
+        canReject={userRoleInfo.canReject}
+        canRevoke={userRoleInfo.canRevoke}
+        data={filteredData}
+        extraTableFilters={extraTableFilters}
+        extraTableFiltersClassName="tech-dict-table-toolbar"
+        isLoading={isLoading}
+        onApprove={handleApproveField}
+        onEdit={handleEditField}
+        onRefresh={fetchTechnicalMetadata}
+        onReject={handleRejectField}
+        onRevoke={handleRevokeField}
       />
     </div>
+  );
+
+  const editModalContent = (
+    <TechnicalDictionaryEditModal
+      cdeOptions={cdeOptions}
+      fieldItem={editingField}
+      isSubmitting={isSubmittingEdit}
+      visible={isEditModalVisible}
+      onCancel={() => {
+        setIsEditModalVisible(false);
+        setEditingField(null);
+      }}
+      onSave={handleSaveField}
+    />
+  );
+
+  if (isEmbedded) {
+    return (
+      <div className="tech-dict-embedded-container">
+        {mainTableContent}
+        {editModalContent}
+      </div>
+    );
+  }
+
+  return (
+    <PageLayoutV1 pageTitle={t('label.technical-dictionary')}>
+      <div className="tech-dict-page-container">
+        <div className="m-b-md">
+          <TitleBreadcrumb titleLinks={breadcrumbs} />
+        </div>
+
+        {/* Header Card */}
+        <div className="tech-dict-header-card">
+          <div className="tech-dict-title">
+            <div className="tech-dict-icon-wrapper">
+              <ColumnBulkIcon height={22} width={22} />
+            </div>
+            <span>{t('label.technical-dictionary', { defaultValue: 'Từ điển kỹ thuật' })}</span>
+          </div>
+          <div className="tech-dict-subheading">
+            {t('message.technical-dictionary-description', {
+              defaultValue:
+                'Danh mục ma trận đặc tả kỹ thuật từ Bảng, Cột, Hệ thống nguồn và ánh xạ quy chiếu về Thành tố dữ liệu dùng chung (CDE).',
+            })}
+          </div>
+
+          {/* Stats Row */}
+          <div className="tech-dict-stats-row">
+            <div className="tech-stat-card">
+              <div className="tech-stat-icon primary">
+                <AppstoreOutlined />
+              </div>
+              <div className="tech-stat-info">
+                <div className="tech-stat-value">{stats.totalFields.toLocaleString()}</div>
+                <div className="tech-stat-label">
+                  {t('label.total-technical-columns', { defaultValue: 'Tổng Cột kỹ thuật' })}
+                </div>
+              </div>
+            </div>
+
+            <div className="tech-stat-card">
+              <div className="tech-stat-icon blue">
+                <TableOutlined />
+              </div>
+              <div className="tech-stat-info">
+                <div className="tech-stat-value">{stats.totalTables.toLocaleString()}</div>
+                <div className="tech-stat-label">
+                  {t('label.data-tables', { defaultValue: 'Bảng dữ liệu' })}
+                </div>
+              </div>
+            </div>
+
+            <div className="tech-stat-card">
+              <div className="tech-stat-icon green">
+                <CheckCircleOutlined />
+              </div>
+              <div className="tech-stat-info">
+                <div className="tech-stat-value">{stats.totalMapped.toLocaleString()}</div>
+                <div className="tech-stat-label">
+                  {t('label.cde-mapped', { defaultValue: 'Đã quy chiếu CDE' })}
+                </div>
+              </div>
+            </div>
+
+            <div className="tech-stat-card">
+              <div className="tech-stat-icon purple">
+                <DatabaseOutlined />
+              </div>
+              <div className="tech-stat-info">
+                <div className="tech-stat-value">{stats.totalSources.toLocaleString()}</div>
+                <div className="tech-stat-label">
+                  {t('label.source-systems', { defaultValue: 'Hệ thống nguồn' })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Card */}
+        {mainTableContent}
+
+        {/* Edit Technical Field Modal */}
+        {editModalContent}
+      </div>
+    </PageLayoutV1>
   );
 };
 

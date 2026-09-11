@@ -114,6 +114,10 @@
   }
 }
 
+.glossary-dropdown-label {
+  margin: 0;
+}
+
 .custom-status-dropdown-btn {
   background-color: @white;
   outline: 1px solid @grey-2;
@@ -289,8 +293,6 @@
 }
 
 .cde-filter-options-scroll {
-  overflow-x: hidden;
-
   &::-webkit-scrollbar {
     width: 6px;
   }
@@ -308,13 +310,13 @@
 .cde-filter-dropdown-overlay {
   .ant-dropdown-menu {
     max-height: calc(100vh - 100px);
-    overflow: hidden;
   }
 }
 
 .cde-glossary-terms-table {
   .ant-table-content {
-    scrollbar-width: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 
     &::-webkit-scrollbar {
       height: 8px;
@@ -338,30 +340,6 @@
     position: sticky;
     top: 0;
     z-index: 10;
-  }
-
-  .ant-table-sticky-scroll {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    background: #ffffff;
-    border-top: 1px solid #eaecf0;
-    border-bottom: 1px solid #eaecf0;
-    box-shadow: 0 -2px 6px rgba(16, 24, 40, 0.06);
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-
-  .ant-table-sticky-scroll-bar {
-    height: 8px;
-    background-color: rgba(0, 0, 0, 0.35);
-    border-radius: 4px;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.55);
-    }
   }
 
   .ant-table-thead > tr > th {
@@ -1094,7 +1072,8 @@
   }
 
   .ant-table-content {
-    scrollbar-width: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 
     &::-webkit-scrollbar {
       height: 8px;
@@ -1118,30 +1097,6 @@
     position: sticky;
     top: 0;
     z-index: 10;
-  }
-
-  .ant-table-sticky-scroll {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    background: #ffffff;
-    border-top: 1px solid #eaecf0;
-    border-bottom: 1px solid #eaecf0;
-    box-shadow: 0 -2px 6px rgba(16, 24, 40, 0.06);
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-
-  .ant-table-sticky-scroll-bar {
-    height: 8px;
-    background-color: rgba(0, 0, 0, 0.35);
-    border-radius: 4px;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.55);
-    }
   }
 
   .ant-table-thead > tr > th {

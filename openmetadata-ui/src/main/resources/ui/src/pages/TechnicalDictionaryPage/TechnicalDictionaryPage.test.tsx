@@ -33,21 +33,38 @@ jest.mock('../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
 }));
 
-jest.mock('../../components/common/Table/Table', () => {
-  return jest.fn().mockImplementation(({ columns, dataSource, loading }) => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Table: AntTable } = jest.requireActual('antd');
+jest.mock('../../components/PageLayoutV1/PageLayoutV1', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(({ children }) => <div>{children}</div>),
+}));
 
-    return (
-      <AntTable
-        columns={columns}
-        dataSource={dataSource}
-        loading={loading}
-        pagination={false}
-        rowKey="id"
-      />
+jest.mock('../../components/common/TitleBreadcrumb/TitleBreadcrumb.component', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => <div>TitleBreadcrumb</div>),
+}));
+
+jest.mock('../../components/common/Table/Table', () => {
+  return jest
+    .fn()
+    .mockImplementation(
+      ({ columns, dataSource, loading, extraTableFilters }) => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Table: AntTable } = jest.requireActual('antd');
+
+        return (
+          <div>
+            {extraTableFilters}
+            <AntTable
+              columns={columns}
+              dataSource={dataSource}
+              loading={loading}
+              pagination={false}
+              rowKey="id"
+            />
+          </div>
+        );
+      }
     );
-  });
 });
 
 const mockGlossaryRes = {
@@ -234,8 +251,8 @@ describe('TechnicalDictionary', () => {
     );
 
     // Verify status badges
-    expect(screen.getByText('In Review')).toBeInTheDocument();
-    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.getByTestId('address-status')).toBeInTheDocument();
+    expect(screen.getByTestId('birthday-status')).toBeInTheDocument();
 
     // Verify edit button is present and clickable
     const editBtn = screen.getByTestId('edit-btn-address');

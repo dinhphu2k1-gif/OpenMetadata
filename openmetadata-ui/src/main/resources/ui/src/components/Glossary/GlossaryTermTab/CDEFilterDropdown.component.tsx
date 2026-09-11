@@ -53,9 +53,23 @@ export const CDEFilterDropdown: FC<CDEFilterDropdownProps> = ({
       : selectedValues
   );
 
-  // Sync temp selection when external selectedValues change or when dropdown opens
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        if (selectedValues.includes('all')) {
+          setTempSelected(['all', ...allOptionValues]);
+        } else {
+          setTempSelected(selectedValues);
+        }
+      }
+      setIsOpen(open);
+    },
+    [selectedValues, allOptionValues]
+  );
+
+  // Sync temp selection when external selectedValues change while closed
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
       if (selectedValues.includes('all')) {
         setTempSelected(['all', ...allOptionValues]);
       } else {
@@ -117,8 +131,8 @@ export const CDEFilterDropdown: FC<CDEFilterDropdownProps> = ({
               className="status-selection-dropdown cde-filter-options-scroll"
               style={{
                 maxHeight: options.length > 6 ? 200 : undefined,
-                overflowY: options.length > 6 ? 'auto' : 'visible',
-                overflowX: 'hidden',
+                overflowY: options.length > 6 ? 'auto' : undefined,
+                overflowX: options.length > 6 ? 'hidden' : undefined,
               }}
               onClick={(e) => e.stopPropagation()}>
               <Checkbox.Group
@@ -198,24 +212,53 @@ export const CDEFilterDropdown: FC<CDEFilterDropdownProps> = ({
     ]
   );
 
+  const isFiltered = useMemo(
+    () => selectedValues.length > 0 && !selectedValues.includes('all'),
+    [selectedValues]
+  );
+
+  const selectedDisplayLabel = useMemo(() => {
+    if (!isFiltered) {
+      return null;
+    }
+    if (selectedValues.length === 1) {
+      const match = options.find((opt) => opt.value === selectedValues[0]);
+
+      return match?.label ?? selectedValues[0];
+    }
+
+    return `(${selectedValues.length})`;
+  }, [isFiltered, selectedValues, options]);
+
   return (
     <Dropdown
       className={classNames(
         'custom-glossary-dropdown-menu status-dropdown cde-filter-dropdown',
-        className
+        className,
+        { active: isFiltered }
       )}
+      destroyPopupOnHide
       menu={menu}
       open={isOpen}
       overlayClassName="custom-glossary-dropdown-menu status-dropdown cde-filter-dropdown-overlay"
+      transitionName=""
       trigger={['click']}
-      onOpenChange={setIsOpen}>
+      onOpenChange={handleOpenChange}>
       <Button
-        className="text-primary remove-button-background-hover"
+        className={classNames('text-primary remove-button-background-hover', {
+          active: isFiltered,
+        })}
         data-testid={dataTestId}
         size="small"
         type="text">
-        <Space>
-          {label}
+        <Space size={4}>
+          <span>{label}</span>
+          {isFiltered && (
+            <span>
+              {': '}
+              <span className="font-semibold">{selectedDisplayLabel}</span>
+            </span>
+          )}
           <DownOutlined />
         </Space>
       </Button>

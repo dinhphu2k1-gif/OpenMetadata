@@ -66,25 +66,43 @@ export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModal
         }
       }
 
-      let elementTypeName = 'Dữ liệu nguyên tố';
+      let elementTypeName = t('label.atomic-data-element', {
+        defaultValue: 'Dữ liệu nguyên tố',
+      });
       if (values.elementType === 'TransformedDataElement') {
-        elementTypeName = 'Dữ liệu chuyển đổi';
+        elementTypeName = t('label.transformed-data-element', {
+          defaultValue: 'Dữ liệu chuyển đổi',
+        });
       }
 
-      let generationTypeName = 'Nhập thủ công';
+      let generationTypeName = t('label.manual-input', {
+        defaultValue: 'Nhập thủ công',
+      });
       if (values.generationType === 'SystemGenerated') {
-        generationTypeName = 'Hệ thống tự sinh';
+        generationTypeName = t('label.system-generated', {
+          defaultValue: 'Hệ thống tự sinh',
+        });
       } else if (values.generationType === 'SystemDerived') {
-        generationTypeName = 'Hệ thống tính toán';
+        generationTypeName = t('label.system-derived', {
+          defaultValue: 'Hệ thống tính toán',
+        });
       } else if (values.generationType === 'FileUpload') {
-        generationTypeName = 'Tải lên';
+        generationTypeName = t('label.file-upload', {
+          defaultValue: 'Tải lên',
+        });
       }
 
-      let creationMethodName = 'N/A';
+      let creationMethodName = t('label.not-applicable', {
+        defaultValue: 'N/A',
+      });
       if (values.creationMethod === 'Parameterised') {
-        creationMethodName = 'Tham số';
+        creationMethodName = t('label.parameterised', {
+          defaultValue: 'Tham số',
+        });
       } else if (values.creationMethod === 'Hardcoded') {
-        creationMethodName = 'Mã cứng';
+        creationMethodName = t('label.hardcoded', {
+          defaultValue: 'Mã cứng',
+        });
       }
 
       await onSave({
@@ -166,8 +184,12 @@ export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModal
             name="elementType"
             rules={[{ required: true }]}>
             <Select>
-              <Option value="AtomicDataElement">Dữ liệu nguyên tố (Atomic)</Option>
-              <Option value="TransformedDataElement">Dữ liệu chuyển đổi (Transformed)</Option>
+              <Option value="AtomicDataElement">
+                {t('label.atomic-data-element', { defaultValue: 'Dữ liệu nguyên tố' })} (Atomic)
+              </Option>
+              <Option value="TransformedDataElement">
+                {t('label.transformed-data-element', { defaultValue: 'Dữ liệu chuyển đổi' })} (Transformed)
+              </Option>
             </Select>
           </Form.Item>
 
@@ -177,10 +199,18 @@ export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModal
             name="generationType"
             rules={[{ required: true }]}>
             <Select>
-              <Option value="ManualInput">Nhập thủ công (Manual Input)</Option>
-              <Option value="SystemGenerated">Hệ thống tự sinh (System Generated)</Option>
-              <Option value="SystemDerived">Hệ thống tính toán (System Derived)</Option>
-              <Option value="FileUpload">Tải lên (File Upload)</Option>
+              <Option value="ManualInput">
+                {t('label.manual-input', { defaultValue: 'Nhập thủ công' })} (Manual Input)
+              </Option>
+              <Option value="SystemGenerated">
+                {t('label.system-generated', { defaultValue: 'Hệ thống tự sinh' })} (System Generated)
+              </Option>
+              <Option value="SystemDerived">
+                {t('label.system-derived', { defaultValue: 'Hệ thống tính toán' })} (System Derived)
+              </Option>
+              <Option value="FileUpload">
+                {t('label.file-upload', { defaultValue: 'Tải lên' })} (File Upload)
+              </Option>
             </Select>
           </Form.Item>
         </div>
@@ -192,9 +222,15 @@ export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModal
             name="creationMethod"
             rules={[{ required: true }]}>
             <Select>
-              <Option value="Parameterised">Tham số (Parameterised)</Option>
-              <Option value="Hardcoded">Mã cứng (Hardcoded)</Option>
-              <Option value="NotApplicable">N/A (Không áp dụng)</Option>
+              <Option value="Parameterised">
+                {t('label.parameterised', { defaultValue: 'Tham số' })} (Parameterised)
+              </Option>
+              <Option value="Hardcoded">
+                {t('label.hardcoded', { defaultValue: 'Mã cứng' })} (Hardcoded)
+              </Option>
+              <Option value="NotApplicable">
+                {t('label.not-applicable', { defaultValue: 'N/A' })} (Not Applicable)
+              </Option>
             </Select>
           </Form.Item>
 

@@ -22,11 +22,17 @@ import { ColumnsType } from 'antd/lib/table';
 import classNames from 'classnames';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
 import { TagLabel } from 'generated/type/tagLabel';
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ReactComponent as IconExternalLink } from '../../assets/svg/external-links.svg';
-import { NO_DATA_PLACEHOLDER } from '../../constants/constants';
+import {
+  NO_DATA_PLACEHOLDER,
+  PAGE_SIZE_BASE,
+  PAGE_SIZE_EXTRA_LARGE,
+  PAGE_SIZE_LARGE,
+  PAGE_SIZE_MEDIUM,
+} from '../../constants/constants';
 import {
   TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS,
   TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS,
@@ -34,10 +40,12 @@ import {
   TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY,
 } from '../../constants/TechnicalDictionary.constants';
 import { getEntityDetailsPath, getGlossaryPath } from '../../utils/RouterUtils';
+import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import RichTextEditorPreviewerNew from '../../components/common/RichTextEditor/RichTextEditorPreviewNew';
 import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
 import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
+import { usePaging } from '../../hooks/paging/usePaging';
 import { EntityStatusClass } from '../../utils/EntityStatusUtils';
 
 export interface TechnicalFieldItem {
@@ -84,6 +92,8 @@ interface TechnicalDictionaryTableProps {
   canApprove?: boolean;
   canReject?: boolean;
   canRevoke?: boolean;
+  extraTableFilters?: React.ReactNode;
+  extraTableFiltersClassName?: string;
   onRefresh?: () => void;
   onEdit?: (item: TechnicalFieldItem) => void;
   onApprove?: (item: TechnicalFieldItem) => void;
@@ -98,12 +108,73 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
   canApprove = true,
   canReject = true,
   canRevoke = true,
+  extraTableFilters,
+  extraTableFiltersClassName,
   onEdit,
   onApprove,
   onReject,
   onRevoke,
 }) => {
   const { t } = useTranslation();
+
+  const {
+    currentPage,
+    pageSize,
+    showPagination,
+    paging,
+    handlePagingChange,
+    handlePageChange,
+    handlePageSizeChange,
+  } = usePaging(PAGE_SIZE_LARGE);
+
+  useEffect(() => {
+    handlePagingChange({ total: data.length });
+    const maxPage = Math.max(1, Math.ceil(data.length / pageSize));
+    if (currentPage > maxPage) {
+      handlePageChange(maxPage, { cursorType: null, cursorValue: undefined });
+    }
+  }, [data.length, pageSize]);
+
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+
+    return data.slice(start, start + pageSize);
+  }, [data, currentPage, pageSize]);
+
+  const handlePaginationChange = useCallback(
+    ({ currentPage: page }: PagingHandlerParams) => {
+      handlePageChange(page, { cursorType: null, cursorValue: undefined });
+    },
+    [handlePageChange]
+  );
+
+  const customPaginationProps = useMemo(
+    () => ({
+      currentPage,
+      showPagination,
+      isNumberBased: true,
+      isLoading,
+      pageSize,
+      paging,
+      pagingHandler: handlePaginationChange,
+      onShowSizeChange: handlePageSizeChange,
+      pageSizeOptions: [
+        PAGE_SIZE_BASE,
+        PAGE_SIZE_MEDIUM,
+        PAGE_SIZE_LARGE,
+        PAGE_SIZE_EXTRA_LARGE,
+      ],
+    }),
+    [
+      currentPage,
+      showPagination,
+      isLoading,
+      pageSize,
+      paging,
+      handlePaginationChange,
+      handlePageSizeChange,
+    ]
+  );
 
   const columns: ColumnsType<TechnicalFieldItem> = useMemo(
     () => [
@@ -421,9 +492,9 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
               {canEdit && onEdit && (
                 <Tooltip title={t('label.edit', { defaultValue: 'Chỉnh sửa' })}>
                   <Button
-                    className="d-flex items-center justify-center p-0"
+                    className="d-flex items-center justify-center p-0 text-primary"
                     data-testid={`edit-btn-${record.columnName}`}
-                    icon={<EditOutlined style={{ fontSize: 13, color: '#1890ff' }} />}
+                    icon={<EditOutlined style={{ fontSize: 13 }} />}
                     size="small"
                     type="text"
                     onClick={() => onEdit(record)}
@@ -440,9 +511,9 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
                   onConfirm={() => onApprove(record)}>
                   <Tooltip title={t('label.approve', { defaultValue: 'Phê duyệt' })}>
                     <Button
-                      className="d-flex items-center justify-center p-0"
+                      className="d-flex items-center justify-center p-0 text-success"
                       data-testid={`approve-btn-${record.columnName}`}
-                      icon={<CheckOutlined style={{ fontSize: 13, color: '#52c41a' }} />}
+                      icon={<CheckOutlined style={{ fontSize: 13 }} />}
                       size="small"
                       type="text"
                     />
@@ -459,9 +530,9 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
                   onConfirm={() => onReject(record)}>
                   <Tooltip title={t('label.reject', { defaultValue: 'Từ chối' })}>
                     <Button
-                      className="d-flex items-center justify-center p-0"
+                      className="d-flex items-center justify-center p-0 text-error"
                       data-testid={`reject-btn-${record.columnName}`}
-                      icon={<CloseOutlined style={{ fontSize: 13, color: '#ff4d4f' }} />}
+                      icon={<CloseOutlined style={{ fontSize: 13 }} />}
                       size="small"
                       type="text"
                     />
@@ -478,9 +549,9 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
                   onConfirm={() => onRevoke(record)}>
                   <Tooltip title={t('label.revoke-approval', { defaultValue: 'Hủy phê duyệt' })}>
                     <Button
-                      className="d-flex items-center justify-center p-0"
+                      className="d-flex items-center justify-center p-0 text-warning"
                       data-testid={`revoke-btn-${record.columnName}`}
-                      icon={<UndoOutlined style={{ fontSize: 13, color: '#fa8c16' }} />}
+                      icon={<UndoOutlined style={{ fontSize: 13 }} />}
                       size="small"
                       type="text"
                     />
@@ -515,14 +586,15 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
     <Table
       resizableColumns
       columns={columns}
-      customPaginationProps={{
-        pageSizeOptions: ['15', '25', '50', '100'],
-      }}
+      customPaginationProps={customPaginationProps}
       data-testid="technical-dictionary-table"
-      dataSource={data}
+      dataSource={paginatedData}
       defaultVisibleColumns={TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS}
       entityType={TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY}
+      extraTableFilters={extraTableFilters}
+      extraTableFiltersClassName={extraTableFiltersClassName}
       loading={isLoading}
+      pagination={false}
       rowKey="id"
       size="small"
       staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
