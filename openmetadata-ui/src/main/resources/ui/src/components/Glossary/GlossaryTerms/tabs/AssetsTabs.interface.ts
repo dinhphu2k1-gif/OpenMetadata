@@ -11,6 +11,10 @@
  *  limitations under the License.
  */
 
+import { Tag } from '../../../../generated/entity/classification/tag';
+import { GlossaryTerm } from '../../../../generated/entity/data/glossaryTerm';
+import { DataProduct } from '../../../../generated/entity/domains/dataProduct';
+import { Domain } from '../../../../generated/entity/domains/domain';
 import { OperationPermission } from '../../../../context/PermissionProvider/PermissionProvider.interface';
 import { EntityDetailsObjectInterface } from '../../../Explore/ExplorePage.interface';
 import { SearchedDataProps } from '../../../SearchedData/SearchedData.interface';
@@ -44,6 +48,7 @@ export interface AssetsTabsProps {
   noDataPlaceholder?: string | AssetNoDataPlaceholderProps;
   preloadedData?: SearchedDataProps['data'];
   skipSearch?: boolean;
+  activeEntity?: Domain | DataProduct | GlossaryTerm | Tag;
 }
 
 export interface AssetNoDataPlaceholderProps {

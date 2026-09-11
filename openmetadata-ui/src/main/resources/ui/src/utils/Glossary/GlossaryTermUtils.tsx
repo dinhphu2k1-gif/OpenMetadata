@@ -105,6 +105,7 @@ export const getGlossaryTermDetailPageTabs = (
                   className: 'glossary-term-resizable-panel-container',
                   children: (
                     <AssetsTabs
+                      activeEntity={glossaryTerm}
                       assetCount={assetCount}
                       entityFqn={glossaryTerm.fullyQualifiedName ?? ''}
                       isSummaryPanelOpen={Boolean(previewAsset)}

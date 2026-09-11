@@ -158,14 +158,14 @@ class MergeChildTagsTest {
   // ==================== End-to-end: buildSearchIndexDoc merges child tags ====================
 
   @Test
-  void testTableIndex_buildDoc_mergesColumnTags() {
+  void testTableIndex_buildDoc_doesNotMergeColumnTags() {
     TagLabel colTag =
         new TagLabel().withTagFQN("PII.Email").withSource(TagLabel.TagSource.CLASSIFICATION);
     Column col =
         new Column()
-            .withName("email")
-            .withDataType(ColumnDataType.VARCHAR)
-            .withTags(List.of(colTag));
+              .withName("email")
+              .withDataType(ColumnDataType.VARCHAR)
+              .withTags(List.of(colTag));
 
     Table table =
         new Table()
@@ -180,7 +180,7 @@ class MergeChildTagsTest {
     @SuppressWarnings("unchecked")
     List<TagLabel> tags = (List<TagLabel>) result.get("tags");
     assertNotNull(tags);
-    assertTrue(tags.stream().anyMatch(t -> "PII.Email".equals(t.getTagFQN())));
+    assertFalse(tags.stream().anyMatch(t -> "PII.Email".equals(t.getTagFQN())));
     // Also verify columnNames was populated (single-pass)
     assertNotNull(result.get("columnNames"));
   }

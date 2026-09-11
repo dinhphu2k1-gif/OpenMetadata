@@ -36,6 +36,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,6 +71,13 @@ import {
   getGlossaryTermByFQN,
   removeAssetsFromGlossaryTerm,
 } from '../../../../rest/glossaryAPI';
+import { showErrorToast } from '../../../../utils/ToastUtils';
+import {
+  findSurvivorshipRule,
+  parseSurvivorshipRules,
+  SurvivorshipRule,
+} from './SurvivorshipRules/survivorship.interface';
+import SurvivorshipBadge from './SurvivorshipRules/SurvivorshipBadge.component';
 import { searchQuery } from '../../../../rest/searchAPI';
 import { getTagByFqn, removeAssetsFromTags } from '../../../../rest/tagAPI';
 import { getAssetsPageQuickFilters } from '../../../../utils/AdvancedSearchUtils';
@@ -88,7 +96,6 @@ import {
   getEncodedFqn,
 } from '../../../../utils/StringUtils';
 import { getTagAssetsQueryFilter } from '../../../../utils/TagsUtils';
-import { showErrorToast } from '../../../../utils/ToastUtils';
 import ErrorPlaceHolder from '../../../common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import ErrorPlaceHolderNew from '../../../common/ErrorWithPlaceholder/ErrorPlaceHolderNew';
 import { ManageButtonItemLabel } from '../../../common/ManageButtonContentItem/ManageButtonContentItem.component';
@@ -127,6 +134,7 @@ const AssetsTabs = forwardRef(
       assetCount,
       preloadedData,
       skipSearch = false,
+      activeEntity: propsActiveEntity,
     }: AssetsTabsProps,
     ref
   ) => {
@@ -168,8 +176,71 @@ const AssetsTabs = forwardRef(
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [assetToDelete, setAssetToDelete] = useState<SourceType>();
     const [activeEntity, setActiveEntity] = useState<
-      Domain | DataProduct | GlossaryTerm | Tag
-    >();
+      Domain | DataProduct | GlossaryTerm | Tag | undefined
+    >(propsActiveEntity);
+
+    useEffect(() => {
+      if (propsActiveEntity) {
+        setActiveEntity(propsActiveEntity);
+      }
+    }, [propsActiveEntity]);
+
+    const survivorshipRules = useMemo<SurvivorshipRule[]>(() => {
+      if (type !== AssetsOfEntity.GLOSSARY || !activeEntity) {
+        return [];
+      }
+      const glossary = activeEntity as GlossaryTerm;
+
+      return parseSurvivorshipRules(glossary.extension?.survivorshipRules);
+    }, [type, activeEntity]);
+
+    const survivorshipRulesMap = useMemo<Map<string, SurvivorshipRule>>(() => {
+      const map = new Map<string, SurvivorshipRule>();
+      survivorshipRules.forEach((r) => {
+        if (r.assetFqn) {
+          map.set(r.assetFqn, r);
+        }
+      });
+
+      return map;
+    }, [survivorshipRules]);
+
+    const survivorshipRulesRef = useRef(survivorshipRules);
+    survivorshipRulesRef.current = survivorshipRules;
+
+    const survivorshipRulesMapRef = useRef(survivorshipRulesMap);
+    survivorshipRulesMapRef.current = survivorshipRulesMap;
+
+    const sortAssetsWithRules = useCallback(
+      (
+        rawHits: SearchedDataProps['data'],
+        rulesMap: Map<string, SurvivorshipRule>
+      ): SearchedDataProps['data'] => {
+        if (type !== AssetsOfEntity.GLOSSARY) {
+          return rawHits;
+        }
+
+        return [...rawHits].sort((a, b) => {
+          const ruleA = findSurvivorshipRule(a._source, rulesMap);
+          const ruleB = findSurvivorshipRule(b._source, rulesMap);
+
+          const rankA = ruleA?.rank ?? 9999;
+          const rankB = ruleB?.rank ?? 9999;
+
+          // 1. So sánh theo số Rank (1 -> 2 -> 3 ... 9999)
+          if (rankA !== rankB) {
+            return rankA - rankB;
+          }
+
+          // 2. KHI CÙNG RANK: Luôn sắp xếp theo bảng chữ cái (Alphabet A-Z)
+          const nameA = a._source.displayName || a._source.name || '';
+          const nameB = b._source.displayName || b._source.name || '';
+
+          return nameA.localeCompare(nameB);
+        });
+      },
+      [type]
+    );
 
     const [selectedItems, setSelectedItems] = useState<
       Map<string, EntityDetailUnion>
@@ -291,15 +362,88 @@ const AssetsTabs = forwardRef(
             query: `*${searchValue}*`,
             queryFilter: finalQueryFilter as Record<string, unknown>,
           });
-          const hits = res.hits.hits as SearchedDataProps['data'];
+          let hits = (res.hits.hits || []) as SearchedDataProps['data'];
           handlePagingChange({ total: res.hits.total.value ?? 0 });
-          setData(hits);
+
+          // If on page 1 and there are survivorship rules, ensure all ranked assets are loaded
+          const currentRules = survivorshipRulesRef.current;
+          const currentRulesMap = survivorshipRulesMapRef.current;
+
+          if (
+            page === 1 &&
+            !searchValue &&
+            currentRules.length > 0 &&
+            type === AssetsOfEntity.GLOSSARY
+          ) {
+            const missingRankedFqns = currentRules
+              .filter((r) => r.assetFqn && r.rank)
+              .filter(
+                (r) =>
+                  !hits.some((h) => {
+                    const rule = findSurvivorshipRule(
+                      h._source,
+                      new Map([[r.assetFqn, r]])
+                    );
+
+                    return rule !== undefined;
+                  })
+              )
+              .map((r) => r.assetFqn.toLowerCase());
+
+            if (missingRankedFqns.length > 0) {
+              try {
+                const missingRes = await searchQuery({
+                  pageNumber: 1,
+                  pageSize: missingRankedFqns.length,
+                  searchIndex: index,
+                  query: '*',
+                  queryFilter: getTermQuery(
+                    { fullyQualifiedName: missingRankedFqns },
+                    'should',
+                    1
+                  ) as Record<string, unknown>,
+                });
+
+                const missingHits = (missingRes.hits?.hits ||
+                  []) as SearchedDataProps['data'];
+
+                const existingIds = new Set(
+                  hits.map((h) => h._source.id || h._id)
+                );
+                const newHits = missingHits.filter(
+                  (mh) => !existingIds.has(mh._source.id || mh._id)
+                );
+                hits = [...newHits, ...hits];
+              } catch {
+                // If fetch fails, keep default hits
+              }
+            }
+          } else if (
+            page > 1 &&
+            !searchValue &&
+            currentRules.length > 0 &&
+            type === AssetsOfEntity.GLOSSARY
+          ) {
+            // Prevent ranked assets already displayed on page 1 from duplicating on subsequent pages
+            hits = hits.filter(
+              (h) =>
+                findSurvivorshipRule(h._source, currentRulesMap) === undefined
+            );
+          }
+
+          const sortedHits = sortAssetsWithRules(hits, currentRulesMap);
+          const finalData =
+            page === 1 && sortedHits.length > pageSize
+              ? sortedHits.slice(0, pageSize)
+              : sortedHits;
+
+          setData(finalData);
           setAggregations(getAggregations(res?.aggregations));
           if (assetCount === undefined) {
             setTotalAssetCount(res.hits.total.value ?? 0);
           }
-          if (hits[0]) {
-            setSelectedCard(hits[0]._source);
+          if (finalData[0]) {
+            setSelectedCard(finalData[0]._source);
           } else {
             setSelectedCard(undefined);
           }
@@ -317,8 +461,16 @@ const AssetsTabs = forwardRef(
         assetCount,
         skipSearch,
         preloadedData,
+        sortAssetsWithRules,
+        type,
       ]
     );
+
+    useEffect(() => {
+      if (data.length > 0 && type === AssetsOfEntity.GLOSSARY) {
+        setData((prev) => sortAssetsWithRules(prev, survivorshipRulesMap));
+      }
+    }, [survivorshipRulesMap, sortAssetsWithRules]);
 
     const hideNotification = () => {
       notification.close('asset-tab-notification-key');
@@ -355,7 +507,9 @@ const AssetsTabs = forwardRef(
 
           break;
         case AssetsOfEntity.GLOSSARY:
-          data = await getGlossaryTermByFQN(fqn);
+          data = await getGlossaryTermByFQN(fqn, {
+            fields: 'extension',
+          });
 
           break;
 
@@ -717,51 +871,60 @@ const AssetsTabs = forwardRef(
       () =>
         data.length ? (
           <div className="assets-data-container">
-            {data.map(({ _source, _id = '', highlight }) => (
-              <ExploreSearchCard
-                showEntityIcon
-                actionPopoverContent={
-                  isRemovable && permissions.EditAll ? (
-                    <Dropdown
-                      align={{ targetOffset: [-12, 0] }}
-                      dropdownRender={renderDropdownContainer}
-                      menu={{ items }}
-                      overlayClassName="manage-dropdown-list-container"
-                      overlayStyle={{ width: '350px' }}
-                      placement="bottomRight"
-                      trigger={['click']}>
-                      <Tooltip
-                        placement="topRight"
-                        title={t('label.manage-entity', {
-                          entity: t('label.asset'),
-                        })}>
-                        <Button
-                          className={classNames('flex-center px-1.5')}
-                          data-testid={`manage-button-${_source.fullyQualifiedName}`}
-                          type="text">
-                          <IconDropdown className="anticon self-center manage-dropdown-icon" />
-                        </Button>
-                      </Tooltip>
-                    </Dropdown>
-                  ) : null
-                }
-                checked={selectedItems?.has(_source.id ?? '')}
-                className={classNames(
-                  'cursor-pointer',
-                  selectedCard?.id === _source.id ? 'highlight-card' : ''
-                )}
-                handleSummaryPanelDisplay={setSelectedCard}
-                highlight={highlight}
-                id={_id}
-                key={'assets_' + _id}
-                showCheckboxes={Boolean(activeEntity) && permissions.Create}
-                showTags={false}
-                source={_source}
-                onCheckboxChange={(selected) =>
-                  handleCheckboxChange(selected, _source)
-                }
-              />
-            ))}
+            {data.map(({ _source, _id = '', highlight }) => {
+              const rule = findSurvivorshipRule(_source, survivorshipRulesMap);
+
+              return (
+                <ExploreSearchCard
+                  showEntityIcon
+                  actionPopoverContent={
+                    isRemovable && permissions.EditAll ? (
+                      <Dropdown
+                        align={{ targetOffset: [-12, 0] }}
+                        dropdownRender={renderDropdownContainer}
+                        menu={{ items }}
+                        overlayClassName="manage-dropdown-list-container"
+                        overlayStyle={{ width: '350px' }}
+                        placement="bottomRight"
+                        trigger={['click']}>
+                        <Tooltip
+                          placement="topRight"
+                          title={t('label.manage-entity', {
+                            entity: t('label.asset'),
+                          })}>
+                          <Button
+                            className={classNames('flex-center px-1.5')}
+                            data-testid={`manage-button-${_source.fullyQualifiedName}`}
+                            type="text">
+                            <IconDropdown className="anticon self-center manage-dropdown-icon" />
+                          </Button>
+                        </Tooltip>
+                      </Dropdown>
+                    ) : null
+                  }
+                  checked={selectedItems?.has(_source.id ?? '')}
+                  className={classNames(
+                    'cursor-pointer',
+                    selectedCard?.id === _source.id ? 'highlight-card' : ''
+                  )}
+                  handleSummaryPanelDisplay={setSelectedCard}
+                  highlight={highlight}
+                  id={_id}
+                  key={'assets_' + _id}
+                  showCheckboxes={Boolean(activeEntity) && permissions.Create}
+                  showTags={false}
+                  source={_source}
+                  survivorshipBadge={
+                    type === AssetsOfEntity.GLOSSARY && rule ? (
+                      <SurvivorshipBadge rule={rule} />
+                    ) : undefined
+                  }
+                  onCheckboxChange={(selected) =>
+                    handleCheckboxChange(selected, _source)
+                  }
+                />
+              );
+            })}
             <NextPrevious
               isNumberBased
               currentPage={currentPage}
@@ -787,6 +950,7 @@ const AssetsTabs = forwardRef(
         selectedCard,
         assetErrorPlaceHolder,
         selectedItems,
+        survivorshipRulesMap,
         setSelectedCard,
         handlePageChange,
         handlePageSizeChange,

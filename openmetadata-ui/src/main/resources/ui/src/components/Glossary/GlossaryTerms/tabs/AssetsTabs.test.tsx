@@ -259,6 +259,71 @@ describe('AssetsTabs queryParam logic', () => {
         });
       });
     });
+
+    it('should fetch missing ranked assets when survivorshipRules are present', async () => {
+      const entityFqn = 'Data Dictionary.CDE1';
+      const mockActiveEntity = {
+        id: 'cde-1',
+        fullyQualifiedName: entityFqn,
+        name: 'CDE1',
+        extension: {
+          survivorshipRules: JSON.stringify([
+            { assetFqn: 'MIS.MISDB.osb1.ACCOUNT.id', rank: 1 },
+          ]),
+        },
+      };
+
+      (searchQuery as jest.Mock)
+        .mockResolvedValueOnce({
+          hits: {
+            total: { value: 103 },
+            hits: [
+              {
+                _id: '1',
+                _source: {
+                  id: '1',
+                  name: 'custnm',
+                  fullyQualifiedName: 'MIS.MISDB.ms1.TBFX.custnm',
+                },
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce({
+          hits: {
+            total: { value: 1 },
+            hits: [
+              {
+                _id: 'ranked-1',
+                _source: {
+                  id: 'ranked-1',
+                  name: 'id',
+                  fullyQualifiedName: 'MIS.MISDB.osb1.ACCOUNT.id',
+                },
+              },
+            ],
+          },
+        });
+
+      renderWithRouter(
+        <AssetsTabs
+          {...defaultProps}
+          activeEntity={mockActiveEntity as any}
+          entityFqn={entityFqn}
+          type={AssetsOfEntity.GLOSSARY}
+        />
+      );
+
+      await waitFor(() => {
+        expect(searchQuery).toHaveBeenCalledTimes(2);
+        expect(searchQuery).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            pageSize: 1,
+            query: '*',
+          })
+        );
+      });
+    });
   });
 
   describe('TAG type', () => {

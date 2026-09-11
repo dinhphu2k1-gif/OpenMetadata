@@ -164,7 +164,7 @@ class MigratedIndexTest {
   // ==================== Child tag merging via mergeChildTags() ====================
 
   @Test
-  void testTableIndex_buildSearchIndexDoc_mergesChildTags() {
+  void testTableIndex_buildSearchIndexDoc_doesNotMergeChildTags() {
     TagLabel colTag =
         new TagLabel().withTagFQN("PII.Email").withSource(TagLabel.TagSource.CLASSIFICATION);
     Column col =
@@ -188,7 +188,7 @@ class MigratedIndexTest {
     @SuppressWarnings("unchecked")
     List<TagLabel> tags = (List<TagLabel>) result.get("tags");
     assertNotNull(tags);
-    assertTrue(tags.stream().anyMatch(t -> "PII.Email".equals(t.getTagFQN())));
+    assertFalse(tags.stream().anyMatch(t -> "PII.Email".equals(t.getTagFQN())));
 
     assertNotNull(result.get("columnNames"));
   }

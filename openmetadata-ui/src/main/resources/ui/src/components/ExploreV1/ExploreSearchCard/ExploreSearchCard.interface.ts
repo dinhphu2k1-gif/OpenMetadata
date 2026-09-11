@@ -36,4 +36,5 @@ export interface ExploreSearchCardProps {
   score?: number;
   highlight?: SearchedDataProps['data'][number]['highlight'];
   classNameForBreadcrumb?: string;
+  survivorshipBadge?: React.ReactNode;
 }

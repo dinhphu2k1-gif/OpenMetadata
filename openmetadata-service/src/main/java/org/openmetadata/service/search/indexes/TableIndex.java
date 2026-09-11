@@ -9,7 +9,6 @@ import java.util.Set;
 import org.openmetadata.schema.entity.data.Table;
 import org.openmetadata.schema.type.ChangeDescription;
 import org.openmetadata.schema.type.ChangeSummaryMap;
-import org.openmetadata.schema.type.TagLabel;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.search.SearchIndexUtils;
 import org.openmetadata.service.search.models.FlattenColumn;
@@ -78,17 +77,12 @@ public record TableIndex(Table table) implements ColumnIndex, DataAssetIndex {
       parseColumns(table.getColumns(), cols, null);
 
       List<String> columnsWithChildrenName = new ArrayList<>();
-      Set<List<TagLabel>> childTags = new HashSet<>();
       for (FlattenColumn col : cols) {
         columnsWithChildrenName.add(col.getName());
-        if (col.getTags() != null) {
-          childTags.add(col.getTags());
-        }
       }
       doc.put("columnNames", columnsWithChildrenName);
       doc.put("columnNamesFuzzy", String.join(" ", columnsWithChildrenName));
       doc.put("columnDescriptionStatus", getColumnDescriptionStatus(table));
-      mergeChildTags(doc, childTags);
 
       SearchIndexUtils.transformColumnExtensions(doc, Entity.TABLE_COLUMN);
     }
