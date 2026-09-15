@@ -70,6 +70,7 @@ const ExploreSearchCard: React.FC<ExploreSearchCardProps> = forwardRef<
       score,
       highlight,
       classNameForBreadcrumb,
+      survivorshipBadge,
     },
     ref
   ) => {
@@ -367,6 +368,10 @@ const ExploreSearchCard: React.FC<ExploreSearchCardProps> = forwardRef<
                     }
                   />
                 )}
+
+                {survivorshipBadge && (
+                  <div className="p-l-sm">{survivorshipBadge}</div>
+                )}
               </div>
             )}
           </Col>
@@ -379,6 +384,7 @@ const ExploreSearchCard: React.FC<ExploreSearchCardProps> = forwardRef<
       showCheckboxes,
       checked,
       entityLink,
+      survivorshipBadge,
     ]);
 
     return (

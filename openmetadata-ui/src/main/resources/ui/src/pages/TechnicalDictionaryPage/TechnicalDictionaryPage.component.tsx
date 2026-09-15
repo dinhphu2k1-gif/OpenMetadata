@@ -14,7 +14,6 @@
 import {
   AppstoreOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   DatabaseOutlined,
   DownloadOutlined,
   ReloadOutlined,
@@ -23,7 +22,7 @@ import {
 } from '@ant-design/icons';
 import { Button, Input } from 'antd';
 import classNames from 'classnames';
-import { compare, Operation } from 'fast-json-patch';
+import { compare } from 'fast-json-patch';
 import { isEmpty } from 'lodash';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +37,15 @@ import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant'
 import { Table } from '../../generated/entity/data/table';
 import { LabelType, State, TagLabel, TagSource } from '../../generated/type/tagLabel';
 import { useApplicationStore } from '../../hooks/useApplicationStore';
-import { getGlossariesByName, getGlossaryTerms } from '../../rest/glossaryAPI';
+import {
+  getGlossariesByName,
+  getGlossaryTermByFQN,
+  getGlossaryTerms,
+  patchGlossaryTerm,
+} from '../../rest/glossaryAPI';
+import {
+  parseSurvivorshipRules,
+} from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/survivorship.interface';
 import { getTableDetailsByFQN, getTableList, patchTableDetails } from '../../rest/tableAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalDictionaryTable, {
@@ -62,6 +69,7 @@ export const getTechnicalFieldOverrides = (): Record<
     const raw = localStorage.getItem(
       TECHNICAL_DICTIONARY_OVERRIDES_STORAGE_KEY
     );
+
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -116,6 +124,8 @@ export const syncColumnProposalToBackend = async (
           cdeCode: item.cdeCode,
           cdeName: item.cdeName,
           cdeFqn: item.cdeFqn,
+          survivorshipRank: item.survivorshipRank,
+          survivorshipNote: item.survivorshipNote,
           elementType: item.elementType,
           elementTypeName: item.elementTypeName,
           generationType: item.generationType,
@@ -142,6 +152,7 @@ export const syncColumnProposalToBackend = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to sync column proposal to backend table:', error);
+
     throw error;
   }
 };
@@ -234,6 +245,8 @@ export const syncColumnMetadataToBackend = async (
           cdeCode: item.cdeCode,
           cdeName: item.cdeName,
           cdeFqn: item.cdeFqn,
+          survivorshipRank: item.survivorshipRank,
+          survivorshipNote: item.survivorshipNote,
           elementType: item.elementType,
           elementTypeName: item.elementTypeName,
           generationType: item.generationType,
@@ -257,9 +270,52 @@ export const syncColumnMetadataToBackend = async (
     if (table.id && jsonPatch.length > 0) {
       await patchTableDetails(table.id, jsonPatch);
     }
+
+    // Sync survivorship rule to CDE Glossary Term if CDE is present
+    const cdeFqnToSync =
+      item.cdeFqn ||
+      (item.cdeCode ? `${DATA_DICTIONARY_GLOSSARY_NAME}.${item.cdeCode}` : undefined);
+    const colFqnToSync = item.columnFqn || `${item.tableFqn}.${item.columnName}`;
+    if (cdeFqnToSync && colFqnToSync) {
+      try {
+        const cdeTerm = await getGlossaryTermByFQN(cdeFqnToSync, {
+          fields: 'extension',
+        });
+        if (cdeTerm?.id) {
+          const currentRules = parseSurvivorshipRules(
+            cdeTerm.extension?.survivorshipRules
+          );
+          const otherRules = currentRules.filter(
+            (r) => r.assetFqn !== colFqnToSync
+          );
+          if (item.survivorshipRank) {
+            otherRules.push({
+              assetFqn: colFqnToSync,
+              rank: item.survivorshipRank,
+              note: item.survivorshipNote,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+          const updatedCdeTerm = {
+            ...cdeTerm,
+            extension: {
+              ...(cdeTerm.extension || {}),
+              survivorshipRules: JSON.stringify(otherRules),
+            },
+          };
+          const patch = compare(cdeTerm, updatedCdeTerm);
+          if (patch.length > 0) {
+            await patchGlossaryTerm(cdeTerm.id, patch);
+          }
+        }
+      } catch {
+        // Continue even if CDE sync fails
+      }
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to sync column metadata to backend table:', error);
+
     throw error;
   }
 };
@@ -309,6 +365,8 @@ export const removeColumnMetadataFromBackend = async (
           cdeCode: undefined,
           cdeName: undefined,
           cdeFqn: undefined,
+          survivorshipRank: undefined,
+          survivorshipNote: undefined,
           elementType: undefined,
           elementTypeName: undefined,
           generationType: undefined,
@@ -333,6 +391,7 @@ export const removeColumnMetadataFromBackend = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to remove column metadata from backend table:', error);
+
     throw error;
   }
 };
@@ -380,6 +439,7 @@ export const rejectColumnMetadataOnBackend = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to reject column metadata on backend table:', error);
+
     throw error;
   }
 };
@@ -508,8 +568,12 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
   const fetchTechnicalMetadata = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch CDE Glossary terms to map CDE codes to business display names
+      // 1. Fetch CDE Glossary terms to map CDE codes to business display names and survivorship rules
       const cdeDisplayMap: Record<string, { name: string; fqn: string }> = {};
+      const cdeSurvivorshipMap = new Map<
+        string,
+        Map<string, { rank: number; note?: string }>
+      >();
       try {
         const glossaryRes = await getGlossariesByName(DATA_DICTIONARY_GLOSSARY_NAME, {
           fields: 'id',
@@ -518,6 +582,7 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
           const termsRes = await getGlossaryTerms({
             glossary: glossaryRes.id,
             limit: 1000,
+            fields: 'extension',
           });
           (termsRes.data || []).forEach((term) => {
             if (term.name) {
@@ -525,6 +590,18 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
                 name: term.displayName || term.name,
                 fqn: term.fullyQualifiedName || '',
               };
+            }
+            if (term.fullyQualifiedName && term.extension?.survivorshipRules) {
+              const rules = parseSurvivorshipRules(
+                term.extension.survivorshipRules
+              );
+              const ruleMap = new Map<string, { rank: number; note?: string }>();
+              rules.forEach((r) => {
+                if (r.assetFqn) {
+                  ruleMap.set(r.assetFqn, { rank: r.rank, note: r.note });
+                }
+              });
+              cdeSurvivorshipMap.set(term.fullyQualifiedName, ruleMap);
             }
           });
         }
@@ -680,6 +757,16 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
           const finalTimeliness = timeliness;
           const finalSystemOwner = colSystemOwner;
           const finalDescription = description;
+          const finalSurvivorshipRank =
+            col.extension?.survivorshipRank ??
+            (finalCdeFqn
+              ? cdeSurvivorshipMap.get(finalCdeFqn)?.get(columnFqn)?.rank
+              : undefined);
+          const finalSurvivorshipNote =
+            col.extension?.survivorshipNote ??
+            (finalCdeFqn
+              ? cdeSurvivorshipMap.get(finalCdeFqn)?.get(columnFqn)?.note
+              : undefined);
 
           fieldsList.push({
             id: fieldId,
@@ -714,6 +801,8 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
             creationMethodName: finalCreationMethodName,
             timeliness: finalTimeliness,
             systemOwner: finalSystemOwner,
+            survivorshipRank: finalSurvivorshipRank,
+            survivorshipNote: finalSurvivorshipNote,
             description: finalDescription,
             tags,
           });
@@ -757,20 +846,21 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
     async (updatedItem: Partial<TechnicalFieldItem>) => {
       setIsSubmittingEdit(true);
       try {
+        const finalStatus = updatedItem.status || 'Approved';
         setTechnicalFields((prev) =>
           prev.map((f) =>
             f.id === updatedItem.id
-              ? ({ ...f, ...updatedItem, status: 'In Review' } as TechnicalFieldItem)
+              ? ({ ...f, ...updatedItem, status: finalStatus } as TechnicalFieldItem)
               : f
           )
         );
 
-        // Sync proposal to OpenMetadata backend so other users (Data Steward, Admin) can see In Review status immediately
-        await syncColumnProposalToBackend({ ...updatedItem, status: 'In Review' });
+        // Directly sync metadata to backend (aligning with CDE and Data Quality direct save workflow)
+        await syncColumnMetadataToBackend({ ...updatedItem, status: finalStatus });
 
         showSuccessToast(
-          t('message.submit-approval-success', {
-            defaultValue: 'Đã lưu và gửi yêu cầu phê duyệt thành công',
+          t('message.update-field-success', {
+            defaultValue: 'Cập nhật trường kỹ thuật thành công!',
           })
         );
         setIsEditModalVisible(false);

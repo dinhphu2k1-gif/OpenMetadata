@@ -41,6 +41,7 @@ import {
 } from '../../constants/TechnicalDictionary.constants';
 import { getEntityDetailsPath, getGlossaryPath } from '../../utils/RouterUtils';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
+import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import RichTextEditorPreviewerNew from '../../components/common/RichTextEditor/RichTextEditorPreviewNew';
 import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
@@ -81,6 +82,8 @@ export interface TechnicalFieldItem {
   creationMethodName?: string;
   timeliness?: string;
   systemOwner?: string;
+  survivorshipRank?: number;
+  survivorshipNote?: string;
   description?: string;
   tags?: TagLabel[];
 }
@@ -311,6 +314,29 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
               ellipsis={{ tooltip: cdeName, rows: 2 }}>
               {cdeName}
             </Typography.Paragraph>
+          );
+        },
+      },
+      {
+        title: 'Thứ hạng (Rank)',
+        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SURVIVORSHIP_RANK,
+        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SURVIVORSHIP_RANK,
+        width: 170,
+        sorter: (a, b) =>
+          (a.survivorshipRank ?? 9999) - (b.survivorshipRank ?? 9999),
+        render: (_, record) => {
+          if (!record.survivorshipRank) {
+            return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
+          }
+
+          return (
+            <SurvivorshipBadge
+              rule={{
+                assetFqn: record.columnFqn || record.id,
+                rank: record.survivorshipRank,
+                note: record.survivorshipNote,
+              }}
+            />
           );
         },
       },
