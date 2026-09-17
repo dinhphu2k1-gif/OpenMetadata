@@ -65,7 +65,7 @@ export const findSurvivorshipRule = (
   source: SurvivorshipSourceCandidate | unknown,
   rulesMap: Map<string, SurvivorshipRule>
 ): SurvivorshipRule | undefined => {
-  if (!source || rulesMap.size === 0) {
+  if (!source) {
     return undefined;
   }
 

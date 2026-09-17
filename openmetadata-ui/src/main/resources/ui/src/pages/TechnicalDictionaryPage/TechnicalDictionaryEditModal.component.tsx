@@ -27,7 +27,9 @@ export interface TechnicalDictionaryEditModalProps {
   isSubmitting?: boolean;
 }
 
-export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModalProps> = ({
+export const TechnicalDictionaryEditModal: React.FC<
+  TechnicalDictionaryEditModalProps
+> = ({
   visible,
   fieldItem,
   cdeOptions = [],
@@ -212,7 +214,7 @@ export const TechnicalDictionaryEditModal: React.FC<TechnicalDictionaryEditModal
                   defaultValue: 'Chưa gán thứ hạng',
                 })}>
                 <Option value={1}>
-                  🥇 {t('label.rank-1-golden', { defaultValue: 'Hạng 1 (Nguồn Vàng)' })}
+                  🥇 {t('label.rank-n', { defaultValue: 'Hạng {{rank}}', rank: 1 })}
                 </Option>
                 <Option value={2}>
                   🥈 {t('label.rank-2', { defaultValue: 'Hạng 2' })}

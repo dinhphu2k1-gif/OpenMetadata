@@ -247,7 +247,9 @@
   }
 }
 
-.cde-glossary-table-container {
+.cde-glossary-table-container,
+.dq-glossary-table-container,
+.dictionary-table-container {
   overflow: visible;
   border: 1px solid @grey-300;
   border-radius: 10px;
@@ -272,10 +274,17 @@
     border-radius: 6px;
   }
 
-  .cde-glossary-table-toolbar {
+  .cde-glossary-table-toolbar,
+  .dq-glossary-table-toolbar,
+  .dictionary-table-toolbar {
     justify-content: flex-start !important;
     gap: 12px !important;
-    flex-wrap: wrap;
+    row-gap: 10px !important;
+    flex-wrap: wrap !important;
+
+    .ant-input-affix-wrapper {
+      flex-shrink: 0;
+    }
 
     .status-dropdown,
     .cde-filter-dropdown {
@@ -284,10 +293,20 @@
       border: 1px solid @grey-300;
       border-radius: 6px;
       color: #344054;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
     }
 
-    .cde-toolbar-collapse-action {
+    .cde-toolbar-collapse-action,
+    .dq-toolbar-collapse-action,
+    .dictionary-toolbar-collapse-action {
       margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .custom-column-dropdown-menu {
+      flex-shrink: 0;
     }
   }
 }
@@ -521,6 +540,36 @@
 .cde-value-pill-neutral {
   background: @grey-100;
   color: @grey-500;
+}
+
+.cde-value-pill-dimension {
+  background: #f4ebff;
+  color: #6941c6;
+}
+
+.cde-value-pill-population {
+  background: #eff8ff;
+  color: #175cd3;
+}
+
+.cde-value-pill-method {
+  background: #fffaeb;
+  color: #b54708;
+}
+
+.cde-value-pill-frequency {
+  background: #ecfeff;
+  color: #0e7090;
+}
+
+.cde-value-pill-atomic {
+  background: #f4ebff;
+  color: #6941c6;
+}
+
+.cde-value-pill-transformed {
+  background: #fff7ed;
+  color: #c4320a;
 }
 
 .cde-header-version-badge {

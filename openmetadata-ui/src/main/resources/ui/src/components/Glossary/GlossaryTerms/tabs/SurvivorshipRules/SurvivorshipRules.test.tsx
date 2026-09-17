@@ -66,6 +66,46 @@ describe('SurvivorshipRules Helper & Logic', () => {
       expect(rule?.rank).toBe(3);
     });
 
+    it('reads column rank without glossary survivorship rules', () => {
+      const source = {
+        fullyQualifiedName: 'db.schema.table_a.col_1',
+        extension: { survivorshipRank: 2, survivorshipNote: 'Backup source' },
+      };
+      const rule = findSurvivorshipRule(source, new Map());
+
+      expect(rule).toEqual({
+        assetFqn: source.fullyQualifiedName,
+        rank: 2,
+        note: 'Backup source',
+      });
+
+      render(<SurvivorshipBadge rule={rule} />);
+
+      expect(screen.getByText('Hạng 2')).toBeInTheDocument();
+    });
+
+    it('reads nested column rank without glossary survivorship rules', () => {
+      expect(
+        findSurvivorshipRule(
+          {
+            fullyQualifiedName: 'db.schema.table_a',
+            columns: [
+              { name: 'col_1', extension: { survivorshipRank: 3 } },
+              { name: 'col_2', extension: { survivorshipRank: 1 } },
+            ],
+          },
+          new Map()
+        )
+      ).toEqual({ assetFqn: 'db.schema.table_a.col_2', rank: 1 });
+    });
+
+    it('returns no rank when both extension and glossary rules are absent', () => {
+      expect(
+        findSurvivorshipRule({ fullyQualifiedName: 'db.schema.table_a' }, new Map())
+      ).toBeUndefined();
+      expect(findSurvivorshipRule(undefined, new Map())).toBeUndefined();
+    });
+
     it('should return undefined for unranked table', () => {
       const source = {
         name: 'table_z',

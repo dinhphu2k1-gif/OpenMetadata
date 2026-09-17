@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { Button, Space, Tag } from 'antd';
+import { Button, Space, Tag, Typography } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -22,7 +22,6 @@ import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import ProfilePicture from '../../common/ProfilePicture/ProfilePicture';
-import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEditorPreviewNew';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
@@ -42,100 +41,34 @@ type CDEGlossaryTableColumnsProps = {
   t: TFunction;
 };
 
+import {
+  getDictionaryReferenceLabel,
+  renderDictionaryReferences,
+  renderDictionaryOwnerList,
+  renderDictionaryMarkdown,
+  renderDictionaryClassificationTags,
+} from './DictionaryCellRenderers';
+
 export const CDE_TAG_CLASSIFICATIONS = {
   dataSource: 'DataSource',
   dataClassification: 'DataClassification',
   personalData: 'PersonalData',
 };
 
-export const getCDEReferenceLabel = (reference: EntityReference) =>
-  getEntityName(reference) ||
-  reference.fullyQualifiedName ||
-  NO_DATA_PLACEHOLDER;
+export const getCDEReferenceLabel = getDictionaryReferenceLabel;
 
-export const renderCDEReferences = (references: EntityReference[] = []) => {
-  if (references.length === 0) {
-    return NO_DATA_PLACEHOLDER;
-  }
+export const renderCDEReferences = renderDictionaryReferences;
 
-  return references.map(getCDEReferenceLabel).join(', ');
-};
-
-export const renderCDEOwners = (owners: EntityReference[] = []) => {
-  if (owners.length === 0) {
-    return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
-  }
-
-  return (
-    <div className="cde-owner-list">
-      {owners.map((owner, index) => {
-        const ownerLabel = getCDEReferenceLabel(owner);
-        const ownerKey =
-          owner.id ?? owner.fullyQualifiedName ?? owner.name ?? String(index);
-
-        return (
-          <div
-            className="cde-owner-item"
-            data-testid={`cde-owner-${ownerKey}`}
-            key={ownerKey}
-            title={ownerLabel}>
-            <ProfilePicture
-              className="cde-owner-avatar"
-              displayName={owner.displayName}
-              isTeam={owner.type === 'team'}
-              name={owner.name ?? owner.fullyQualifiedName ?? ''}
-              width="24"
-            />
-            <span className="cde-owner-name">{ownerLabel}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const getTagLabel = (tag: TagLabel) =>
-  tag.displayName ??
-  tag.name ??
-  tag.tagFQN.split('.').at(-1)?.replaceAll('_', ' ');
+export const renderCDEOwners = (owners: EntityReference[] = []) =>
+  renderDictionaryOwnerList(owners, 'cde-owner');
 
 export const renderCDEClassificationTags = (
   tags: TagLabel[] = [],
   classification: string,
   variant: 'source' | 'classification' | 'personal'
-) => {
-  const matchingTags = tags.filter(
-    (tag) => tag.tagFQN.split('.')[0] === classification
-  );
+) => renderDictionaryClassificationTags(tags, classification, variant);
 
-  if (matchingTags.length === 0) {
-    return NO_DATA_PLACEHOLDER;
-  }
-
-  return (
-    <Space wrap size={[4, 4]}>
-      {matchingTags.map((tag) => (
-        <Tag
-          className={`cde-value-pill cde-value-pill-${variant}`}
-          key={tag.tagFQN}>
-          {getTagLabel(tag)}
-        </Tag>
-      ))}
-    </Space>
-  );
-};
-
-export const renderCDEMarkdown = (value?: string, className?: string) =>
-  value?.trim() ? (
-    <RichTextEditorPreviewerNew
-      enableSeeMoreVariant
-      className={className}
-      markdown={value}
-      maxLength={100}
-    />
-  ) : (
-    NO_DATA_PLACEHOLDER
-  );
+export const renderCDEMarkdown = renderDictionaryMarkdown;
 
 export const renderCDEQualityRule = (
   value: boolean | string | string[] | undefined,

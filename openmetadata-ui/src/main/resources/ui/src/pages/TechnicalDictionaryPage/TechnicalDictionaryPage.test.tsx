@@ -11,12 +11,9 @@
  *  limitations under the License.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { getGlossariesByName, getGlossaryTerms } from '../../rest/glossaryAPI';
-import { getTableList } from '../../rest/tableAPI';
-import { TechnicalDictionaryPage } from './TechnicalDictionaryPage.component';
 
 jest.mock('../../rest/glossaryAPI', () => ({
   getGlossariesByName: jest.fn(),
@@ -66,68 +63,6 @@ jest.mock('../../components/common/Table/Table', () => {
       }
     );
 });
-
-const mockGlossaryRes = {
-  id: 'g-123',
-  name: 'Data Dictionary',
-  displayName: 'Từ điển dữ liệu dùng chung',
-};
-
-const mockTermsRes = {
-  data: [
-    {
-      id: 't-1',
-      name: 'CDE12',
-      displayName: 'Địa chỉ khách hàng',
-      fullyQualifiedName: 'Data Dictionary.CDE12',
-    },
-    {
-      id: 't-2',
-      name: 'CDE17',
-      displayName: 'Ngày sinh',
-      fullyQualifiedName: 'Data Dictionary.CDE17',
-    },
-  ],
-};
-
-const mockTablesRes = {
-  data: [
-    {
-      id: 'tbl-1',
-      name: 'AGR_USER',
-      displayName: 'AGR_USER',
-      fullyQualifiedName: 'MIS.MISDB.ms1.AGR_USER',
-      database: { name: 'MISDB', fullyQualifiedName: 'MIS.MISDB' },
-      databaseSchema: { name: 'ms1', fullyQualifiedName: 'MIS.MISDB.ms1' },
-      service: { name: 'MIS' },
-      columns: [
-        {
-          name: 'address',
-          dataType: 'VARCHAR',
-          dataTypeDisplay: 'VARCHAR(255)',
-          dataLength: 255,
-          tags: [
-            {
-              tagFQN: 'Data Dictionary.CDE12',
-              source: 'Glossary',
-            },
-          ],
-        },
-        {
-          name: 'birthday',
-          dataType: 'DATE',
-          dataTypeDisplay: 'DATE',
-          tags: [
-            {
-              tagFQN: 'Data Dictionary.CDE17',
-              source: 'Glossary',
-            },
-          ],
-        },
-      ],
-    },
-  ],
-};
 
 describe('TechnicalDictionary', () => {
   const mockData = [
@@ -218,9 +153,18 @@ describe('TechnicalDictionary', () => {
     expect(screen.getByText(/CDE17/)).toBeInTheDocument();
     expect(screen.getAllByText('Dữ liệu nguyên tố').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Nhập thủ công').length).toBeGreaterThan(0);
+    expect(screen.getByText('255')).toBeInTheDocument();
+    expect(screen.getByText('VARCHAR(255)')).toHaveClass('cde-value-pill-classification');
+    screen.getAllByText('Nhập thủ công').forEach((tag) => {
+      expect(tag).toHaveClass('cde-value-pill-quality');
+    });
+    expect(screen.getAllByText('N/A')).toHaveLength(2);
+    expect(screen.queryByText('NotApplicable')).not.toBeInTheDocument();
+    expect(screen.getAllByText('T', { selector: '.cde-value-pill-frequency' })).toHaveLength(2);
+    expect(screen.getAllByText('Trung tâm Quản lý dữ liệu')).toHaveLength(2);
   });
 
-  it('renders status column and handles edit action', () => {
+  it('renders status and handles edit action by default', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
     const mockOnEdit = jest.fn();
@@ -254,10 +198,24 @@ describe('TechnicalDictionary', () => {
     expect(screen.getByTestId('address-status')).toBeInTheDocument();
     expect(screen.getByTestId('birthday-status')).toBeInTheDocument();
 
+    // Keep actions visible even with previously saved column preferences.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Table = require('../../components/common/Table/Table');
+
+    expect(Table.mock.calls[Table.mock.calls.length - 1][0]).toEqual(
+      expect.objectContaining({
+        defaultVisibleColumns: expect.arrayContaining(['actions']),
+        staticVisibleColumns: expect.arrayContaining(['actions']),
+      })
+    );
+
     // Verify edit button is present and clickable
     const editBtn = screen.getByTestId('edit-btn-address');
+
     expect(editBtn).toBeInTheDocument();
+
     editBtn.click();
+
     expect(mockOnEdit).toHaveBeenCalledWith(dataWithStatus[0]);
 
     // Verify approve and reject buttons are rendered for 'In Review' item
@@ -290,9 +248,9 @@ describe('TechnicalDictionary', () => {
       <MemoryRouter>
         <TechnicalDictionaryTable
           canApprove
-          canEdit={false}
           canReject
           canRevoke
+          canEdit={false}
           data={dataItems}
           isLoading={false}
           onApprove={mockOnApprove}
@@ -339,8 +297,8 @@ describe('TechnicalDictionary', () => {
     render(
       <MemoryRouter>
         <TechnicalDictionaryTable
-          canApprove={false}
           canEdit
+          canApprove={false}
           canReject={false}
           canRevoke={false}
           data={dataItems}
@@ -394,8 +352,26 @@ describe('TechnicalDictionary', () => {
     expect(screen.queryByTestId('reject-btn-address')).not.toBeInTheDocument();
     expect(screen.queryByTestId('revoke-btn-address')).not.toBeInTheDocument();
 
-    // Table view link remains accessible
+    // Table view link remains accessible when showActions is true
     expect(screen.getByTestId('view-table-AGR_USER')).toBeInTheDocument();
+  });
+
+  it('does not render actions column when explicitly hidden', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
+
+    render(
+      <MemoryRouter>
+        <TechnicalDictionaryTable
+          data={mockData}
+          isLoading={false}
+          showActions={false}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByTestId('edit-btn-address')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('view-table-AGR_USER')).not.toBeInTheDocument();
   });
 
   describe('Backend metadata synchronization on approve and revoke', () => {
@@ -565,6 +541,39 @@ describe('TechnicalDictionary', () => {
           }),
         ])
       );
+    });
+  });
+});
+
+
+describe('Technical dictionary CDE search', () => {
+  const { getTechnicalDictionarySearchQuery } = require('./TechnicalDictionaryPage.component');
+
+  it.each(['CDE1', 'cde1', '  CDE1  '])(
+    'searches %s by exact glossary tag instead of full-text tokens',
+    (search) => {
+      expect(getTechnicalDictionarySearchQuery(search)).toEqual({
+        query: '*',
+        cdeFilter: { term: { glossaryTags: 'data dictionary.cde1' } },
+      });
+    }
+  );
+
+  it('keeps different CDE codes distinct', () => {
+    expect(getTechnicalDictionarySearchQuery('CDE10').cdeFilter).toEqual({
+      term: { glossaryTags: 'data dictionary.cde10' },
+    });
+  });
+
+  it.each([
+    ['AGR_USER', '*AGR_USER*'],
+    ['address', '*address*'],
+    ['', '*'],
+    ['   ', '*'],
+  ])('preserves general search for %s', (search, query) => {
+    expect(getTechnicalDictionarySearchQuery(search)).toEqual({
+      query,
+      cdeFilter: undefined,
     });
   });
 });

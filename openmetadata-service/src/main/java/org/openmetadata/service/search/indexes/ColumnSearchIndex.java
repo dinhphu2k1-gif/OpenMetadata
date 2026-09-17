@@ -45,8 +45,6 @@ public class ColumnSearchIndex implements SearchIndex {
         "customMetrics",
         "jsonSchema",
         "precision",
-        "scale",
-        "dataLength",
         "arrayDataType");
   }
 

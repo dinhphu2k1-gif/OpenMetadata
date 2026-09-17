@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { Button, Tag } from 'antd';
+import { Button, Tag, Typography } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -28,7 +28,6 @@ import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import ProfilePicture from '../../common/ProfilePicture/ProfilePicture';
-import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEditorPreviewNew';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type DQExtension = {
@@ -54,48 +53,18 @@ export const DQ_TAG_CLASSIFICATIONS = {
   dataSource: 'DataSource',
 };
 
-export const getDQReferenceLabel = (reference: EntityReference) =>
-  getEntityName(reference) ||
-  reference.fullyQualifiedName ||
-  NO_DATA_PLACEHOLDER;
+import {
+  getDictionaryReferenceLabel,
+  renderDictionaryOwnerList,
+  renderDictionaryMarkdown,
+  renderDictionaryClassificationTags,
+  getDictionaryTagLabel,
+} from './DictionaryCellRenderers';
 
-export const renderDQOwners = (owners: EntityReference[] = []) => {
-  if (owners.length === 0) {
-    return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
-  }
+export const getDQReferenceLabel = getDictionaryReferenceLabel;
 
-  return (
-    <div className="dq-owner-list">
-      {owners.map((owner, index) => {
-        const ownerLabel = getDQReferenceLabel(owner);
-        const ownerKey =
-          owner.id ?? owner.fullyQualifiedName ?? owner.name ?? String(index);
-
-        return (
-          <div
-            className="dq-owner-item"
-            data-testid={`dq-owner-${ownerKey}`}
-            key={ownerKey}
-            title={ownerLabel}>
-            <ProfilePicture
-              className="dq-owner-avatar"
-              displayName={owner.displayName}
-              isTeam={owner.type === 'team'}
-              name={owner.name ?? owner.fullyQualifiedName ?? ''}
-              width="24"
-            />
-            <span className="dq-owner-name">{ownerLabel}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const getTagLabel = (tag: TagLabel) =>
-  tag.displayName ??
-  tag.name ??
-  tag.tagFQN.split('.').at(-1)?.replaceAll('_', ' ');
+export const renderDQOwners = (owners: EntityReference[] = []) =>
+  renderDictionaryOwnerList(owners, 'dq-owner');
 
 export const renderDQDimensionTags = (tags: TagLabel[] = []) => {
   const dimensionTags = tags.filter(
@@ -127,7 +96,7 @@ export const renderDQDimensionTags = (tags: TagLabel[] = []) => {
 
         return (
           <Tag className={`dq-value-pill ${pillVariant}`} key={tag.tagFQN}>
-            {getTagLabel(tag)}
+            {getDictionaryTagLabel(tag)}
           </Tag>
         );
       })}
@@ -139,39 +108,9 @@ export const renderDQClassificationTags = (
   tags: TagLabel[] = [],
   classification: string,
   variant: 'source' | 'population' | 'method' | 'frequency' | 'neutral' = 'neutral'
-) => {
-  const matchingTags = tags.filter(
-    (tag) => tag.tagFQN.split('.')[0] === classification
-  );
+) => renderDictionaryClassificationTags(tags, classification, variant);
 
-  if (matchingTags.length === 0) {
-    return NO_DATA_PLACEHOLDER;
-  }
-
-  return (
-    <div className="d-flex flex-column items-start gap-1">
-      {matchingTags.map((tag) => (
-        <Tag
-          className={`dq-value-pill dq-value-pill-${variant}`}
-          key={tag.tagFQN}>
-          {getTagLabel(tag)}
-        </Tag>
-      ))}
-    </div>
-  );
-};
-
-export const renderDQMarkdown = (value?: string, className?: string) =>
-  value?.trim() ? (
-    <RichTextEditorPreviewerNew
-      enableSeeMoreVariant
-      className={className}
-      markdown={value}
-      maxLength={100}
-    />
-  ) : (
-    NO_DATA_PLACEHOLDER
-  );
+export const renderDQMarkdown = renderDictionaryMarkdown;
 
 export const renderDQCdeCode = (
   record: ModifiedGlossaryTerm,

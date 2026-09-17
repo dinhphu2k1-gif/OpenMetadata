@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
+import { SearchIndex } from '../../../enums/search.enum';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import {
   mockedGlossaryTerms,
@@ -43,6 +44,7 @@ const mockSetGlossaryChildTerms = jest.fn();
 const mockGetFirstLevelGlossaryTermsPaginated = jest.fn();
 const mockGetGlossaryTermChildrenLazy = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
+const mockSearchQuery = jest.fn();
 const mockGetAllFeeds = jest.fn();
 const mockUpdateTask = jest.fn();
 
@@ -104,6 +106,24 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   searchGlossaryTermsPaginated: jest
     .fn()
     .mockImplementation((...args) => mockSearchGlossaryTermsPaginated(...args)),
+}));
+
+jest.mock('../../../rest/searchAPI', () => ({
+  searchQuery: jest
+    .fn()
+    .mockImplementation((...args) => mockSearchQuery(...args)),
+}));
+
+jest.mock('../../../rest/domainAPI', () => ({
+  getDomainList: jest.fn().mockResolvedValue({ data: [] }),
+}));
+
+jest.mock('../../../rest/tagAPI', () => ({
+  getTags: jest.fn().mockResolvedValue({ data: [] }),
+}));
+
+jest.mock('../../../rest/teamsAPI', () => ({
+  getTeams: jest.fn().mockResolvedValue({ data: [] }),
 }));
 
 jest.mock('../../../rest/feedsAPI', () => ({
@@ -312,6 +332,12 @@ describe('Test GlossaryTermTab component', () => {
     mockSearchGlossaryTermsPaginated.mockResolvedValue({
       data: mockedGlossaryTerms,
       paging: { after: null },
+    });
+    mockSearchQuery.mockResolvedValue({
+      hits: {
+        total: { value: mockedGlossaryTerms.length },
+        hits: mockedGlossaryTerms.map((term) => ({ _source: term })),
+      },
     });
     mockGetGlossaryTermChildrenLazy.mockResolvedValue({
       data: [
@@ -736,19 +762,18 @@ describe('Test GlossaryTermTab component', () => {
       expect(mockUpdateTask).not.toHaveBeenCalled();
     });
 
-    it('should request extended fields only for the CDE table', async () => {
+    it('should query SearchIndex.GLOSSARY_TERM for the CDE table', async () => {
       render(<GlossaryTermTab isGlossary />, {
         wrapper: MemoryRouter,
       });
 
       await waitFor(() => {
-        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
-          'Data Dictionary',
-          expect.any(Number),
-          undefined,
-          expect.any(String),
-          CDE_GLOSSARY_TERM_FIELDS,
-          undefined
+        expect(mockSearchQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            searchIndex: SearchIndex.GLOSSARY_TERM,
+            pageNumber: 1,
+            pageSize: expect.any(Number),
+          })
         );
       });
     });

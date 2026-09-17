@@ -14,22 +14,19 @@
 import {
   CheckOutlined,
   CloseOutlined,
-  EditOutlined,
-  UndoOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
-import { Button, Popconfirm, Tag, Tooltip, Typography } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
-import classNames from 'classnames';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
-import { TagLabel } from 'generated/type/tagLabel';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { ReactComponent as EditIcon } from '../../assets/svg/edit-new.svg';
 import { ReactComponent as IconExternalLink } from '../../assets/svg/external-links.svg';
 import {
   NO_DATA_PLACEHOLDER,
   PAGE_SIZE_BASE,
-  PAGE_SIZE_EXTRA_LARGE,
   PAGE_SIZE_LARGE,
   PAGE_SIZE_MEDIUM,
 } from '../../constants/constants';
@@ -40,14 +37,19 @@ import {
   TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY,
 } from '../../constants/TechnicalDictionary.constants';
 import { getEntityDetailsPath, getGlossaryPath } from '../../utils/RouterUtils';
-import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
+import {
+  NextPreviousProps,
+  PagingHandlerParams,
+} from '../../components/common/NextPrevious/NextPrevious.interface';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
-import RichTextEditorPreviewerNew from '../../components/common/RichTextEditor/RichTextEditorPreviewNew';
-import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
-import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import { usePaging } from '../../hooks/paging/usePaging';
-import { EntityStatusClass } from '../../utils/EntityStatusUtils';
+import {
+  renderDictionaryOwnerList,
+  renderDictionaryMarkdown,
+  renderDictionaryPastelTag,
+  renderDictionaryStatusBadge,
+} from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
 
 export interface TechnicalFieldItem {
   id: string;
@@ -95,8 +97,12 @@ interface TechnicalDictionaryTableProps {
   canApprove?: boolean;
   canReject?: boolean;
   canRevoke?: boolean;
+  showActions?: boolean;
   extraTableFilters?: React.ReactNode;
   extraTableFiltersClassName?: string;
+  customPaginationProps?: NextPreviousProps & {
+    showPagination: boolean;
+  };
   onRefresh?: () => void;
   onEdit?: (item: TechnicalFieldItem) => void;
   onApprove?: (item: TechnicalFieldItem) => void;
@@ -111,8 +117,10 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
   canApprove = true,
   canReject = true,
   canRevoke = true,
+  showActions = true,
   extraTableFilters,
   extraTableFiltersClassName,
+  customPaginationProps: externalPaginationProps,
   onEdit,
   onApprove,
   onReject,
@@ -128,21 +136,26 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
     handlePagingChange,
     handlePageChange,
     handlePageSizeChange,
-  } = usePaging(PAGE_SIZE_LARGE);
+  } = usePaging(PAGE_SIZE_BASE);
 
   useEffect(() => {
-    handlePagingChange({ total: data.length });
-    const maxPage = Math.max(1, Math.ceil(data.length / pageSize));
-    if (currentPage > maxPage) {
-      handlePageChange(maxPage, { cursorType: null, cursorValue: undefined });
+    if (!externalPaginationProps) {
+      handlePagingChange({ total: data.length });
+      const maxPage = Math.max(1, Math.ceil(data.length / pageSize));
+      if (currentPage > maxPage) {
+        handlePageChange(maxPage, { cursorType: null, cursorValue: undefined });
+      }
     }
-  }, [data.length, pageSize]);
+  }, [externalPaginationProps, data.length, pageSize]);
 
   const paginatedData = useMemo(() => {
+    if (externalPaginationProps) {
+      return data;
+    }
     const start = (currentPage - 1) * pageSize;
 
     return data.slice(start, start + pageSize);
-  }, [data, currentPage, pageSize]);
+  }, [externalPaginationProps, data, currentPage, pageSize]);
 
   const handlePaginationChange = useCallback(
     ({ currentPage: page }: PagingHandlerParams) => {
@@ -151,7 +164,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
     [handlePageChange]
   );
 
-  const customPaginationProps = useMemo(
+  const localPaginationProps = useMemo(
     () => ({
       currentPage,
       showPagination,
@@ -165,7 +178,6 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         PAGE_SIZE_BASE,
         PAGE_SIZE_MEDIUM,
         PAGE_SIZE_LARGE,
-        PAGE_SIZE_EXTRA_LARGE,
       ],
     }),
     [
@@ -179,10 +191,12 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
     ]
   );
 
-  const columns: ColumnsType<TechnicalFieldItem> = useMemo(
-    () => [
+  const activePaginationProps = externalPaginationProps || localPaginationProps;
+
+  const columns: ColumnsType<TechnicalFieldItem> = useMemo(() => {
+    const baseColumns: ColumnsType<TechnicalFieldItem> = [
       {
-        title: t('label.database-name', { defaultValue: 'Database Name' }),
+        title: t('label.database-name', { defaultValue: 'Tên cơ sở dữ liệu' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
         width: 150,
@@ -193,7 +207,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
 
           return record.databaseFqn ? (
             <Link
-              className="tech-code-link"
+              className="tech-entity-link"
               title={record.databaseDisplayName || record.databaseName}
               to={getEntityDetailsPath(
                 EntityType.DATABASE,
@@ -203,7 +217,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
             </Link>
           ) : (
             <span
-              className="tech-code-font"
+              className="tech-text-muted"
               title={record.databaseDisplayName || record.databaseName}>
               {record.databaseDisplayName || record.databaseName}
             </span>
@@ -222,7 +236,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
 
           return record.databaseSchemaFqn ? (
             <Link
-              className="tech-code-link"
+              className="tech-entity-link"
               title={record.schemaDisplayName || record.schemaName}
               to={getEntityDetailsPath(
                 EntityType.DATABASE_SCHEMA,
@@ -232,7 +246,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
             </Link>
           ) : (
             <span
-              className="tech-code-font"
+              className="tech-text-muted"
               title={record.schemaDisplayName || record.schemaName}>
               {record.schemaDisplayName || record.schemaName}
             </span>
@@ -246,7 +260,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         width: 190,
         render: (_, record) => (
           <Link
-            className="tech-code-link"
+            className="tech-entity-link"
             title={record.tableName}
             to={getEntityDetailsPath(
               EntityType.TABLE,
@@ -263,59 +277,50 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
         width: 160,
         render: (_, record) => (
-          <span className="tech-code-font font-semibold" title={record.columnName}>
+          <span className="tech-column-name" title={record.columnName}>
             {record.columnName}
           </span>
         ),
       },
       {
-        title: t('label.source', { defaultValue: 'Hệ thống nguồn' }),
+        title: t('label.source', { defaultValue: 'Nguồn' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SERVICE_NAME,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SERVICE_NAME,
         width: 130,
-        render: (serviceName: string) => (
-          <Tag className="tech-source-pill">{serviceName || NO_DATA_PLACEHOLDER}</Tag>
-        ),
+        render: (serviceName: string) =>
+          serviceName ? (
+            renderDictionaryPastelTag(serviceName, 'source')
+          ) : (
+            <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
+          ),
       },
       {
         title: t('label.cde-code-ref', { defaultValue: 'Mã CDE quy chiếu' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_CODE,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_CODE,
         width: 150,
-        render: (_, record) => {
-          if (!record.cdeCode) {
-            return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
-          }
-
-          const targetFqn = record.cdeFqn || `Data Dictionary.${record.cdeCode}`;
-
-          return (
-            <Link to={getGlossaryPath(targetFqn)}>
-              <Tag className="tech-cde-pill">
-                <span>🔗 {record.cdeCode}</span>
-              </Tag>
+        render: (_, record) =>
+          record.cdeCode ? (
+            <Link
+              className="cde-code-link cursor-pointer"
+              data-testid={`cde-code-${record.cdeCode}`}
+              title={record.cdeName || record.cdeCode}
+              to={getGlossaryPath(
+                record.cdeFqn || `Data Dictionary.${record.cdeCode}`
+              )}>
+              {record.cdeCode}
             </Link>
-          );
-        },
+          ) : (
+            <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
+          ),
       },
       {
         title: t('label.cde-name', { defaultValue: 'Tên thành tố CDE' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_NAME,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_NAME,
         width: 220,
-        render: (cdeName: string) => {
-          if (!cdeName) {
-            return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
-          }
-
-          return (
-            <Typography.Paragraph
-              className="m-0"
-              ellipsis={{ tooltip: cdeName, rows: 2 }}>
-              {cdeName}
-            </Typography.Paragraph>
-          );
-        },
+        render: (cdeName: string) =>
+          renderDictionaryMarkdown(cdeName),
       },
       {
         title: 'Thứ hạng (Rank)',
@@ -341,34 +346,17 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         },
       },
       {
-        title: t('label.data-type', { defaultValue: 'Kiểu dữ liệu' }),
+        title: t('label.data-type', { defaultValue: 'Loại dữ liệu' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATA_TYPE,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATA_TYPE,
         width: 130,
-        render: (_, record) => (
-          <Tag className="tech-type-pill">
-            {record.dataTypeDisplay || record.dataType || NO_DATA_PLACEHOLDER}
-          </Tag>
-        ),
-      },
-      {
-        title: t('label.field-length-decimal', { defaultValue: 'Độ dài' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_LENGTH,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_LENGTH,
-        width: 120,
         render: (_, record) => {
-          if (record.dataLength !== undefined && record.dataLength !== null) {
-            if (record.scale !== undefined && record.scale !== null && record.scale > 0) {
-              return `${record.dataLength} (${record.scale})`;
-            }
-
-            return `${record.dataLength}`;
-          }
-          if (record.scale !== undefined && record.scale !== null) {
-            return `(${record.scale})`;
+          const type = record.dataTypeDisplay || record.dataType;
+          if (!type) {
+            return <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>;
           }
 
-          return NO_DATA_PLACEHOLDER;
+          return renderDictionaryPastelTag(type, 'classification');
         },
       },
       {
@@ -382,56 +370,61 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
             return NO_DATA_PLACEHOLDER;
           }
           const isAtomic =
-            type.includes('Atomic') ||
+            type === 'Atomic' ||
             type.includes('Nguyên tố') ||
             type.includes('nguyen to');
 
-          return (
-            <Tag
-              className={classNames('tech-pill', {
-                'tech-pill-atomic': isAtomic,
-                'tech-pill-transformed': !isAtomic,
-              })}>
-              {record.elementTypeName || type}
-            </Tag>
+          return renderDictionaryPastelTag(
+            record.elementTypeName || type,
+            isAtomic ? 'atomic' : 'transformed'
           );
         },
       },
       {
-        title: t('label.field-generation-type', { defaultValue: 'Loại trường dữ liệu' }),
+        title: t('label.generation-type', {
+          defaultValue: 'Loại trường dữ liệu',
+        }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.GENERATION_TYPE,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.GENERATION_TYPE,
-        width: 170,
+        width: 180,
         render: (_, record) => {
           const genType = record.generationType || '';
           if (!genType) {
             return NO_DATA_PLACEHOLDER;
           }
-          const isSystem = genType.includes('SystemGenerated') || genType.includes('Tự sinh');
-          const isDerived = genType.includes('SystemDerived') || genType.includes('Tính toán');
-          const isManual = genType.includes('Manual') || genType.includes('Nhập');
-          const isUpload = genType.includes('Upload') || genType.includes('Tải');
+          const isSystem =
+            genType.includes('SystemGenerated') || genType.includes('Tự sinh');
+          const isDerived =
+            genType.includes('SystemDerived') || genType.includes('Tính toán');
+          const isManual =
+            genType.includes('Manual') || genType.includes('Nhập');
+          const isUpload =
+            genType.includes('Upload') || genType.includes('Tải');
 
-          return (
-            <Tag
-              className={classNames('tech-pill', {
-                'tech-pill-system-generated': isSystem,
-                'tech-pill-system-derived': isDerived,
-                'tech-pill-manual': isManual,
-                'tech-pill-upload': isUpload,
-              })}>
-              {record.generationTypeName || genType}
-            </Tag>
+          let variant = 'classification';
+          if (isSystem) {
+            variant = 'quality';
+          } else if (isDerived) {
+            variant = 'source';
+          } else if (isManual) {
+            variant = 'quality';
+          } else if (isUpload) {
+            variant = 'personal';
+          }
+
+          return renderDictionaryPastelTag(
+            record.generationTypeName || genType,
+            variant
           );
         },
       },
       {
-        title: t('label.data-creation-method', { defaultValue: 'Phương thức tạo' }),
+        title: t('label.creation-method', { defaultValue: 'Phương thức tạo' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CREATION_METHOD,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CREATION_METHOD,
-        width: 140,
-        render: (_, record) =>
-          record.creationMethodName || record.creationMethod || NO_DATA_PLACEHOLDER,
+        width: 160,
+        render: (creationMethod: string, record) =>
+          record.creationMethodName || creationMethod || NO_DATA_PLACEHOLDER,
       },
       {
         title: t('label.timeliness', { defaultValue: 'Thời gian' }),
@@ -440,7 +433,7 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         width: 110,
         render: (timeliness: string) =>
           timeliness ? (
-            <Tag className="tech-pill-time">{timeliness}</Tag>
+            renderDictionaryPastelTag(timeliness, 'frequency')
           ) : (
             NO_DATA_PLACEHOLDER
           ),
@@ -450,142 +443,106 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SYSTEM_OWNER,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SYSTEM_OWNER,
         width: 180,
-        render: (owner: string) => owner || NO_DATA_PLACEHOLDER,
+        render: (owner: string) =>
+          renderDictionaryOwnerList(owner, 'tech-owner'),
       },
       {
-        title: t('label.description', { defaultValue: 'Mô tả trường' }),
+        title: t('label.description', { defaultValue: 'Mô tả' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
         width: 240,
         render: (description: string) =>
-          description ? (
-            <RichTextEditorPreviewerNew
-              enableSeeMoreVariant
-              markdown={description}
-              maxLength={80}
-            />
-          ) : (
-            NO_DATA_PLACEHOLDER
-          ),
+          renderDictionaryMarkdown(description),
       },
       {
         title: t('label.status', { defaultValue: 'Trạng thái' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
         width: 140,
-        render: (status: string, record) => {
-          const rawStatus = (status || record.status || 'Approved').trim();
-          let entityStatus: EntityStatus = EntityStatus.Approved;
-          if (rawStatus === 'Draft') {
-            entityStatus = EntityStatus.Draft;
-          } else if (
-            rawStatus === 'In Review' ||
-            rawStatus === 'InReview' ||
-            rawStatus === 'Pending'
-          ) {
-            entityStatus = EntityStatus.InReview;
-          } else if (rawStatus === 'Rejected') {
-            entityStatus = EntityStatus.Rejected;
-          } else if (rawStatus === 'Deprecated') {
-            entityStatus = EntityStatus.Deprecated;
-          }
-
-          return (
-            <StatusBadge
-              dataTestId={`${record.columnName}-status`}
-              label={entityStatus}
-              status={EntityStatusClass[entityStatus]}
-            />
-          );
-        },
+        render: (status: string, record) =>
+          renderDictionaryStatusBadge(
+            status || record.status,
+            `${record.columnName}-status`
+          ),
       },
-      {
+    ];
+
+    if (showActions) {
+      baseColumns.push({
         title: t('label.action-plural', { defaultValue: 'Thao tác' }),
         dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
         key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
-        width: 140,
         fixed: 'right',
+        width: 120,
         render: (_, record) => {
-          const isInReview =
-            record.status === 'In Review' ||
-            record.status === 'InReview' ||
-            record.status === 'Pending';
-          const isApproved =
-            !isInReview && (record.status || 'Approved').trim() === 'Approved';
+          const currentStatus = record.status || 'Draft';
+          const isPending =
+            currentStatus === 'In Review' ||
+            currentStatus === 'InReview' ||
+            currentStatus === 'Pending';
+          const isApproved = currentStatus === 'Approved';
 
           return (
             <div className="d-flex items-center gap-2">
-              {canEdit && onEdit && (
-                <Tooltip title={t('label.edit', { defaultValue: 'Chỉnh sửa' })}>
+              {canEdit && (
+                <Tooltip title={t('label.edit', { defaultValue: 'Sửa' })}>
                   <Button
-                    className="d-flex items-center justify-center p-0 text-primary"
+                    className="d-flex items-center justify-center p-0"
                     data-testid={`edit-btn-${record.columnName}`}
-                    icon={<EditOutlined style={{ fontSize: 13 }} />}
+                    icon={<EditIcon height={14} width={14} />}
                     size="small"
                     type="text"
-                    onClick={() => onEdit(record)}
+                    onClick={() => onEdit?.(record)}
                   />
                 </Tooltip>
               )}
-              {canApprove && isInReview && onApprove && (
-                <Popconfirm
-                  cancelText={t('label.cancel', { defaultValue: 'Hủy' })}
-                  okText={t('label.approve', { defaultValue: 'Phê duyệt' })}
-                  title={t('label.confirm-approve-title', {
-                    defaultValue: 'Phê duyệt trường này?',
-                  })}
-                  onConfirm={() => onApprove(record)}>
-                  <Tooltip title={t('label.approve', { defaultValue: 'Phê duyệt' })}>
-                    <Button
-                      className="d-flex items-center justify-center p-0 text-success"
-                      data-testid={`approve-btn-${record.columnName}`}
-                      icon={<CheckOutlined style={{ fontSize: 13 }} />}
-                      size="small"
-                      type="text"
-                    />
-                  </Tooltip>
-                </Popconfirm>
+              {canApprove && isPending && (
+                <Tooltip
+                  title={t('label.approve', { defaultValue: 'Phê duyệt' })}>
+                  <Button
+                    className="d-flex items-center justify-center p-0 text-success"
+                    data-testid={`approve-btn-${record.columnName}`}
+                    icon={<CheckOutlined height={14} width={14} />}
+                    size="small"
+                    type="text"
+                    onClick={() => onApprove?.(record)}
+                  />
+                </Tooltip>
               )}
-              {canReject && isInReview && onReject && (
-                <Popconfirm
-                  cancelText={t('label.cancel', { defaultValue: 'Hủy' })}
-                  okText={t('label.reject', { defaultValue: 'Từ chối' })}
-                  title={t('label.confirm-reject-title', {
-                    defaultValue: 'Từ chối trường này?',
-                  })}
-                  onConfirm={() => onReject(record)}>
-                  <Tooltip title={t('label.reject', { defaultValue: 'Từ chối' })}>
-                    <Button
-                      className="d-flex items-center justify-center p-0 text-error"
-                      data-testid={`reject-btn-${record.columnName}`}
-                      icon={<CloseOutlined style={{ fontSize: 13 }} />}
-                      size="small"
-                      type="text"
-                    />
-                  </Tooltip>
-                </Popconfirm>
+              {canReject && isPending && (
+                <Tooltip
+                  title={t('label.reject', { defaultValue: 'Từ chối' })}>
+                  <Button
+                    className="d-flex items-center justify-center p-0 text-danger"
+                    data-testid={`reject-btn-${record.columnName}`}
+                    icon={<CloseOutlined height={14} width={14} />}
+                    size="small"
+                    type="text"
+                    onClick={() => onReject?.(record)}
+                  />
+                </Tooltip>
               )}
-              {canRevoke && isApproved && onRevoke && (
-                <Popconfirm
-                  cancelText={t('label.cancel', { defaultValue: 'Hủy' })}
-                  okText={t('label.revoke-approval', { defaultValue: 'Hủy duyệt' })}
-                  title={t('label.confirm-revoke-approval-title', {
-                    defaultValue: 'Hủy phê duyệt trường này?',
-                  })}
-                  onConfirm={() => onRevoke(record)}>
-                  <Tooltip title={t('label.revoke-approval', { defaultValue: 'Hủy phê duyệt' })}>
-                    <Button
-                      className="d-flex items-center justify-center p-0 text-warning"
-                      data-testid={`revoke-btn-${record.columnName}`}
-                      icon={<UndoOutlined style={{ fontSize: 13 }} />}
-                      size="small"
-                      type="text"
-                    />
-                  </Tooltip>
-                </Popconfirm>
+              {canRevoke && isApproved && (
+                <Tooltip
+                  title={t('label.revoke-approval', {
+                    defaultValue: 'Thu hồi phê duyệt',
+                  })}>
+                  <Button
+                    className="d-flex items-center justify-center p-0 text-warning"
+                    data-testid={`revoke-btn-${record.columnName}`}
+                    icon={<RollbackOutlined height={14} width={14} />}
+                    size="small"
+                    type="text"
+                    onClick={() => onRevoke?.(record)}
+                  />
+                </Tooltip>
               )}
-              <Tooltip title={t('label.view-table-details', { defaultValue: 'Xem chi tiết bảng' })}>
+              <Tooltip
+                title={t('label.view-table-details', {
+                  defaultValue: 'Xem chi tiết bảng',
+                })}>
                 <Link
+                  target="_blank"
                   to={getEntityDetailsPath(
                     EntityType.TABLE,
                     record.tableFqn,
@@ -603,16 +560,30 @@ export const TechnicalDictionaryTable: React.FC<TechnicalDictionaryTableProps> =
             </div>
           );
         },
-      },
-    ],
-    [t]
-  );
+      });
+    }
+
+    return baseColumns;
+  }, [
+    t,
+    showActions,
+    canEdit,
+    onEdit,
+    canApprove,
+    onApprove,
+    canReject,
+    onReject,
+    canRevoke,
+    onRevoke,
+  ]);
 
   return (
     <Table
       resizableColumns
+      className="cde-glossary-terms-table"
+      containerClassName="cde-glossary-table-container"
       columns={columns}
-      customPaginationProps={customPaginationProps}
+      customPaginationProps={activePaginationProps}
       data-testid="technical-dictionary-table"
       dataSource={paginatedData}
       defaultVisibleColumns={TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS}

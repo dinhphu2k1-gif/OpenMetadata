@@ -1,14 +1,14 @@
 {
-  "numFailedTestSuites": 0,
-  "numFailedTests": 0,
-  "numPassedTestSuites": 1,
-  "numPassedTests": 5,
+  "numFailedTestSuites": 1,
+  "numFailedTests": 1,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 17,
   "numPendingTestSuites": 0,
   "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 5,
+  "numTotalTests": 18,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1787566220704,
-  "success": true,
+  "startTime": 1789559212811,
+  "success": false,
   "testResults": [
     {
       "leaks": false,
-      "numFailingTests": 0,
-      "numPassingTests": 5,
+      "numFailingTests": 1,
+      "numPassingTests": 17,
       "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1787566231562,
-        "runtime": 7442,
+        "end": 1789559225255,
+        "runtime": 11861,
         "slow": true,
-        "start": 1787566224120
+        "start": 1789559213394
       },
       "skipped": false,
       "snapshot": {
@@ -52,89 +52,294 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/project/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/AddGlossaryTermForm/CDEGlossaryTermForm.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/pages/TechnicalDictionaryPage/TechnicalDictionaryPage.test.tsx",
       "testResults": [
         {
           "ancestorTitles": [
-            "CDEGlossaryTermForm"
+            "TechnicalDictionary"
           ],
-          "duration": 143,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "CDEGlossaryTermForm renders correctly in Add mode",
+          "duration": 287,
+          "failureDetails": [
+            {
+              "name": "TestingLibraryElementError"
+            }
+          ],
+          "failureMessages": [
+            "TestingLibraryElementError: Unable to find an element with the text: 255. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.\n\nIgnored nodes: comments, script, style\n\u001b[36m<body>\u001b[39m\n  \u001b[36m<div>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-wrapper\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-spin-nested-loading\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<div\u001b[39m\n            \u001b[33mclass\u001b[39m=\u001b[32m\"ant-spin-container\"\u001b[39m\n          \u001b[36m>\u001b[39m\n            \u001b[36m<div\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table ant-table-has-fix-right\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[36m<div\u001b[39m\n                \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-container\"\u001b[39m\n              \u001b[36m>\u001b[39m\n                \u001b[36m<div\u001b[39m\n                  \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-content\"\u001b[39m\n                \u001b[36m>\u001b[39m\n                  \u001b[36m<table\u001b[39m\n                    \u001b[33mstyle\u001b[39m=\u001b[32m\"table-layout: auto;\"\u001b[39m\n                  \u001b[36m>\u001b[39m\n                    \u001b[36m<colgroup>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 190px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 130px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 220px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 170px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 130px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 180px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 110px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 180px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 240px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 140px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                      \u001b[36m<col\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 120px;\"\u001b[39m\n                      \u001b[36m/>\u001b[39m\n                    \u001b[36m</colgroup>\u001b[39m\n                    \u001b[36m<thead\u001b[39m\n                      \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-thead\"\u001b[39m\n                    \u001b[36m>\u001b[39m\n                      \u001b[36m<tr>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.database-name\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.schema-name\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.table-name\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.column-name\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.source\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.cde-code-ref\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[0mlabel.cde-name\u001b[0m\n                        \u001b[36m</th>\u001b[39m\n                        \u001b[36m<th\u001b[39m\n                          \u001b[33maria-label\u001b[39m=\u001b[32m\"Thứ hạng (Rank)\"\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell ant-table-column-has-sorters\"\u001b[39m\n                          \u001b[33mtabindex\u001b[39m=\u001b[32m\"0\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[36m<div\u001b[39m\n                            \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorters\"\u001b[39m\n                          \u001b[36m>\u001b[39m\n                            \u001b[36m<span\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-title\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mThứ hạng (Rank)\u001b[0m\n                            \u001b[36m</span>\u001b[39m\n                            \u001b[36m<span\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorter ant-table-column-sorter-full\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[36m<span\u001b[39m\n                                \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorter-inner\"\u001b[39m\n                              \u001b[36m>\u001b[39m\n                                \u001b[36m<span\u001b[39m\n                                  \u001b[33maria-label\u001b[39m=\u001b[32m\"caret-up\"\u001b[39m\n                                  \u001b[33mclass\u001b[39m=\u001b[32m\"anticon anticon-caret-up ant-table-column-sorter-up\"\u001b[39m\n                                  \u001b[33mrole\u001b[39m=\u001b[32m\"presentation\"\u001b[39m\n                                \u001b[36m>\u001b[39m\n                                  \u001b[36m<svg\u001b[39m\n                                    \u001b[33maria-hidden\u001b[39m=\u001b[32m\"true\"\u001b[39m\n                                    \u001b[33mdata-icon\u001b[39m=\u001b[32m\"caret-up\"\u001b[39m\n                                    \u001b[33mfill\u001b[39m=\u001b[32m\"currentColor\"\u001b[39m\n                                    \u001b[33mfocusable\u001b[39m=\u001b[32m\"false\"\u001b[39m\n                                    \u001b[33mheight\u001b[39m=\u001b[32m\"1em\"\u001b[39m\n                   ...\n    at Object.getElementError (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/config.js:37:19)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/query-helpers.js:76:38\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/query-helpers.js:52:17\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/query-helpers.js:95:19\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/pages/TechnicalDictionaryPage/TechnicalDictionaryPage.test.tsx:156:19)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)"
+          ],
+          "fullName": "TechnicalDictionary renders TechnicalDictionaryTable columns and data correctly",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 4,
+          "numPassingAsserts": 9,
           "retryReasons": [],
-          "status": "passed",
-          "title": "renders correctly in Add mode"
+          "status": "failed",
+          "title": "renders TechnicalDictionaryTable columns and data correctly"
         },
         {
           "ancestorTitles": [
-            "CDEGlossaryTermForm"
+            "TechnicalDictionary"
           ],
-          "duration": 89,
+          "duration": 97,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "CDEGlossaryTermForm submits a complete CDE in Add mode",
+          "fullName": "TechnicalDictionary renders status and handles edit action by default",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 7,
           "retryReasons": [],
           "status": "passed",
-          "title": "submits a complete CDE in Add mode"
+          "title": "renders status and handles edit action by default"
         },
         {
           "ancestorTitles": [
-            "CDEGlossaryTermForm"
+            "TechnicalDictionary"
           ],
-          "duration": 45,
+          "duration": 74,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "CDEGlossaryTermForm prefills fields correctly in Edit mode",
+          "fullName": "TechnicalDictionary enforces RBAC: Data Steward can approve/reject in-review items and revoke approved items, but cannot edit",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 4,
+          "numPassingAsserts": 5,
           "retryReasons": [],
           "status": "passed",
-          "title": "prefills fields correctly in Edit mode"
+          "title": "enforces RBAC: Data Steward can approve/reject in-review items and revoke approved items, but cannot edit"
         },
         {
           "ancestorTitles": [
-            "CDEGlossaryTermForm"
+            "TechnicalDictionary"
+          ],
+          "duration": 68,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TechnicalDictionary enforces RBAC: Data Proposer can edit but cannot approve/reject or revoke",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "enforces RBAC: Data Proposer can edit but cannot approve/reject or revoke"
+        },
+        {
+          "ancestorTitles": [
+            "TechnicalDictionary"
           ],
           "duration": 47,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "CDEGlossaryTermForm preserves non-CDE tags and submits all CDE data accurately",
+          "fullName": "TechnicalDictionary enforces RBAC: Data Consumer cannot edit, approve/reject, or revoke",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 11,
+          "numPassingAsserts": 5,
           "retryReasons": [],
           "status": "passed",
-          "title": "preserves non-CDE tags and submits all CDE data accurately"
+          "title": "enforces RBAC: Data Consumer cannot edit, approve/reject, or revoke"
         },
         {
           "ancestorTitles": [
-            "CDEGlossaryTermForm"
+            "TechnicalDictionary"
           ],
-          "duration": 48,
+          "duration": 53,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "CDEGlossaryTermForm safely handles clearing domains without crashing",
+          "fullName": "TechnicalDictionary does not render actions column when explicitly hidden",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "does not render actions column when explicitly hidden"
+        },
+        {
+          "ancestorTitles": [
+            "TechnicalDictionary",
+            "Backend metadata synchronization on approve and revoke"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke removes CDE glossary and classification tags from table columns when revoked",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "removes CDE glossary and classification tags from table columns when revoked"
+        },
+        {
+          "ancestorTitles": [
+            "TechnicalDictionary",
+            "Backend metadata synchronization on approve and revoke"
+          ],
+          "duration": 3,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke attaches CDE glossary and classification tags to table columns when approved",
           "invocations": 1,
           "location": null,
           "numPassingAsserts": 1,
           "retryReasons": [],
           "status": "passed",
-          "title": "safely handles clearing domains without crashing"
+          "title": "attaches CDE glossary and classification tags to table columns when approved"
+        },
+        {
+          "ancestorTitles": [
+            "TechnicalDictionary",
+            "Backend metadata synchronization on approve and revoke"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke persists proposed metadata with In Review status to backend table when submitted by proposer",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "persists proposed metadata with In Review status to backend table when submitted by proposer"
+        },
+        {
+          "ancestorTitles": [
+            "TechnicalDictionary",
+            "Backend metadata synchronization on approve and revoke"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke persists rejected status to backend table when rejected by steward",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "persists rejected status to backend table when rejected by steward"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search searches CDE1 by exact glossary tag instead of full-text tokens",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "searches CDE1 by exact glossary tag instead of full-text tokens"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search searches cde1 by exact glossary tag instead of full-text tokens",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "searches cde1 by exact glossary tag instead of full-text tokens"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search searches   CDE1   by exact glossary tag instead of full-text tokens",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "searches   CDE1   by exact glossary tag instead of full-text tokens"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search keeps different CDE codes distinct",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "keeps different CDE codes distinct"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search preserves general search for AGR_USER",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves general search for AGR_USER"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search preserves general search for address",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves general search for address"
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search preserves general search for ",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves general search for "
+        },
+        {
+          "ancestorTitles": [
+            "Technical dictionary CDE search"
+          ],
+          "duration": 0,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Technical dictionary CDE search preserves general search for    ",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves general search for    "
         }
       ],
       "displayName": {
         "color": "white",
         "name": "@openmetadata"
       },
-      "failureMessage": null
+      "failureMessage": "  ● TechnicalDictionary › renders TechnicalDictionaryTable columns and data correctly\n\n    TestingLibraryElementError: Unable to find an element with the text: 255. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.\n\n    Ignored nodes: comments, script, style\n    \u001b[36m<body>\u001b[39m\n      \u001b[36m<div>\u001b[39m\n        \u001b[36m<div>\u001b[39m\n          \u001b[36m<div\u001b[39m\n            \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-wrapper\"\u001b[39m\n          \u001b[36m>\u001b[39m\n            \u001b[36m<div\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-spin-nested-loading\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[36m<div\u001b[39m\n                \u001b[33mclass\u001b[39m=\u001b[32m\"ant-spin-container\"\u001b[39m\n              \u001b[36m>\u001b[39m\n                \u001b[36m<div\u001b[39m\n                  \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table ant-table-has-fix-right\"\u001b[39m\n                \u001b[36m>\u001b[39m\n                  \u001b[36m<div\u001b[39m\n                    \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-container\"\u001b[39m\n                  \u001b[36m>\u001b[39m\n                    \u001b[36m<div\u001b[39m\n                      \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-content\"\u001b[39m\n                    \u001b[36m>\u001b[39m\n                      \u001b[36m<table\u001b[39m\n                        \u001b[33mstyle\u001b[39m=\u001b[32m\"table-layout: auto;\"\u001b[39m\n                      \u001b[36m>\u001b[39m\n                        \u001b[36m<colgroup>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 190px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 130px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 150px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 220px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 170px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 130px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 180px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 160px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 110px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 180px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 240px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 140px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                          \u001b[36m<col\u001b[39m\n                            \u001b[33mstyle\u001b[39m=\u001b[32m\"width: 120px;\"\u001b[39m\n                          \u001b[36m/>\u001b[39m\n                        \u001b[36m</colgroup>\u001b[39m\n                        \u001b[36m<thead\u001b[39m\n                          \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-thead\"\u001b[39m\n                        \u001b[36m>\u001b[39m\n                          \u001b[36m<tr>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.database-name\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.schema-name\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.table-name\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.column-name\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.source\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.cde-code-ref\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[0mlabel.cde-name\u001b[0m\n                            \u001b[36m</th>\u001b[39m\n                            \u001b[36m<th\u001b[39m\n                              \u001b[33maria-label\u001b[39m=\u001b[32m\"Thứ hạng (Rank)\"\u001b[39m\n                              \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-cell ant-table-column-has-sorters\"\u001b[39m\n                              \u001b[33mtabindex\u001b[39m=\u001b[32m\"0\"\u001b[39m\n                            \u001b[36m>\u001b[39m\n                              \u001b[36m<div\u001b[39m\n                                \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorters\"\u001b[39m\n                              \u001b[36m>\u001b[39m\n                                \u001b[36m<span\u001b[39m\n                                  \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-title\"\u001b[39m\n                                \u001b[36m>\u001b[39m\n                                  \u001b[0mThứ hạng (Rank)\u001b[0m\n                                \u001b[36m</span>\u001b[39m\n                                \u001b[36m<span\u001b[39m\n                                  \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorter ant-table-column-sorter-full\"\u001b[39m\n                                \u001b[36m>\u001b[39m\n                                  \u001b[36m<span\u001b[39m\n                                    \u001b[33mclass\u001b[39m=\u001b[32m\"ant-table-column-sorter-inner\"\u001b[39m\n                                  \u001b[36m>\u001b[39m\n                                    \u001b[36m<span\u001b[39m\n                                      \u001b[33maria-label\u001b[39m=\u001b[32m\"caret-up\"\u001b[39m\n                                      \u001b[33mclass\u001b[39m=\u001b[32m\"anticon anticon-caret-up ant-table-column-sorter-up\"\u001b[39m\n                                      \u001b[33mrole\u001b[39m=\u001b[32m\"presentation\"\u001b[39m\n                                    \u001b[36m>\u001b[39m\n                                      \u001b[36m<svg\u001b[39m\n                                        \u001b[33maria-hidden\u001b[39m=\u001b[32m\"true\"\u001b[39m\n                                        \u001b[33mdata-icon\u001b[39m=\u001b[32m\"caret-up\"\u001b[39m\n                                        \u001b[33mfill\u001b[39m=\u001b[32m\"currentColor\"\u001b[39m\n                                        \u001b[33mfocusable\u001b[39m=\u001b[32m\"false\"\u001b[39m\n                                        \u001b[33mheight\u001b[39m=\u001b[32m\"1em\"\u001b[39m\n                       ...\n\n      154 |     expect(screen.getAllByText('Dữ liệu nguyên tố').length).toBeGreaterThan(0);\n      155 |     expect(screen.getAllByText('Nhập thủ công').length).toBeGreaterThan(0);\n    > 156 |     expect(screen.getByText('255')).toBeInTheDocument();\n          |                   ^\n      157 |     expect(screen.getByText('VARCHAR(255)')).toHaveClass('cde-value-pill-classification');\n      158 |     screen.getAllByText('Nhập thủ công').forEach((tag) => {\n      159 |       expect(tag).toHaveClass('cde-value-pill-quality');\n\n      at Object.getElementError (node_modules/@testing-library/dom/dist/config.js:37:19)\n      at node_modules/@testing-library/dom/dist/query-helpers.js:76:38\n      at node_modules/@testing-library/dom/dist/query-helpers.js:52:17\n      at node_modules/@testing-library/dom/dist/query-helpers.js:95:19\n      at Object.<anonymous> (src/pages/TechnicalDictionaryPage/TechnicalDictionaryPage.test.tsx:156:19)\n"
     }
   ],
   "wasInterrupted": false

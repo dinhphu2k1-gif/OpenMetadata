@@ -12,9 +12,7 @@
  */
 
 import {
-  DownloadOutlined,
   DownOutlined,
-  UploadOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
@@ -101,6 +99,8 @@ import { User } from '../../../generated/entity/teams/user';
 import { Paging } from '../../../generated/type/paging';
 import { usePaging } from '../../../hooks/paging/usePaging';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
+import { SearchIndex } from '../../../enums/search.enum';
+import { getDomainList } from '../../../rest/domainAPI';
 import { getAllFeeds, updateTask } from '../../../rest/feedsAPI';
 import {
   getFirstLevelGlossaryTermsPaginated,
@@ -109,6 +109,9 @@ import {
   patchGlossaryTerm,
   searchGlossaryTermsPaginated,
 } from '../../../rest/glossaryAPI';
+import { searchQuery } from '../../../rest/searchAPI';
+import { getTags } from '../../../rest/tagAPI';
+import { getTeams } from '../../../rest/teamsAPI';
 import { getBulkEditButton } from '../../../utils/EntityBulkEdit/EntityBulkEditUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityBulkEditPath } from '../../../utils/EntityPureUtils';
@@ -139,17 +142,13 @@ import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
 import {
   CDE_TAG_CLASSIFICATIONS,
   getCDEGlossaryTableColumns,
-  getCDEReferenceLabel,
 } from './CDEGlossaryTableColumns';
 import CDEFilterDropdown from './CDEFilterDropdown.component';
 import {
   DQ_TAG_CLASSIFICATIONS,
   getDQGlossaryTableColumns,
-  getDQReferenceLabel,
 } from './DQGlossaryTableColumns';
 import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
-import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
-import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import {
   GlossaryTermTabProps,
   ModifiedGlossaryTerm,
@@ -187,29 +186,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     );
   }, [activeGlossary, isGlossary]);
 
-  const canImportCDE = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
 
-    const isSteward =
-      userRoles.some((r) => r.includes('steward')) ||
-      personaName.includes('steward');
-
-    const isProposer =
-      !isSteward &&
-      (userRoles.some((r) => r.includes('proposer')) ||
-        personaName.includes('proposer'));
-
-    return isProposer;
-  }, [currentUser, selectedPersona]);
   const isDQGlossary = useMemo(() => {
     const glossary = isGlossary
       ? activeGlossary
@@ -523,7 +500,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [selectedCdeDataSources, setSelectedCdeDataSources] = useState<string[]>(['all']);
   const [selectedCdeOwners, setSelectedCdeOwners] = useState<string[]>(['all']);
   const [selectedCdeClassifications, setSelectedCdeClassifications] = useState<string[]>(['all']);
-  const [allCdeTerms, setAllCdeTerms] = useState<ModifiedGlossaryTerm[]>([]);
+  const [cdeFilterOptions, setCdeFilterOptions] = useState<{
+    domains: Array<{ label: string; value: string }>;
+    dataSources: Array<{ label: string; value: string }>;
+    classifications: Array<{ label: string; value: string }>;
+    owners: Array<{ label: string; value: string }>;
+  }>({
+    domains: [],
+    dataSources: [],
+    classifications: [],
+    owners: [],
+  });
 
   // DQ Column Filters
   const [selectedDqDimensions, setSelectedDqDimensions] = useState<string[]>(['all']);
@@ -531,7 +518,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [selectedDqOwners, setSelectedDqOwners] = useState<string[]>(['all']);
   const [selectedDqMethods, setSelectedDqMethods] = useState<string[]>(['all']);
   const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] = useState<string[]>(['all']);
-  const [allDqTerms, setAllDqTerms] = useState<ModifiedGlossaryTerm[]>([]);
+  const [dqFilterOptions, setDqFilterOptions] = useState<{
+    dimensions: Array<{ label: string; value: string }>;
+    dataSources: Array<{ label: string; value: string }>;
+    methods: Array<{ label: string; value: string }>;
+    targetPopulations: Array<{ label: string; value: string }>;
+    owners: Array<{ label: string; value: string }>;
+  }>({
+    dimensions: [],
+    dataSources: [],
+    methods: [],
+    targetPopulations: [],
+    owners: [],
+  });
 
   const {
     currentPage,
@@ -581,55 +580,233 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     setSelectedDqTargetPopulations(['all']);
   }, [activeGlossary?.fullyQualifiedName]);
 
-  // Fetch full list of CDE terms for options and comprehensive client-side filtering
-  const fetchAllCdeTerms = useCallback(async () => {
-    if (!activeGlossary?.id || !isCDEGlossary) {
+  // Lightweight option fetching for CDE & DQ filters
+  useEffect(() => {
+    if (!isCDEGlossary) {
       return;
     }
-    try {
-      const key = isGlossary ? 'glossary' : 'parent';
-      const { data } = await getGlossaryTerms({
-        [key]: activeGlossary.id,
-        limit: API_RES_MAX_SIZE,
-        fields: CDE_GLOSSARY_TERM_FIELDS,
-        ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
-      });
-      setAllCdeTerms(data as ModifiedGlossaryTerm[]);
-    } catch (error) {
-      // fallback to glossaryChildTerms
-    }
-  }, [activeGlossary?.id, isCDEGlossary, isGlossary, isConsumer]);
+    const loadCdeOptions = async () => {
+      try {
+        const [domainRes, dataSourceRes, classRes, teamRes] =
+          await Promise.allSettled([
+            getDomainList({ limit: 100 }),
+            getTags({ parent: CDE_TAG_CLASSIFICATIONS.dataSource, limit: 100 }),
+            getTags({
+              parent: CDE_TAG_CLASSIFICATIONS.dataClassification,
+              limit: 100,
+            }),
+            getTeams({ limit: 100 }),
+          ]);
+
+        const domains: Array<{ label: string; value: string }> = [];
+        if (domainRes.status === 'fulfilled' && domainRes.value?.data) {
+          domainRes.value.data.forEach((d) => {
+            const label = d.displayName || d.name || '';
+            if (label && !domains.some((item) => item.value === label)) {
+              domains.push({ label, value: label });
+            }
+          });
+        }
+        if (activeGlossary?.domains) {
+          activeGlossary.domains.forEach((d) => {
+            const label = d.displayName || d.name || '';
+            if (label && !domains.some((item) => item.value === label)) {
+              domains.push({ label, value: label });
+            }
+          });
+        }
+        domains.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const dataSources: Array<{ label: string; value: string }> = [];
+        if (dataSourceRes.status === 'fulfilled' && dataSourceRes.value?.data) {
+          dataSourceRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !dataSources.some((item) => item.value === value)
+            ) {
+              dataSources.push({ label, value });
+            }
+          });
+        }
+        dataSources.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const classifications: Array<{ label: string; value: string }> = [];
+        if (classRes.status === 'fulfilled' && classRes.value?.data) {
+          classRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !classifications.some((item) => item.value === value)
+            ) {
+              classifications.push({ label, value });
+            }
+          });
+        }
+        classifications.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const owners: Array<{ label: string; value: string }> = [];
+        if (teamRes.status === 'fulfilled' && teamRes.value?.data) {
+          teamRes.value.data.forEach((tm) => {
+            const label = tm.displayName || tm.name || '';
+            const value = tm.name || tm.id || '';
+            if (label && value && !owners.some((item) => item.value === value)) {
+              owners.push({ label, value });
+            }
+          });
+        }
+        owners.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        setCdeFilterOptions({
+          domains,
+          dataSources,
+          classifications,
+          owners,
+        });
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    loadCdeOptions();
+  }, [isCDEGlossary, activeGlossary?.domains]);
 
   useEffect(() => {
-    if (isCDEGlossary && activeGlossary?.id) {
-      fetchAllCdeTerms();
-    }
-  }, [fetchAllCdeTerms, isCDEGlossary, activeGlossary?.id]);
-
-  // Fetch full list of DQ terms for options and comprehensive client-side filtering
-  const fetchAllDqTerms = useCallback(async () => {
-    if (!activeGlossary?.id || !isDQGlossary) {
+    if (!isDQGlossary) {
       return;
     }
-    try {
-      const key = isGlossary ? 'glossary' : 'parent';
-      const { data } = await getGlossaryTerms({
-        [key]: activeGlossary.id,
-        limit: API_RES_MAX_SIZE,
-        fields: DQ_GLOSSARY_TERM_FIELDS,
-        ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
-      });
-      setAllDqTerms(data as ModifiedGlossaryTerm[]);
-    } catch (error) {
-      // fallback to glossaryChildTerms
-    }
-  }, [activeGlossary?.id, isDQGlossary, isGlossary, isConsumer]);
+    const loadDqOptions = async () => {
+      try {
+        const [dimRes, dataSourceRes, methodRes, targetPopRes, teamRes] =
+          await Promise.allSettled([
+            getTags({ parent: DQ_TAG_CLASSIFICATIONS.dimension, limit: 100 }),
+            getTags({ parent: DQ_TAG_CLASSIFICATIONS.dataSource, limit: 100 }),
+            getTags({ parent: DQ_TAG_CLASSIFICATIONS.method, limit: 100 }),
+            getTags({
+              parent: DQ_TAG_CLASSIFICATIONS.targetPopulation,
+              limit: 100,
+            }),
+            getTeams({ limit: 100 }),
+          ]);
 
-  useEffect(() => {
-    if (isDQGlossary && activeGlossary?.id) {
-      fetchAllDqTerms();
-    }
-  }, [fetchAllDqTerms, isDQGlossary, activeGlossary?.id]);
+        const dimensions: Array<{ label: string; value: string }> = [];
+        if (dimRes.status === 'fulfilled' && dimRes.value?.data) {
+          dimRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !dimensions.some((item) => item.value === value)
+            ) {
+              dimensions.push({ label, value });
+            }
+          });
+        }
+        dimensions.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const dataSources: Array<{ label: string; value: string }> = [];
+        if (dataSourceRes.status === 'fulfilled' && dataSourceRes.value?.data) {
+          dataSourceRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !dataSources.some((item) => item.value === value)
+            ) {
+              dataSources.push({ label, value });
+            }
+          });
+        }
+        dataSources.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const methods: Array<{ label: string; value: string }> = [];
+        if (methodRes.status === 'fulfilled' && methodRes.value?.data) {
+          methodRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !methods.some((item) => item.value === value)
+            ) {
+              methods.push({ label, value });
+            }
+          });
+        }
+        methods.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const targetPopulations: Array<{ label: string; value: string }> = [];
+        if (targetPopRes.status === 'fulfilled' && targetPopRes.value?.data) {
+          targetPopRes.value.data.forEach((t) => {
+            const label =
+              t.displayName ??
+              t.name ??
+              t.tagFQN?.split('.').at(-1)?.replaceAll('_', ' ') ??
+              '';
+            const value = t.tagFQN || t.fullyQualifiedName || '';
+            if (
+              label &&
+              value &&
+              !targetPopulations.some((item) => item.value === value)
+            ) {
+              targetPopulations.push({ label, value });
+            }
+          });
+        }
+        targetPopulations.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        const owners: Array<{ label: string; value: string }> = [];
+        if (teamRes.status === 'fulfilled' && teamRes.value?.data) {
+          teamRes.value.data.forEach((tm) => {
+            const label = tm.displayName || tm.name || '';
+            const value = tm.name || tm.id || '';
+            if (label && value && !owners.some((item) => item.value === value)) {
+              owners.push({ label, value });
+            }
+          });
+        }
+        owners.sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+
+        setDqFilterOptions({
+          dimensions,
+          dataSources,
+          methods,
+          targetPopulations,
+          owners,
+        });
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    loadDqOptions();
+  }, [isDQGlossary]);
 
 
   const hasActiveCdeFilters = useMemo(
@@ -662,231 +839,88 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     ]
   );
 
-  const sourceTermsForOptions = useMemo(() => {
-    if (allCdeTerms.length > 0) {
-      return allCdeTerms;
-    }
-    if (Array.isArray(glossaryChildTerms)) {
-      return glossaryChildTerms as ModifiedGlossaryTerm[];
-    }
+  const cdeDomainOptions = cdeFilterOptions.domains;
+  const cdeDataSourceOptions = cdeFilterOptions.dataSources;
+  const cdeOwnerOptions = cdeFilterOptions.owners;
+  const cdeClassificationOptions = cdeFilterOptions.classifications;
 
-    return [];
-  }, [allCdeTerms, glossaryChildTerms]);
+  const dqDimensionOptions = dqFilterOptions.dimensions;
+  const dqDataSourceOptions = dqFilterOptions.dataSources;
+  const dqOwnerOptions = dqFilterOptions.owners;
+  const dqMethodOptions = dqFilterOptions.methods;
+  const dqTargetPopulationOptions = dqFilterOptions.targetPopulations;
 
-  const sourceDqTermsForOptions = useMemo(() => {
-    if (allDqTerms.length > 0) {
-      return allDqTerms;
-    }
-    if (Array.isArray(glossaryChildTerms)) {
-      return glossaryChildTerms as ModifiedGlossaryTerm[];
-    }
+  const handleCdeDomainsChange = useCallback(
+    (vals: string[]) => {
+      setSelectedCdeDomains(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-    return [];
-  }, [allDqTerms, glossaryChildTerms]);
+  const handleCdeDataSourcesChange = useCallback(
+    (vals: string[]) => {
+      setSelectedCdeDataSources(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-  const cdeDomainOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceTermsForOptions.forEach((term) => {
-      term.domains?.forEach((d) => {
-        const label = d.displayName || d.name || '';
-        if (label) {
-          map.set(label, label);
-        }
-      });
-    });
+  const handleCdeOwnersChange = useCallback(
+    (vals: string[]) => {
+      setSelectedCdeOwners(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceTermsForOptions]);
+  const handleCdeClassificationsChange = useCallback(
+    (vals: string[]) => {
+      setSelectedCdeClassifications(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-  const cdeDataSourceOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
+  const handleDqDimensionsChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqDimensions(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceTermsForOptions]);
+  const handleDqDataSourcesChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqDataSources(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-  const cdeOwnerOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceTermsForOptions.forEach((term) => {
-      term.owners?.forEach((o) => {
-        const label = getCDEReferenceLabel(o);
-        const val = o.id || o.fullyQualifiedName || o.name || '';
-        if (label && val) {
-          map.set(val, label);
-        }
-      });
-    });
+  const handleDqOwnersChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqOwners(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceTermsForOptions]);
+  const handleDqMethodsChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqMethods(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
-  const cdeClassificationOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (
-          t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataClassification
-        ) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceTermsForOptions]);
-
-  const dqDimensionOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceDqTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dimension) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceDqTermsForOptions]);
-
-  const dqDataSourceOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceDqTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceDqTermsForOptions]);
-
-  const dqOwnerOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceDqTermsForOptions.forEach((term) => {
-      term.owners?.forEach((o) => {
-        const label = getDQReferenceLabel(o);
-        const val = o.id || o.fullyQualifiedName || o.name || '';
-        if (label && val) {
-          map.set(val, label);
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceDqTermsForOptions]);
-
-  const dqMethodOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceDqTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.method) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceDqTermsForOptions]);
-
-  const dqTargetPopulationOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    sourceDqTermsForOptions.forEach((term) => {
-      term.tags?.forEach((t) => {
-        if (
-          t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.targetPopulation
-        ) {
-          const label =
-            t.displayName ??
-            t.name ??
-            t.tagFQN.split('.').at(-1)?.replaceAll('_', ' ') ??
-            '';
-          if (label) {
-            map.set(t.tagFQN, label);
-          }
-        }
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ label, value }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [sourceDqTermsForOptions]);
-
-  const availableCdeDomains = useMemo(() => {
-    const domainMap = new Map<string, EntityReference>();
-    (activeGlossary.domains ?? []).forEach((d) => {
-      if (d.fullyQualifiedName) {
-        domainMap.set(d.fullyQualifiedName, d);
-      }
-    });
-    sourceTermsForOptions.forEach((term) => {
-      term.domains?.forEach((d) => {
-        if (d.fullyQualifiedName) {
-          domainMap.set(d.fullyQualifiedName, d);
-        }
-      });
-    });
-
-    return Array.from(domainMap.values());
-  }, [activeGlossary.domains, sourceTermsForOptions]);
+  const handleDqTargetPopulationsChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqTargetPopulations(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
 
   const fetchChildTerms = async (parentFQN: string, after?: string) => {
     setLoadingChildren((prev) => ({ ...prev, [parentFQN]: true }));
@@ -982,55 +1016,163 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         ? [EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
         : (rawStatuses as EntityStatus[]);
 
-      // Use search API if search term is present
-      if (searchTerm.trim()) {
-        const response = await searchGlossaryTermsPaginated({
-          q: searchTerm,
-          glossaryFqn: activeGlossary.fullyQualifiedName,
-          limit: pageSize,
-          entityStatus: entityStatusParam?.join(','),
-        });
-        data = response.data;
-        pagingResponse = response.paging;
-      } else {
-        const after =
-          pagingCursor.cursorType === CursorType.AFTER
-            ? pagingCursor.cursorValue
-            : undefined;
-        const before =
-          pagingCursor.cursorType === CursorType.BEFORE
-            ? pagingCursor.cursorValue
-            : undefined;
+      if (isCDEGlossary || isDQGlossary) {
+        const mustQueries: Array<Record<string, unknown>> = [
+          { term: { 'glossary.name.keyword': activeGlossary.name } },
+          { term: { deleted: false } },
+        ];
 
-        // Use regular listing API when no search term
-        const response = isDQGlossary
-          ? await getFirstLevelGlossaryTermsPaginated(
-              activeGlossary?.fullyQualifiedName || '',
-              pageSize,
-              after,
-              entityStatusParam?.join(','),
-              DQ_GLOSSARY_TERM_FIELDS,
-              before
-            )
-          : isCDEGlossary
-          ? await getFirstLevelGlossaryTermsPaginated(
-              activeGlossary?.fullyQualifiedName || '',
-              pageSize,
-              after,
-              entityStatusParam?.join(','),
-              CDE_GLOSSARY_TERM_FIELDS,
-              before
-            )
-          : await getFirstLevelGlossaryTermsPaginated(
-              activeGlossary?.fullyQualifiedName || '',
-              pageSize,
-              after,
-              entityStatusParam?.join(','),
-              undefined,
-              before
-            );
-        data = response.data;
-        pagingResponse = response.paging;
+        if (isConsumer) {
+          mustQueries.push({ term: { entityStatus: EntityStatus.Approved } });
+        } else if (rawStatuses.length > 0) {
+          mustQueries.push({ terms: { entityStatus: rawStatuses } });
+        }
+
+        if (isCDEGlossary) {
+          if (
+            !selectedCdeDomains.includes('all') &&
+            selectedCdeDomains.length > 0
+          ) {
+            mustQueries.push({
+              terms: { 'domains.displayName': selectedCdeDomains },
+            });
+          }
+          if (
+            !selectedCdeDataSources.includes('all') &&
+            selectedCdeDataSources.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedCdeDataSources },
+            });
+          }
+          if (
+            !selectedCdeClassifications.includes('all') &&
+            selectedCdeClassifications.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedCdeClassifications },
+            });
+          }
+          if (
+            !selectedCdeOwners.includes('all') &&
+            selectedCdeOwners.length > 0
+          ) {
+            mustQueries.push({
+              nested: {
+                path: 'owners',
+                query: {
+                  terms: { 'owners.name': selectedCdeOwners },
+                },
+              },
+            });
+          }
+        } else if (isDQGlossary) {
+          if (
+            !selectedDqDimensions.includes('all') &&
+            selectedDqDimensions.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedDqDimensions },
+            });
+          }
+          if (
+            !selectedDqDataSources.includes('all') &&
+            selectedDqDataSources.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedDqDataSources },
+            });
+          }
+          if (
+            !selectedDqMethods.includes('all') &&
+            selectedDqMethods.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedDqMethods },
+            });
+          }
+          if (
+            !selectedDqTargetPopulations.includes('all') &&
+            selectedDqTargetPopulations.length > 0
+          ) {
+            mustQueries.push({
+              terms: { classificationTags: selectedDqTargetPopulations },
+            });
+          }
+          if (
+            !selectedDqOwners.includes('all') &&
+            selectedDqOwners.length > 0
+          ) {
+            mustQueries.push({
+              nested: {
+                path: 'owners',
+                query: {
+                  terms: { 'owners.name': selectedDqOwners },
+                },
+              },
+            });
+          }
+        }
+
+        const queryFilter = {
+          query: {
+            bool: {
+              must: mustQueries,
+            },
+          },
+        };
+
+        const searchRes = await searchQuery({
+          searchIndex: SearchIndex.GLOSSARY_TERM,
+          query: searchTerm.trim() ? `*${searchTerm.trim()}*` : '*',
+          pageNumber: currentPage,
+          pageSize: pageSize,
+          queryFilter,
+          trackTotalHits: true,
+          fetchSource: true,
+          sortField: 'name.keyword',
+          sortOrder: 'asc',
+        });
+
+        data = (searchRes.hits.hits.map(
+          (hit) => hit._source
+        ) as unknown) as ModifiedGlossary[];
+        pagingResponse = {
+          total: searchRes.hits.total.value,
+        };
+      } else {
+        // Use search API if search term is present
+        if (searchTerm.trim()) {
+          const response = await searchGlossaryTermsPaginated({
+            q: searchTerm,
+            glossaryFqn: activeGlossary.fullyQualifiedName,
+            limit: pageSize,
+            entityStatus: entityStatusParam?.join(','),
+          });
+          data = response.data;
+          pagingResponse = response.paging;
+        } else {
+          const after =
+            pagingCursor.cursorType === CursorType.AFTER
+              ? pagingCursor.cursorValue
+              : undefined;
+          const before =
+            pagingCursor.cursorType === CursorType.BEFORE
+              ? pagingCursor.cursorValue
+              : undefined;
+
+          // Use regular listing API when no search term
+          const response = await getFirstLevelGlossaryTermsPaginated(
+            activeGlossary?.fullyQualifiedName || '',
+            pageSize,
+            after,
+            entityStatusParam?.join(','),
+            undefined,
+            before
+          );
+          data = response.data;
+          pagingResponse = response.paging;
+        }
       }
 
       setTotalTermsCount(pagingResponse?.total ?? data.length);
@@ -1049,21 +1191,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     handleClearSelection();
     refreshGlossaryTerms?.();
     fetchAllTerms();
-    if (isCDEGlossary) {
-      fetchAllCdeTerms();
-    }
-    if (isDQGlossary) {
-      fetchAllDqTerms();
-    }
   }, [
     handleCloseBulkModal,
     handleClearSelection,
     refreshGlossaryTerms,
     fetchAllTerms,
-    isCDEGlossary,
-    fetchAllCdeTerms,
-    isDQGlossary,
-    fetchAllDqTerms,
   ]);
 
   const fetchExpadedTree = async () => {
@@ -1182,7 +1314,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   const handleTermsPaging = useCallback(
     ({ cursorType, currentPage }: PagingHandlerParams) => {
-      if (searchTerm) {
+      if (isCDEGlossary || isDQGlossary || searchTerm) {
         handlePageChange(currentPage);
       } else if (cursorType) {
         handlePageChange(
@@ -1192,7 +1324,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         );
       }
     },
-    [handlePageChange, pageSize, paging, searchTerm]
+    [handlePageChange, pageSize, paging, searchTerm, isCDEGlossary, isDQGlossary]
   );
 
   const glossaryTermStatus: EntityStatus | null = useMemo(() => {
@@ -2157,268 +2289,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return [];
     }
 
-    if (isCDEGlossary && hasActiveCdeFilters) {
-      const sourceList: ModifiedGlossaryTerm[] =
-        allCdeTerms.length > 0
-          ? (buildTree(allCdeTerms) as ModifiedGlossaryTerm[])
-          : glossaryTerms;
-
-      const filterPredicate = (term: ModifiedGlossaryTerm): boolean => {
-        if (!selectedCdeDomains.includes('all')) {
-          const termDomains =
-            term.domains?.map((d) => d.displayName || d.name || '') || [];
-          if (!selectedCdeDomains.some((d) => termDomains.includes(d))) {
-            return false;
-          }
-        }
-
-        if (!selectedCdeDataSources.includes('all')) {
-          const termSources =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource
-              )
-              .map((t) => t.tagFQN) || [];
-          if (!selectedCdeDataSources.some((s) => termSources.includes(s))) {
-            return false;
-          }
-        }
-
-        if (!selectedCdeOwners.includes('all')) {
-          const termOwners =
-            term.owners?.map(
-              (o) =>
-                o.id ||
-                o.fullyQualifiedName ||
-                o.name ||
-                getCDEReferenceLabel(o)
-            ) || [];
-          if (!selectedCdeOwners.some((o) => termOwners.includes(o))) {
-            return false;
-          }
-        }
-
-        if (!selectedCdeClassifications.includes('all')) {
-          const termClasses =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] ===
-                  CDE_TAG_CLASSIFICATIONS.dataClassification
-              )
-              .map((t) => t.tagFQN) || [];
-          if (
-            !selectedCdeClassifications.some((c) => termClasses.includes(c))
-          ) {
-            return false;
-          }
-        }
-
-        if (searchTerm.trim()) {
-          const termLower = searchTerm.toLowerCase();
-          const nameMatch = term.name?.toLowerCase().includes(termLower);
-          const dispMatch = term.displayName
-            ?.toLowerCase()
-            .includes(termLower);
-          if (!nameMatch && !dispMatch) {
-            return false;
-          }
-        }
-
-        return true;
-      };
-
-      const filterRecursive = (
-        nodes: ModifiedGlossaryTerm[]
-      ): ModifiedGlossaryTerm[] => {
-        const result: ModifiedGlossaryTerm[] = [];
-
-        for (const node of nodes) {
-          const selfMatches = filterPredicate(node);
-          const matchingChildren = node.children?.length
-            ? filterRecursive(node.children as ModifiedGlossaryTerm[])
-            : [];
-
-          if (selfMatches || matchingChildren.length > 0) {
-            result.push({
-              ...node,
-              children:
-                matchingChildren.length > 0 ? matchingChildren : node.children,
-              childrenCount:
-                matchingChildren.length > 0
-                  ? matchingChildren.length
-                  : node.childrenCount,
-            });
-          }
-        }
-
-        return result;
-      };
-
-      return processTermsWithLoadMore(filterRecursive(sourceList));
-    }
-
-    if (isDQGlossary && hasActiveDqFilters) {
-      const sourceList: ModifiedGlossaryTerm[] =
-        allDqTerms.length > 0
-          ? (buildTree(allDqTerms) as ModifiedGlossaryTerm[])
-          : glossaryTerms;
-
-      const filterPredicate = (term: ModifiedGlossaryTerm): boolean => {
-        if (!selectedDqDimensions.includes('all')) {
-          const termDims =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dimension
-              )
-              .map((t) => t.tagFQN) || [];
-          if (!selectedDqDimensions.some((d) => termDims.includes(d))) {
-            return false;
-          }
-        }
-
-        if (!selectedDqDataSources.includes('all')) {
-          const termSources =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource
-              )
-              .map((t) => t.tagFQN) || [];
-          if (!selectedDqDataSources.some((s) => termSources.includes(s))) {
-            return false;
-          }
-        }
-
-        if (!selectedDqOwners.includes('all')) {
-          const termOwners =
-            term.owners?.map(
-              (o) =>
-                o.id ||
-                o.fullyQualifiedName ||
-                o.name ||
-                getDQReferenceLabel(o)
-            ) || [];
-          if (!selectedDqOwners.some((o) => termOwners.includes(o))) {
-            return false;
-          }
-        }
-
-        if (!selectedDqMethods.includes('all')) {
-          const termMethods =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.method
-              )
-              .map((t) => t.tagFQN) || [];
-          if (!selectedDqMethods.some((m) => termMethods.includes(m))) {
-            return false;
-          }
-        }
-
-        if (!selectedDqTargetPopulations.includes('all')) {
-          const termPops =
-            term.tags
-              ?.filter(
-                (t) =>
-                  t.tagFQN.split('.')[0] ===
-                  DQ_TAG_CLASSIFICATIONS.targetPopulation
-              )
-              .map((t) => t.tagFQN) || [];
-          if (!selectedDqTargetPopulations.some((p) => termPops.includes(p))) {
-            return false;
-          }
-        }
-
-        if (searchTerm.trim()) {
-          const termLower = searchTerm.toLowerCase();
-          const nameMatch = term.name?.toLowerCase().includes(termLower);
-          const dispMatch = term.displayName
-            ?.toLowerCase()
-            .includes(termLower);
-          const descMatch = term.description
-            ?.toLowerCase()
-            .includes(termLower);
-          const ext = term.extension as Record<string, unknown> | undefined;
-          const cdeCodeMatch = String(ext?.cdeCode ?? '')
-            .toLowerCase()
-            .includes(termLower);
-          const cdeNameMatch = String(ext?.cdeName ?? '')
-            .toLowerCase()
-            .includes(termLower);
-          const ruleExplMatch = String(ext?.ruleExplanation ?? '')
-            .toLowerCase()
-            .includes(termLower);
-
-          if (
-            !nameMatch &&
-            !dispMatch &&
-            !descMatch &&
-            !cdeCodeMatch &&
-            !cdeNameMatch &&
-            !ruleExplMatch
-          ) {
-            return false;
-          }
-        }
-
-        return true;
-      };
-
-      const filterRecursive = (
-        nodes: ModifiedGlossaryTerm[]
-      ): ModifiedGlossaryTerm[] => {
-        const result: ModifiedGlossaryTerm[] = [];
-
-        for (const node of nodes) {
-          const selfMatches = filterPredicate(node);
-          const matchingChildren = node.children?.length
-            ? filterRecursive(node.children as ModifiedGlossaryTerm[])
-            : [];
-
-          if (selfMatches || matchingChildren.length > 0) {
-            result.push({
-              ...node,
-              children:
-                matchingChildren.length > 0 ? matchingChildren : node.children,
-              childrenCount:
-                matchingChildren.length > 0
-                  ? matchingChildren.length
-                  : node.childrenCount,
-            });
-          }
-        }
-
-        return result;
-      };
-
-      return processTermsWithLoadMore(filterRecursive(sourceList));
-    }
-
     return processTermsWithLoadMore(glossaryTerms);
-  }, [
-    glossaryTerms,
-    processTermsWithLoadMore,
-    isCDEGlossary,
-    hasActiveCdeFilters,
-    allCdeTerms,
-    selectedCdeDomains,
-    selectedCdeDataSources,
-    selectedCdeOwners,
-    selectedCdeClassifications,
-    isDQGlossary,
-    hasActiveDqFilters,
-    allDqTerms,
-    selectedDqDimensions,
-    selectedDqDataSources,
-    selectedDqOwners,
-    selectedDqMethods,
-    selectedDqTargetPopulations,
-    searchTerm,
-  ]);
+  }, [glossaryTerms, processTermsWithLoadMore]);
 
   useEffect(() => {
     if (
@@ -2514,28 +2386,28 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               label={t('cde.business-group')}
               options={cdeDomainOptions}
               selectedValues={selectedCdeDomains}
-              onChange={setSelectedCdeDomains}
+              onChange={handleCdeDomainsChange}
             />
             <CDEFilterDropdown
               dataTestId="cde-datasource-filter"
               label={t('cde.data-source')}
               options={cdeDataSourceOptions}
               selectedValues={selectedCdeDataSources}
-              onChange={setSelectedCdeDataSources}
+              onChange={handleCdeDataSourcesChange}
             />
             <CDEFilterDropdown
               dataTestId="cde-owner-filter"
               label={t('cde.data-owner')}
               options={cdeOwnerOptions}
               selectedValues={selectedCdeOwners}
-              onChange={setSelectedCdeOwners}
+              onChange={handleCdeOwnersChange}
             />
             <CDEFilterDropdown
               dataTestId="cde-classification-filter"
               label={t('cde.data-classification')}
               options={cdeClassificationOptions}
               selectedValues={selectedCdeClassifications}
-              onChange={setSelectedCdeClassifications}
+              onChange={handleCdeClassificationsChange}
             />
           </>
         )}
@@ -2547,35 +2419,35 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               label={t('dq.dimension', 'Tiêu chí')}
               options={dqDimensionOptions}
               selectedValues={selectedDqDimensions}
-              onChange={setSelectedDqDimensions}
+              onChange={handleDqDimensionsChange}
             />
             <CDEFilterDropdown
               dataTestId="dq-datasource-filter"
               label={t('dq.data-source', 'Hệ thống nguồn')}
               options={dqDataSourceOptions}
               selectedValues={selectedDqDataSources}
-              onChange={setSelectedDqDataSources}
+              onChange={handleDqDataSourcesChange}
             />
             <CDEFilterDropdown
               dataTestId="dq-owner-filter"
               label={t('dq.owners', 'Chủ sở hữu')}
               options={dqOwnerOptions}
               selectedValues={selectedDqOwners}
-              onChange={setSelectedDqOwners}
+              onChange={handleDqOwnersChange}
             />
             <CDEFilterDropdown
               dataTestId="dq-method-filter"
               label={t('dq.method', 'Hình thức kiểm tra')}
               options={dqMethodOptions}
               selectedValues={selectedDqMethods}
-              onChange={setSelectedDqMethods}
+              onChange={handleDqMethodsChange}
             />
             <CDEFilterDropdown
               dataTestId="dq-target-population-filter"
               label={t('dq.target-population', 'Tập dữ liệu kiểm tra')}
               options={dqTargetPopulationOptions}
               selectedValues={selectedDqTargetPopulations}
-              onChange={setSelectedDqTargetPopulations}
+              onChange={handleDqTargetPopulationsChange}
             />
           </>
         )}
@@ -2635,9 +2507,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedDqOwners,
     selectedDqMethods,
     selectedDqTargetPopulations,
+    handleCdeDomainsChange,
+    handleCdeDataSourcesChange,
+    handleCdeOwnersChange,
+    handleCdeClassificationsChange,
+    handleDqDimensionsChange,
+    handleDqDataSourcesChange,
+    handleDqOwnersChange,
+    handleDqMethodsChange,
+    handleDqTargetPopulationsChange,
     filteredGlossaryTerms,
-    allCdeTerms,
-    allDqTerms,
     t,
     permissions.EditAll,
   ]);
@@ -2652,6 +2531,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         currentPage,
         pagingCursor.cursorType,
         pagingCursor.cursorValue,
+        isCDEGlossary ? selectedCdeDomains.join(',') : '',
+        isCDEGlossary ? selectedCdeDataSources.join(',') : '',
+        isCDEGlossary ? selectedCdeOwners.join(',') : '',
+        isCDEGlossary ? selectedCdeClassifications.join(',') : '',
+        isDQGlossary ? selectedDqDimensions.join(',') : '',
+        isDQGlossary ? selectedDqDataSources.join(',') : '',
+        isDQGlossary ? selectedDqOwners.join(',') : '',
+        isDQGlossary ? selectedDqMethods.join(',') : '',
+        isDQGlossary ? selectedDqTargetPopulations.join(',') : '',
       ].join('|'),
     [
       activeGlossary?.fullyQualifiedName,
@@ -2661,6 +2549,17 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       currentPage,
       pagingCursor.cursorType,
       pagingCursor.cursorValue,
+      isCDEGlossary,
+      selectedCdeDomains,
+      selectedCdeDataSources,
+      selectedCdeOwners,
+      selectedCdeClassifications,
+      isDQGlossary,
+      selectedDqDimensions,
+      selectedDqDataSources,
+      selectedDqOwners,
+      selectedDqMethods,
+      selectedDqTargetPopulations,
     ]
   );
 
@@ -2682,7 +2581,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     () => ({
       currentPage,
       isLoading: isTableLoading,
-      isNumberBased: Boolean(searchTerm),
+      isNumberBased: isCDEGlossary || isDQGlossary || Boolean(searchTerm),
       pageSize,
       pageSizeOptions: [PAGE_SIZE_BASE, PAGE_SIZE_MEDIUM, PAGE_SIZE_LARGE],
       paging,
@@ -2698,6 +2597,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       pageSize,
       paging,
       searchTerm,
+      isCDEGlossary,
+      isDQGlossary,
     ]
   );
 
@@ -2715,10 +2616,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     hasActiveCdeFilters ||
     hasActiveDqFilters;
 
-  const totalGlossaryTermsCount =
-    activeGlossary?.termCount ??
-    activeGlossary?.childrenCount ??
-    (isDQGlossary ? allDqTerms.length : allCdeTerms.length);
+
 
   const glossaryPlaceholderText = useMemo(() => {
     if (isSearchActive && (searchTerm || searchInput)) {

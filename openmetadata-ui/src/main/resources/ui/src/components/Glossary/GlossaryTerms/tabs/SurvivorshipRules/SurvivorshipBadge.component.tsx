@@ -33,7 +33,7 @@ export const SurvivorshipBadge: React.FC<SurvivorshipBadgeProps> = ({
       case 1:
         return {
           icon: '🥇',
-          label: 'Hạng 1 (Nguồn Vàng)',
+          label: 'Hạng 1',
           style: {
             backgroundColor: '#fffbe6',
             borderColor: '#ffe58f',
