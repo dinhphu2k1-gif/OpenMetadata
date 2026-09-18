@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Typography } from 'antd';
+import { useEffect, useState } from 'react';
+import { Card, Typography } from '@openmetadata/ui-core-components';
 import {
   DatabaseOutlined,
   TableOutlined,
@@ -19,8 +19,6 @@ import { getChartPreviewByName } from '../../../../rest/DataInsightAPI';
 import { SystemChartType } from '../../../../enums/DataInsight.enum';
 import { getEpochMillisForPastDays, getCurrentMillis } from '../../../../utils/date-time/DateTimeUtils';
 import { groupBy } from 'lodash';
-
-const { Text, Title } = Typography;
 
 const calculateTrend = (current: number, past: number) => {
   if (!past || past === 0) return { trend: 'up', trendValue: '0%' };
@@ -182,16 +180,16 @@ const AgribankStatsWidget = () => {
   return (
     <div className="agribank-stats-container">
       {statsData.map((stat) => (
-        <Card key={stat.id} className="agribank-stat-card" bordered>
+        <Card className="agribank-stat-card" key={stat.id}>
           <div className="stat-card-body">
             <div className={`stat-icon-wrapper ${stat.bgClass}`}>
               {stat.icon}
             </div>
             <div className="stat-content">
-              <Title level={3} className="stat-value">
+              <Typography as="h3" className="stat-value">
                 {stat.value}
-              </Title>
-              <Text className="stat-title">{stat.title}</Text>
+              </Typography>
+              <Typography as="span" className="stat-title">{stat.title}</Typography>
               <div
                 className={`stat-trend ${
                   stat.trend === 'up' ? 'trend-up' : 'trend-down'
@@ -201,9 +199,9 @@ const AgribankStatsWidget = () => {
                 ) : (
                   <ArrowDownOutlined className="trend-icon" />
                 )}
-                <Text className="trend-text">
+                <Typography as="span" className="trend-text">
                   <span className="trend-value">{stat.trendValue}</span> {stat.trendText}
-                </Text>
+                </Typography>
               </div>
             </div>
           </div>
@@ -214,4 +212,3 @@ const AgribankStatsWidget = () => {
 };
 
 export default AgribankStatsWidget;
-

@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 import Icon from '@ant-design/icons';
-import { Alert, Button, Modal, Progress, Space, Typography } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Alert, Modal, Progress, Space, Typography } from 'antd';
 import { AxiosError } from 'axios';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -120,7 +121,7 @@ export const GlossaryUpdateConfirmationModal = ({
           {failedStatus?.numberOfRowsFailed &&
             `${failedStatus.numberOfRowsFailed} ${t('label.failed')}`}
         </Typography.Text>
-        <Button onClick={onCancel}>{t('label.cancel')}</Button>
+        <Button color="secondary" onPress={onCancel}>{t('label.cancel')}</Button>
       </div>
     );
 
@@ -152,10 +153,10 @@ export const GlossaryUpdateConfirmationModal = ({
               </Typography.Text>
               <div className="m-t-lg">
                 <Space size={8}>
-                  <Button onClick={onCancel}>
+                  <Button color="secondary" onPress={onCancel}>
                     {t('label.no-comma-cancel')}
                   </Button>
-                  <Button type="primary" onClick={handleUpdateConfirmation}>
+                  <Button color="primary" onPress={handleUpdateConfirmation}>
                     {t('label.yes-comma-confirm')}
                   </Button>
                 </Space>
@@ -201,19 +202,19 @@ export const GlossaryUpdateConfirmationModal = ({
                 {failedStatus?.numberOfRowsFailed &&
                   `${failedStatus.numberOfRowsFailed} ${t('label.failed')}`}
               </Typography.Text>
-              <Button onClick={onCancel}>{t('label.cancel')}</Button>
+              <Button color="secondary" onPress={onCancel}>{t('label.cancel')}</Button>
             </div>
           ),
         };
       case UpdateState.UPDATING:
         return {
           content: progressBar,
-          footer: <Button onClick={onCancel}>{t('label.cancel')}</Button>,
+          footer: <Button color="secondary" onPress={onCancel}>{t('label.cancel')}</Button>,
         };
       case UpdateState.SUCCESS:
         return {
           content: progressBar,
-          footer: <Button onClick={onCancel}>{t('label.cancel')}</Button>,
+          footer: <Button color="secondary" onPress={onCancel}>{t('label.cancel')}</Button>,
         };
     }
   }, [updateState, failedStatus]);

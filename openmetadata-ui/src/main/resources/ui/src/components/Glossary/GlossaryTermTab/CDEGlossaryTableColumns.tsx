@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 
-import { Button, Tag } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -20,10 +21,7 @@ import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.con
 import { EntityReference } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
-import {
-  getGlossaryPath,
-  getGlossaryTermsVersionsPath,
-} from '../../../utils/RouterUtils';
+import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
@@ -124,14 +122,13 @@ export const getCDEGlossaryTableColumns = ({
 
         return (
           <Button
-            className="text-primary"
+            color="link-color"
             data-testid="load-more-children-button"
-            loading={
+            isLoading={
               loadingChildren[parentRecord?.fullyQualifiedName ?? ''] ?? false
             }
-            size="small"
-            type="link"
-            onClick={() =>
+            size="sm"
+            onPress={() =>
               parentRecord && handleLoadMoreChildren(parentRecord)
             }>
             {t('label.view-more')} ({Math.max(totalCount - loadedCount, 0)})

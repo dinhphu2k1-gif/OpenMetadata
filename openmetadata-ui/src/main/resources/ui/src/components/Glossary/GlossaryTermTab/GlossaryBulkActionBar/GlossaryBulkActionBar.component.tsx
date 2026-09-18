@@ -12,8 +12,7 @@
  */
 
 import Icon, { CloseOutlined, UndoOutlined } from '@ant-design/icons';
-import { Typography } from '@openmetadata/ui-core-components';
-import { Button, Space } from 'antd';
+import { Button, Typography } from '@openmetadata/ui-core-components';
 import { FC, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as CheckIcon } from '../../../../assets/svg/ic-check-circle.svg';
@@ -134,18 +133,18 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
       </div>
 
       <div className="bulk-bar-right">
-        <Space size={8}>
+        <div className="bulk-bar-actions">
           {canSubmitForReview && draftTerms.length > 0 && (
             <Button
+              color="primary"
               data-testid="bulk-submit-for-review-btn"
-              icon={
+              iconLeading={
                 <Icon
                   component={PaperPlaneIcon}
-                  style={{ fontSize: '14px', marginRight: '6px' }}
+                  style={{ fontSize: '14px' }}
                 />
               }
-              type="primary"
-              onClick={() => onSubmitForReview(draftTerms)}>
+              onPress={() => onSubmitForReview(draftTerms)}>
               {t('label.bulk-submit-for-review-count', 'Gửi phê duyệt ({{count}})', {
                 count: draftTerms.length,
               })}
@@ -156,26 +155,25 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
             <>
               <Button
                 className="btn-bulk-approve"
+                color="primary"
                 data-testid="bulk-approve-btn"
-                icon={
+                iconLeading={
                   <Icon
                     component={CheckIcon}
-                    style={{ fontSize: '14px', marginRight: '6px' }}
+                    style={{ fontSize: '14px' }}
                   />
                 }
-                type="primary"
-                onClick={() => onApprove(inReviewTerms)}>
+                onPress={() => onApprove(inReviewTerms)}>
                 {t('label.bulk-approve-count', 'Phê duyệt tất cả ({{count}})', {
                   count: inReviewTerms.length,
                 })}
               </Button>
 
               <Button
-                danger
+                color="primary-destructive"
                 data-testid="bulk-reject-btn"
-                icon={<CloseOutlined style={{ marginRight: '6px' }} />}
-                type="default"
-                onClick={() => onReject(inReviewTerms)}>
+                iconLeading={<CloseOutlined />}
+                onPress={() => onReject(inReviewTerms)}>
                 {t('label.bulk-reject-count', 'Từ chối tất cả ({{count}})', {
                   count: inReviewTerms.length,
                 })}
@@ -186,16 +184,16 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
           {canRevokeApproval && approvedTerms.length > 0 && onRevokeApproval && (
             <Button
               className="btn-bulk-revoke"
+              color="secondary"
               data-testid="bulk-revoke-btn"
-              icon={<UndoOutlined style={{ marginRight: '6px' }} />}
-              type="default"
-              onClick={() => onRevokeApproval(approvedTerms)}>
+              iconLeading={<UndoOutlined />}
+              onPress={() => onRevokeApproval(approvedTerms)}>
               {t('label.bulk-revoke-count', 'Hủy duyệt ({{count}})', {
                 count: approvedTerms.length,
               })}
             </Button>
           )}
-        </Space>
+        </div>
       </div>
     </div>
   );

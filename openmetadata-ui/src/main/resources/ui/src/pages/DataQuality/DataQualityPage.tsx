@@ -12,6 +12,7 @@
  */
 
 import { DownOutlined } from '@ant-design/icons';
+import { Button as CoreButton } from '@openmetadata/ui-core-components';
 import { Button, Card, Col, Dropdown, Row, Space, Tabs } from 'antd';
 import { isEmpty } from 'lodash';
 import { useMemo, useState } from 'react';
@@ -145,24 +146,24 @@ const DataQualityPage = () => {
               <Col className="d-flex justify-end" span={8}>
                 {activeTab === DataQualityPageTabs.TEST_SUITES &&
                   testSuitePermission?.Create && (
-                    <Button
+                    <CoreButton
+                      color="primary"
                       data-testid="add-test-suite-btn"
-                      type="primary"
-                      onClick={handleOpenBundleSuiteModal}>
+                      onPress={handleOpenBundleSuiteModal}>
                       {t('label.add-a-entity', {
                         entity: t('label.bundle-suite'),
                       })}
-                    </Button>
+                    </CoreButton>
                   )}
                 {activeTab === DataQualityPageTabs.TEST_CASES && (
-                  <Button
+                  <CoreButton
+                    color="primary"
                     data-testid="add-test-case-btn"
-                    type="primary"
-                    onClick={handleOpenTestCaseModal}>
+                    onPress={handleOpenTestCaseModal}>
                     {t('label.add-a-entity', {
                       entity: t('label.test-case'),
                     })}
-                  </Button>
+                  </CoreButton>
                 )}
                 {exportDataQualityDashboardButton}
 

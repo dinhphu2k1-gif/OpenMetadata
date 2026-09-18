@@ -15,6 +15,12 @@ import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { validateTagAddtionToGlossary } from '../../../rest/glossaryAPI';
 import { GlossaryUpdateConfirmationModal } from './GlossaryUpdateConfirmationModal';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, onPress, ...props }: any) => (
+    <button {...props} onClick={onPress}>{children}</button>
+  ),
+}));
+
 const mockOnCancel = jest.fn();
 const mockOnValidationSuccess = jest.fn();
 

@@ -82,7 +82,6 @@ import { exportDQToExcel } from '../DQImportExport/DQImportExport.utils';
 
 import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
-import { getEntityVoteStatus } from '../../../utils/EntityVoteUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import {
@@ -96,7 +95,7 @@ import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { EntityStatusBadge } from '../../Entity/EntityStatusBadge/EntityStatusBadge.component';
-import Voting from '../../Entity/Voting/Voting.component';
+
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
 import StyleModal from '../../Modals/StyleModal/StyleModal.component';
@@ -372,10 +371,6 @@ const GlossaryHeader = ({
     );
   }, [isCustomManagedTerm, selectedData]);
 
-  const voteStatus = useMemo(
-    () => getEntityVoteStatus(currentUser?.id ?? '', selectedData.votes),
-    [selectedData.votes, currentUser]
-  );
 
   const icon = useMemo(() => {
     if (isGlossary) {
@@ -1262,13 +1257,7 @@ const GlossaryHeader = ({
             {!isVersionView && createButtons}
 
             <ButtonGroup className="spaced" size="small">
-              {updateVote && (
-                <Voting
-                  voteStatus={voteStatus}
-                  votes={selectedData.votes}
-                  onUpdateVote={updateVote}
-                />
-              )}
+
 
               {!isCustomManagedTerm && selectedData?.version && (
                 <Tooltip

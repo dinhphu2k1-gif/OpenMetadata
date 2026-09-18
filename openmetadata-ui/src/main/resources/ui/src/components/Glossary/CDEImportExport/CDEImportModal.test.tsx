@@ -23,6 +23,15 @@ import {
 import CDEImportModal from './CDEImportModal.component';
 import * as utils from './CDEImportExport.utils';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, iconLeading, isDisabled, onPress, ...props }: any) => (
+    <button disabled={isDisabled} {...props} onClick={onPress}>
+      {iconLeading}
+      {children}
+    </button>
+  ),
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, defaultVal: string) => defaultVal || key,

@@ -482,9 +482,9 @@ services:
       - "8585:8585"
       - "8586:8586"
       - "5005:5005"
-    volumes:
-      # Mount Java Truststore chứa CA nội bộ Agribank để JVM tin cậy SSL của IAM IdP
-      - ./certs/cacerts:/etc/ssl/certs/java/cacerts:ro
+    # volumes:
+    #   # Mount Java Truststore chứa CA nội bộ Agribank để JVM tin cậy SSL của IAM IdP
+    #   - ./certs/cacerts:/etc/ssl/certs/java/cacerts:ro
     depends_on:
       opensearch:
         condition: service_healthy

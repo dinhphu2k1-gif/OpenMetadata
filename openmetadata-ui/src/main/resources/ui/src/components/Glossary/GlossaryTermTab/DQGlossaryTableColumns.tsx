@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 
-import { Button, Tag, Typography } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -27,7 +28,6 @@ import {
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
-import ProfilePicture from '../../common/ProfilePicture/ProfilePicture';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type DQExtension = {
@@ -184,14 +184,13 @@ export const getDQGlossaryTableColumns = ({
 
         return (
           <Button
-            className="text-primary"
+            color="link-color"
             data-testid="load-more-children-button"
-            loading={
+            isLoading={
               loadingChildren[parentRecord?.fullyQualifiedName ?? ''] ?? false
             }
-            size="small"
-            type="link"
-            onClick={() =>
+            size="sm"
+            onPress={() =>
               parentRecord && handleLoadMoreChildren(parentRecord)
             }>
             {t('label.view-more')} ({Math.max(totalCount - loadedCount, 0)})

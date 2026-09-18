@@ -37,6 +37,17 @@ import {
 } from './CDEGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, isDisabled, isLoading, onPress, ...props }: any) => (
+    <button disabled={isDisabled || isLoading} {...props} onClick={onPress}>
+      {children}
+    </button>
+  ),
+  Typography: ({ as: Component = 'span', children, ...props }: any) => (
+    <Component {...props}>{children}</Component>
+  ),
+}));
+
 const mockOnAddGlossaryTerm = jest.fn();
 const mockRefreshGlossaryTerms = jest.fn();
 const mockOnEditGlossaryTerm = jest.fn();

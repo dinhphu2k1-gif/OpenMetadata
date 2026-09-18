@@ -17,9 +17,9 @@ import {
   DownloadOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
+import { Button } from '@openmetadata/ui-core-components';
 import {
   Alert,
-  Button,
   Divider,
   Form,
   Modal,
@@ -549,10 +549,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               )}
             </Typography.Text>
             <Button
-              icon={<DownloadOutlined />}
-              size="small"
-              type="default"
-              onClick={downloadCDEExcelTemplate}>
+              color="secondary"
+              iconLeading={<DownloadOutlined />}
+              size="sm"
+              onPress={downloadCDEExcelTemplate}>
               {t('cde.download-template-btn', 'Tải file mẫu Excel')}
             </Button>
           </div>
@@ -689,16 +689,16 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           )}
 
           <div className="d-flex justify-between items-center m-t-md">
-            <Button onClick={() => setActiveStep(0)}>
+            <Button color="secondary" onPress={() => setActiveStep(0)}>
               {t('label.back', 'Chọn file khác')}
             </Button>
             <Button
-              disabled={
+              color="primary"
+              isDisabled={
                 validationResult.validCount + validationResult.warningCount ===
                 0
               }
-              type="primary"
-              onClick={handleStartImport}>
+              onPress={handleStartImport}>
               {t(
                 'cde.start-import-btn',
                 'Bắt đầu nạp dữ liệu ({{count}} bản ghi)',
@@ -729,10 +729,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           ) : (
             <Result
               extra={[
-                <Button key="done" type="primary" onClick={handleDone}>
+                <Button color="primary" key="done" onPress={handleDone}>
                   {t('cde.close-and-view-list', 'Đóng & Xem danh sách CDE')}
                 </Button>,
-                <Button key="another" onClick={resetState}>
+                <Button color="secondary" key="another" onPress={resetState}>
                   {t('cde.import-another-file', 'Nạp tiếp file khác')}
                 </Button>,
               ]}

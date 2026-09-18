@@ -16,6 +16,18 @@ import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 import GlossaryBulkActionBar from './GlossaryBulkActionBar.component';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, iconLeading, onPress, ...props }: any) => (
+    <button {...props} onClick={onPress}>
+      {iconLeading}
+      {children}
+    </button>
+  ),
+  Typography: ({ as: Component = 'span', children, ...props }: any) => (
+    <Component {...props}>{children}</Component>
+  ),
+}));
+
 describe('GlossaryBulkActionBar', () => {
   const mockClearSelection = jest.fn();
   const mockSubmitForReview = jest.fn();

@@ -10,7 +10,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Button, Modal } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Modal } from 'antd';
 import { useForm } from 'antd/lib/form/Form';
 import { AxiosError } from 'axios';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
@@ -182,17 +183,17 @@ const GlossaryTermModal: FC<Props> = ({
       data-testid="edit-glossary-modal"
       footer={[
         <Button
+          color={isCustomModal ? 'secondary' : 'link-color'}
           key="cancel-btn"
-          type={isCustomModal ? 'default' : 'link'}
-          onClick={onCancel}>
+          onPress={onCancel}>
           {t('label.cancel')}
         </Button>,
         <Button
+          color="primary"
           data-testid="save-glossary-term"
+          isLoading={saving}
           key="save-btn"
-          loading={saving}
-          type="primary"
-          onClick={form.submit}>
+          onPress={form.submit}>
           {isCustomModal && !editMode
             ? t('label.create-entity', {
                 entity: isDQGlossary

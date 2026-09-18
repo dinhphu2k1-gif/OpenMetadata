@@ -11,12 +11,13 @@
  *  limitations under the License.
  */
 
-import { Button, Modal, Progress, Space, Typography } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Modal, Progress, Space, Typography } from 'antd';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
 import { patchGlossaryTerm } from '../../../../rest/glossaryAPI';
-import { showErrorToast, showSuccessToast } from '../../../../utils/ToastUtils';
+import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
 export type BulkActionType = 'submitForReview' | 'approve' | 'reject' | 'revoke';
@@ -158,21 +159,24 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
   return (
     <Modal
       centered
+      destroyOnClose
       closable={!isProcessing}
       data-testid="glossary-bulk-action-modal"
-      destroyOnClose
       footer={
         isProcessing
           ? null
           : [
-              <Button key="cancel" onClick={handleModalClose}>
+              <Button color="secondary" key="cancel" onPress={handleModalClose}>
                 {t('label.cancel', 'Hủy')}
               </Button>,
               <Button
-                danger={actionType === 'reject' || actionType === 'revoke'}
+                color={
+                  actionType === 'reject' || actionType === 'revoke'
+                    ? 'primary-destructive'
+                    : 'primary'
+                }
                 key="confirm"
-                type="primary"
-                onClick={handleExecute}>
+                onPress={handleExecute}>
                 {actionType === 'revoke'
                   ? t('label.revoke-approval', 'Hủy duyệt')
                   : t('label.confirm', 'Xác nhận')}

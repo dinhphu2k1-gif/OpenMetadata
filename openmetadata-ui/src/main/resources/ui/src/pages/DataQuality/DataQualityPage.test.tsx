@@ -21,6 +21,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import DataQualityPage from './DataQualityPage';
 import { DataQualityPageTabs } from './DataQualityPage.interface';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, onPress, ...props }: any) => (
+    <button {...props} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
+
 const DATA_QUALITY_TEST_PATHS = {
   testCases: `/data-quality/${DataQualityPageTabs.TEST_CASES}`,
   testSuites: `/data-quality/${DataQualityPageTabs.TEST_SUITES}`,

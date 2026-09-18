@@ -18,6 +18,12 @@ import { ReactNode } from 'react';
 import { getGlossaryTermByFQN } from '../../../rest/glossaryAPI';
 import GlossaryTermModal from './GlossaryTermModal.component';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, isLoading, onPress, ...props }: any) => (
+    <button disabled={isLoading} {...props} onClick={onPress}>{children}</button>
+  ),
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { entity?: string }) =>

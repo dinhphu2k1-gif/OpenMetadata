@@ -13,6 +13,7 @@
 
 import { DownOutlined, WarningOutlined } from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
+import { Button as CoreButton } from '@openmetadata/ui-core-components';
 import {
   Button,
   Checkbox,
@@ -1739,19 +1740,18 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             const remainingCount = totalCount - loadedCount;
 
             return (
-              <Button
-                className="text-primary"
+              <CoreButton
+                color="link-color"
                 data-testid="load-more-children-button"
-                loading={isLoading}
-                size="small"
-                type="link"
-                onClick={() =>
+                isLoading={isLoading}
+                size="sm"
+                onPress={() =>
                   parentRecord && handleLoadMoreChildren(parentRecord)
                 }>
                 {t('label.view-more-count', {
                   countValue: remainingCount,
                 })}
-              </Button>
+              </CoreButton>
             );
           }
 

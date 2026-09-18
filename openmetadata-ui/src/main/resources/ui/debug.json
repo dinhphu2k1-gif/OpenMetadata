@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 1,
+  "numPassedTests": 4,
   "numPendingTestSuites": 0,
-  "numPendingTests": 12,
+  "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 13,
+  "numTotalTests": 4,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1789714044382,
+  "startTime": 1789766314344,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 1,
-      "numPendingTests": 12,
+      "numPassingTests": 4,
+      "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1789714108983,
-        "runtime": 62176,
-        "slow": true,
-        "start": 1789714046807
+        "end": 1789766316140,
+        "runtime": 1388,
+        "slow": false,
+        "start": 1789766314752
       },
       "skipped": false,
       "snapshot": {
@@ -52,202 +52,67 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/GlossaryTermsV1.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermModal/GlossaryTermModal.test.tsx",
       "testResults": [
         {
           "ancestorTitles": [
-            "Test Glossary-term component"
+            "GlossaryTermModal"
           ],
-          "duration": 871,
+          "duration": 75,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test Glossary-term component opens the approved CDE snapshot selected from the table",
+          "fullName": "GlossaryTermModal uses the redesigned copy and dimensions for CDE add mode",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 6,
           "retryReasons": [],
           "status": "passed",
-          "title": "opens the approved CDE snapshot selected from the table"
+          "title": "uses the redesigned copy and dimensions for CDE add mode"
         },
         {
           "ancestorTitles": [
-            "Test Glossary-term component"
+            "GlossaryTermModal"
           ],
-          "duration": null,
+          "duration": 27,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test Glossary-term component Should render overview tab when activeTab is undefined",
+          "fullName": "GlossaryTermModal keeps the existing CDE edit mode presentation",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 6,
           "retryReasons": [],
-          "status": "pending",
-          "title": "Should render overview tab when activeTab is undefined"
+          "status": "passed",
+          "title": "keeps the existing CDE edit mode presentation"
         },
         {
           "ancestorTitles": [
-            "Test Glossary-term component"
+            "GlossaryTermModal"
           ],
-          "duration": null,
+          "duration": 12,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test Glossary-term component redirects the legacy Relations Graph URL to Overview",
+          "fullName": "GlossaryTermModal keeps the standard glossary term modal unchanged",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 5,
           "retryReasons": [],
-          "status": "pending",
-          "title": "redirects the legacy Relations Graph URL to Overview"
+          "status": "passed",
+          "title": "keeps the standard glossary term modal unchanged"
         },
         {
           "ancestorTitles": [
-            "Test Glossary-term component"
+            "GlossaryTermModal"
           ],
-          "duration": null,
+          "duration": 12,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test Glossary-term component filters Relations Graph from saved custom tabs",
+          "fullName": "GlossaryTermModal renders DQGlossaryTermForm with wide layout when isDQGlossary is true",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 5,
           "retryReasons": [],
-          "status": "pending",
-          "title": "filters Relations Graph from saved custom tabs"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should replace the standard overview widgets with the CDE overview",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should replace the standard overview widgets with the CDE overview"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should only show Overview and Assets tabs for CDE when user is not admin",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should only show Overview and Assets tabs for CDE when user is not admin"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should show all 6 tabs for CDE when user is admin",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show all 6 tabs for CDE when user is admin"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should redirect restricted tabs to Overview for CDE when user is not admin",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should redirect restricted tabs to Overview for CDE when user is not admin"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should only show Overview and Assets tabs for Data Quality when user is not admin",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should only show Overview and Assets tabs for Data Quality when user is not admin"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component Should render GlossaryTermTab component",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "Should render GlossaryTermTab component"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should call getGlossaryTermDetailPageTabs without onExtensionUpdate",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should call getGlossaryTermDetailPageTabs without onExtensionUpdate"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should call getFeedCounts on mount when not in version view",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should call getFeedCounts on mount when not in version view"
-        },
-        {
-          "ancestorTitles": [
-            "Test Glossary-term component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "Test Glossary-term component should not call getFeedCounts when in version view",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should not call getFeedCounts when in version view"
+          "status": "passed",
+          "title": "renders DQGlossaryTermForm with wide layout when isDQGlossary is true"
         }
       ],
       "displayName": {

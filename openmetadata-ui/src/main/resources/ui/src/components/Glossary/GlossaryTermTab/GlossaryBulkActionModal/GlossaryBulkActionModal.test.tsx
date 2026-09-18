@@ -17,6 +17,14 @@ import * as glossaryAPI from '../../../../rest/glossaryAPI';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 import GlossaryBulkActionModal from './GlossaryBulkActionModal.component';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, onPress, ...props }: any) => (
+    <button {...props} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
+
 jest.mock('../../../../rest/glossaryAPI', () => ({
   patchGlossaryTerm: jest.fn().mockResolvedValue({}),
 }));

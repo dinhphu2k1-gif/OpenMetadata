@@ -15,6 +15,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { mockedGlossaries } from '../../../mocks/Glossary.mock';
 import GlossaryLeftPanel from './GlossaryLeftPanel.component';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  Button: ({ children, onPress, ...props }: any) => (
+    <button {...props} onClick={onPress}>{children}</button>
+  ),
+}));
+
 const mockNavigate = jest.fn();
 
 jest.mock('react-router-dom', () => ({

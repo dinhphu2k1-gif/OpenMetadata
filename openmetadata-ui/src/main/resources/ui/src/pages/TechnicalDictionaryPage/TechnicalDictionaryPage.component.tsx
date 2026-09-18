@@ -20,7 +20,8 @@ import {
   SearchOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import { Button, Input } from 'antd';
+import { Button } from '@openmetadata/ui-core-components';
+import { Input } from 'antd';
 import classNames from 'classnames';
 import { compare } from 'fast-json-patch';
 import { isEmpty } from 'lodash';
@@ -1487,19 +1488,21 @@ export const TechnicalDictionaryPage: React.FC<TechnicalDictionaryPageProps> = (
         <div className="tech-dict-toolbar-actions">
           <Button
             className="d-flex items-center gap-1"
+            color="secondary"
             data-testid="export-csv-btn"
-            icon={<DownloadOutlined />}
-            size="small"
-            onClick={handleExportCSV}>
+            iconLeading={<DownloadOutlined />}
+            size="sm"
+            onPress={handleExportCSV}>
             {t('label.export-csv', { defaultValue: 'Xuất CSV' })}
           </Button>
           <Button
             className="d-flex items-center justify-center"
+            color="secondary"
             data-testid="reload-btn"
-            icon={<ReloadOutlined />}
-            size="small"
+            iconLeading={<ReloadOutlined />}
+            size="sm"
             title={t('label.reload', { defaultValue: 'Tải lại' })}
-            onClick={() => {
+            onPress={() => {
               setSearchText('');
               handlePageChange(1);
               fetchTechnicalMetadata(1, pageSize, '');
