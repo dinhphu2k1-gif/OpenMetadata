@@ -28,6 +28,9 @@ buildNumber.properties
 .maestro
 catalog-services/catalog-services.iml
 
+#cert
+certs
+
 # local docker volume
 docker/development/docker-volume
 docker-volume
