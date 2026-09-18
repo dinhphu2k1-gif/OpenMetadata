@@ -20,8 +20,11 @@ import classNames from 'classnames';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { ROUTES } from '../../constants/constants';
 import { getMarketplaceSidebarConfig } from '../../constants/CustomSidebar.constants';
 import { useCurrentUserPreferences } from '../../hooks/currentUserStore/useCurrentUserStore';
+import { useApplicationStore } from '../../hooks/useApplicationStore';
+import { isNonAdminPersona } from '../../utils/Persona/BasicConsumerNavigation';
 import { isNewLayoutRoute } from '../../utils/LayoutUtils';
 import BrandImage from '../common/BrandImage/BrandImage';
 import './app-sidebar.less';
@@ -38,7 +41,7 @@ const getActiveUrl = (
   return (
     hrefs
       .filter((href) => pathname.startsWith(href))
-      .sort((a, b) => b.length - a.length)[0] ?? pathname
+      .sort((a, b) => b.length - a.length)[0] ?? ''
   );
 };
 
@@ -46,21 +49,34 @@ export interface SidebarProps {
   className?: string;
 }
 
-const COLLAPSED_WIDTH = 72;
+const COLLAPSED_WIDTH = 64;
 const EXPANDED_WIDTH = 197;
 
 const Sidebar = ({ className }: SidebarProps) => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const { selectedPersona } = useApplicationStore();
   const {
     preferences: { isSidebarCollapsed: collapsed },
   } = useCurrentUserPreferences();
 
   const config = useMemo(() => getMarketplaceSidebarConfig(t), [t]);
 
+  const bottomItems = useMemo(() => {
+    if (!config.bottomItems) {
+      return undefined;
+    }
+
+    return isNonAdminPersona(selectedPersona)
+      ? config.bottomItems.filter(
+          (item) => 'href' in item && item.href !== ROUTES.SETTINGS
+        )
+      : config.bottomItems;
+  }, [config.bottomItems, selectedPersona]);
+
   const allItems = useMemo(
-    () => [...config.items, ...(config.bottomItems ?? [])],
-    [config]
+    () => [...config.items, ...(bottomItems ?? [])],
+    [config.items, bottomItems]
   );
   const activeUrl = useMemo(
     () => getActiveUrl(pathname, allItems),
@@ -115,13 +131,13 @@ const Sidebar = ({ className }: SidebarProps) => {
           items={config.items}
         />
 
-        {config.bottomItems && (
+        {bottomItems && bottomItems.length > 0 && (
           <>
             <div className="tw:flex-1" />
             <NavList
               activeUrl={activeUrl}
               className="tw:px-4 tw:pb-4"
-              items={config.bottomItems}
+              items={bottomItems}
             />
           </>
         )}

@@ -26,10 +26,17 @@ import { useCustomPages } from '../../../hooks/useCustomPages';
 import {
   getDetailsTabWithNewLabel,
 } from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import GlossaryTerms from './GlossaryTermsV1.component';
 
 const mockPush = jest.fn();
+
+jest.mock('../../../hooks/useApplicationStore', () => ({
+  useApplicationStore: jest.fn().mockReturnValue({
+    currentUser: { isAdmin: false },
+  }),
+}));
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
@@ -79,6 +86,9 @@ jest.mock('../../Customization/GenericTab/GenericTab', () => ({
 }));
 jest.mock('./CDEGlossaryTermOverview', () =>
   jest.fn().mockImplementation(() => <div>CDEGlossaryTermOverview</div>)
+);
+jest.mock('./DQGlossaryTermOverview', () =>
+  jest.fn().mockImplementation(() => <div>DQGlossaryTermOverview</div>)
 );
 const mockProps = {
   isSummaryPanelOpen: false,
@@ -243,6 +253,110 @@ describe('Test Glossary-term component', () => {
       await screen.findByText('CDEGlossaryTermOverview')
     ).toBeInTheDocument();
     expect(screen.queryByText('GenericTab')).not.toBeInTheDocument();
+  });
+
+  it('should only show Overview and Assets tabs for CDE when user is not admin', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { isAdmin: false },
+    });
+
+    render(
+      <GlossaryTerms
+        {...mockProps}
+        glossaryTerm={{
+          ...mockProps.glossaryTerm,
+          fullyQualifiedName: 'Data Dictionary.CDE1',
+          name: 'CDE1',
+        }}
+      />
+    );
+
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
+      'label.overview',
+      'label.asset-plural0',
+    ]);
+  });
+
+  it('should show all 6 tabs for CDE when user is admin', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { isAdmin: true },
+    });
+
+    render(
+      <GlossaryTerms
+        {...mockProps}
+        glossaryTerm={{
+          ...mockProps.glossaryTerm,
+          fullyQualifiedName: 'Data Dictionary.CDE1',
+          name: 'CDE1',
+        }}
+      />
+    );
+
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs).toHaveLength(6);
+    expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
+      'label.overview',
+      'label.glossary-term-plural2',
+      'label.asset-plural0',
+      'label.activity-feed-and-task-plural0',
+      'label.custom-property-plural',
+      'label.data-observability',
+    ]);
+  });
+
+  it('should redirect restricted tabs to Overview for CDE when user is not admin', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { isAdmin: false },
+    });
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.CUSTOM_PROPERTIES,
+      version: undefined,
+    });
+
+    render(
+      <GlossaryTerms
+        {...mockProps}
+        glossaryTerm={{
+          ...mockProps.glossaryTerm,
+          fullyQualifiedName: 'Data Dictionary.CDE1',
+          name: 'CDE1',
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        { pathname: '/glossary/glossaryTerm/overview' },
+        { replace: true }
+      )
+    );
+  });
+
+  it('should only show Overview and Assets tabs for Data Quality when user is not admin', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { isAdmin: false },
+    });
+
+    render(
+      <GlossaryTerms
+        {...mockProps}
+        glossaryTerm={{
+          ...mockProps.glossaryTerm,
+          fullyQualifiedName: 'Data Quality.DQ1',
+          name: 'DQ1',
+        }}
+      />
+    );
+
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
+      'label.overview',
+      'label.asset-plural0',
+    ]);
   });
 
   it('Should render GlossaryTermTab component', async () => {

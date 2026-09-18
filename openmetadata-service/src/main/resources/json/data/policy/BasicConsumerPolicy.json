@@ -7,6 +7,7 @@
   "allowDelete": false,
   "provider": "system",
   "rules": [
+
     {
       "name": "BasicConsumerPolicy-ViewBusinessMetadata",
       "description": "Allow read-only view on business metadata, domains, and data quality rules",
@@ -29,19 +30,6 @@
         "ViewBasic"
       ],
       "effect": "allow"
-    },
-    {
-      "name": "BasicConsumerPolicy-DenyUnapprovedGlossaryTerms",
-      "description": "Deny viewing glossary terms that are not in Approved status",
-      "resources": [
-        "glossaryTerm"
-      ],
-      "operations": [
-        "ViewAll",
-        "ViewBasic"
-      ],
-      "effect": "deny",
-      "condition": "neverApproved()"
     },
     {
       "name": "BasicConsumerPolicy-DenyNonReadOperations",

@@ -12,7 +12,12 @@
  */
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import LeftSidebar from './LeftSidebar.component';
+
+jest.mock('../../../hooks/useApplicationStore', () => ({
+  useApplicationStore: jest.fn().mockReturnValue({ selectedPersona: undefined }),
+}));
 
 jest.mock(
   '../../Settings/Applications/ApplicationsProvider/ApplicationsProvider',
@@ -22,7 +27,10 @@ jest.mock(
 );
 
 describe('LeftSidebar', () => {
-  it('renders sidebar links correctly', () => {
+  it('renders sidebar links correctly for default / admin user without restricted persona', () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      selectedPersona: undefined,
+    });
     render(
       <BrowserRouter>
         <LeftSidebar />
@@ -35,6 +43,25 @@ describe('LeftSidebar', () => {
     expect(screen.getByTestId('data-marketplace-section')).toBeInTheDocument();
     expect(screen.getByTestId('governance')).toBeInTheDocument();
     expect(screen.getByTestId('app-bar-item-settings')).toBeInTheDocument();
+    expect(screen.getByTestId('app-bar-item-logout')).toBeInTheDocument();
+  });
+
+  it('hides settings link for non-admin persona', () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      selectedPersona: { name: 'DataConsumerPersona' },
+    });
+    render(
+      <BrowserRouter>
+        <LeftSidebar />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByTestId('image')).toBeInTheDocument();
+    expect(screen.getByTestId('app-bar-item-explore')).toBeInTheDocument();
+    expect(screen.getByTestId('observability')).toBeInTheDocument();
+    expect(screen.getByTestId('data-marketplace-section')).toBeInTheDocument();
+    expect(screen.getByTestId('governance')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-bar-item-settings')).not.toBeInTheDocument();
     expect(screen.getByTestId('app-bar-item-logout')).toBeInTheDocument();
   });
 });

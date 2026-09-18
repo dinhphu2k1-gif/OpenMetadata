@@ -44,9 +44,11 @@ import {
   SUPPORTED_EMPTY_FILTER_FIELDS,
   TAG_FQN_KEY,
 } from '../../constants/explore.constants';
+import { EntityFields } from '../../enums/AdvancedSearch.enum';
 import { SIZE, SORT_ORDER } from '../../enums/common.enum';
 import { EntityType } from '../../enums/entity.enum';
 import { SearchIndex } from '../../enums/search.enum';
+import { useApplicationStore } from '../../hooks/useApplicationStore';
 import { QueryFilterInterface } from '../../pages/ExplorePage/ExplorePage.interface';
 import {
   exportSearchResultsCsvStream,
@@ -60,6 +62,7 @@ import {
   getExploreQueryFilterMust,
   getSelectedValuesFromQuickFilter,
 } from '../../utils/ExploreUtils';
+import { isNonAdminPersona } from '../../utils/Persona/BasicConsumerNavigation';
 import searchClassBase from '../../utils/SearchClassBase';
 import FilterErrorPlaceHolder from '../common/ErrorWithPlaceholder/FilterErrorPlaceHolder';
 import Loader from '../common/Loader/Loader';
@@ -100,6 +103,7 @@ const ExploreV1: React.FC<ExploreProps> = ({
 }) => {
   const tabsInfo = searchClassBase.getTabsInfo();
   const { t } = useTranslation();
+  const { selectedPersona } = useApplicationStore();
   const [selectedQuickFilters, setSelectedQuickFilters] = useState<
     ExploreQuickFilterField[]
   >([] as ExploreQuickFilterField[]);
@@ -107,7 +111,38 @@ const ExploreV1: React.FC<ExploreProps> = ({
   const [entityDetails, setEntityDetails] =
     useState<SearchedDataProps['data'][number]['_source']>();
 
-  const firstEntity = searchResults?.hits
+  const filteredSearchResults = useMemo(() => {
+    if (!searchResults || !isNonAdminPersona(selectedPersona)) {
+      return searchResults;
+    }
+
+    const filteredHits = (searchResults.hits?.hits ?? []).filter(
+      (hit) =>
+        hit._source?.entityType !== EntityType.TAG &&
+        hit._source?.entityType !== EntityType.METRIC &&
+        hit._source?.entityType !== EntityType.CLASSIFICATION
+    );
+
+    const totalReduction =
+      (searchResults.hits?.hits?.length ?? 0) - filteredHits.length;
+
+    return {
+      ...searchResults,
+      hits: {
+        ...searchResults.hits,
+        hits: filteredHits,
+        total: {
+          ...searchResults.hits?.total,
+          value: Math.max(
+            0,
+            (searchResults.hits?.total?.value ?? 0) - totalReduction
+          ),
+        },
+      },
+    };
+  }, [searchResults, selectedPersona]);
+
+  const firstEntity = filteredSearchResults?.hits
     ?.hits[0] as SearchedDataProps['data'][number];
 
   const parsedSearch = useMemo(
@@ -145,8 +180,8 @@ const ExploreV1: React.FC<ExploreProps> = ({
     [queryFilter, quickFilters, sqlQuery, searchQueryParam]
   );
   const pageResultCount = useMemo(
-    () => searchResults?.hits?.hits?.length ?? 0,
-    [searchResults]
+    () => filteredSearchResults?.hits?.hits?.length ?? 0,
+    [filteredSearchResults]
   );
   const visibleResultCount = useMemo(
     () => (isSearchMode ? tabAssetsCount ?? 0 : pageResultCount),
@@ -425,10 +460,16 @@ const ExploreV1: React.FC<ExploreProps> = ({
   }, []);
 
   useEffect(() => {
-    const dropdownItems: Array<{
+    let dropdownItems: Array<{
       label: string;
       key: string;
     }> = getDropDownItems(activeTabKey);
+
+    if (isNonAdminPersona(selectedPersona)) {
+      dropdownItems = dropdownItems.filter(
+        (item) => item.key !== EntityFields.TAG
+      );
+    }
 
     const selectedValuesFromQuickFilter = getSelectedValuesFromQuickFilter(
       dropdownItems,
@@ -441,10 +482,13 @@ const ExploreV1: React.FC<ExploreProps> = ({
         value: selectedValuesFromQuickFilter?.[item.label] ?? [],
       }))
     );
-  }, [activeTabKey, quickFilters]);
+  }, [activeTabKey, quickFilters, selectedPersona]);
 
   useEffect(() => {
-    if (!isUndefined(searchResults) && searchResults?.hits?.hits[0]) {
+    if (
+      !isUndefined(filteredSearchResults) &&
+      filteredSearchResults?.hits?.hits[0]
+    ) {
       handleSummaryPanelDisplay(
         highlightEntityNameAndDescription(
           firstEntity._source,
@@ -455,7 +499,7 @@ const ExploreV1: React.FC<ExploreProps> = ({
       setShowSummaryPanel(false);
       setEntityDetails(undefined);
     }
-  }, [searchResults]);
+  }, [filteredSearchResults]);
 
   const exportModalTitle = useMemo(
     () => (
@@ -637,14 +681,14 @@ const ExploreV1: React.FC<ExploreProps> = ({
               <Card className="h-full tw:flex-1 explore-main-card">
                 {!loading && !isElasticSearchIssue ? (
                   <SearchedData
-                    data={searchResults?.hits.hits ?? []}
+                    data={filteredSearchResults?.hits.hits ?? []}
                     filter={parsedSearch}
                     handleSummaryPanelDisplay={handleSummaryPanelDisplay}
                     isFilterSelected={hasActiveFilters}
                     isSummaryPanelVisible={showSummaryPanel}
                     selectedEntityId={entityDetails?.id || ''}
                     showResultCount={hasActiveFilters}
-                    totalValue={searchResults?.hits.total.value ?? 0}
+                    totalValue={filteredSearchResults?.hits.total.value ?? 0}
                     onPaginationChange={onChangePage}
                   />
                 ) : (

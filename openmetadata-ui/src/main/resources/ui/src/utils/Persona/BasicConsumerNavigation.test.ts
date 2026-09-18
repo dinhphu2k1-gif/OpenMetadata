@@ -15,6 +15,7 @@ import { ROUTES } from '../../constants/constants';
 import {
   hideBasicConsumerMarketplaceOverview,
   isBasicConsumerPersona,
+  isNonAdminPersona,
 } from './BasicConsumerNavigation';
 
 describe('BasicConsumerNavigation', () => {
@@ -34,6 +35,20 @@ describe('BasicConsumerNavigation', () => {
       })
     ).toBe(false);
     expect(isBasicConsumerPersona({ name: 'GeneralUser' })).toBe(false);
+  });
+
+  it('recognizes all non-admin personas with isNonAdminPersona', () => {
+    expect(isNonAdminPersona({ name: 'BasicConsumerPersona' })).toBe(true);
+    expect(isNonAdminPersona({ name: 'DataConsumerPersona' })).toBe(true);
+    expect(isNonAdminPersona({ name: 'DataProposerPersona' })).toBe(true);
+    expect(isNonAdminPersona({ name: 'DataStewardPersona' })).toBe(true);
+    expect(
+      isNonAdminPersona({
+        fullyQualifiedName: 'persona.DataStewardPersona',
+      })
+    ).toBe(true);
+    expect(isNonAdminPersona({ name: 'AdminPersona' })).toBe(false);
+    expect(isNonAdminPersona(undefined)).toBe(false);
   });
 
   it('hides marketplace overview and technical dictionary for basic consumer', () => {

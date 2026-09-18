@@ -7,6 +7,7 @@
   "allowDelete": false,
   "provider": "system",
   "rules": [
+
     {
       "name": "DataConsumer-ViewAllRule",
       "description": "Allow read-only view on all metadata assets",
@@ -31,19 +32,6 @@
         "ViewBasic"
       ],
       "effect": "allow"
-    },
-    {
-      "name": "DataConsumer-DenyUnapprovedGlossaryTerms",
-      "description": "Deny viewing glossary terms that are not in Approved status",
-      "resources": [
-        "glossaryTerm"
-      ],
-      "operations": [
-        "ViewAll",
-        "ViewBasic"
-      ],
-      "effect": "deny",
-      "condition": "neverApproved()"
     },
     {
       "name": "DataConsumer-DenyAllNonReadOperations",

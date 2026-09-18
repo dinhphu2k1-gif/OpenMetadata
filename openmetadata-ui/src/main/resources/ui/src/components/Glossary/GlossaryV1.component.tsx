@@ -86,7 +86,7 @@ const GlossaryV1 = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isPermissionLoading, setIsPermissionLoading] = useState(false);
   const { setGlossaryFunctionRef } = useGlossaryStore();
-  const [isTabExpanded, setIsTabExpanded] = useState(false);
+  const [isTabExpanded, setIsTabExpanded] = useState(true);
 
   const [isDelete, setIsDelete] = useState<boolean>(false);
 
@@ -394,6 +394,7 @@ const GlossaryV1 = ({
       setHasMore(true);
       initializeGlossary();
     }
+    setIsTabExpanded(true);
 
     // Cleanup on unmount
     return () => {

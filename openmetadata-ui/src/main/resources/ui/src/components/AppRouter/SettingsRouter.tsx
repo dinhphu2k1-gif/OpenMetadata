@@ -309,7 +309,14 @@ const SettingsRouter = () => {
 
   return (
     <Routes>
-      <Route element={<GlobalSettingPage />} path="/" />
+      <Route
+        element={
+          <AdminProtectedRoute>
+            <GlobalSettingPage />
+          </AdminProtectedRoute>
+        }
+        path="/"
+      />
       <Route element={<SettingsSso />} path={ROUTES.SETTINGS_SSO} />
 
       {/* keep these route above the setting route always */}

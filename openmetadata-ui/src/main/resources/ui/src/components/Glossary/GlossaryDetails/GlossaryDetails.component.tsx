@@ -33,6 +33,11 @@ import { ActivityFeedTab } from '../../ActivityFeed/ActivityFeedTab/ActivityFeed
 import { ActivityFeedLayoutType } from '../../ActivityFeed/ActivityFeedTab/ActivityFeedTab.interface';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
 import Loader from '../../common/Loader/Loader';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import TabsLabel from '../../common/TabsLabel/TabsLabel.component';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
@@ -80,6 +85,25 @@ const GlossaryDetails = ({
     );
   };
 
+  const { currentUser } = useApplicationStore();
+  const isAdmin = Boolean(currentUser?.isAdmin);
+  const isRestrictedGlossary = useMemo(
+    () =>
+      isDataDictionaryGlossary(
+        glossary.fullyQualifiedName,
+        glossary.name,
+        glossary.displayName
+      ) ||
+      isDataQualityGlossary(
+        glossary.fullyQualifiedName,
+        glossary.name,
+        glossary.displayName
+      ),
+    [glossary.fullyQualifiedName, glossary.name, glossary.displayName]
+  );
+
+  const shouldHideActivityFeed = isRestrictedGlossary && !isAdmin;
+
   const handleTabChange = (activeKey: string) => {
     if (activeKey !== activeTab) {
       navigate(
@@ -99,6 +123,17 @@ const GlossaryDetails = ({
     }
   }, [activeTab, glossary.fullyQualifiedName, glossary.name, navigate]);
 
+  useEffect(() => {
+    const glossaryFqn = glossary.fullyQualifiedName ?? glossary.name;
+
+    if (shouldHideActivityFeed && activeTab === EntityTabs.ACTIVITY_FEED && glossaryFqn) {
+      navigate(
+        getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS),
+        { replace: true }
+      );
+    }
+  }, [shouldHideActivityFeed, activeTab, glossary.fullyQualifiedName, glossary.name, navigate]);
+
   const tabs = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
@@ -115,7 +150,7 @@ const GlossaryDetails = ({
         key: EntityTabs.TERMS,
         children: <GenericTab type={PageType.Glossary} />,
       },
-      ...(!isVersionView
+      ...(!isVersionView && !shouldHideActivityFeed
         ? [
             {
               label: (
@@ -160,6 +195,7 @@ const GlossaryDetails = ({
     feedCount.totalTasksCount,
     activeTab,
     isVersionView,
+    shouldHideActivityFeed,
   ]);
 
   useEffect(() => {

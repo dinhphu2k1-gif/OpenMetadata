@@ -17,8 +17,13 @@ import { useApplicationStore } from './useApplicationStore';
 export const useAuth = () => {
   const { currentUser, newUser } = useApplicationStore();
 
+  const isAdminUser = Boolean(
+    currentUser?.isAdmin ||
+      currentUser?.roles?.some((r) => r.name?.toLowerCase() === 'admin')
+  );
+
   return {
-    isAdminUser: currentUser?.isAdmin,
+    isAdminUser,
     isFirstTimeUser: !isEmpty(currentUser) && !isEmpty(newUser),
   };
 };

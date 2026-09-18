@@ -366,7 +366,11 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
         path={ROUTES.EXPLORE_WITH_TAB}
       />
       <Route
-        element={<OntologyExplorerPage />}
+        element={
+          <AdminProtectedRoute>
+            <OntologyExplorerPage />
+          </AdminProtectedRoute>
+        }
         path={ROUTES.ONTOLOGY_EXPLORER}
       />
       <Route

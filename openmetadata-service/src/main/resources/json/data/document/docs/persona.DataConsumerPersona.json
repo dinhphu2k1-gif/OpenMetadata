@@ -87,14 +87,14 @@
             "isHidden": false
           },
           {
-            "id": "/ontology-explorer",
+            "id": "/governance/ontology",
             "title": "label.ontology-explorer",
             "isHidden": true
           },
           {
             "id": "/tags",
             "title": "label.classification",
-            "isHidden": false
+            "isHidden": true
           },
           {
             "id": "/metrics",

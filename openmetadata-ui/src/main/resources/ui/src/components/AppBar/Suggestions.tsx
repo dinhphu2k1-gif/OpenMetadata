@@ -25,9 +25,12 @@ import {
   SuggestionsObject,
 } from '../../context/GlobalSearchProvider/GlobalSearchSuggestions/GlobalSearchSuggestions.interface';
 import { useTourProvider } from '../../context/TourProvider/TourProvider';
+import { EntityType } from '../../enums/entity.enum';
 import { SearchIndex } from '../../enums/search.enum';
+import { useApplicationStore } from '../../hooks/useApplicationStore';
 import { searchQuery } from '../../rest/searchAPI';
 import { Transi18next } from '../../utils/i18next/LocalUtil';
+import { isNonAdminPersona } from '../../utils/Persona/BasicConsumerNavigation';
 import searchClassBase from '../../utils/SearchClassBase';
 import {
   filterOptionsByIndex,
@@ -57,6 +60,11 @@ const Suggestions = ({
 }: SuggestionProp) => {
   const { t } = useTranslation();
   const { isTourOpen } = useTourProvider();
+  const { selectedPersona } = useApplicationStore();
+  const isNonAdmin = useMemo(
+    () => isNonAdminPersona(selectedPersona),
+    [selectedPersona]
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [options, setOptions] = useState<Array<Option>>([]);
   const [suggestions, setSuggestions] = useState<SuggestionsObject>({
@@ -253,7 +261,9 @@ const Suggestions = ({
             suggestions: databaseSchemaSuggestions,
             searchIndex: SearchIndex.DATABASE_SCHEMA,
           },
-          { suggestions: tagSuggestions, searchIndex: SearchIndex.TAG },
+          ...(!isNonAdmin
+            ? [{ suggestions: tagSuggestions, searchIndex: SearchIndex.TAG }]
+            : []),
           {
             suggestions: dataProductSuggestions,
             searchIndex: SearchIndex.DATA_PRODUCT,
@@ -270,10 +280,14 @@ const Suggestions = ({
             suggestions: apiEndpointSuggestions,
             searchIndex: SearchIndex.API_ENDPOINT,
           },
-          {
-            suggestions: metricSuggestions,
-            searchIndex: SearchIndex.METRIC,
-          },
+          ...(!isNonAdmin
+            ? [
+                {
+                  suggestions: metricSuggestions,
+                  searchIndex: SearchIndex.METRIC,
+                },
+              ]
+            : []),
           {
             suggestions: suggestions.directorySuggestions,
             searchIndex: SearchIndex.DIRECTORY,
@@ -306,17 +320,34 @@ const Suggestions = ({
     try {
       setIsLoading(true);
 
+      const effectiveSearchIndex =
+        isNonAdmin &&
+        (searchCriteria === SearchIndex.TAG ||
+          searchCriteria === SearchIndex.METRIC)
+          ? SearchIndex.DATA_ASSET
+          : searchCriteria ?? SearchIndex.DATA_ASSET;
+
       const res = await searchQuery({
         query: escapeESReservedCharacters(searchText),
-        searchIndex: searchCriteria ?? SearchIndex.DATA_ASSET,
+        searchIndex: effectiveSearchIndex,
         queryFilter: quickFilter,
         pageSize: PAGE_SIZE_BASE,
         includeDeleted: false,
         excludeSourceFields: ['columns', 'queries', 'columnNames', 'dataModel'],
       });
 
-      setOptions(res.hits.hits as unknown as Option[]);
-      updateSuggestions(res.hits.hits as unknown as Option[]);
+      const rawHits = (res.hits.hits as unknown as Option[]) ?? [];
+      const filteredHits = isNonAdmin
+        ? rawHits.filter(
+            (hit) =>
+              hit._source?.entityType !== EntityType.TAG &&
+              hit._source?.entityType !== EntityType.METRIC &&
+              hit._source?.entityType !== EntityType.CLASSIFICATION
+          )
+        : rawHits;
+
+      setOptions(filteredHits);
+      updateSuggestions(filteredHits);
     } catch (err) {
       showErrorToast(
         err as AxiosError,

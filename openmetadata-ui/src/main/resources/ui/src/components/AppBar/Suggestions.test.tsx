@@ -149,5 +149,49 @@ describe('Suggestions Component', () => {
 
       expect(mockSearchQuery).not.toHaveBeenCalled();
     });
+
+    it('should filter out Tag suggestions for non-admin personas', async () => {
+      const { useApplicationStore } = jest.requireActual(
+        '../../hooks/useApplicationStore'
+      );
+      useApplicationStore.setState({
+        selectedPersona: { name: 'BasicConsumerPersona' },
+      });
+
+      mockUseTourProvider.mockReturnValue({
+        isTourOpen: false,
+      } as any);
+
+      mockSearchQuery.mockResolvedValue({
+        hits: {
+          hits: [
+            {
+              _id: '1',
+              _source: {
+                id: '1',
+                name: 'Glossary Term 1',
+                entityType: 'glossaryTerm',
+              },
+            },
+            {
+              _id: '2',
+              _source: {
+                id: '2',
+                name: 'Tag 1',
+                entityType: 'tag',
+              },
+            },
+          ],
+        },
+      });
+
+      const { rerender } = render(
+        <Suggestions {...defaultProps} searchText="" />
+      );
+
+      rerender(<Suggestions {...defaultProps} searchText="test" />);
+
+      expect(screen.queryByText('Tag 1')).not.toBeInTheDocument();
+    });
   });
 });

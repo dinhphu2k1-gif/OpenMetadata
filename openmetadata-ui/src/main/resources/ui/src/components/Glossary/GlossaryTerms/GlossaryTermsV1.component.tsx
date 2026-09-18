@@ -33,6 +33,7 @@ import {
 import { Operation } from '../../../generated/entity/policies/policy';
 import { PageType } from '../../../generated/system/ui/page';
 import { useCustomPages } from '../../../hooks/useCustomPages';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import { FeedCounts } from '../../../interface/feed.interface';
 import { MOCK_GLOSSARY_NO_PERMISSIONS } from '../../../mocks/Glossary.mock';
@@ -69,6 +70,13 @@ import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
 
+export const CDE_RESTRICTED_TABS = new Set([
+  EntityTabs.GLOSSARY_TERMS,
+  EntityTabs.ACTIVITY_FEED,
+  EntityTabs.CUSTOM_PROPERTIES,
+  EntityTabs.DATA_OBSERVABILITY,
+]);
+
 const GlossaryTermsV1 = ({
   glossaryTerm,
   handleGlossaryTermUpdate,
@@ -87,6 +95,8 @@ const GlossaryTermsV1 = ({
   }>();
   const { fqn: glossaryFqn } = useFqn();
   const navigate = useNavigate();
+  const { currentUser } = useApplicationStore();
+  const isAdmin = Boolean(currentUser?.isAdmin);
   const assetTabRef = useRef<AssetsTabRef>(null);
   const [assetModalVisible, setAssetModalVisible] = useState(false);
   const [feedCount, setFeedCount] = useState<FeedCounts>(
@@ -127,11 +137,42 @@ const GlossaryTermsV1 = ({
     );
   }, [glossaryFqn, navigate, version]);
 
+  const isCDEGlossaryTerm = useMemo(
+    () =>
+      isDataDictionaryGlossary(
+        glossaryTerm.fullyQualifiedName,
+        glossaryTerm.glossary?.name,
+        glossaryTerm.glossary?.displayName
+      ),
+    [glossaryTerm]
+  );
+
+  const isDQGlossaryTerm = useMemo(
+    () =>
+      isDataQualityGlossary(
+        glossaryTerm.fullyQualifiedName,
+        glossaryTerm.glossary?.name,
+        glossaryTerm.glossary?.displayName
+      ),
+    [glossaryTerm]
+  );
+
   useEffect(() => {
     if (activeTab === EntityTabs.RELATIONS_GRAPH) {
       activeTabHandler(EntityTabs.OVERVIEW);
     }
   }, [activeTab, activeTabHandler]);
+
+  useEffect(() => {
+    if (
+      (isCDEGlossaryTerm || isDQGlossaryTerm) &&
+      !isAdmin &&
+      activeTab &&
+      CDE_RESTRICTED_TABS.has(activeTab)
+    ) {
+      activeTabHandler(EntityTabs.OVERVIEW);
+    }
+  }, [isCDEGlossaryTerm, isDQGlossaryTerm, isAdmin, activeTab, activeTabHandler]);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
     setFeedCount(data);
@@ -193,26 +234,6 @@ const GlossaryTermsV1 = ({
     [permissions]
   );
 
-  const isCDEGlossaryTerm = useMemo(
-    () =>
-      isDataDictionaryGlossary(
-        glossaryTerm.fullyQualifiedName,
-        glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName
-      ),
-    [glossaryTerm]
-  );
-
-  const isDQGlossaryTerm = useMemo(
-    () =>
-      isDataQualityGlossary(
-        glossaryTerm.fullyQualifiedName,
-        glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName
-      ),
-    [glossaryTerm]
-  );
-
   const tabItems = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
@@ -244,7 +265,7 @@ const GlossaryTermsV1 = ({
     );
 
     if (isDQGlossaryTerm) {
-      return detailTabs.map((tab) =>
+      const dqTabs = detailTabs.map((tab) =>
         tab.key === EntityTabs.OVERVIEW
           ? {
               ...tab,
@@ -252,10 +273,18 @@ const GlossaryTermsV1 = ({
             }
           : tab
       );
+
+      if (!isAdmin) {
+        return dqTabs.filter(
+          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+        );
+      }
+
+      return dqTabs;
     }
 
     if (isCDEGlossaryTerm) {
-      return detailTabs.map((tab) =>
+      const cdeTabs = detailTabs.map((tab) =>
         tab.key === EntityTabs.OVERVIEW
           ? {
               ...tab,
@@ -263,6 +292,14 @@ const GlossaryTermsV1 = ({
             }
           : tab
       );
+
+      if (!isAdmin) {
+        return cdeTabs.filter(
+          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+        );
+      }
+
+      return cdeTabs;
     }
 
     return detailTabs;
@@ -282,6 +319,7 @@ const GlossaryTermsV1 = ({
     handleAssetClick,
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
+    isAdmin,
   ]);
 
   useEffect(() => {

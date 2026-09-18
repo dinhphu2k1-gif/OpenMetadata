@@ -11,11 +11,18 @@
  *  limitations under the License.
  */
 import { render, waitFor } from '@testing-library/react';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import ExploreTree from './ExploreTree';
 
 jest.mock('react-router-dom', () => ({
   useParams: jest.fn().mockReturnValue({
     tab: 'tables',
+  }),
+}));
+
+jest.mock('../../../hooks/useApplicationStore', () => ({
+  useApplicationStore: jest.fn().mockReturnValue({
+    selectedPersona: undefined,
   }),
 }));
 
@@ -38,5 +45,22 @@ describe('ExploreTree', () => {
     expect(getByText('label.search-index-plural')).toBeInTheDocument();
     expect(getByText('label.ml-model-plural')).toBeInTheDocument();
     expect(getByText('label.governance')).toBeInTheDocument();
+  });
+
+  it('filters out Tag and Metric for non-admin personas', async () => {
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      selectedPersona: { name: 'BasicConsumerPersona' },
+    });
+
+    const { queryByText, queryByTestId } = render(
+      <ExploreTree onFieldValueSelect={jest.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(queryByTestId('loader')).not.toBeInTheDocument();
+    });
+
+    expect(queryByText('label.tag-plural')).not.toBeInTheDocument();
+    expect(queryByText('label.metric-plural')).not.toBeInTheDocument();
   });
 });

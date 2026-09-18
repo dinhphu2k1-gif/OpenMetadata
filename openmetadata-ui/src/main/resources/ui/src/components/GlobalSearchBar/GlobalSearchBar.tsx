@@ -34,10 +34,12 @@ import { ReactComponent as IconSearch } from '../../assets/svg/search.svg';
 import { TOUR_SEARCH_TERM } from '../../constants/constants';
 import { useTourProvider } from '../../context/TourProvider/TourProvider';
 import { CurrentTourPageType } from '../../enums/tour.enum';
+import { SearchIndex } from '../../enums/search.enum';
 import { useApplicationStore } from '../../hooks/useApplicationStore';
 import useCustomLocation from '../../hooks/useCustomLocation/useCustomLocation';
 import { useSearchStore } from '../../hooks/useSearchStore';
 import { getNLPEnabledStatus } from '../../rest/searchAPI';
+import { isNonAdminPersona } from '../../utils/Persona/BasicConsumerNavigation';
 import { addToRecentSearched } from '../../utils/RecentActivityUtils';
 import {
   getExplorePath,
@@ -51,14 +53,19 @@ import './global-search-bar.less';
 
 export const GlobalSearchBar = () => {
   const tabsInfo = searchClassBase.getTabsInfo();
-  const { searchCriteria, updateSearchCriteria, currentUser } =
+  const { searchCriteria, updateSearchCriteria, currentUser, selectedPersona } =
     useApplicationStore(
       useShallow((state) => ({
         searchCriteria: state.searchCriteria,
         updateSearchCriteria: state.updateSearchCriteria,
         currentUser: state.currentUser,
+        selectedPersona: state.selectedPersona,
       }))
     );
+  const isNonAdmin = useMemo(
+    () => isNonAdminPersona(selectedPersona),
+    [selectedPersona]
+  );
   const { isNLPEnabled, isNLPActive, setNLPActive, setNLPEnabled } =
     useSearchStore();
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -101,17 +108,24 @@ export const GlobalSearchBar = () => {
         suffixIcon={<DropDownIcon width={12} />}
         value={searchCriteria}
         onChange={updateSearchCriteria}>
-        {searchClassBase.getGlobalSearchOptions().map(({ value, label }) => (
-          <Select.Option
-            data-testid={`global-search-select-option-${label}`}
-            key={value}
-            value={value}>
-            {label}
-          </Select.Option>
-        ))}
+        {searchClassBase
+          .getGlobalSearchOptions()
+          .filter(
+            ({ value }) =>
+              !isNonAdmin ||
+              (value !== SearchIndex.TAG && value !== SearchIndex.METRIC)
+          )
+          .map(({ value, label }) => (
+            <Select.Option
+              data-testid={`global-search-select-option-${label}`}
+              key={value}
+              value={value}>
+              {label}
+            </Select.Option>
+          ))}
       </Select>
     ),
-    [searchCriteria, i18n.language, renderSearchDropdown]
+    [searchCriteria, i18n.language, renderSearchDropdown, isNonAdmin]
   );
 
   const handleSelectOption = useCallback((text: string) => {

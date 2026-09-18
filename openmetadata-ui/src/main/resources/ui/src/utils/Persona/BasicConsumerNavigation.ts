@@ -16,12 +16,25 @@ import { ROUTES } from '../../constants/constants';
 import { EntityReference } from '../../generated/entity/type';
 
 export const BASIC_CONSUMER_PERSONA_NAME = 'BasicConsumerPersona';
+export const DATA_CONSUMER_PERSONA_NAME = 'DataConsumerPersona';
+export const DATA_PROPOSER_PERSONA_NAME = 'DataProposerPersona';
+export const DATA_STEWARD_PERSONA_NAME = 'DataStewardPersona';
 
 export const RESTRICTED_PERSONA_NAMES = new Set([
   BASIC_CONSUMER_PERSONA_NAME,
+  DATA_CONSUMER_PERSONA_NAME,
+  DATA_PROPOSER_PERSONA_NAME,
+  DATA_STEWARD_PERSONA_NAME,
 ]);
 
 export const isBasicConsumerPersona = (
+  persona?: Pick<EntityReference, 'name' | 'fullyQualifiedName'>
+): boolean =>
+  [persona?.name, persona?.fullyQualifiedName]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.split('.').at(-1) === BASIC_CONSUMER_PERSONA_NAME);
+
+export const isNonAdminPersona = (
   persona?: Pick<EntityReference, 'name' | 'fullyQualifiedName'>
 ): boolean =>
   [persona?.name, persona?.fullyQualifiedName]

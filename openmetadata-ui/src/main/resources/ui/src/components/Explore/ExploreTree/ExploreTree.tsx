@@ -38,7 +38,9 @@ import {
   updateTreeData,
   updateTreeDataWithCounts,
 } from '../../../utils/ExploreUtils';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { Transi18next } from '../../../utils/i18next/LocalUtil';
+import { isNonAdminPersona } from '../../../utils/Persona/BasicConsumerNavigation';
 import searchClassBase from '../../../utils/SearchClassBase';
 import serviceUtilClassBase from '../../../utils/ServiceUtilClassBase';
 import { generateUUID } from '../../../utils/StringUtils';
@@ -54,19 +56,48 @@ import {
   TreeNodeData,
 } from './ExploreTree.interface';
 
+const filterTreeDataForPersona = (
+  nodes: ExploreTreeNode[],
+  isNonAdmin: boolean
+): ExploreTreeNode[] => {
+  if (!isNonAdmin) {
+    return nodes;
+  }
+
+  return nodes.map((node) => {
+    if (node.key === 'Governance') {
+      const filteredChildren = (node.children ?? []).filter(
+        (child) =>
+          child.key !== EntityType.TAG && child.key !== EntityType.METRIC
+      );
+      const filteredChildEntities = (node.data?.childEntities ?? []).filter(
+        (entity) =>
+          entity !== EntityType.TAG && entity !== EntityType.METRIC
+      );
+
+      return {
+        ...node,
+        children: filteredChildren,
+        data: {
+          ...node.data,
+          childEntities: filteredChildEntities,
+        },
+      };
+    }
+
+    return node;
+  });
+};
+
 const ExploreTreeTitle = ({ node }: { node: ExploreTreeNode }) => {
   const tooltipText = node.tooltip ?? node.title;
 
   return (
     <Tooltip
-      title={
-        <Typography.Text className="text-white">
-          {tooltipText}
-          {node.type && (
-            <span className="text-grey-400">{` (${node.type})`}</span>
-          )}
-        </Typography.Text>
-      }>
+      destroyTooltipOnHide
+      mouseEnterDelay={1.5}
+      placement="topLeft"
+      title={tooltipText}>
       <div className="d-flex justify-between">
         <Typography.Text
           className={classNames({
@@ -89,10 +120,23 @@ const ExploreTree = ({ onFieldValueSelect }: ExploreTreeProps) => {
   const hasFetchedRef = useRef(false); // Use a ref to track if we've already fetched, in dev mode as it will fetch twice
   const { t } = useTranslation();
   const { tab } = useRequiredParams<UrlParams>();
-  const initTreeData = searchClassBase.getExploreTree();
+  const { selectedPersona } = useApplicationStore();
+  const isNonAdmin = useMemo(
+    () => isNonAdminPersona(selectedPersona),
+    [selectedPersona]
+  );
+  const initTreeData = useMemo(
+    () =>
+      filterTreeDataForPersona(searchClassBase.getExploreTree(), isNonAdmin),
+    [isNonAdmin]
+  );
   const [treeData, setTreeData] = useState(initTreeData);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setTreeData(initTreeData);
+  }, [initTreeData]);
 
   const defaultExpandedKeys = useMemo(() => {
     return searchClassBase.getExploreTreeKey(tab as ExplorePageTabs);

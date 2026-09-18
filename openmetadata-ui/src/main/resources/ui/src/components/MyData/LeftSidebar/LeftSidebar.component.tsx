@@ -27,6 +27,8 @@ import { SidebarItem } from '../../../enums/sidebar.enum';
 import { useCurrentUserPreferences } from '../../../hooks/currentUserStore/useCurrentUserStore';
 import useCustomLocation from '../../../hooks/useCustomLocation/useCustomLocation';
 import { useSidebarItems } from '../../../hooks/useSidebarItems';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
+import { isNonAdminPersona } from '../../../utils/Persona/BasicConsumerNavigation';
 import { useAuthProvider } from '../../Auth/AuthProviders/AuthProvider';
 import BrandImage from '../../common/BrandImage/BrandImage';
 import './left-sidebar.less';
@@ -37,6 +39,7 @@ const LeftSidebar = () => {
   const location = useCustomLocation();
   const { t } = useTranslation();
   const { onLogoutHandler } = useAuthProvider();
+  const { selectedPersona } = useApplicationStore();
   const [isConfirmLogoutModalOpen, setIsConfirmLogoutModalOpen] =
     useState(false);
   const {
@@ -66,15 +69,23 @@ const LeftSidebar = () => {
     setIsConfirmLogoutModalOpen(false);
   };
 
+  const lowerSidebarItems = useMemo(
+    () =>
+      isNonAdminPersona(selectedPersona)
+        ? [LOGOUT_ITEM]
+        : [SETTING_ITEM, LOGOUT_ITEM],
+    [selectedPersona]
+  );
+
   const LOWER_SIDEBAR_TOP_SIDEBAR_MENU_ITEMS: MenuProps['items'] = useMemo(
     () =>
-      [SETTING_ITEM, LOGOUT_ITEM].map((item) => ({
+      lowerSidebarItems.map((item) => ({
         key: item.key,
         icon: <Icon component={item.icon} />,
         onClick: item.key === SidebarItem.LOGOUT ? handleLogoutClick : noop,
         label: <LeftSidebarItem data={item} />,
       })),
-    [handleLogoutClick]
+    [lowerSidebarItems, handleLogoutClick]
   );
 
   const menuItems = useMemo(() => {
