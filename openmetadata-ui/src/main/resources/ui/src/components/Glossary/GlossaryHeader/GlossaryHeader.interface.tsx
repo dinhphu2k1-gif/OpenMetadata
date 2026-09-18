@@ -10,6 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { Glossary } from '../../../generated/entity/data/glossary';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { VotingDataProps } from '../../Entity/Voting/voting.interface';
 
@@ -17,7 +18,7 @@ export interface GlossaryHeaderProps {
   supportAddOwner?: boolean;
   onDelete: (id: string) => Promise<void>;
   onAssetAdd?: () => void;
-  onVersionSelect?: (version: GlossaryTerm) => void;
+  onVersionSelect?: (version: Glossary | GlossaryTerm) => void;
   updateVote?: (data: VotingDataProps) => Promise<void>;
   onAddGlossaryTerm: (glossaryTerm: GlossaryTerm | undefined) => void;
 }

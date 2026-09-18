@@ -32,7 +32,7 @@ export const ENTITY_STATUS_TRANSLATION_KEYS: Record<EntityStatus, string> = {
   [EntityStatus.Rejected]: 'label.rejected',
   [EntityStatus.Deprecated]: 'label.deprecated',
   [EntityStatus.InReview]: 'label.in-review',
-  [EntityStatus.Unprocessed]: 'label.unprocessed',
+  [EntityStatus.Unprocessed]: 'label.draft',
   [EntityStatus.Archived]: 'label.archived',
 };
 

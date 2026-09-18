@@ -18,10 +18,12 @@ import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
-import { EntityReference } from '../../../generated/entity/data/glossaryTerm';
+import { EntityReference, EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
+import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
@@ -140,8 +142,8 @@ export const getCDEGlossaryTableColumns = ({
         | { cdeVersion?: string; version?: string; phien_ban?: string }
         | undefined;
       const businessVersion = String(
-        extension?.cdeVersion ??
-          extension?.version ??
+        extension?.version ??
+          extension?.cdeVersion ??
           extension?.phien_ban ??
           ''
       ).trim();
@@ -288,10 +290,29 @@ export const getCDEGlossaryTableColumns = ({
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
-        : record.extension?.cdeVersion ??
-          record.extension?.version ??
+        : record.extension?.version ??
+          record.extension?.cdeVersion ??
           record.extension?.phien_ban ??
           '1.0',
+  },
+  {
+    title: t('label.status'),
+    dataIndex: 'entityStatus',
+    key: 'entityStatus',
+    width: 150,
+    render: (entityStatus: EntityStatus | undefined, record) => {
+      if (record.isLoadMoreButton) {
+        return null;
+      }
+      const status = entityStatus ?? EntityStatus.Approved;
+
+      return (
+        <StatusBadge
+          label={status}
+          status={getEntityStatusClass(status)}
+        />
+      );
+    },
   },
   ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
     title: String(

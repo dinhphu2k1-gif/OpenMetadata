@@ -112,8 +112,8 @@ const DQGlossaryTermForm = ({
         owners: glossaryTerm.owners,
         reviewers: glossaryTerm.reviewers,
         cdeVersion:
-          extension.cdeVersion ??
           extension.version ??
+          extension.cdeVersion ??
           extension.phien_ban ??
           '1.0',
         cdeCode: extension.cdeCode,
@@ -209,8 +209,11 @@ const DQGlossaryTermForm = ({
           }
         : {}),
       ...(values.cdeVersion?.trim()
-        ? { cdeVersion: values.cdeVersion.trim() }
-        : { cdeVersion: '1.0' }),
+        ? {
+            version: values.cdeVersion.trim(),
+            cdeVersion: values.cdeVersion.trim(),
+          }
+        : { version: '1.0', cdeVersion: '1.0' }),
       ...(values.qualityThreshold?.trim()
         ? { qualityThreshold: values.qualityThreshold.trim() }
         : {}),

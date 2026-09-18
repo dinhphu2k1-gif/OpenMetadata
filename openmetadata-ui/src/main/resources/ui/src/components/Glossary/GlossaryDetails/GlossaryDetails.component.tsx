@@ -39,6 +39,9 @@ import {
 } from '../../../constants/Glossary.contant';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import TabsLabel from '../../common/TabsLabel/TabsLabel.component';
+import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
+import { Glossary } from '../../../generated/entity/data/glossary';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
@@ -46,6 +49,8 @@ import './glossary-details.less';
 import { GlossaryDetailsProps } from './GlossaryDetails.interface';
 
 const GlossaryDetails = ({
+  permissions,
+  updateGlossary,
   updateVote,
   handleGlossaryDelete,
   isVersionView,
@@ -55,6 +60,13 @@ const GlossaryDetails = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeGlossary: glossary } = useGlossaryStore();
+  const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
+  const currentGlossary = viewedVersion ?? glossary;
+
+  useEffect(() => {
+    setViewedVersion(null);
+  }, [glossary.fullyQualifiedName]);
+
   const [feedCount, setFeedCount] = useState<FeedCounts>(
     FEED_COUNT_INITIAL_DATA
   );
@@ -212,39 +224,55 @@ const GlossaryDetails = ({
   }
 
   return (
-    <Row
-      className="glossary-details"
-      data-testid="glossary-details"
-      gutter={[0, 12]}>
-      <Col span={24}>
-        <GlossaryHeader
-          updateVote={updateVote}
-          onAddGlossaryTerm={onAddGlossaryTerm}
-          onDelete={handleGlossaryDelete}
-        />
-      </Col>
-      <Col className="glossary-page-tabs" span={24}>
-        <Tabs
-          activeKey={activeTab}
-          className="tabs-new"
-          data-testid="tabs"
-          items={tabs}
-          tabBarExtraContent={
-            isExpandViewSupported && (
-              <AlignRightIconButton
-                aria-label={
-                  isTabExpanded ? t('label.expand') : t('label.collapse')
-                }
-                className={isTabExpanded ? '' : 'rotate-180'}
-                title={isTabExpanded ? t('label.expand') : t('label.collapse')}
-                onClick={toggleTabExpanded}
-              />
-            )
-          }
-          onChange={handleTabChange}
-        />
-      </Col>
-    </Row>
+    <GenericProvider<Glossary>
+      data={currentGlossary}
+      isTabExpanded={isTabExpanded}
+      isVersionView={isVersionView || Boolean(viewedVersion)}
+      permissions={permissions}
+      type={EntityType.GLOSSARY}
+      onUpdate={updateGlossary}>
+      <Row
+        className="glossary-details"
+        data-testid="glossary-details"
+        gutter={[0, 12]}>
+        <Col span={24}>
+          <GlossaryHeader
+            updateVote={updateVote}
+            onAddGlossaryTerm={onAddGlossaryTerm}
+            onDelete={handleGlossaryDelete}
+            onVersionSelect={(snapshot) =>
+              setViewedVersion(
+                (snapshot as Glossary).version === glossary.version &&
+                  (snapshot as Glossary).entityStatus === EntityStatus.Approved
+                  ? null
+                  : (snapshot as Glossary)
+              )
+            }
+          />
+        </Col>
+        <Col className="glossary-page-tabs" span={24}>
+          <Tabs
+            activeKey={activeTab}
+            className="tabs-new"
+            data-testid="tabs"
+            items={tabs}
+            tabBarExtraContent={
+              isExpandViewSupported && (
+                <AlignRightIconButton
+                  aria-label={
+                    isTabExpanded ? t('label.expand') : t('label.collapse')
+                  }
+                  className={isTabExpanded ? '' : 'rotate-180'}
+                  title={isTabExpanded ? t('label.expand') : t('label.collapse')}
+                  onClick={toggleTabExpanded}
+                />
+              )
+            }
+            onChange={handleTabChange}
+          />
+        </Col>
+      </Row>
+    </GenericProvider>
   );
 };
 

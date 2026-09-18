@@ -34,8 +34,9 @@
     },
     {
       "name": "DataProposer-CreateDraftFromApprovedRule",
-      "description": "Allow Data Proposers to create drafts and upgrade versions for glossary terms",
+      "description": "Allow Data Proposers to create drafts and upgrade versions for glossary terms and glossaries",
       "resources": [
+        "glossary",
         "glossaryTerm"
       ],
       "operations": [
@@ -46,8 +47,9 @@
     },
     {
       "name": "DataProposer-ManageUnapprovedRule",
-      "description": "Allow editing/deleting draft/unapproved glossary terms and test cases",
+      "description": "Allow editing/deleting draft/unapproved glossaries, glossary terms and test cases",
       "resources": [
+        "glossary",
         "glossaryTerm",
         "testCase",
         "testSuite"

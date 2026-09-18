@@ -186,8 +186,8 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                 continue;
               }
               const raw = String(
-                p?.extension?.cdeVersion ??
                 p?.extension?.version ??
+                p?.extension?.cdeVersion ??
                 p?.extension?.phien_ban ??
                 '1.0'
               ).trim();

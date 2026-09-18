@@ -142,6 +142,7 @@ const CDEGlossaryTermForm = ({
           ? DateTime.fromISO(glossaryTerm.extension.expirationDate)
           : null,
         cdeVersion:
+          glossaryTerm.extension?.version ??
           glossaryTerm.extension?.cdeVersion ??
           glossaryTerm.extension?.phien_ban ??
           '1.0',
@@ -190,7 +191,12 @@ const CDEGlossaryTermForm = ({
     const extension = mergeCDEDates(
       {
         ...preservedExtension,
-        ...(versionVal ? { cdeVersion: versionVal } : {}),
+        ...(versionVal
+          ? {
+              version: versionVal,
+              cdeVersion: versionVal,
+            }
+          : {}),
         ...(entityRelationshipVal
           ? {
               entityRelationship: entityRelationshipVal,

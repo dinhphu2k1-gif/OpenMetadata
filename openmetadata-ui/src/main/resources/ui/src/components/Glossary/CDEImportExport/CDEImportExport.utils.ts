@@ -224,7 +224,7 @@ export const exportCDEToExcel = (
       const dqRules = formatQualityRules(
         ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
       );
-      const version = ext.cdeVersion ?? ext.phien_ban ?? '1.0';
+      const version = ext.version ?? ext.cdeVersion ?? ext.phien_ban ?? '1.0';
       const statusLabel = getEntityStatusLabel(
         term.entityStatus ?? EntityStatus.Approved
       );
@@ -1406,6 +1406,7 @@ export const transformRowToGlossaryTermPayload = (
   const extension = mergeCDEDates(
     {
       ...existingExtension,
+      version: row.cdeVersion || '1.0',
       cdeVersion: row.cdeVersion || '1.0',
       ...(row.entityRelationship
         ? { entityRelationship: row.entityRelationship }

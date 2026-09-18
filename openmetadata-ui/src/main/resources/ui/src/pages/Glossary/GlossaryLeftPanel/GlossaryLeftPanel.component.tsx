@@ -49,8 +49,8 @@ const GlossaryLeftPanel = ({ glossaries }: GlossaryLeftPanelProps) => {
       return Fqn.split(glossaryFqn)[0];
     }
 
-    return glossaries[0].fullyQualifiedName;
-  }, [glossaryFqn]);
+    return glossaries[0]?.fullyQualifiedName;
+  }, [glossaryFqn, glossaries]);
 
   const menuItems: ItemType[] = useMemo(() => {
     return glossaries.reduce((acc, glossary) => {

@@ -48,10 +48,14 @@ import {
   TabSpecificField,
 } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
@@ -101,6 +105,33 @@ const GlossaryPage = () => {
     setActiveGlossary,
     updateActiveGlossary,
   } = useGlossaryStore();
+
+  const { currentUser, selectedPersona } = useApplicationStore();
+  const isConsumer = useMemo(() => {
+    if (currentUser?.isAdmin) {
+      return false;
+    }
+    const userRoles =
+      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
+    const personaName = (
+      selectedPersona?.name ||
+      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
+      ''
+    ).toLowerCase();
+
+    const isElevated =
+      userRoles.some(
+        (r) =>
+          r.includes('steward') ||
+          r.includes('proposer') ||
+          r.includes('admin')
+      ) ||
+      personaName.includes('steward') ||
+      personaName.includes('proposer') ||
+      personaName.includes('admin');
+
+    return !isElevated;
+  }, [currentUser, selectedPersona]);
 
   const isImportAction = useMemo(
     () => action === EntityAction.IMPORT,
@@ -184,14 +215,20 @@ const GlossaryPage = () => {
         handlePagingChange(glossaryPaging);
       } while (nextPage && !isGlossaryFound);
 
-      setGlossaries(allGlossaries);
+      const visibleGlossaries = isConsumer
+        ? allGlossaries.filter(
+            (item) => item.entityStatus === EntityStatus.Approved
+          )
+        : allGlossaries;
+
+      setGlossaries(visibleGlossaries);
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
       setIsLoading(false);
       setInitialised(true);
     }
-  }, [paging.after, glossaryFqn]);
+  }, [paging.after, glossaryFqn, isConsumer]);
 
   const fetchNextGlossaryItems = async (after?: string) => {
     try {
@@ -215,7 +252,13 @@ const GlossaryPage = () => {
       allGlossaries = [...allGlossaries, ...data];
       handlePagingChange(glossaryPaging);
 
-      setGlossaries(allGlossaries);
+      const visibleGlossaries = isConsumer
+        ? allGlossaries.filter(
+            (item) => item.entityStatus === EntityStatus.Approved
+          )
+        : allGlossaries;
+
+      setGlossaries(visibleGlossaries);
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
@@ -267,11 +310,16 @@ const GlossaryPage = () => {
       if (!isGlossaryActive) {
         fetchGlossaryTermDetails();
       } else {
-        setActiveGlossary(
-          glossaries.find(
-            (glossary) => glossary.fullyQualifiedName === glossaryFqn
-          ) || glossaries[0]
+        const foundGlossary = glossaries.find(
+          (glossary) => glossary.fullyQualifiedName === glossaryFqn
         );
+        if (!foundGlossary && isConsumer && glossaryFqn) {
+          navigate(ROUTES.FORBIDDEN, { replace: true });
+
+          return;
+        }
+
+        setActiveGlossary(foundGlossary || glossaries[0]);
 
         if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
           navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
@@ -281,8 +329,10 @@ const GlossaryPage = () => {
 
         setIsRightPanelLoading(false);
       }
+    } else {
+      setIsRightPanelLoading(false);
     }
-  }, [isGlossaryActive, glossaryFqn, glossaries]);
+  }, [isGlossaryActive, glossaryFqn, glossaries, isConsumer]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
@@ -291,7 +341,17 @@ const GlossaryPage = () => {
       try {
         const response = await patchGlossaries(activeGlossary?.id, jsonPatch);
 
-        updateActiveGlossary({ ...updatedData, ...response });
+        const updatedGlossaryObj = {
+          ...activeGlossary,
+          ...updatedData,
+          ...response,
+        };
+        updateActiveGlossary(updatedGlossaryObj);
+        setGlossaries((prev) =>
+          prev.map((item) =>
+            item.id === response.id ? { ...item, ...response } : item
+          )
+        );
 
         if (activeGlossary?.name !== updatedData.name) {
           navigate(getGlossaryPath(response.fullyQualifiedName));
@@ -299,9 +359,10 @@ const GlossaryPage = () => {
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+        throw error;
       }
     },
-    [activeGlossary, updateActiveGlossary, navigate, fetchGlossaryList]
+    [activeGlossary, updateActiveGlossary, navigate, fetchGlossaryList, setGlossaries]
   );
 
   const updateVote = useCallback(
@@ -369,8 +430,10 @@ const GlossaryPage = () => {
         return;
       }
 
-      const shouldRefreshTerms = jsonPatch.some((patch) =>
-        patch.path.startsWith('/owners')
+      const shouldRefreshTerms = jsonPatch.some(
+        (patch) =>
+          patch.path.startsWith('/owners') ||
+          patch.path.startsWith('/entityStatus')
       );
 
       try {
