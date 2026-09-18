@@ -500,7 +500,7 @@ services:
     expose:
       - 80
     ports:
-      - "3000:80"
+      - "80:80"
     depends_on:
       openmetadata-server:
         condition: service_healthy

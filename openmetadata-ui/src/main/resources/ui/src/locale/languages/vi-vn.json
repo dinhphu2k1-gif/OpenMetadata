@@ -1,5 +1,9 @@
 {
   "cde": {
+    "effective-date": "Ngày hiệu lực",
+    "expiration-date": "Ngày hết hiệu lực",
+    "invalid-date": "Ngày không hợp lệ. Sử dụng định dạng dd/MM/yyyy hoặc yyyy-MM-dd.",
+    "invalid-date-range": "Ngày hết hiệu lực phải bằng hoặc sau ngày hiệu lực.",
     "business-context": "Ngữ cảnh nghiệp vụ",
     "core-definition": "Định nghĩa cốt lõi",
     "data-dictionary": "Từ điển dữ liệu dùng chung",

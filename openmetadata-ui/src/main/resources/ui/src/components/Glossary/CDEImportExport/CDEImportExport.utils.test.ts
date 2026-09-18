@@ -12,14 +12,16 @@
  */
 
 import * as XLSX from 'xlsx';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import {
   CDE_EXPORT_HEADERS,
-  CDE_TEMPLATE_FILE_NAME,
+  CDEImportRowData,
   downloadCDEExcelTemplate,
   exportCDEToExcel,
   findMatchingDomain,
-  findMatchingUserOrTeam,
   formatCDEImportErrorMessage,
   getCDEExportFileName,
   readAndValidateCDEExcel,
@@ -37,7 +39,10 @@ describe('CDEImportExport.utils', () => {
     it('should generate exact format Agribank_CDE_Danh_Tu_Dien_Du_Lieu_YYYYMMDD_HHmm.xlsx', () => {
       const fixedDate = new Date(2026, 8, 9, 9, 30); // 2026-09-09 09:30
       const fileName = getCDEExportFileName(fixedDate);
-      expect(fileName).toBe('Agribank_CDE_Danh_Tu_Dien_Du_Lieu_20260909_0930.xlsx');
+
+      expect(fileName).toBe(
+        'Agribank_CDE_Danh_Tu_Dien_Du_Lieu_20260909_0930.xlsx'
+      );
     });
   });
 
@@ -53,19 +58,25 @@ describe('CDEImportExport.utils', () => {
       URL.revokeObjectURL = jest.fn();
 
       mockClick = jest.fn();
-      jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-        if (tagName === 'a') {
-          return {
-            href: '',
-            setAttribute: jest.fn(),
-            click: mockClick,
-          } as unknown as HTMLAnchorElement;
-        }
+      jest
+        .spyOn(document, 'createElement')
+        .mockImplementation((tagName: string) => {
+          if (tagName === 'a') {
+            return {
+              href: '',
+              setAttribute: jest.fn(),
+              click: mockClick,
+            } as unknown as HTMLAnchorElement;
+          }
 
-        return document.createElement(tagName);
-      });
-      jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
-      jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+          return document.createElement(tagName);
+        });
+      jest
+        .spyOn(document.body, 'appendChild')
+        .mockImplementation((node) => node);
+      jest
+        .spyOn(document.body, 'removeChild')
+        .mockImplementation((node) => node);
     });
 
     afterEach(() => {
@@ -74,7 +85,7 @@ describe('CDEImportExport.utils', () => {
       jest.restoreAllMocks();
     });
 
-    it('should export CDE terms with 14 headers and trigger download', () => {
+    it('round trips dates through the 16-column export and triggers download', async () => {
       const mockTerms: GlossaryTerm[] = [
         {
           id: '1',
@@ -98,6 +109,8 @@ describe('CDEImportExport.utils', () => {
           ],
           extension: {
             cdeVersion: '1.0',
+            effectiveDate: '2026-09-18',
+            expirationDate: '2026-12-31',
             entityRelationship: 'Thuộc thực thể Khách hàng',
             relatedRegulatoryDocuments: 'QĐ 123',
             dataQualityRules: ['Y'],
@@ -109,6 +122,23 @@ describe('CDEImportExport.utils', () => {
 
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(mockClick).toHaveBeenCalled();
+      expect(CDE_EXPORT_HEADERS).toHaveLength(16);
+
+      const blob = (URL.createObjectURL as jest.Mock).mock.calls[0][0];
+      const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(blob);
+      });
+      const parsed = await readAndValidateCDEExcel({
+        arrayBuffer: async () => bytes,
+      } as File);
+
+      expect(parsed.rows[0]).toMatchObject({
+        effectiveDate: '2026-09-18',
+        expirationDate: '2026-12-31',
+      });
     });
 
     it('should download template file Agribank_CDE_Mau_Nhap_Lieu.xlsx', () => {
@@ -194,8 +224,12 @@ describe('CDEImportExport.utils', () => {
       const result = await readAndValidateCDEExcel(mockFile);
 
       expect(result.totalRows).toBe(3);
-      expect(result.rows[0].errors).toContain('Thiếu Mã CDE quy chiếu (bắt buộc).');
-      expect(result.rows[2].errors[0]).toContain('bị trùng lặp với dòng khác trong file');
+      expect(result.rows[0].errors).toContain(
+        'Thiếu Mã CDE quy chiếu (bắt buộc).'
+      );
+      expect(result.rows[2].errors[0]).toContain(
+        'bị trùng lặp với dòng khác trong file'
+      );
     });
   });
 
@@ -286,7 +320,9 @@ describe('CDEImportExport.utils', () => {
           state: 'Confirmed',
         },
       ]);
-      expect(payload.tags?.find((t) => t.tagFQN.startsWith('PersonalData.'))).toBeUndefined();
+      expect(
+        payload.tags?.find((t) => t.tagFQN.startsWith('PersonalData.'))
+      ).toBeUndefined();
       expect(payload.extension).toEqual({
         cdeVersion: '1.3',
         entityRelationship: '<p>test 1 tý</p>',
@@ -314,21 +350,25 @@ describe('CDEImportExport.utils', () => {
 
     it('should find domain by exact displayName', () => {
       const match = findMatchingDomain('Dịch vụ', mockDomains);
+
       expect(match?.name).toBe('Dich_vu');
     });
 
     it('should find domain by case-insensitive name or FQN', () => {
       const match = findMatchingDomain('dich_vu', mockDomains);
+
       expect(match?.displayName).toBe('Dịch vụ');
     });
 
     it('should find domain via KNOWN_CDE_DOMAIN_MAP unaccented keyword', () => {
       const match = findMatchingDomain('dich vu', mockDomains);
+
       expect(match?.name).toBe('Dich_vu');
     });
 
     it('should return undefined for non-existing domain such as Dịch vụ 2', () => {
       const match = findMatchingDomain('Dịch vụ 2', mockDomains);
+
       expect(match).toBeUndefined();
     });
 
@@ -341,10 +381,12 @@ describe('CDEImportExport.utils', () => {
   describe('Validation Helpers', () => {
     it('validateDataSourceValues should validate known and unknown sources', () => {
       const validRes = validateDataSourceValues('IPCAS, Thẻ');
+
       expect(validRes.isValid).toBe(true);
       expect(validRes.invalidSources).toEqual([]);
 
       const invalidRes = validateDataSourceValues('IPCAS, UnknownSource_123');
+
       expect(invalidRes.isValid).toBe(false);
       expect(invalidRes.invalidSources).toEqual(['UnknownSource_123']);
     });
@@ -354,9 +396,12 @@ describe('CDEImportExport.utils', () => {
       expect(validateDataClassificationValue('Công cộng').isValid).toBe(true);
       expect(validateDataClassificationValue('Bí mật').isValid).toBe(true);
       expect(validateDataClassificationValue('Tối mật').isValid).toBe(true);
-      expect(validateDataClassificationValue('Internal, Confidential').isValid).toBe(true);
+      expect(
+        validateDataClassificationValue('Internal, Confidential').isValid
+      ).toBe(true);
 
       const invalid = validateDataClassificationValue('TuyMat');
+
       expect(invalid.isValid).toBe(false);
       expect(invalid.invalidValues).toEqual(['TuyMat']);
     });
@@ -370,6 +415,7 @@ describe('CDEImportExport.utils', () => {
       expect(validatePersonalDataValue('No').isValid).toBe(true);
 
       const invalid = validatePersonalDataValue('UnknownValue');
+
       expect(invalid.isValid).toBe(false);
       expect(invalid.invalidValue).toBe('UnknownValue');
     });
@@ -379,14 +425,29 @@ describe('CDEImportExport.utils', () => {
         { id: 'u1', type: 'user', name: 'user1', displayName: 'User One' },
       ];
       const mockTeams = [
-        { id: 't1', type: 'team', name: 'Ban_Ke_toan', displayName: 'Ban Kế toán' },
+        {
+          id: 't1',
+          type: 'team',
+          name: 'Ban_Ke_toan',
+          displayName: 'Ban Kế toán',
+        },
       ];
 
-      const validRes = validateUserOrTeamList('User One, Ban Kế toán', mockUsers, mockTeams);
+      const validRes = validateUserOrTeamList(
+        'User One, Ban Kế toán',
+        mockUsers,
+        mockTeams
+      );
+
       expect(validRes.isValid).toBe(true);
       expect(validRes.matchedRefs).toHaveLength(2);
 
-      const invalidRes = validateUserOrTeamList('User One, GhostUser', mockUsers, mockTeams);
+      const invalidRes = validateUserOrTeamList(
+        'User One, GhostUser',
+        mockUsers,
+        mockTeams
+      );
+
       expect(invalidRes.isValid).toBe(false);
       expect(invalidRes.invalidNames).toEqual(['GhostUser']);
     });
@@ -469,14 +530,20 @@ describe('CDEImportExport.utils', () => {
       );
 
       expect(result.errorCount).toBe(1);
+
       const rowErrors = result.rows[0].errors;
-      expect(rowErrors.some((e) => e.includes('không tồn tại trên hệ thống'))).toBe(true);
+
+      expect(
+        rowErrors.some((e) => e.includes('không tồn tại trên hệ thống'))
+      ).toBe(true);
       expect(rowErrors.some((e) => e.includes('Nguồn dữ liệu'))).toBe(true);
       expect(rowErrors.some((e) => e.includes('Phân loại dữ liệu'))).toBe(true);
       expect(rowErrors.some((e) => e.includes('Dữ liệu cá nhân'))).toBe(true);
       expect(rowErrors.some((e) => e.includes('Chủ sở hữu'))).toBe(true);
       expect(rowErrors.some((e) => e.includes('Người kiểm soát'))).toBe(true);
-      expect(rowErrors.some((e) => e.includes('Quy định chất lượng dữ liệu'))).toBe(true);
+      expect(
+        rowErrors.some((e) => e.includes('Quy định chất lượng dữ liệu'))
+      ).toBe(true);
       expect(rowErrors.some((e) => e.includes('Phiên bản'))).toBe(true);
     });
   });
@@ -487,6 +554,7 @@ describe('CDEImportExport.utils', () => {
       if (typeof defaultVal === 'string' && options) {
         return defaultVal.replace(/\{\{(\w+)\}\}/g, (_, k) => options[k] ?? '');
       }
+
       return defaultVal || key;
     };
 
@@ -501,16 +569,17 @@ describe('CDEImportExport.utils', () => {
       };
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe(
         "Mã CDE 'alo4' đã tồn tại trong danh mục 'Data Dictionary'."
       );
     });
 
     it('should format entity name already exists error', () => {
-      const backendError =
-        "GlossaryTerm with name 'alo4' already exists.";
+      const backendError = "GlossaryTerm with name 'alo4' already exists.";
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe("Mã CDE 'alo4' đã tồn tại trên hệ thống.");
     });
 
@@ -519,13 +588,17 @@ describe('CDEImportExport.utils', () => {
         "Term 'alo4' (or one of its descendants) already exists in the parent chain.";
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
-      expect(result).toBe("Thuật ngữ 'alo4' đã tồn tại trong chuỗi phân cấp cha.");
+
+      expect(result).toBe(
+        "Thuật ngữ 'alo4' đã tồn tại trong chuỗi phân cấp cha."
+      );
     });
 
     it('should format generic already exists error', () => {
       const backendError = { message: 'Entity already exists' };
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe('Bản ghi CDE đã tồn tại trên hệ thống.');
     });
 
@@ -540,6 +613,7 @@ describe('CDEImportExport.utils', () => {
       };
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe('Bạn không có quyền thực hiện thao tác này.');
     });
 
@@ -547,6 +621,7 @@ describe('CDEImportExport.utils', () => {
       const backendError = 'Tag labels are mutually exclusive';
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe('Các nhãn phân loại (tags) bị xung đột lẫn nhau.');
     });
 
@@ -554,6 +629,7 @@ describe('CDEImportExport.utils', () => {
       const backendError = 'Glossary instance for id not found';
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'update');
+
       expect(result).toBe('Không tìm thấy thông tin bản ghi trên hệ thống.');
     });
 
@@ -561,6 +637,7 @@ describe('CDEImportExport.utils', () => {
       const backendError = new Error('Network Error');
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe('Lỗi kết nối tới máy chủ.');
     });
 
@@ -568,6 +645,7 @@ describe('CDEImportExport.utils', () => {
       const backendError = 'Internal server error occurred';
 
       const result = formatCDEImportErrorMessage(backendError, mockT, 'create');
+
       expect(result).toBe('Lỗi máy chủ nội bộ. Vui lòng thử lại sau.');
     });
 
@@ -582,6 +660,7 @@ describe('CDEImportExport.utils', () => {
 
     it('should preserve already localized Vietnamese text', () => {
       const customMsg = 'Không tìm thấy ID của bản ghi CDE cần cập nhật.';
+
       expect(formatCDEImportErrorMessage(customMsg, mockT, 'update')).toBe(
         customMsg
       );
@@ -589,4 +668,126 @@ describe('CDEImportExport.utils', () => {
   });
 });
 
+describe('CDE validity dates in Excel', () => {
+  const parse = async (
+    dateHeaders: string[],
+    dateValues: unknown[],
+    old?: GlossaryTerm,
+    date1904 = false
+  ) => {
+    const workbook = XLSX.utils.book_new();
+    workbook.Workbook = { WBProps: { date1904 } };
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['Mã CDE', 'Tên thành tố CDE', 'Ý nghĩa nghiệp vụ', ...dateHeaders],
+        ['CDE001', 'Name', 'Meaning', ...dateValues],
+      ]),
+      'CDE'
+    );
+    const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
 
+    return readAndValidateCDEExcel(
+      { arrayBuffer: async () => bytes } as File,
+      old ? [old] : []
+    );
+  };
+  const payload = (row: CDEImportRowData, extension = {}) =>
+    transformRowToGlossaryTermPayload(
+      row,
+      'Data Dictionary',
+      [],
+      [],
+      [],
+      [],
+      extension
+    );
+
+  it('normalizes text dates and round trips the new export layout', async () => {
+    const result = await parse(
+      ['Ngày hiệu lực', 'Ngày hết hiệu lực'],
+      ['18/09/2026', '2026-12-31']
+    );
+
+    expect(result.rows[0]).toMatchObject({
+      effectiveDate: '2026-09-18',
+      expirationDate: '2026-12-31',
+      isValid: true,
+    });
+    expect(payload(result.rows[0]).extension).toMatchObject({
+      effectiveDate: '2026-09-18',
+      expirationDate: '2026-12-31',
+    });
+    expect(CDE_EXPORT_HEADERS.slice(11, 14)).toEqual([
+      'Phiên bản',
+      'Ngày hiệu lực',
+      'Ngày hết hiệu lực',
+    ]);
+  });
+
+  it('handles Excel serial dates including the 1904 epoch', async () => {
+    const serial = await parse(['Ngày hiệu lực'], [46100]);
+    const excel = XLSX.SSF.parse_date_code(46100);
+
+    expect(serial.rows[0].effectiveDate).toBe(
+      `${excel.y}-${String(excel.m).padStart(2, '0')}-${String(
+        excel.d
+      ).padStart(2, '0')}`
+    );
+
+    const epoch = await parse(['Ngày hiệu lực'], [1], undefined, true);
+
+    expect(epoch.rows[0].effectiveDate).toBe('1904-01-02');
+
+    const invalidLeap = await parse(['Ngày hiệu lực'], [60]);
+
+    expect(invalidLeap.rows[0].isValid).toBe(false);
+  });
+
+  it.each([
+    ['31/02/2026', ''],
+    ['2026-12-31', '01/01/2026'],
+  ])('rejects invalid dates/ranges %s %s', async (start, end) => {
+    const result = await parse(
+      ['Ngày hiệu lực', 'Ngày hết hiệu lực'],
+      [start, end]
+    );
+
+    expect(result.rows[0].isValid).toBe(false);
+    expect(result.rows[0].errors.length).toBeGreaterThan(0);
+  });
+
+  it('keeps missing columns, clears empty cells, and preserves other custom properties', async () => {
+    const extension = {
+      custom: 'keep',
+      effectiveDate: '2026-01-01',
+      expirationDate: '2026-12-31',
+    };
+    const old = {
+      id: 'id',
+      name: 'CDE001',
+      extension,
+    } as unknown as GlossaryTerm;
+    const legacy = await parse([], [], old);
+
+    expect(legacy.rows[0].effectiveDate).toBeUndefined();
+    expect(payload(legacy.rows[0], extension).extension).toMatchObject(
+      extension
+    );
+
+    const cleared = await parse(['Ngày hết hiệu lực'], [''], old);
+
+    expect(cleared.rows[0].expirationDate).toBe('');
+    expect(payload(cleared.rows[0], extension).extension).toMatchObject({
+      custom: 'keep',
+      effectiveDate: '2026-01-01',
+    });
+    expect(payload(cleared.rows[0], extension).extension).not.toHaveProperty(
+      'expirationDate'
+    );
+
+    const reversed = await parse(['Ngày hiệu lực'], ['2027-01-01'], old);
+
+    expect(reversed.rows[0].isValid).toBe(false);
+  });
+});

@@ -3,7 +3,13 @@
  *  Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { Form, FormInstance } from 'antd';
 import { CreateGlossaryTerm } from '../../../generated/api/data/createGlossaryTerm';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
@@ -30,67 +36,74 @@ jest.mock('../../../hooks/useEntityRules', () => ({
   }),
 }));
 
-jest.mock('../../common/DomainSelectableList/DomainSelectableList.component', () =>
-  jest.fn().mockImplementation(({ children, onUpdate }) => (
-    <div data-testid="mock-domain-list">
-      {children}
-      <button
-        data-testid="mock-set-domain"
-        type="button"
-        onClick={() =>
-          onUpdate([
-            { id: 'domain-1', name: 'Khách hàng', fullyQualifiedName: 'KhachHang', type: 'domain' },
-          ])
-        }>
-        Set Domain
-      </button>
-      <button
-        data-testid="mock-clear-domain"
-        type="button"
-        onClick={() => onUpdate(undefined)}>
-        Clear Domain
-      </button>
-    </div>
-  ))
+jest.mock(
+  '../../common/DomainSelectableList/DomainSelectableList.component',
+  () =>
+    jest.fn().mockImplementation(({ children, onUpdate }) => (
+      <div data-testid="mock-domain-list">
+        {children}
+        <button
+          data-testid="mock-set-domain"
+          type="button"
+          onClick={() =>
+            onUpdate([
+              {
+                id: 'domain-1',
+                name: 'Khách hàng',
+                fullyQualifiedName: 'KhachHang',
+                type: 'domain',
+              },
+            ])
+          }>
+          Set Domain
+        </button>
+        <button
+          data-testid="mock-clear-domain"
+          type="button"
+          onClick={() => onUpdate(undefined)}>
+          Clear Domain
+        </button>
+      </div>
+    ))
 );
 
-jest.mock('../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component', () =>
-  jest.fn().mockImplementation(({ onUpdate }) => (
-    <div data-testid="mock-user-team-picker">
-      <button
-        data-testid="mock-set-owner"
-        type="button"
-        onClick={() =>
-          onUpdate([
-            { id: 'owner-1', name: 'Data Team', type: 'team' },
-          ])
-        }>
-        Set Owner
-      </button>
-      <button
-        data-testid="mock-set-reviewer"
-        type="button"
-        onClick={() =>
-          onUpdate([
-            { id: 'reviewer-1', name: 'Reviewer User', type: 'user' },
-          ])
-        }>
-        Set Reviewer
-      </button>
-    </div>
-  ))
+jest.mock(
+  '../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component',
+  () =>
+    jest.fn().mockImplementation(({ onUpdate }) => (
+      <div data-testid="mock-user-team-picker">
+        <button
+          data-testid="mock-set-owner"
+          type="button"
+          onClick={() =>
+            onUpdate([{ id: 'owner-1', name: 'Data Team', type: 'team' }])
+          }>
+          Set Owner
+        </button>
+        <button
+          data-testid="mock-set-reviewer"
+          type="button"
+          onClick={() =>
+            onUpdate([
+              { id: 'reviewer-1', name: 'Reviewer User', type: 'user' },
+            ])
+          }>
+          Set Reviewer
+        </button>
+      </div>
+    ))
 );
 
 jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
-  jest.fn().mockImplementation(
-    ({ initialValue, onTextChange, ...rest }) => (
+  jest
+    .fn()
+    .mockImplementation(({ initialValue, onTextChange, ...rest }) => (
       <textarea
         data-testid={rest['data-testid'] || 'cde-business-meaning'}
         defaultValue={initialValue}
         onChange={(e) => onTextChange?.(e.target.value)}
       />
-    )
-  )
+    ))
 );
 
 jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
@@ -123,7 +136,12 @@ const mockGlossaryTerm: GlossaryTerm = {
   description: 'Mã định danh duy nhất của khách hàng',
   glossary: { id: 'glossary-1', name: 'Data Dictionary', type: 'glossary' },
   domains: [
-    { id: 'domain-1', name: 'Khách hàng', fullyQualifiedName: 'KhachHang', type: 'domain' },
+    {
+      id: 'domain-1',
+      name: 'Khách hàng',
+      fullyQualifiedName: 'KhachHang',
+      type: 'domain',
+    },
   ],
   owners: [{ id: 'team-1', name: 'Ban QLDL', type: 'team' }],
   reviewers: [{ id: 'user-2', name: 'Steward User', type: 'user' }],
@@ -175,7 +193,10 @@ const FormWrapper = ({
         onCancel={jest.fn()}
         onSave={onSave}
       />
-      <button data-testid="submit-btn" type="button" onClick={() => form.submit()}>
+      <button
+        data-testid="submit-btn"
+        type="button"
+        onClick={() => form.submit()}>
         Submit
       </button>
     </div>
@@ -191,10 +212,10 @@ describe('CDEGlossaryTermForm', () => {
     expect(screen.getByTestId('cde-version')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-meaning')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-group')).toBeInTheDocument();
-    expect(
-      container.querySelector('.cde-glossary-term-form')
-    ).toHaveClass('cde-glossary-term-form--add');
-    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(13);
+    expect(container.querySelector('.cde-glossary-term-form')).toHaveClass(
+      'cde-glossary-term-form--add'
+    );
+    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(15);
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
       0
     );
@@ -220,9 +241,7 @@ describe('CDEGlossaryTermForm', () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId('mock-set-domain'));
       fireEvent.click(
-        screen.getByTestId(
-          `mock-add-tag-${CDE_TAG_CLASSIFICATIONS.dataSource}`
-        )
+        screen.getByTestId(`mock-add-tag-${CDE_TAG_CLASSIFICATIONS.dataSource}`)
       );
       fireEvent.click(screen.getAllByTestId('mock-set-owner')[0]);
       fireEvent.click(screen.getAllByTestId('mock-set-reviewer')[1]);
@@ -234,9 +253,7 @@ describe('CDEGlossaryTermForm', () => {
         name: 'CDE_NEW',
         displayName: 'New CDE',
         description: 'Meaning for the new CDE',
-        domains: [
-          expect.objectContaining({ fullyQualifiedName: 'KhachHang' }),
-        ],
+        domains: [expect.objectContaining({ fullyQualifiedName: 'KhachHang' })],
         owners: [expect.objectContaining({ id: 'owner-1' })],
         reviewers: [expect.objectContaining({ id: 'reviewer-1' })],
         tags: [
@@ -257,15 +274,19 @@ describe('CDEGlossaryTermForm', () => {
     );
 
     expect(screen.getByTestId('cde-term-code')).toHaveValue('CDE_MA_KH');
-    expect(screen.getByTestId('cde-business-term-name')).toHaveValue('Mã khách hàng');
+    expect(screen.getByTestId('cde-business-term-name')).toHaveValue(
+      'Mã khách hàng'
+    );
     expect(screen.getByTestId('cde-version')).toHaveValue('1.0');
     expect(screen.getByTestId('cde-business-meaning')).toHaveValue(
       'Mã định danh duy nhất của khách hàng'
     );
-    expect(screen.getByTestId('cde-business-group')).toHaveTextContent('Khách hàng');
-    expect(
-      container.querySelector('.cde-glossary-term-form')
-    ).toHaveClass('cde-glossary-term-form--edit');
+    expect(screen.getByTestId('cde-business-group')).toHaveTextContent(
+      'Khách hàng'
+    );
+    expect(container.querySelector('.cde-glossary-term-form')).toHaveClass(
+      'cde-glossary-term-form--edit'
+    );
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
       0
     );
@@ -273,7 +294,13 @@ describe('CDEGlossaryTermForm', () => {
 
   it('preserves non-CDE tags and submits all CDE data accurately', async () => {
     const handleSave = jest.fn();
-    render(<FormWrapper editMode glossaryTerm={mockGlossaryTerm} onSave={handleSave} />);
+    render(
+      <FormWrapper
+        editMode
+        glossaryTerm={mockGlossaryTerm}
+        onSave={handleSave}
+      />
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('submit-btn'));
@@ -287,14 +314,23 @@ describe('CDEGlossaryTermForm', () => {
     expect(savedData.displayName).toBe('Mã khách hàng');
     expect(savedData.description).toBe('Mã định danh duy nhất của khách hàng');
     expect(savedData.domains).toEqual([
-      { id: 'domain-1', name: 'Khách hàng', fullyQualifiedName: 'KhachHang', type: 'domain' },
+      {
+        id: 'domain-1',
+        name: 'Khách hàng',
+        fullyQualifiedName: 'KhachHang',
+        type: 'domain',
+      },
     ]);
-    expect(savedData.owners).toEqual([{ id: 'team-1', name: 'Ban QLDL', type: 'team' }]);
-    expect(savedData.reviewers).toEqual([{ id: 'user-2', name: 'Steward User', type: 'user' }]);
+    expect(savedData.owners).toEqual([
+      { id: 'team-1', name: 'Ban QLDL', type: 'team' },
+    ]);
+    expect(savedData.reviewers).toEqual([
+      { id: 'user-2', name: 'Steward User', type: 'user' },
+    ]);
 
     // Should contain both CDE tags and non-CDE tags (Tier.Tier1)
-    const tagFqns = (savedData as GlossaryTermForm).tags.map((tag) =>
-      tag.tagFQN
+    const tagFqns = (savedData as GlossaryTermForm).tags.map(
+      (tag) => tag.tagFQN
     );
 
     expect(tagFqns).toContain('Tier.Tier1');
@@ -318,5 +354,78 @@ describe('CDEGlossaryTermForm', () => {
     });
 
     expect(screen.getByTestId('cde-business-group')).toBeInTheDocument();
+  });
+
+  it('loads dates, preserves custom fields and saves clearing a date', async () => {
+    const handleSave = jest.fn();
+    render(
+      <FormWrapper
+        editMode
+        glossaryTerm={{
+          ...mockGlossaryTerm,
+          extension: {
+            ...mockGlossaryTerm.extension,
+            custom: 'keep',
+            effectiveDate: '2026-01-01',
+            expirationDate: '2026-12-31',
+          },
+        }}
+        onSave={handleSave}
+      />
+    );
+
+    expect(screen.getByTestId('cde-effectiveDate')).toHaveValue('01/01/2026');
+
+    const expiration = screen
+      .getByTestId('cde-expirationDate')
+      .closest('.ant-picker');
+    await act(async () => {
+      fireEvent.mouseDown(expiration!.querySelector('.ant-picker-clear')!);
+      fireEvent.mouseUp(expiration!.querySelector('.ant-picker-clear')!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submit-btn'));
+    });
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extension: expect.objectContaining({
+          custom: 'keep',
+          effectiveDate: '2026-01-01',
+        }),
+      })
+    );
+    expect(handleSave.mock.calls[0][0].extension).not.toHaveProperty(
+      'expirationDate'
+    );
+  });
+
+  it('blocks saving a reversed date interval', async () => {
+    const handleSave = jest.fn();
+    render(
+      <FormWrapper
+        editMode
+        glossaryTerm={{
+          ...mockGlossaryTerm,
+          extension: {
+            ...mockGlossaryTerm.extension,
+            effectiveDate: '2026-12-31',
+            expirationDate: '2026-01-01',
+          },
+        }}
+        onSave={handleSave}
+      />
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('submit-btn'));
+    });
+
+    expect(handleSave).not.toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('cde.invalid-date-range').length
+      ).toBeGreaterThan(0)
+    );
   });
 });

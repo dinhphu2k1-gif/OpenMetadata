@@ -17,6 +17,7 @@ export interface GlossaryHeaderProps {
   supportAddOwner?: boolean;
   onDelete: (id: string) => Promise<void>;
   onAssetAdd?: () => void;
+  onVersionSelect?: (version: GlossaryTerm) => void;
   updateVote?: (data: VotingDataProps) => Promise<void>;
   onAddGlossaryTerm: (glossaryTerm: GlossaryTerm | undefined) => void;
 }

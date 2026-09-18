@@ -11,10 +11,7 @@
  *  limitations under the License.
  */
 
-import {
-  DownOutlined,
-  WarningOutlined,
-} from '@ant-design/icons';
+import { DownOutlined, WarningOutlined } from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
 import {
   Button,
@@ -100,12 +97,14 @@ import { Paging } from '../../../generated/type/paging';
 import { usePaging } from '../../../hooks/paging/usePaging';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { SearchIndex } from '../../../enums/search.enum';
+import { getApprovedCDEAuditSnapshots } from '../../../utils/CDEApprovedVersionUtils';
 import { getDomainList } from '../../../rest/domainAPI';
 import { getAllFeeds, updateTask } from '../../../rest/feedsAPI';
 import {
   getFirstLevelGlossaryTermsPaginated,
   getGlossaryTermChildrenLazy,
   getGlossaryTerms,
+  getGlossaryTermsVersionsList,
   patchGlossaryTerm,
   searchGlossaryTermsPaginated,
 } from '../../../rest/glossaryAPI';
@@ -136,6 +135,7 @@ import { PagingHandlerParams } from '../../common/NextPrevious/NextPrevious.inte
 import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEditorPreviewNew';
 import StatusAction from '../../common/StatusAction/StatusAction';
 import Table from '../../common/Table/Table';
+import { useCDETablePreferences } from '../../../hooks/useCDETablePreferences';
 import TagButton from '../../common/TagButton/TagButton.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
@@ -160,6 +160,7 @@ import GlossaryBulkActionModal, {
 } from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
 const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
+  useCDETablePreferences();
   const navigate = useNavigate();
   const { currentUser, selectedPersona } = useApplicationStore();
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -185,7 +186,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       activeGlossary.fullyQualifiedName
     );
   }, [activeGlossary, isGlossary]);
-
 
   const isDQGlossary = useMemo(() => {
     const glossary = isGlossary
@@ -478,12 +478,22 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   >(() =>
     isConsumer
       ? [EntityStatus.Approved]
-      : ['all', EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
+      : [
+          'all',
+          EntityStatus.Draft,
+          EntityStatus.InReview,
+          EntityStatus.Approved,
+        ]
   );
   const [selectedStatus, setSelectedStatus] = useState<string[]>(() =>
     isConsumer
       ? [EntityStatus.Approved]
-      : ['all', EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved]
+      : [
+          'all',
+          EntityStatus.Draft,
+          EntityStatus.InReview,
+          EntityStatus.Approved,
+        ]
   );
 
   useEffect(() => {
@@ -496,10 +506,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [totalTermsCount, setTotalTermsCount] = useState<number>(0);
 
   // CDE Column Filters
-  const [selectedCdeDomains, setSelectedCdeDomains] = useState<string[]>(['all']);
-  const [selectedCdeDataSources, setSelectedCdeDataSources] = useState<string[]>(['all']);
+  const [selectedCdeDomains, setSelectedCdeDomains] = useState<string[]>([
+    'all',
+  ]);
+  const [selectedCdeDataSources, setSelectedCdeDataSources] = useState<
+    string[]
+  >(['all']);
   const [selectedCdeOwners, setSelectedCdeOwners] = useState<string[]>(['all']);
-  const [selectedCdeClassifications, setSelectedCdeClassifications] = useState<string[]>(['all']);
+  const [selectedCdeClassifications, setSelectedCdeClassifications] = useState<
+    string[]
+  >(['all']);
   const [cdeFilterOptions, setCdeFilterOptions] = useState<{
     domains: Array<{ label: string; value: string }>;
     dataSources: Array<{ label: string; value: string }>;
@@ -513,11 +529,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   });
 
   // DQ Column Filters
-  const [selectedDqDimensions, setSelectedDqDimensions] = useState<string[]>(['all']);
-  const [selectedDqDataSources, setSelectedDqDataSources] = useState<string[]>(['all']);
+  const [selectedDqDimensions, setSelectedDqDimensions] = useState<string[]>([
+    'all',
+  ]);
+  const [selectedDqDataSources, setSelectedDqDataSources] = useState<string[]>([
+    'all',
+  ]);
   const [selectedDqOwners, setSelectedDqOwners] = useState<string[]>(['all']);
   const [selectedDqMethods, setSelectedDqMethods] = useState<string[]>(['all']);
-  const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] = useState<string[]>(['all']);
+  const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] =
+    useState<string[]>(['all']);
   const [dqFilterOptions, setDqFilterOptions] = useState<{
     dimensions: Array<{ label: string; value: string }>;
     dataSources: Array<{ label: string; value: string }>;
@@ -662,7 +683,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           teamRes.value.data.forEach((tm) => {
             const label = tm.displayName || tm.name || '';
             const value = tm.name || tm.id || '';
-            if (label && value && !owners.some((item) => item.value === value)) {
+            if (
+              label &&
+              value &&
+              !owners.some((item) => item.value === value)
+            ) {
               owners.push({ label, value });
             }
           });
@@ -786,7 +811,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           teamRes.value.data.forEach((tm) => {
             const label = tm.displayName || tm.name || '';
             const value = tm.name || tm.id || '';
-            if (label && value && !owners.some((item) => item.value === value)) {
+            if (
+              label &&
+              value &&
+              !owners.some((item) => item.value === value)
+            ) {
               owners.push({ label, value });
             }
           });
@@ -807,7 +836,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
     loadDqOptions();
   }, [isDQGlossary]);
-
 
   const hasActiveCdeFilters = useMemo(
     () =>
@@ -1022,10 +1050,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           { term: { deleted: false } },
         ];
 
-        if (isConsumer) {
-          mustQueries.push({ term: { entityStatus: EntityStatus.Approved } });
-        } else if (rawStatuses.length > 0) {
-          mustQueries.push({ terms: { entityStatus: rawStatuses } });
+        // CDE status is applied to each version after loading its history.
+        // Filtering the latest entity here would hide approved versions when
+        // the latest version is a draft.
+        if (!isCDEGlossary) {
+          if (isConsumer) {
+            mustQueries.push({ term: { entityStatus: EntityStatus.Approved } });
+          } else if (rawStatuses.length > 0) {
+            mustQueries.push({ terms: { entityStatus: rawStatuses } });
+          }
         }
 
         if (isCDEGlossary) {
@@ -1134,9 +1167,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           sortOrder: 'asc',
         });
 
-        data = (searchRes.hits.hits.map(
+        data = searchRes.hits.hits.map(
           (hit) => hit._source
-        ) as unknown) as ModifiedGlossary[];
+        ) as unknown as ModifiedGlossary[];
         pagingResponse = {
           total: searchRes.hits.total.value,
         };
@@ -1177,6 +1210,138 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
       setTotalTermsCount(pagingResponse?.total ?? data.length);
       handlePagingChange(pagingResponse ?? { total: data.length });
+      if (isCDEGlossary) {
+        const [histories, audits] = await Promise.all([
+          Promise.allSettled(
+            data.map((term) => getGlossaryTermsVersionsList(term.id))
+          ),
+          Promise.allSettled(
+            data.map((term) =>
+              term.entityStatus === EntityStatus.Approved
+                ? Promise.resolve([])
+                : getApprovedCDEAuditSnapshots(term)
+            )
+          ),
+        ]);
+        data = (data as unknown as ModifiedGlossaryTerm[]).flatMap(
+          (term, index) => {
+            const history = histories[index];
+            const audit = audits[index];
+            const visibleStatuses = isConsumer
+              ? [EntityStatus.Approved]
+              : rawStatuses.length > 0
+              ? rawStatuses
+              : [
+                  EntityStatus.Draft,
+                  EntityStatus.InReview,
+                  EntityStatus.Approved,
+                ];
+            if (history.status !== 'fulfilled') {
+              return visibleStatuses.includes(
+                term.entityStatus ?? EntityStatus.Approved
+              )
+                ? [term]
+                : [];
+            }
+
+            const snapshots = (history.value.versions ?? [])
+              .map((value) => {
+                try {
+                  return (
+                    typeof value === 'string' ? JSON.parse(value) : value
+                  ) as ModifiedGlossaryTerm;
+                } catch {
+                  return undefined;
+                }
+              })
+              .filter((value): value is ModifiedGlossaryTerm => Boolean(value))
+              .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
+            const approved = new Map<string, ModifiedGlossaryTerm>();
+            for (const snapshot of snapshots) {
+              if (
+                String(snapshot.entityStatus ?? 'Approved').toLowerCase() !==
+                'approved'
+              ) {
+                continue;
+              }
+              const extension = snapshot.extension as
+                | { cdeVersion?: string; version?: string; phien_ban?: string }
+                | undefined;
+              const businessVersion = String(
+                extension?.cdeVersion ??
+                  extension?.version ??
+                  extension?.phien_ban ??
+                  '1.0'
+              );
+              if (!approved.has(businessVersion)) {
+                approved.set(businessVersion, snapshot);
+              }
+            }
+
+            if (audit.status === 'fulfilled') {
+              for (const { snapshot } of audit.value) {
+                const extension = snapshot.extension as
+                  | {
+                      cdeVersion?: string;
+                      version?: string;
+                      phien_ban?: string;
+                    }
+                  | undefined;
+                const businessVersion = String(
+                  extension?.cdeVersion ??
+                    extension?.version ??
+                    extension?.phien_ban ??
+                    '1.0'
+                );
+                if (!approved.has(businessVersion)) {
+                  approved.set(businessVersion, {
+                    ...snapshot,
+                    auditBusinessVersion: businessVersion,
+                  } as ModifiedGlossaryTerm);
+                }
+              }
+            }
+
+            const current = term as ModifiedGlossaryTerm;
+            const currentExtension = current.extension as
+              | { cdeVersion?: string; version?: string; phien_ban?: string }
+              | undefined;
+            const currentVersion = String(
+              currentExtension?.cdeVersion ??
+                currentExtension?.version ??
+                currentExtension?.phien_ban ??
+                '1.0'
+            );
+            if (
+              String(current.entityStatus ?? 'Approved').toLowerCase() ===
+              'approved'
+            ) {
+              approved.delete(currentVersion);
+            }
+
+            return [
+              current,
+              ...Array.from(
+                approved.entries(),
+                ([businessVersion, snapshot]) => ({
+                  ...snapshot,
+                  id: term.id,
+                  fullyQualifiedName: term.fullyQualifiedName,
+                  snapshotVersion: snapshot.auditBusinessVersion
+                    ? undefined
+                    : String(snapshot.version),
+                  versionRowKey: `${term.fullyQualifiedName}@${businessVersion}`,
+                  children: undefined,
+                })
+              ),
+            ].filter((row) =>
+              visibleStatuses.includes(
+                row.entityStatus ?? EntityStatus.Approved
+              )
+            );
+          }
+        ) as unknown as ModifiedGlossary[];
+      }
       setGlossaryChildTerms(data as ModifiedGlossary[]);
       setExpandedRowKeys([]);
     } catch (error) {
@@ -1324,7 +1489,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         );
       }
     },
-    [handlePageChange, pageSize, paging, searchTerm, isCDEGlossary, isDQGlossary]
+    [
+      handlePageChange,
+      pageSize,
+      paging,
+      searchTerm,
+      isCDEGlossary,
+      isDQGlossary,
+    ]
   );
 
   const glossaryTermStatus: EntityStatus | null = useMemo(() => {
@@ -2069,8 +2241,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     [debouncedSetSearchTerm]
   );
 
-
-
   const handleAddGlossaryTermClick = () => {
     onAddGlossaryTerm(
       isGlossary ? undefined : (activeGlossary as GlossaryTerm)
@@ -2605,7 +2775,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   // Check if this is due to search or filter returning no results
   const isSearchActive = Boolean(
     (searchTerm && searchTerm.trim().length > 0) ||
-    (searchInput && searchInput.trim().length > 0)
+      (searchInput && searchInput.trim().length > 0)
   );
   const isStatusFilterActive = !selectedStatus.includes('all');
   const hasNoTerms = isEmpty(glossaryTerms);
@@ -2615,8 +2785,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     isStatusFilterActive ||
     hasActiveCdeFilters ||
     hasActiveDqFilters;
-
-
 
   const glossaryPlaceholderText = useMemo(() => {
     if (isSearchActive && (searchTerm || searchInput)) {
@@ -2691,11 +2859,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             <>
               <Table
                 resizableColumns
-                className={classNames('drop-over-background', {
-                  'cde-glossary-terms-table': isCDEGlossary,
-                  'dq-glossary-terms-table': isDQGlossary,
-                  'drop-over-table': isTableHovered,
-                })}
+                className={classNames(
+                  'drop-over-background',
+                  'glossary-terms-table',
+                  {
+                    'cde-glossary-terms-table': isCDEGlossary,
+                    'dq-glossary-terms-table': isDQGlossary,
+                    'drop-over-table': isTableHovered,
+                  }
+                )}
                 columns={columns}
                 components={TABLE_CONSTANTS}
                 containerClassName={
@@ -2743,7 +2915,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                 }}
                 pagination={false}
                 rowClassName={getRowClassName}
-                rowKey="fullyQualifiedName"
+                rowKey={(record: ModifiedGlossaryTerm) =>
+                  record.versionRowKey ?? record.fullyQualifiedName
+                }
                 rowSelection={rowSelection}
                 size="small"
                 staticVisibleColumns={
@@ -2753,6 +2927,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                     ? CDE_STATIC_VISIBLE_COLUMNS
                     : STATIC_VISIBLE_COLUMNS
                 }
+                sticky={{
+                  offsetScroll: 0,
+                  getContainer: () =>
+                    tableContainerRef.current?.closest<HTMLElement>(
+                      '.ant-tabs-tabpane'
+                    ) ?? document.body,
+                }}
                 onHeaderRow={onTableHeader}
                 onRow={onTableRow}
               />
@@ -2823,6 +3004,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   ? CDE_STATIC_VISIBLE_COLUMNS
                   : STATIC_VISIBLE_COLUMNS
               }
+              sticky={{
+                offsetScroll: 0,
+                getContainer: () =>
+                  tableContainerRef.current?.closest<HTMLElement>(
+                    '.ant-tabs-tabpane'
+                  ) ?? document.body,
+              }}
               onHeaderRow={onTableHeader}
               onRow={onTableRow}
             />

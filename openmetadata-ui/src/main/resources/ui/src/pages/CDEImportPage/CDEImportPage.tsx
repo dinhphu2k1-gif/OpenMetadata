@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { DownloadOutlined, FilterOutlined } from '@ant-design/icons';
+import { DownloadOutlined } from '@ant-design/icons';
 import {
   Alert,
   Button,
@@ -32,6 +32,12 @@ import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import DataGrid, { Column, RenderCellProps, textEditor } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { useTranslation } from 'react-i18next';
+import {
+  CDE_DATE_FIELDS,
+  normalizeCDEDate,
+  formatCDEDate,
+  validateCDEDates,
+} from '../../utils/CDEDateUtils';
 import { useNavigate } from 'react-router-dom';
 import { ReactComponent as FailBadgeIcon } from '../../assets/svg/fail-badge.svg';
 import { ReactComponent as ImportIcon } from '../../assets/svg/ic-drag-drop.svg';
@@ -57,7 +63,10 @@ import '../../components/UploadFile/upload-file.less';
 import { VALIDATION_STEP } from '../../constants/BulkImport.constant';
 import { Tag as ClassificationTag } from '../../generated/entity/classification/tag';
 import { Glossary } from '../../generated/entity/data/glossary';
-import { EntityStatus, GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../generated/entity/type';
 import { CSVImportResult, Status } from '../../generated/type/csvImportResult';
 import { useFqn } from '../../hooks/useFqn';
@@ -67,6 +76,7 @@ import {
   addGlossaryTerm,
   getGlossariesByName,
   getGlossaryTerms,
+  getGlossaryTermsById,
   patchGlossaryTerm,
 } from '../../rest/glossaryAPI';
 import { getTags } from '../../rest/tagAPI';
@@ -90,7 +100,15 @@ const CDEImportPage: FC = () => {
   );
   const [glossary, setGlossary] = useState<Glossary>();
   const [existingTerms, setExistingTerms] = useState<
-    (GlossaryTerm | { name?: string; fullyQualifiedName?: string; id?: string })[]
+    (
+      | GlossaryTerm
+      | {
+          name?: string;
+          fullyQualifiedName?: string;
+          id?: string;
+          extension?: GlossaryTerm['extension'];
+        }
+    )[]
   >([]);
 
   const [duplicatePolicy, setDuplicatePolicy] =
@@ -143,7 +161,7 @@ const CDEImportPage: FC = () => {
         .then((res) => setGlossary(res))
         .catch((err) => showErrorToast(err));
 
-      getGlossaryTerms({ glossary: fqn, limit: 1000 })
+      getGlossaryTerms({ glossary: fqn, limit: 1000, fields: 'extension' })
         .then((res) => {
           if (res?.data) {
             setExistingTerms(res.data);
@@ -351,6 +369,22 @@ const CDEImportPage: FC = () => {
         renderEditCell: textEditor,
       },
       {
+        key: 'effectiveDate',
+        name: t('cde.effective-date'),
+        width: 160,
+        editable: true,
+        resizable: true,
+        renderEditCell: textEditor,
+      },
+      {
+        key: 'expirationDate',
+        name: t('cde.expiration-date'),
+        width: 160,
+        editable: true,
+        resizable: true,
+        renderEditCell: textEditor,
+      },
+      {
         key: 'reviewer',
         name: t('label.reviewer', 'Người kiểm soát'),
         width: 160,
@@ -397,6 +431,8 @@ const CDEImportPage: FC = () => {
         relatedRegulatoryDocuments: '',
         dataQualityRules: '',
         cdeVersion: '1.0',
+        effectiveDate: '',
+        expirationDate: '',
         reviewer: '',
       },
     ]);
@@ -431,6 +467,17 @@ const CDEImportPage: FC = () => {
           relatedRegulatoryDocuments: r.relatedRegulatoryDocuments || '',
           dataQualityRules: r.dataQualityRules || '',
           cdeVersion: r.cdeVersion || '1.0',
+          ...(r.effectiveDate !== undefined
+            ? { effectiveDate: formatCDEDate(r.effectiveDate, r.effectiveDate) }
+            : {}),
+          ...(r.expirationDate !== undefined
+            ? {
+                expirationDate: formatCDEDate(
+                  r.expirationDate,
+                  r.expirationDate
+                ),
+              }
+            : {}),
           reviewer: r.reviewer || '',
         }));
 
@@ -471,7 +518,8 @@ const CDEImportPage: FC = () => {
 
     const existingMap = new Map<
       string,
-      GlossaryTerm | { name?: string; id?: string }
+      | GlossaryTerm
+      | { name?: string; id?: string; extension?: GlossaryTerm['extension'] }
     >();
     existingTerms.forEach((term) => {
       if (term.name) {
@@ -480,7 +528,10 @@ const CDEImportPage: FC = () => {
     });
 
     dataSource.forEach((row, idx) => {
-      const rowCopy = { ...row, id: row.id || `${idx + 1}` };
+      const rowCopy: Record<string, string> = {
+        ...row,
+        id: row.id || `${idx + 1}`,
+      };
       const errors: string[] = [];
 
       // 1. Thẩm định Mã CDE
@@ -495,9 +546,13 @@ const CDEImportPage: FC = () => {
         const lower = name.toLowerCase();
         if (seenNames.has(lower)) {
           errors.push(
-            t('cde.code-duplicate-in-data', "Mã CDE '{{code}}' bị trùng lặp trong bảng", {
-              code: name,
-            })
+            t(
+              'cde.code-duplicate-in-data',
+              "Mã CDE '{{code}}' bị trùng lặp trong bảng",
+              {
+                code: name,
+              }
+            )
           );
         } else {
           seenNames.add(lower);
@@ -640,7 +695,25 @@ const CDEImportPage: FC = () => {
       }
 
       const isExisting = Boolean(name && existingMap.has(name.toLowerCase()));
-      const existingTerm = name ? existingMap.get(name.toLowerCase()) : undefined;
+      const existingTerm = name
+        ? existingMap.get(name.toLowerCase())
+        : undefined;
+      CDE_DATE_FIELDS.forEach((key) => {
+        if (rowCopy[key] !== undefined) {
+          rowCopy[key] = normalizeCDEDate(rowCopy[key]) ?? rowCopy[key];
+        }
+      });
+      const dateError = validateCDEDates({
+        ...existingTerm?.extension,
+        ...Object.fromEntries(
+          CDE_DATE_FIELDS.filter((key) => rowCopy[key] !== undefined).map(
+            (key) => [key, rowCopy[key]]
+          )
+        ),
+      });
+      if (dateError) {
+        errors.push(t(dateError));
+      }
       rowCopy.existingId = (existingTerm as any)?.id || '';
       rowCopy.isExisting = isExisting ? 'true' : 'false';
 
@@ -653,14 +726,8 @@ const CDEImportPage: FC = () => {
         if (isExisting) {
           rowCopy.details =
             duplicatePolicy === 'update'
-              ? t(
-                  'cde.existing-record-update',
-                  'Cập nhật ghi đè'
-                )
-              : t(
-                  'cde.existing-record-skip',
-                  'Bỏ qua (trùng mã)'
-                );
+              ? t('cde.existing-record-update', 'Cập nhật ghi đè')
+              : t('cde.existing-record-skip', 'Bỏ qua (trùng mã)');
         } else {
           rowCopy.details = t('label.valid', 'Hợp lệ');
         }
@@ -678,7 +745,16 @@ const CDEImportPage: FC = () => {
     setValidateDataSource(validatedRows);
     setStatusFilter('all');
     setActiveStep(VALIDATION_STEP.UPDATE);
-  }, [dataSource, existingTerms, allDomains, allTags, allUsers, allTeams, duplicatePolicy, t]);
+  }, [
+    dataSource,
+    existingTerms,
+    allDomains,
+    allTags,
+    allUsers,
+    allTeams,
+    duplicatePolicy,
+    t,
+  ]);
 
   // Cột hiển thị tại Bước 3 (Cập Nhật): có thêm cột Trạng thái Thẩm định
   const validateColumns: Column<Record<string, string>>[] = useMemo(
@@ -774,7 +850,10 @@ const CDEImportPage: FC = () => {
     );
     if (rowsToProcess.length === 0) {
       showErrorToast(
-        t('cde.no-valid-rows', 'Không có bản ghi CDE hợp lệ nào để nạp dữ liệu.')
+        t(
+          'cde.no-valid-rows',
+          'Không có bản ghi CDE hợp lệ nào để nạp dữ liệu.'
+        )
       );
 
       return;
@@ -806,10 +885,16 @@ const CDEImportPage: FC = () => {
       if (isExisting) {
         if (duplicatePolicy === 'skip') {
           skippedCount++;
+
           continue;
         }
 
         try {
+          const current = row.existingId
+            ? await getGlossaryTermsById(row.existingId, {
+                fields: 'extension',
+              })
+            : undefined;
           const payload = transformRowToGlossaryTermPayload(
             {
               rowNumber: idx + 1,
@@ -825,6 +910,8 @@ const CDEImportPage: FC = () => {
               relatedRegulatoryDocuments: row.relatedRegulatoryDocuments,
               dataQualityRules: row.dataQualityRules,
               cdeVersion: row.cdeVersion || '1.0',
+              effectiveDate: row.effectiveDate,
+              expirationDate: row.expirationDate,
               reviewer: row.reviewer,
               status: EntityStatus.Draft,
               errors: [],
@@ -835,7 +922,8 @@ const CDEImportPage: FC = () => {
             allDomains,
             allTags,
             allUsers,
-            allTeams
+            allTeams,
+            current?.extension
           );
 
           if (row.existingId) {
@@ -848,10 +936,18 @@ const CDEImportPage: FC = () => {
               { op: 'add', path: '/entityStatus', value: EntityStatus.Draft },
             ];
             if (payload.owners && payload.owners.length > 0) {
-              patchOps.push({ op: 'add', path: '/owners', value: payload.owners });
+              patchOps.push({
+                op: 'add',
+                path: '/owners',
+                value: payload.owners,
+              });
             }
             if (payload.reviewers && payload.reviewers.length > 0) {
-              patchOps.push({ op: 'add', path: '/reviewers', value: payload.reviewers });
+              patchOps.push({
+                op: 'add',
+                path: '/reviewers',
+                value: payload.reviewers,
+              });
             }
             await patchGlossaryTerm(row.existingId, patchOps);
             updatedCount++;
@@ -891,6 +987,8 @@ const CDEImportPage: FC = () => {
               relatedRegulatoryDocuments: row.relatedRegulatoryDocuments,
               dataQualityRules: row.dataQualityRules,
               cdeVersion: row.cdeVersion || '1.0',
+              effectiveDate: row.effectiveDate,
+              expirationDate: row.expirationDate,
               reviewer: row.reviewer,
               status: EntityStatus.Draft,
               errors: [],
@@ -1039,7 +1137,9 @@ const CDEImportPage: FC = () => {
                   ) : (
                     <span>
                       Kéo & Thả hoặc{' '}
-                      <span className="browse-text">Duyệt tệp Excel (.xlsx)</span>{' '}
+                      <span className="browse-text">
+                        Duyệt tệp Excel (.xlsx)
+                      </span>{' '}
                       vào đây
                     </span>
                   )}
@@ -1051,7 +1151,7 @@ const CDEImportPage: FC = () => {
             <div className="m-t-md p-x-xs">
               <Row align="top" gutter={[16, 16]} justify="space-between">
                 <Col md={18} xs={24}>
-                  <Typography.Text className="d-block m-b-sm" strong>
+                  <Typography.Text strong className="d-block m-b-sm">
                     {t('cde.duplicate-handling', 'Xử lý khi trùng mã CDE')}:
                   </Typography.Text>
                   <Radio.Group
@@ -1218,7 +1318,9 @@ const CDEImportPage: FC = () => {
                                   label: (
                                     <span className="filter-item">
                                       <span className="filter-status-dot dot-error" />
-                                      <span>{t('label.errors-only', 'Bị lỗi')}</span>
+                                      <span>
+                                        {t('label.errors-only', 'Bị lỗi')}
+                                      </span>
                                       <span
                                         className={
                                           validationData.numberOfRowsFailed > 0
@@ -1360,6 +1462,7 @@ const CDEImportPage: FC = () => {
                         )}
                         {importErrors.length > 0 && (
                           <Alert
+                            showIcon
                             className="m-t-sm text-left"
                             description={
                               <ul
@@ -1384,13 +1487,13 @@ const CDEImportPage: FC = () => {
                                             row: err.row,
                                           })}
                                     </strong>
-                                    : {formatCDEImportErrorMessage(err.reason, t)}
+                                    :{' '}
+                                    {formatCDEImportErrorMessage(err.reason, t)}
                                   </li>
                                 ))}
                               </ul>
                             }
                             message={t('label.failure-reason', 'Lý do lỗi')}
-                            showIcon
                             type="error"
                           />
                         )}

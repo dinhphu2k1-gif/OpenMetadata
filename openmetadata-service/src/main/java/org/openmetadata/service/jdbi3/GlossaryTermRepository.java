@@ -2069,6 +2069,37 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       super(original, updated, operation);
     }
 
+    @Override
+    protected boolean consolidateChanges(
+        GlossaryTerm original, GlossaryTerm updated, Operation operation) {
+      // Never consolidate changes if entityStatus is changing (e.g. Approved -> Draft on create draft,
+      // Draft -> In Review on submit, In Review -> Approved on approve)
+      if (original.getEntityStatus() != updated.getEntityStatus()) {
+        return false;
+      }
+
+      // Check if this term belongs to Data Dictionary or Data Quality (CDE terms)
+      String fqn =
+          original.getFullyQualifiedName() != null
+              ? original.getFullyQualifiedName()
+              : updated.getFullyQualifiedName();
+      if (fqn != null
+          && (fqn.startsWith("Data Dictionary.")
+              || fqn.startsWith("Data Quality.")
+              || fqn.contains("Data Dictionary")
+              || fqn.contains("Data Quality"))) {
+        return false;
+      }
+
+      if (original.getGlossary() != null
+          && ("Data Dictionary".equalsIgnoreCase(original.getGlossary().getName())
+              || "Data Quality".equalsIgnoreCase(original.getGlossary().getName()))) {
+        return false;
+      }
+
+      return super.consolidateChanges(original, updated, operation);
+    }
+
     @Transaction
     @Override
     public void entitySpecificUpdate(boolean consolidatingChanges) {

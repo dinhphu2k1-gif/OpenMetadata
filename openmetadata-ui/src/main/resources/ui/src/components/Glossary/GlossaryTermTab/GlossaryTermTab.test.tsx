@@ -45,6 +45,8 @@ const mockGetFirstLevelGlossaryTermsPaginated = jest.fn();
 const mockGetGlossaryTermChildrenLazy = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
 const mockSearchQuery = jest.fn();
+const mockGetGlossaryTermsVersionsList = jest.fn();
+const mockGetApprovedCDEAuditSnapshots = jest.fn();
 const mockGetAllFeeds = jest.fn();
 const mockUpdateTask = jest.fn();
 
@@ -87,10 +89,14 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
   },
 };
 
-const getCDETranslation = (locale: keyof typeof cdeTranslations) =>
-  (key: string) => cdeTranslations[locale][key] ?? key;
+const getCDETranslation =
+  (locale: keyof typeof cdeTranslations) => (key: string) =>
+    cdeTranslations[locale][key] ?? key;
 
 jest.mock('../../../rest/glossaryAPI', () => ({
+  getGlossaryTermsVersionsList: jest
+    .fn()
+    .mockImplementation((...args) => mockGetGlossaryTermsVersionsList(...args)),
   getGlossaryTerms: jest
     .fn()
     .mockImplementation(() => Promise.resolve({ data: mockedGlossaryTerms })),
@@ -106,6 +112,12 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   searchGlossaryTermsPaginated: jest
     .fn()
     .mockImplementation((...args) => mockSearchGlossaryTermsPaginated(...args)),
+}));
+
+jest.mock('../../../utils/CDEApprovedVersionUtils', () => ({
+  getApprovedCDEAuditSnapshots: jest
+    .fn()
+    .mockImplementation((...args) => mockGetApprovedCDEAuditSnapshots(...args)),
 }));
 
 jest.mock('../../../rest/searchAPI', () => ({
@@ -324,6 +336,9 @@ global.MutationObserver = jest.fn().mockImplementation(() => ({
 describe('Test GlossaryTermTab component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { id: 'reviewer-id', name: 'reviewer' },
+    });
     mockUpdateTask.mockResolvedValue({});
     mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
       data: mockedGlossaryTerms,
@@ -333,6 +348,8 @@ describe('Test GlossaryTermTab component', () => {
       data: mockedGlossaryTerms,
       paging: { after: null },
     });
+    mockGetGlossaryTermsVersionsList.mockResolvedValue({ versions: [] });
+    mockGetApprovedCDEAuditSnapshots.mockResolvedValue([]);
     mockSearchQuery.mockResolvedValue({
       hits: {
         total: { value: mockedGlossaryTerms.length },
@@ -421,8 +438,12 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.change(searchInput, { target: { value: 'nonexistent-term' } });
 
       await waitFor(() => {
-        expect(screen.getByTestId('search-glossary-terms-input')).toBeInTheDocument();
-        expect(screen.getByTestId('glossary-status-dropdown')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('search-glossary-terms-input')
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId('glossary-status-dropdown')
+        ).toBeInTheDocument();
         expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
       });
     });
@@ -648,10 +669,16 @@ describe('Test GlossaryTermTab component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Mã thuật ngữ')).toBeInTheDocument();
-        expect(screen.getAllByText('Nhóm theo nghiệp vụ').length).toBeGreaterThan(0);
+        expect(
+          screen.getAllByText('Nhóm theo nghiệp vụ').length
+        ).toBeGreaterThan(0);
         expect(screen.getAllByText('Nguồn dữ liệu').length).toBeGreaterThan(0);
-        expect(screen.getByText('Mối quan hệ với thực thể')).toBeInTheDocument();
-        expect(screen.getByText('Quan hệ 1-N với khách hàng')).toBeInTheDocument();
+        expect(
+          screen.getByText('Mối quan hệ với thực thể')
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText('Quan hệ 1-N với khách hàng')
+        ).toBeInTheDocument();
         expect(screen.getAllByText('label.status')).not.toHaveLength(0);
         expect(
           screen.getByText('Quy định về chất lượng dữ liệu')
@@ -718,7 +745,9 @@ describe('Test GlossaryTermTab component', () => {
       expect(
         await screen.findByTestId('Data Dictionary.CDE102-status')
       ).toBeInTheDocument();
-      expect(screen.queryByTestId('CDE102-approve-btn')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('CDE102-approve-btn')
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId('CDE102-reject-btn')).not.toBeInTheDocument();
     });
 
@@ -760,6 +789,73 @@ describe('Test GlossaryTermTab component', () => {
         screen.queryByTestId('CDE102-approve-btn')
       ).not.toBeInTheDocument();
       expect(mockUpdateTask).not.toHaveBeenCalled();
+    });
+
+    it('keeps approved versions visible when the latest CDE version is a draft', async () => {
+      const draft = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.Draft,
+        extension: { ...cdeTerm.extension, cdeVersion: '1.3' },
+        version: 1.3,
+      };
+      mockSearchQuery.mockResolvedValue({
+        hits: { total: { value: 1 }, hits: [{ _source: draft }] },
+      });
+      mockGetGlossaryTermsVersionsList.mockResolvedValue({
+        versions: [
+          draft,
+          {
+            ...draft,
+            version: 1.1,
+            entityStatus: EntityStatus.Approved,
+            extension: { cdeVersion: '1.1' },
+          },
+        ],
+      });
+      mockGetApprovedCDEAuditSnapshots.mockResolvedValue([
+        {
+          snapshot: {
+            ...draft,
+            version: 1.2,
+            entityStatus: EntityStatus.Approved,
+            extension: { cdeVersion: '1.2' },
+          },
+          eventId: 'approved-1-2',
+        },
+      ]);
+      (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+        currentUser: { id: 'consumer-id', roles: [{ name: 'BasicConsumer' }] },
+      });
+
+      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+      await waitFor(() => {
+        expect(mockSetGlossaryChildTerms).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              versionRowKey: 'Data Dictionary.CDE102@1.2',
+            }),
+            expect.objectContaining({
+              versionRowKey: 'Data Dictionary.CDE102@1.1',
+            }),
+          ])
+        );
+      });
+      const rows = mockSetGlossaryChildTerms.mock.lastCall[0];
+      expect(rows).toHaveLength(2);
+      expect(
+        rows.every(
+          (row: ModifiedGlossaryTerm) =>
+            row.entityStatus === EntityStatus.Approved
+        )
+      ).toBe(true);
+      expect(
+        mockSearchQuery.mock.lastCall[0].queryFilter.query.bool.must
+      ).not.toEqual(
+        expect.arrayContaining([
+          { term: { entityStatus: EntityStatus.Approved } },
+        ])
+      );
     });
 
     it('should query SearchIndex.GLOSSARY_TERM for the CDE table', async () => {
@@ -1585,16 +1681,22 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.click(rowCheckboxes[0]);
 
       await waitFor(() => {
-        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('glossary-bulk-action-bar')
+        ).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('bulk-submit-for-review-btn')
+      ).toBeInTheDocument();
 
       const clearBtn = screen.getByTestId('clear-selection-btn');
       fireEvent.click(clearBtn);
 
       await waitFor(() => {
-        expect(screen.queryByTestId('glossary-bulk-action-bar')).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('glossary-bulk-action-bar')
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -1619,7 +1721,9 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.click(rowCheckboxes[0]);
 
       await waitFor(() => {
-        expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('bulk-submit-for-review-btn')
+        ).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId('bulk-submit-for-review-btn'));
@@ -1659,7 +1763,9 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.click(rowCheckboxes[0]);
 
       await waitFor(() => {
-        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('glossary-bulk-action-bar')
+        ).toBeInTheDocument();
       });
 
       expect(
@@ -1743,7 +1849,9 @@ describe('Test GlossaryTermTab component', () => {
       expect(screen.getByTestId('dq-datasource-filter')).toBeInTheDocument();
       expect(screen.getByTestId('dq-owner-filter')).toBeInTheDocument();
       expect(screen.getByTestId('dq-method-filter')).toBeInTheDocument();
-      expect(screen.getByTestId('dq-target-population-filter')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('dq-target-population-filter')
+      ).toBeInTheDocument();
     });
 
     it('should show bulk action bar when row is selected on DQ table', async () => {
@@ -1767,10 +1875,14 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.click(rowCheckboxes[0]);
 
       await waitFor(() => {
-        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('glossary-bulk-action-bar')
+        ).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId('bulk-submit-for-review-btn')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('bulk-submit-for-review-btn')
+      ).toBeInTheDocument();
     });
 
     it('should not show bulk-submit-for-review-btn when Data Steward selects row on DQ table', async () => {
@@ -1800,7 +1912,9 @@ describe('Test GlossaryTermTab component', () => {
       fireEvent.click(rowCheckboxes[0]);
 
       await waitFor(() => {
-        expect(screen.getByTestId('glossary-bulk-action-bar')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('glossary-bulk-action-bar')
+        ).toBeInTheDocument();
       });
 
       expect(

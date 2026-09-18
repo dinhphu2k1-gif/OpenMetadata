@@ -12,14 +12,28 @@
  */
 
 import { isEmpty } from 'lodash';
+import i18next from 'i18next';
+import {
+  CDE_DATE_FIELDS,
+  formatCDEDate,
+  normalizeCDEDate,
+  mergeCDEDates,
+  validateCDEDates,
+} from '../../../utils/CDEDateUtils';
 import * as XLSX from 'xlsx';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
-import { CDE_TAG_CLASSIFICATIONS, CDEExtension } from '../GlossaryTermTab/CDEGlossaryTableColumns';
+import {
+  CDE_TAG_CLASSIFICATIONS,
+  CDEExtension,
+} from '../GlossaryTermTab/CDEGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
 
 export interface CDEImportRowData {
@@ -36,6 +50,8 @@ export interface CDEImportRowData {
   relatedRegulatoryDocuments: string;
   dataQualityRules: string;
   cdeVersion: string;
+  effectiveDate?: string;
+  expirationDate?: string;
   reviewer: string;
   status: EntityStatus;
   isExisting?: boolean;
@@ -68,6 +84,8 @@ export const CDE_EXPORT_HEADERS = [
   'Văn bản quy định liên quan',
   'Quy định chất lượng dữ liệu',
   'Phiên bản',
+  'Ngày hiệu lực',
+  'Ngày hết hiệu lực',
   'Người kiểm soát',
   'Trạng thái',
 ];
@@ -85,6 +103,8 @@ export const CDE_TEMPLATE_HEADERS = [
   'Văn bản quy định liên quan',
   'Quy định chất lượng dữ liệu',
   'Phiên bản',
+  'Ngày hiệu lực',
+  'Ngày hết hiệu lực',
   'Người kiểm soát',
 ];
 
@@ -101,6 +121,8 @@ export const CDE_COLUMN_WIDTHS = [
   { wch: 35 }, // Văn bản quy định liên quan
   { wch: 24 }, // Quy định chất lượng dữ liệu
   { wch: 14 }, // Phiên bản
+  { wch: 18 }, // Ngày hiệu lực
+  { wch: 18 }, // Ngày hết hiệu lực
   { wch: 22 }, // Người kiểm soát
   { wch: 20 }, // Trạng thái
 ];
@@ -128,7 +150,10 @@ const extractClassificationTagNames = (
 ): string => {
   return tags
     .filter((tag) => tag.tagFQN?.split('.')[0] === classification)
-    .map((tag) => tag.displayName ?? tag.name ?? tag.tagFQN?.split('.').at(-1) ?? '')
+    .map(
+      (tag) =>
+        tag.displayName ?? tag.name ?? tag.tagFQN?.split('.').at(-1) ?? ''
+    )
     .filter(Boolean)
     .join(', ');
 };
@@ -141,11 +166,10 @@ const extractPersonalDataTag = (tags: TagLabel[] = []): string => {
     return 'Không';
   }
 
-  const isYes = personalTags.some(
-    (t) =>
-      ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
-        (t.name || t.tagFQN.split('.').at(-1) || '').toUpperCase()
-      )
+  const isYes = personalTags.some((t) =>
+    ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
+      (t.name || t.tagFQN.split('.').at(-1) || '').toUpperCase()
+    )
   );
 
   return isYes ? 'Có' : 'Không';
@@ -193,25 +217,39 @@ export const exportCDEToExcel = (
     .filter((term) => !('isLoadMoreButton' in term && term.isLoadMoreButton))
     .map((term) => {
       const ext = (term.extension ?? {}) as CDEExtension;
-      const entityRel = ext.entityRelationship ?? ext.moi_quan_he_voi_thuc_the ?? '';
-      const regDocs = ext.relatedRegulatoryDocuments ?? ext.van_ban_quy_dinh_lien_quan ?? '';
-      const dqRules = formatQualityRules(ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu);
+      const entityRel =
+        ext.entityRelationship ?? ext.moi_quan_he_voi_thuc_the ?? '';
+      const regDocs =
+        ext.relatedRegulatoryDocuments ?? ext.van_ban_quy_dinh_lien_quan ?? '';
+      const dqRules = formatQualityRules(
+        ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
+      );
       const version = ext.cdeVersion ?? ext.phien_ban ?? '1.0';
-      const statusLabel = getEntityStatusLabel(term.entityStatus ?? EntityStatus.Approved);
+      const statusLabel = getEntityStatusLabel(
+        term.entityStatus ?? EntityStatus.Approved
+      );
 
       return [
         term.name ?? '',
         term.displayName ?? '',
         formatReferences(term.domains),
-        extractClassificationTagNames(term.tags, CDE_TAG_CLASSIFICATIONS.dataSource),
+        extractClassificationTagNames(
+          term.tags,
+          CDE_TAG_CLASSIFICATIONS.dataSource
+        ),
         stripHtmlTags(term.description ?? ''),
         stripHtmlTags(entityRel),
         formatReferences(term.owners),
-        extractClassificationTagNames(term.tags, CDE_TAG_CLASSIFICATIONS.dataClassification),
+        extractClassificationTagNames(
+          term.tags,
+          CDE_TAG_CLASSIFICATIONS.dataClassification
+        ),
         extractPersonalDataTag(term.tags),
         regDocs,
         dqRules,
         version,
+        formatCDEDate(ext.effectiveDate, ''),
+        formatCDEDate(ext.expirationDate, ''),
         formatReferences(term.reviewers),
         statusLabel,
       ];
@@ -259,6 +297,8 @@ export const downloadCDEExcelTemplate = () => {
       'Quyết định số 123/QĐ-NHNo',
       'Có',
       '1.0',
+      '',
+      '',
       'steward_user',
     ],
     [
@@ -274,6 +314,8 @@ export const downloadCDEExcelTemplate = () => {
       'Thông tư 23/2014/TT-NHNN',
       'Có',
       '1.0',
+      '',
+      '',
       'steward_user',
     ],
   ];
@@ -311,6 +353,10 @@ const normalizeHeader = (header: unknown): string => {
 };
 
 const HEADER_KEY_MAPPING: Record<string, string> = {
+  ngayhieuluc: 'effectiveDate',
+  effectivedate: 'effectiveDate',
+  ngayhethieuluc: 'expirationDate',
+  expirationdate: 'expirationDate',
   macdequychieu: 'name',
   macde: 'name',
   code: 'name',
@@ -563,7 +609,10 @@ export const validateDataSourceValues = (
     return { isValid: true, invalidSources: [], resolvedFQNs: [] };
   }
 
-  const items = clean.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+  const items = clean
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const invalidSources: string[] = [];
   const resolvedFQNs: string[] = [];
 
@@ -588,18 +637,21 @@ export const validateDataSourceValues = (
 
     if (matchedTag?.fullyQualifiedName) {
       resolvedFQNs.push(matchedTag.fullyQualifiedName);
+
       continue;
     }
 
     // 2. Kiểm tra trong KNOWN_CDE_TAG_MAP
     if (KNOWN_CDE_TAG_MAP[itemLower]?.startsWith('DataSource.')) {
       resolvedFQNs.push(KNOWN_CDE_TAG_MAP[itemLower]);
+
       continue;
     }
 
     // 3. Nếu người dùng nhập trực tiếp FQN dạng DataSource.xxx
     if (itemLower.startsWith('datasource.')) {
       resolvedFQNs.push(item);
+
       continue;
     }
 
@@ -625,7 +677,10 @@ export const validateDataClassificationValue = (
     return { isValid: true, invalidValues: [] };
   }
 
-  const items = clean.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+  const items = clean
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const invalidValues: string[] = [];
 
   const allowedBaseKeys = new Set([
@@ -787,7 +842,8 @@ export const findMatchingUserOrTeam = (
     return (
       (u.name && u.name.toLowerCase() === cleanLower) ||
       (u.displayName && u.displayName.toLowerCase() === cleanLower) ||
-      (u.fullyQualifiedName && u.fullyQualifiedName.toLowerCase() === cleanLower) ||
+      (u.fullyQualifiedName &&
+        u.fullyQualifiedName.toLowerCase() === cleanLower) ||
       ((u as any).email && (u as any).email.toLowerCase() === cleanLower)
     );
   });
@@ -806,7 +862,8 @@ export const findMatchingUserOrTeam = (
     return (
       (t.name && t.name.toLowerCase() === cleanLower) ||
       (t.displayName && t.displayName.toLowerCase() === cleanLower) ||
-      (t.fullyQualifiedName && t.fullyQualifiedName.toLowerCase() === cleanLower)
+      (t.fullyQualifiedName &&
+        t.fullyQualifiedName.toLowerCase() === cleanLower)
     );
   });
   if (matchedTeam) {
@@ -829,7 +886,11 @@ export const validateUserOrTeamList = (
   rawInput: string,
   availableUsers: EntityReference[] = [],
   availableTeams: EntityReference[] = []
-): { isValid: boolean; invalidNames: string[]; matchedRefs: EntityReference[] } => {
+): {
+  isValid: boolean;
+  invalidNames: string[];
+  matchedRefs: EntityReference[];
+} => {
   const clean = rawInput.trim();
   if (!clean) {
     return { isValid: true, invalidNames: [], matchedRefs: [] };
@@ -840,12 +901,19 @@ export const validateUserOrTeamList = (
     return { isValid: true, invalidNames: [], matchedRefs: [] };
   }
 
-  const items = clean.split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+  const items = clean
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const invalidNames: string[] = [];
   const matchedRefs: EntityReference[] = [];
 
   for (const item of items) {
-    const matched = findMatchingUserOrTeam(item, availableUsers, availableTeams);
+    const matched = findMatchingUserOrTeam(
+      item,
+      availableUsers,
+      availableTeams
+    );
     if (matched) {
       matchedRefs.push(matched);
     } else {
@@ -931,7 +999,7 @@ export const readAndValidateCDEExcel = async (
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
     header: 1,
     defval: '',
-  }) as unknown as string[][];
+  }) as unknown as unknown[][];
 
   if (rawRows.length < 2) {
     throw new Error(
@@ -1040,7 +1108,9 @@ export const readAndValidateCDEExcel = async (
       const dsRes = validateDataSourceValues(rowData.dataSource, availableTags);
       if (!dsRes.isValid) {
         errors.push(
-          `Nguồn dữ liệu '${dsRes.invalidSources.join(', ')}' không tồn tại trên hệ thống.`
+          `Nguồn dữ liệu '${dsRes.invalidSources.join(
+            ', '
+          )}' không tồn tại trên hệ thống.`
         );
       }
     }
@@ -1053,7 +1123,9 @@ export const readAndValidateCDEExcel = async (
       );
       if (!dcRes.isValid) {
         errors.push(
-          `Phân loại dữ liệu '${dcRes.invalidValues.join(', ')}' không hợp lệ (hợp lệ: Công cộng, Nội bộ, Bí mật, Tối mật).`
+          `Phân loại dữ liệu '${dcRes.invalidValues.join(
+            ', '
+          )}' không hợp lệ (hợp lệ: Công cộng, Nội bộ, Bí mật, Tối mật).`
         );
       }
     }
@@ -1066,7 +1138,9 @@ export const readAndValidateCDEExcel = async (
       );
       if (!pdRes.isValid) {
         errors.push(
-          `Dữ liệu cá nhân '${pdRes.invalidValue || rowData.personalData}' không hợp lệ (hợp lệ: Có, Không, Cơ bản, Nhạy cảm).`
+          `Dữ liệu cá nhân '${
+            pdRes.invalidValue || rowData.personalData
+          }' không hợp lệ (hợp lệ: Có, Không, Cơ bản, Nhạy cảm).`
         );
       }
     }
@@ -1083,7 +1157,9 @@ export const readAndValidateCDEExcel = async (
       );
       if (!ownerRes.isValid) {
         errors.push(
-          `Chủ sở hữu '${ownerRes.invalidNames.join(', ')}' không tồn tại trên hệ thống (Người dùng hoặc Nhóm).`
+          `Chủ sở hữu '${ownerRes.invalidNames.join(
+            ', '
+          )}' không tồn tại trên hệ thống (Người dùng hoặc Nhóm).`
         );
       }
     }
@@ -1100,7 +1176,9 @@ export const readAndValidateCDEExcel = async (
       );
       if (!revRes.isValid) {
         errors.push(
-          `Người kiểm soát '${revRes.invalidNames.join(', ')}' không tồn tại trên hệ thống (Người dùng hoặc Nhóm).`
+          `Người kiểm soát '${revRes.invalidNames.join(
+            ', '
+          )}' không tồn tại trên hệ thống (Người dùng hoặc Nhóm).`
         );
       }
     }
@@ -1131,9 +1209,37 @@ export const readAndValidateCDEExcel = async (
     }
 
     const existingTerm = existingMap.get(rowData.name.toLowerCase());
+    const dates: Pick<CDEImportRowData, 'effectiveDate' | 'expirationDate'> =
+      {};
+    CDE_DATE_FIELDS.forEach((key) => {
+      const index = columnKeys.indexOf(key);
+      if (index >= 0) {
+        let value = row[index] ?? '';
+        if (typeof value === 'number') {
+          const parsed = XLSX.SSF.parse_date_code(value, {
+            date1904: workbook.Workbook?.WBProps?.date1904,
+          });
+          value = parsed
+            ? `${String(parsed.y).padStart(4, '0')}-${String(parsed.m).padStart(
+                2,
+                '0'
+              )}-${String(parsed.d).padStart(2, '0')}`
+            : String(value);
+        }
+        dates[key] = normalizeCDEDate(value) ?? String(value);
+      }
+    });
+    const dateError = validateCDEDates({
+      ...existingTerm?.extension,
+      ...dates,
+    });
+    if (dateError) {
+      errors.push(i18next.t(dateError));
+    }
     const isExisting = Boolean(existingTerm);
 
     parsedRows.push({
+      ...dates,
       rowNumber: i + 1,
       name: rowData.name,
       displayName: rowData.displayName,
@@ -1183,7 +1289,8 @@ export const transformRowToGlossaryTermPayload = (
   availableDomains: EntityReference[] = [],
   availableTags: Tag[] = [],
   availableUsers: EntityReference[] = [],
-  availableTeams: EntityReference[] = []
+  availableTeams: EntityReference[] = [],
+  existingExtension: Record<string, unknown> = {}
 ) => {
   const tags: TagLabel[] = [];
 
@@ -1278,7 +1385,10 @@ export const transformRowToGlossaryTermPayload = (
 
   // Người kiểm soát (Reviewers)
   let reviewers: EntityReference[] | undefined;
-  if (row.reviewer && (availableUsers.length > 0 || availableTeams.length > 0)) {
+  if (
+    row.reviewer &&
+    (availableUsers.length > 0 || availableTeams.length > 0)
+  ) {
     const revRes = validateUserOrTeamList(
       row.reviewer,
       availableUsers,
@@ -1293,14 +1403,22 @@ export const transformRowToGlossaryTermPayload = (
   const isDqYes = ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
     row.dataQualityRules.trim().toUpperCase()
   );
-  const extension: Record<string, unknown> = {
-    cdeVersion: row.cdeVersion || '1.0',
-    ...(row.entityRelationship ? { entityRelationship: row.entityRelationship } : {}),
-    ...(row.relatedRegulatoryDocuments
-      ? { relatedRegulatoryDocuments: row.relatedRegulatoryDocuments }
-      : {}),
-    ...(row.dataQualityRules ? { dataQualityRules: isDqYes ? ['Y'] : ['N'] } : {}),
-  };
+  const extension = mergeCDEDates(
+    {
+      ...existingExtension,
+      cdeVersion: row.cdeVersion || '1.0',
+      ...(row.entityRelationship
+        ? { entityRelationship: row.entityRelationship }
+        : {}),
+      ...(row.relatedRegulatoryDocuments
+        ? { relatedRegulatoryDocuments: row.relatedRegulatoryDocuments }
+        : {}),
+      ...(row.dataQualityRules
+        ? { dataQualityRules: isDqYes ? ['Y'] : ['N'] }
+        : {}),
+    },
+    row
+  );
 
   return {
     name: row.name,
@@ -1331,6 +1449,12 @@ export const formatCDEImportErrorMessage = (
       : t('cde.error-generic-create', 'Lỗi khi tạo mới bản ghi CDE.');
   }
 
+  if (
+    ['cde.invalid-date', 'cde.invalid-date-range'].includes(rawError?.message)
+  ) {
+    return t(rawError.message);
+  }
+
   let message = '';
   if (typeof rawError === 'string') {
     message = rawError.trim();
@@ -1357,6 +1481,7 @@ export const formatCDEImportErrorMessage = (
   );
   if (termAlreadyExistsMatch) {
     const [, termName, glossaryName] = termAlreadyExistsMatch;
+
     return t(
       'cde.error-term-already-exists',
       `Mã CDE '${termName}' đã tồn tại trong danh mục '${glossaryName}'.`,
@@ -1371,6 +1496,7 @@ export const formatCDEImportErrorMessage = (
   );
   if (entityNameMatch) {
     const [, termName] = entityNameMatch;
+
     return t(
       'cde.error-term-name-exists',
       `Mã CDE '${termName}' đã tồn tại trên hệ thống.`,
@@ -1385,6 +1511,7 @@ export const formatCDEImportErrorMessage = (
   );
   if (parentChainMatch) {
     const [, termName] = parentChainMatch;
+
     return t(
       'cde.error-parent-chain-exists',
       `Thuật ngữ '${termName}' đã tồn tại trong chuỗi phân cấp cha.`,
@@ -1451,4 +1578,3 @@ export const formatCDEImportErrorMessage = (
 
   return message;
 };
-

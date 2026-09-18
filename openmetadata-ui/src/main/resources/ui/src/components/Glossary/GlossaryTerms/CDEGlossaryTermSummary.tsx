@@ -12,7 +12,16 @@
  *  limitations under the License.
  */
 
-import { Col, Popover, Row, Select, Tag, Typography } from 'antd';
+import { Col, Form, Modal, Popover, Row, Select, Tag, Typography } from 'antd';
+import { DateTime } from 'luxon';
+import DatePicker from '../../common/DatePicker/DatePicker';
+import {
+  CDEDateField,
+  formatCDEDate,
+  mergeCDEDates,
+  validateCDEDates,
+} from '../../../utils/CDEDateUtils';
+import { showErrorToast } from '../../../utils/ToastUtils';
 import { EntityTags } from 'Models';
 import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +38,10 @@ import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/User
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModalWithMarkdownEditor } from '../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
 import TagsContainerV2 from '../../Tag/TagsContainerV2/TagsContainerV2';
-import { DisplayType, LayoutType } from '../../Tag/TagsViewer/TagsViewer.interface';
+import {
+  DisplayType,
+  LayoutType,
+} from '../../Tag/TagsViewer/TagsViewer.interface';
 import {
   CDE_TAG_CLASSIFICATIONS,
   renderCDEOwners,
@@ -98,9 +110,7 @@ const CDETagField = ({
   };
 
   return (
-    <CDEField
-      className={`cde-detail-field-${classification}`}
-      label={label}>
+    <CDEField className={`cde-detail-field-${classification}`} label={label}>
       <TagsContainerV2
         showInlineEditButton
         classificationFilter={classification}
@@ -175,8 +185,8 @@ const CDEDomainsField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
     const domains = Array.isArray(selectedDomain)
       ? selectedDomain
       : selectedDomain
-        ? [selectedDomain]
-        : [];
+      ? [selectedDomain]
+      : [];
 
     await onUpdate?.({
       ...glossaryTerm,
@@ -346,10 +356,7 @@ const CDETextCustomField = ({
       label={label}>
       <div className="cde-detail-field-markdown-content">
         {value ? (
-          <RichTextEditorPreviewerV1
-            enableSeeMoreVariant
-            markdown={value}
-          />
+          <RichTextEditorPreviewerV1 enableSeeMoreVariant markdown={value} />
         ) : (
           <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
         )}
@@ -371,6 +378,105 @@ const CDETextCustomField = ({
   );
 };
 
+const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
+  const { t } = useTranslation();
+  const { data, isVersionView, onUpdate, permissions } =
+    useGenericContext<GlossaryTerm>();
+  const [editingDate, setEditingDate] = useState<CDEDateField | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form] = Form.useForm();
+  const extension = data?.extension ?? glossaryTerm.extension ?? {};
+  const canEdit =
+    !isVersionView &&
+    Boolean(permissions?.EditAll || permissions?.EditCustomFields);
+  const openEditor = (key: CDEDateField) => {
+    form.setFieldsValue({
+      [key]: extension[key] ? DateTime.fromISO(extension[key]) : null,
+    });
+    setEditingDate(key);
+  };
+  const save = async () => {
+    try {
+      if (!editingDate) {
+        return;
+      }
+      const values = await form.validateFields();
+      const value = values[editingDate]?.toFormat('yyyy-MM-dd') ?? '';
+      const error = validateCDEDates({ ...extension, [editingDate]: value });
+      if (error) {
+        form.setFields([{ name: editingDate, errors: [t(error)] }]);
+
+        return;
+      }
+      setSaving(true);
+      await onUpdate?.(
+        {
+          ...glossaryTerm,
+          ...data,
+          extension: mergeCDEDates(extension, { [editingDate]: value }),
+        },
+        'extension'
+      );
+      setEditingDate(null);
+    } catch (error) {
+      if (!(error && typeof error === 'object' && 'errorFields' in error)) {
+        showErrorToast(error instanceof Error ? error.message : String(error));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      {(['effectiveDate', 'expirationDate'] as const).map((key) => (
+        <CDEField
+          action={
+            canEdit ? (
+              <EditIconButton
+                size="small"
+                title={t('label.edit')}
+                onClick={() => openEditor(key)}
+              />
+            ) : undefined
+          }
+          key={key}
+          label={t(
+            key === 'effectiveDate'
+              ? 'cde.effective-date'
+              : 'cde.expiration-date'
+          )}>
+          {formatCDEDate(extension[key])}
+        </CDEField>
+      ))}
+      <Modal
+        confirmLoading={saving}
+        title={t(
+          editingDate === 'expirationDate'
+            ? 'cde.expiration-date'
+            : 'cde.effective-date'
+        )}
+        visible={editingDate !== null}
+        onCancel={() => setEditingDate(null)}
+        onOk={save}>
+        <Form form={form} layout="vertical">
+          {editingDate && (
+            <Form.Item
+              label={t(
+                editingDate === 'effectiveDate'
+                  ? 'cde.effective-date'
+                  : 'cde.expiration-date'
+              )}
+              name={editingDate}>
+              <DatePicker allowClear format="dd/MM/yyyy" />
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
+    </>
+  );
+};
+
 const CDEGlossaryTermSummary = ({
   glossaryTerm,
 }: CDEGlossaryTermSummaryProps) => {
@@ -378,7 +484,7 @@ const CDEGlossaryTermSummary = ({
 
   return (
     <>
-      {/* Group 1: Nhóm theo nghiệp vụ, Nguồn dữ liệu, Chủ sở hữu dữ liệu, Phân loại dữ liệu, Dữ liệu cá nhân, Quy định về chất lượng dữ liệu */}
+      {/* CDE metadata and validity dates */}
       <div
         className="cde-detail-summary cde-detail-summary-group-1"
         data-testid="cde-glossary-term-summary-group-1">
@@ -401,6 +507,7 @@ const CDEGlossaryTermSummary = ({
             label={t('cde.personal-data')}
           />
           <CDEQualityRuleField glossaryTerm={glossaryTerm} />
+          <CDEValidityFields glossaryTerm={glossaryTerm} />
         </Row>
       </div>
 

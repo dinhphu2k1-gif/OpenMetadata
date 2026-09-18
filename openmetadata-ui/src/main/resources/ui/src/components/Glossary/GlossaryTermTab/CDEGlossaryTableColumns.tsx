@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { Button, Space, Tag, Typography } from 'antd';
+import { Button, Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -19,13 +19,18 @@ import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
 import { EntityReference } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
-import { getEntityName } from '../../../utils/EntityNameUtils';
-import { getGlossaryPath } from '../../../utils/RouterUtils';
-import ProfilePicture from '../../common/ProfilePicture/ProfilePicture';
+import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import {
+  getGlossaryPath,
+  getGlossaryTermsVersionsPath,
+} from '../../../utils/RouterUtils';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
   cdeVersion?: string;
+  version?: string;
+  effectiveDate?: string;
+  expirationDate?: string;
   phien_ban?: string;
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
@@ -134,11 +139,26 @@ export const getCDEGlossaryTableColumns = ({
         );
       }
 
+      const extension = record.extension as
+        | { cdeVersion?: string; version?: string; phien_ban?: string }
+        | undefined;
+      const businessVersion = String(
+        extension?.cdeVersion ??
+          extension?.version ??
+          extension?.phien_ban ??
+          ''
+      ).trim();
+
+      const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
+      const toUrl = businessVersion
+        ? `${basePath}?approvedVersion=${encodeURIComponent(businessVersion)}`
+        : basePath;
+
       return (
         <Link
           className="cde-code-link cursor-pointer"
           data-testid={`cde-code-${name}`}
-          to={getGlossaryPath(record.fullyQualifiedName ?? name)}>
+          to={toUrl}>
           {name}
         </Link>
       );
@@ -258,11 +278,31 @@ export const getCDEGlossaryTableColumns = ({
       record.isLoadMoreButton
         ? null
         : renderCDEQualityRule(
-            (record.extension as CDEExtension | undefined)
-              ?.dataQualityRules ??
+            (record.extension as CDEExtension | undefined)?.dataQualityRules ??
               (record.extension as CDEExtension | undefined)
                 ?.quy_dinh_chat_luong_du_lieu,
             t
           ),
   },
+  {
+    title: String(t('cde.version')),
+    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.VERSION,
+    width: 120,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : record.extension?.cdeVersion ??
+          record.extension?.version ??
+          record.extension?.phien_ban ??
+          '1.0',
+  },
+  ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
+    title: String(
+      t(key === 'effectiveDate' ? 'cde.effective-date' : 'cde.expiration-date')
+    ),
+    key,
+    width: 160,
+    render: (_: unknown, record: ModifiedGlossaryTerm) =>
+      record.isLoadMoreButton ? null : formatCDEDate(record.extension?.[key]),
+  })),
 ];

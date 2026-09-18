@@ -1,5 +1,9 @@
 {
   "cde": {
+    "effective-date": "Effective date",
+    "expiration-date": "Expiration date",
+    "invalid-date": "Invalid date. Use dd/MM/yyyy or yyyy-MM-dd.",
+    "invalid-date-range": "Expiration date must be on or after the effective date.",
     "business-context": "Business context",
     "business-group": "Business Group",
     "business-meaning": "Business Meaning",

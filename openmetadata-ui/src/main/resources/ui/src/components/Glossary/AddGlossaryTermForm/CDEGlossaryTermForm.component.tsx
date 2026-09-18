@@ -6,6 +6,9 @@
 import { DownOutlined } from '@ant-design/icons';
 import { Button, Form, FormInstance, Input, Select } from 'antd';
 import { isEmpty } from 'lodash';
+import { DateTime } from 'luxon';
+import DatePicker from '../../common/DatePicker/DatePicker';
+import { mergeCDEDates, validateCDEDates } from '../../../utils/CDEDateUtils';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EntityType } from '../../../enums/entity.enum';
@@ -29,6 +32,8 @@ export interface CDEGlossaryTermFormValues {
   displayName?: string;
   description?: string;
   cdeVersion?: string;
+  effectiveDate?: DateTime | null;
+  expirationDate?: DateTime | null;
   phien_ban?: string;
   domains?: EntityReference[];
   owners?: EntityReference[];
@@ -59,13 +64,13 @@ const CDEGlossaryTermForm = ({
   const reviewers = Form.useWatch<EntityReference[]>('reviewers', form) ?? [];
   const domainLabel = domains.length
     ? domains
-      .filter(Boolean)
-      .map(
-        (domain) =>
-          getEntityName(domain) || domain.fullyQualifiedName || ''
-      )
-      .filter(Boolean)
-      .join(', ') || t('label.select-entity', { entity: t('label.domain-plural') })
+        .filter(Boolean)
+        .map(
+          (domain) => getEntityName(domain) || domain.fullyQualifiedName || ''
+        )
+        .filter(Boolean)
+        .join(', ') ||
+      t('label.select-entity', { entity: t('label.domain-plural') })
     : t('label.select-entity', { entity: t('label.domain-plural') });
 
   useEffect(() => {
@@ -79,7 +84,8 @@ const CDEGlossaryTermForm = ({
         owners: glossaryTerm.owners,
         reviewers: glossaryTerm.reviewers,
         dataSourceTags: tags.filter(
-          (tag) => tag.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource
+          (tag) =>
+            tag.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource
         ),
         dataClassificationTags: tags.filter(
           (tag) =>
@@ -98,17 +104,28 @@ const CDEGlossaryTermForm = ({
                   ? glossaryTerm.extension.dataQualityRules.includes('Y') ||
                       glossaryTerm.extension.dataQualityRules.includes('true')
                   : ['1', 'TRUE', 'Y', 'YES', 'CO', 'CÓ'].includes(
-                      String(glossaryTerm.extension.dataQualityRules).trim().toUpperCase()
+                      String(glossaryTerm.extension.dataQualityRules)
+                        .trim()
+                        .toUpperCase()
                     )
               )
-            : glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== undefined &&
+            : glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !==
+                undefined &&
               glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu !== null
             ? String(
-                Array.isArray(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu)
-                  ? glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes('Y') ||
-                      glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes('true')
+                Array.isArray(
+                  glossaryTerm.extension.quy_dinh_chat_luong_du_lieu
+                )
+                  ? glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes(
+                      'Y'
+                    ) ||
+                      glossaryTerm.extension.quy_dinh_chat_luong_du_lieu.includes(
+                        'true'
+                      )
                   : ['1', 'TRUE', 'Y', 'YES', 'CO', 'CÓ'].includes(
-                      String(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu).trim().toUpperCase()
+                      String(glossaryTerm.extension.quy_dinh_chat_luong_du_lieu)
+                        .trim()
+                        .toUpperCase()
                     )
               )
             : undefined,
@@ -118,6 +135,12 @@ const CDEGlossaryTermForm = ({
         entityRelationship:
           glossaryTerm.extension?.entityRelationship ??
           glossaryTerm.extension?.moi_quan_he_voi_thuc_the,
+        effectiveDate: glossaryTerm.extension?.effectiveDate
+          ? DateTime.fromISO(glossaryTerm.extension.effectiveDate)
+          : null,
+        expirationDate: glossaryTerm.extension?.expirationDate
+          ? DateTime.fromISO(glossaryTerm.extension.expirationDate)
+          : null,
         cdeVersion:
           glossaryTerm.extension?.cdeVersion ??
           glossaryTerm.extension?.phien_ban ??
@@ -155,26 +178,42 @@ const CDEGlossaryTermForm = ({
 
     const versionVal = values.cdeVersion?.trim();
 
-    const extension = {
-      ...(versionVal ? { cdeVersion: versionVal } : {}),
-      ...(entityRelationshipVal
-        ? {
-            entityRelationship: entityRelationshipVal,
-          }
-        : {}),
-      ...(dataQualityVal !== undefined &&
-      dataQualityVal !== null &&
-      dataQualityVal !== ''
-        ? {
-            dataQualityRules: dataQualityVal === 'true' ? ['Y'] : ['N'],
-          }
-        : {}),
-      ...(relatedDocsVal
-        ? {
-            relatedRegulatoryDocuments: relatedDocsVal,
-          }
-        : {}),
-    };
+    const preservedExtension = { ...glossaryTerm?.extension };
+    [
+      'entityRelationship',
+      'relatedRegulatoryDocuments',
+      'dataQualityRules',
+      'moi_quan_he_voi_thuc_the',
+      'van_ban_quy_dinh_lien_quan',
+      'quy_dinh_chat_luong_du_lieu',
+    ].forEach((key) => delete preservedExtension[key]);
+    const extension = mergeCDEDates(
+      {
+        ...preservedExtension,
+        ...(versionVal ? { cdeVersion: versionVal } : {}),
+        ...(entityRelationshipVal
+          ? {
+              entityRelationship: entityRelationshipVal,
+            }
+          : {}),
+        ...(dataQualityVal !== undefined &&
+        dataQualityVal !== null &&
+        dataQualityVal !== ''
+          ? {
+              dataQualityRules: dataQualityVal === 'true' ? ['Y'] : ['N'],
+            }
+          : {}),
+        ...(relatedDocsVal
+          ? {
+              relatedRegulatoryDocuments: relatedDocsVal,
+            }
+          : {}),
+      },
+      {
+        effectiveDate: values.effectiveDate?.toFormat('yyyy-MM-dd') ?? '',
+        expirationDate: values.expirationDate?.toFormat('yyyy-MM-dd') ?? '',
+      }
+    );
 
     await onSave({
       name: String(values.name ?? '').trim(),
@@ -208,8 +247,9 @@ const CDEGlossaryTermForm = ({
 
   return (
     <Form<CDEGlossaryTermFormValues>
-      className={`cde-glossary-term-form cde-glossary-term-form--${editMode ? 'edit' : 'add'
-        }`}
+      className={`cde-glossary-term-form cde-glossary-term-form--${
+        editMode ? 'edit' : 'add'
+      }`}
       form={form}
       initialValues={{ cdeVersion: '1.0' }}
       layout="vertical"
@@ -241,6 +281,42 @@ const CDEGlossaryTermForm = ({
           rules={[{ required: true, whitespace: true }]}>
           <Input data-testid="cde-version" placeholder="1.0" />
         </Form.Item>
+        {(['effectiveDate', 'expirationDate'] as const).map((key) => (
+          <Form.Item
+            dependencies={[
+              key === 'effectiveDate' ? 'expirationDate' : 'effectiveDate',
+            ]}
+            key={key}
+            label={t(
+              key === 'effectiveDate'
+                ? 'cde.effective-date'
+                : 'cde.expiration-date'
+            )}
+            name={key}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator: async () => {
+                  const error = validateCDEDates({
+                    effectiveDate:
+                      getFieldValue('effectiveDate')?.toFormat('yyyy-MM-dd') ??
+                      '',
+                    expirationDate:
+                      getFieldValue('expirationDate')?.toFormat('yyyy-MM-dd') ??
+                      '',
+                  });
+                  if (error) {
+                    throw new Error(t(error));
+                  }
+                },
+              }),
+            ]}>
+            <DatePicker
+              allowClear
+              data-testid={`cde-${key}`}
+              format="dd/MM/yyyy"
+            />
+          </Form.Item>
+        ))}
         <Form.Item label={t('cde.business-group')} name="domains">
           <DomainSelectableList
             hasPermission
@@ -295,9 +371,7 @@ const CDEGlossaryTermForm = ({
           CDE_TAG_CLASSIFICATIONS.personalData,
           'personal'
         )}
-        <Form.Item
-          label={t('cde.data-quality-rules')}
-          name="dataQualityRules">
+        <Form.Item label={t('cde.data-quality-rules')} name="dataQualityRules">
           <Select
             allowClear
             options={[
@@ -322,9 +396,7 @@ const CDEGlossaryTermForm = ({
             onUpdate={async (value) => form.setFieldValue('owners', value)}
           />
         </Form.Item>
-        <Form.Item
-          label={t('label.reviewer-plural')}
-          name="reviewers">
+        <Form.Item label={t('label.reviewer-plural')} name="reviewers">
           <UserTeamSelectableListSearchInput
             hasPermission
             multiple={{ user: true, team: true }}
@@ -333,9 +405,7 @@ const CDEGlossaryTermForm = ({
             popoverProps={{
               placement: 'topLeft',
             }}
-            onUpdate={async (value) =>
-              form.setFieldValue('reviewers', value)
-            }
+            onUpdate={async (value) => form.setFieldValue('reviewers', value)}
           />
         </Form.Item>
         <Form.Item

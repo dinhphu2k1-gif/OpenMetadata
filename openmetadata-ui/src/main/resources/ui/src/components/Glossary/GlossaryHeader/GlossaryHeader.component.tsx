@@ -11,7 +11,15 @@
  *  limitations under the License.
  */
 import Icon, { DownOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Input, Modal, Space, Tooltip, Typography } from 'antd';
+import {
+  Button,
+  Dropdown,
+  Input,
+  Modal,
+  Space,
+  Tooltip,
+  Typography,
+} from 'antd';
 import ButtonGroup from 'antd/lib/button/button-group';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
 import { AxiosError } from 'axios';
@@ -64,6 +72,8 @@ import {
   getGlossariesById,
   getGlossaryTerms,
   getGlossaryTermsById,
+  getGlossaryTermsVersionsList,
+  getGlossaryTermsVersion,
 } from '../../../rest/glossaryAPI';
 import { API_RES_MAX_SIZE } from '../../../constants/constants';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
@@ -110,6 +120,7 @@ const GlossaryHeader = ({
   onDelete,
   onAssetAdd,
   onAddGlossaryTerm,
+  onVersionSelect,
   updateVote,
 }: GlossaryHeaderProps) => {
   const { t } = useTranslation();
@@ -156,6 +167,10 @@ const GlossaryHeader = ({
     useState<boolean>(false);
   const [draftVersion, setDraftVersion] = useState<string>('');
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
+  const [availableVersions, setAvailableVersions] = useState<
+    { label: string; snapshotVersion: string }[]
+  >([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const isGlossary = entityType === EntityType.GLOSSARY;
   const { permissions: globalPermissions } = usePermissionProvider();
 
@@ -248,8 +263,6 @@ const GlossaryHeader = ({
 
     return permissions.EditAll || permissions.EditDisplayName;
   }, [permissions, isSteward, currentUser?.isAdmin]);
-
-
 
   const isCDEGlossary = useMemo(() => {
     if (!isGlossary) {
@@ -418,7 +431,9 @@ const GlossaryHeader = ({
       path = getGlossaryPath(latestGlossaryData?.fullyQualifiedName);
     } else {
       const targetVersion = isCustomManagedTerm
-        ? String(cdeVersion ?? '1.0').trim().replace(/^(version:?\s*|v)/i, '')
+        ? String(cdeVersion ?? '1.0')
+            .trim()
+            .replace(/^(version:?\s*|v)/i, '')
         : toString(selectedData.version);
 
       path = isGlossary
@@ -427,6 +442,58 @@ const GlossaryHeader = ({
     }
 
     navigate(path);
+  };
+
+  const loadAvailableVersions = async (open: boolean) => {
+    if (!open || !isCustomManagedTerm) {
+      return;
+    }
+
+    setIsLoadingVersions(true);
+    try {
+      const history = await getGlossaryTermsVersionsList(selectedData.id);
+      const versions = history.versions
+        .map((snapshot) =>
+          typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
+        )
+        .filter(
+          (snapshot) =>
+            String(
+              snapshot.entityStatus ?? snapshot.status ?? 'Approved'
+            ).toLowerCase() === 'approved'
+        )
+        .map((snapshot) => ({
+          label: String(
+            snapshot.extension?.cdeVersion ??
+              snapshot.extension?.version ??
+              snapshot.extension?.phien_ban ??
+              '1.0'
+          )
+            .trim()
+            .replace(/^(version:?\s*|v)/i, ''),
+          snapshotVersion: toString(snapshot.version),
+        }));
+
+      setAvailableVersions(
+        versions.filter(
+          (item, index) =>
+            versions.findIndex((version) => version.label === item.label) === index
+        )
+      );
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const selectVersion = async (snapshotVersion: string) => {
+    try {
+      const snapshot = await getGlossaryTermsVersion(selectedData.id, snapshotVersion);
+      onVersionSelect?.(snapshot);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    }
   };
 
   const handleDelete = async () => {
@@ -521,8 +588,7 @@ const GlossaryHeader = ({
     try {
       setIsCreatingDraft(true);
       const cleanVer = draftVersion?.trim().replace(/^(version:?\s*|v)/i, '');
-      const currentExtension =
-        (selectedData as GlossaryTerm)?.extension ?? {};
+      const currentExtension = (selectedData as GlossaryTerm)?.extension ?? {};
       const updatedDetails = {
         ...selectedData,
         entityStatus: EntityStatus.Draft,
@@ -601,8 +667,7 @@ const GlossaryHeader = ({
     try {
       setIsSubmittingForReview(true);
       const cleanVer = submitVersion?.trim().replace(/^(version:?\s*|v)/i, '');
-      const currentExtension =
-        (selectedData as GlossaryTerm)?.extension ?? {};
+      const currentExtension = (selectedData as GlossaryTerm)?.extension ?? {};
       const updatedDetails = {
         ...selectedData,
         entityStatus: EntityStatus.InReview,
@@ -756,11 +821,13 @@ const GlossaryHeader = ({
               setShowActions(false);
             },
           },
-          ...((isDQGlossary
-            ? canImportDQ
-            : isCDEGlossary
-            ? canImportCDE
-            : importExportPermissions)
+          ...((
+            isDQGlossary
+              ? canImportDQ
+              : isCDEGlossary
+              ? canImportCDE
+              : importExportPermissions
+          )
             ? [
                 {
                   label: (
@@ -878,7 +945,9 @@ const GlossaryHeader = ({
                   (selectedData as GlossaryTerm)?.extension?.phien_ban ??
                   '1.0';
                 setSubmitVersion(
-                  String(currentVer).trim().replace(/^(version:?\s*|v)/i, '')
+                  String(currentVer)
+                    .trim()
+                    .replace(/^(version:?\s*|v)/i, '')
                 );
               }
               setIsSubmitForReviewModalOpen(true);
@@ -1020,28 +1089,37 @@ const GlossaryHeader = ({
       return (
         <Space align="center" size={8}>
           <EntityStatusBadge showDivider status={entityStatus} />
-          <Tooltip
-            title={t(
-              `label.${
-                isVersionView
-                  ? 'exit-version-history'
-                  : 'version-plural-history'
-              }`
-            )}>
+          <Dropdown
+            menu={{
+              items: isLoadingVersions
+                ? [
+                    {
+                      key: 'loading',
+                      label: t('label.loading'),
+                      disabled: true,
+                    },
+                  ]
+                : availableVersions.map((availableVersion) => ({
+                    key: availableVersion.snapshotVersion,
+                    label: `${t('label.version')}: ${availableVersion.label}`,
+                  })),
+              onClick: ({ key }) => selectVersion(key),
+            }}
+            trigger={['click']}
+            onOpenChange={loadAvailableVersions}>
             <button
               className={classNames(
                 'status-badge cde-header-version-badge',
                 statusClass
               )}
               data-testid="version-button"
-              type="button"
-              onClick={handleVersionClick}>
-              <Icon component={VersionIcon} />
+              type="button">
               <span className={`status-badge-label ${statusClass}`}>
                 {versionLabel}
               </span>
+              <DownOutlined />
             </button>
-          </Tooltip>
+          </Dropdown>
         </Space>
       );
     }
@@ -1053,7 +1131,9 @@ const GlossaryHeader = ({
     isCustomManagedTerm,
     cdeVersion,
     isVersionView,
-    handleVersionClick,
+    availableVersions,
+    isLoadingVersions,
+    navigate,
     t,
   ]);
 
@@ -1431,8 +1511,6 @@ const GlossaryHeader = ({
         onCancel={() => setIsRejectModalOpen(false)}
         onConfirm={handleRejectTerm}
       />
-
-
     </>
   );
 };

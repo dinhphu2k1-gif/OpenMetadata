@@ -12,8 +12,10 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
+import { useLocation } from 'react-router-dom';
 import { OperationPermission } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import { EntityTabs } from '../../../enums/entity.enum';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import {
   mockedGlossaryTerms,
@@ -23,12 +25,12 @@ import {
 import * as CommonUtils from '../../../utils/CommonUtils';
 import glossaryTermClassBase from '../../../utils/Glossary/GlossaryTermClassBase';
 import { useCustomPages } from '../../../hooks/useCustomPages';
-import {
-  getDetailsTabWithNewLabel,
-} from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
+import { getDetailsTabWithNewLabel } from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import GlossaryTerms from './GlossaryTermsV1.component';
+import { getApprovedCDEAuditSnapshots } from '../../../utils/CDEApprovedVersionUtils';
+import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
 
 const mockPush = jest.fn();
 
@@ -41,6 +43,11 @@ jest.mock('../../../hooks/useApplicationStore', () => ({
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn().mockImplementation(() => mockPush),
+  useLocation: jest.fn().mockReturnValue({ search: '' }),
+}));
+
+jest.mock('../../../utils/CDEApprovedVersionUtils', () => ({
+  getApprovedCDEAuditSnapshots: jest.fn(),
 }));
 
 jest.mock('../../../utils/useRequiredParams', () => ({
@@ -170,6 +177,7 @@ jest.mock('../../Customization/GenericProvider/GenericProvider', () => {
 describe('Test Glossary-term component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (useLocation as jest.Mock).mockReturnValue({ search: '' });
     (useRequiredParams as jest.Mock).mockReturnValue({
       tab: undefined,
       version: 'glossaryVersion',
@@ -177,6 +185,31 @@ describe('Test Glossary-term component', () => {
     (useCustomPages as jest.Mock).mockReturnValue({
       customizedPage: null,
       isLoading: false,
+    });
+  });
+
+  it('opens the approved CDE snapshot selected from the table', async () => {
+    const snapshot = {
+      ...mockProps.glossaryTerm,
+      entityStatus: EntityStatus.Approved,
+      extension: { cdeVersion: '1.2' },
+    };
+    (useLocation as jest.Mock).mockReturnValue({
+      search: '?approvedVersion=1.2',
+    });
+    (getApprovedCDEAuditSnapshots as jest.Mock).mockResolvedValue([
+      { snapshot, eventId: 'approved-1-2' },
+    ]);
+
+    render(<GlossaryTerms {...mockProps} />);
+
+    await waitFor(() => {
+      expect((GenericProvider as jest.Mock).mock.lastCall[0]).toEqual(
+        expect.objectContaining({
+          isVersionView: true,
+          data: expect.objectContaining({ extension: { cdeVersion: '1.2' } }),
+        })
+      );
     });
   });
 

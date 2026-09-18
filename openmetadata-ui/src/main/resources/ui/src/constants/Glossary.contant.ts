@@ -169,6 +169,9 @@ export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
   PERSONAL_DATA: 'cdePersonalData',
   RELATED_REGULATION: 'cdeRelatedRegulation',
   DATA_QUALITY_RULE: 'cdeDataQualityRule',
+  VERSION: 'cdeVersion',
+  EFFECTIVE_DATE: 'effectiveDate',
+  EXPIRATION_DATE: 'expirationDate',
 };
 
 export const CDE_DEFAULT_VISIBLE_COLUMNS = Object.values(
@@ -183,7 +186,7 @@ export const CDE_STATIC_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
 ];
 
-export const CDE_GLOSSARY_TABLE_PREFERENCE_KEY = 'cdeGlossaryTerm';
+export const CDE_GLOSSARY_TABLE_PREFERENCE_KEY = 'cdeGlossaryTermDatesV1';
 
 export const DEFAULT_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.DESCRIPTION,

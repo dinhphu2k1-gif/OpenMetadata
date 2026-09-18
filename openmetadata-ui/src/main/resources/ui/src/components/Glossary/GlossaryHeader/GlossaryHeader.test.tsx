@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { EntityType } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -21,6 +21,7 @@ import {
 import { mockUserData } from '../../../mocks/MyDataPage.mock';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
+import { getGlossaryTermsVersion, getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
 import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import GlossaryHeader, { suggestNextVersion } from './GlossaryHeader.component';
@@ -169,6 +170,8 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     .fn()
     .mockImplementation(() => Promise.resolve({ data: mockedGlossaryTerms })),
   moveGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
+  getGlossaryTermsVersionsList: jest.fn(),
+  getGlossaryTermsVersion: jest.fn(),
 }));
 
 const mockOnDelete = jest.fn();
@@ -705,6 +708,7 @@ describe('GlossaryHeader component', () => {
       expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
 
       const versionInput = screen.getByTestId('cde-draft-version-input');
+
       expect(versionInput).toHaveValue('1.1');
 
       await act(async () => {
@@ -888,6 +892,52 @@ describe('GlossaryHeader component', () => {
       expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
       expect(screen.getByTestId('cde-draft-version-input')).toHaveValue('1.1');
     });
+  });
+
+  it('lists approved CDE versions and opens the selected version', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { name: 'Data Dictionary' },
+        entityStatus: EntityStatus.Approved,
+        extension: { cdeVersion: '1.1' },
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true, EditAll: true },
+      isVersionView: false,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+    (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
+      versions: [
+        { version: 1.2, entityStatus: 'Approved', extension: { cdeVersion: '1.1' } },
+        { version: 1.1, entityStatus: 'Draft', extension: { cdeVersion: '1.2' } },
+        { version: 1.0, entityStatus: 'Approved', extension: { cdeVersion: '1.0' } },
+      ],
+    });
+    const selectedSnapshot = { ...mockedGlossaryTerms[0], extension: { cdeVersion: '1.0' } };
+    (getGlossaryTermsVersion as jest.Mock).mockResolvedValue(selectedSnapshot);
+    const onVersionSelect = jest.fn();
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+        onVersionSelect={onVersionSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+    await waitFor(() => expect(screen.getByText('label.version: 1.0')).toBeInTheDocument());
+
+    expect(screen.queryByText('label.version: 1.2')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('label.version: 1.0'));
+
+    await waitFor(() => expect(onVersionSelect).toHaveBeenCalledWith(selectedSnapshot));
+
+    expect(getGlossaryTermsVersion).toHaveBeenCalledWith(mockedGlossaryTerms[0].id, '1');
   });
 
   describe('CDE Import and Export permissions in GlossaryHeader', () => {

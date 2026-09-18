@@ -12,11 +12,30 @@
  *  limitations under the License.
  */
 
-import { render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from '@testing-library/react';
 import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import CDEGlossaryTermSummary from './CDEGlossaryTermSummary';
+
+const mockUpdate = jest.fn();
+let mockPermissions: Record<string, boolean> = {};
+let mockVersionView = false;
+jest.mock('../../Customization/GenericProvider/GenericProvider', () => ({
+  useGenericContext: () => ({
+    permissions: mockPermissions,
+    isVersionView: mockVersionView,
+    entityRules: { canAddMultipleDomains: true },
+    onUpdate: mockUpdate,
+  }),
+}));
 
 jest.mock('../../common/ProfilePicture/ProfilePicture', () =>
   jest.fn().mockImplementation(({ displayName }) => <span>{displayName}</span>)
@@ -27,15 +46,18 @@ jest.mock('../../common/RichTextEditor/RichTextEditorPreviewerV1', () =>
 );
 
 jest.mock('../../Tag/TagsContainerV2/TagsContainerV2', () =>
-  jest.fn().mockImplementation(({ selectedTags }) => (
-    <div>
-      {selectedTags.map((tag) => tag.displayName ?? tag.name).join(', ')}
-    </div>
-  ))
+  jest
+    .fn()
+    .mockImplementation(({ selectedTags }) => (
+      <div>
+        {selectedTags.map((tag) => tag.displayName ?? tag.name).join(', ')}
+      </div>
+    ))
 );
 
-jest.mock('../../common/DomainSelectableList/DomainSelectableList.component', () =>
-  jest.fn().mockImplementation(({ children }) => <div>{children}</div>)
+jest.mock(
+  '../../common/DomainSelectableList/DomainSelectableList.component',
+  () => jest.fn().mockImplementation(({ children }) => <div>{children}</div>)
 );
 
 const glossaryTerm = {
@@ -82,6 +104,9 @@ const glossaryTerm = {
 
 const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
   en: {
+    'cde.version': 'Version',
+    'cde.effective-date': 'Effective date',
+    'cde.expiration-date': 'Expiration date',
     'cde.business-group': 'Business Group',
     'cde.data-source': 'Data Source',
     'cde.data-owner': 'Data Owner',
@@ -94,6 +119,9 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'label.no': 'No',
   },
   vi: {
+    'cde.version': 'Phiên bản',
+    'cde.effective-date': 'Ngày hiệu lực',
+    'cde.expiration-date': 'Ngày hết hiệu lực',
     'cde.business-group': 'Nhóm theo nghiệp vụ',
     'cde.data-source': 'Nguồn dữ liệu',
     'cde.data-owner': 'Chủ sở hữu dữ liệu',
@@ -117,6 +145,9 @@ const setCDELocale = (locale: keyof typeof cdeTranslations) => {
 describe('CDEGlossaryTermSummary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPermissions = {};
+    mockVersionView = false;
+    mockUpdate.mockResolvedValue(undefined);
     setCDELocale('vi');
   });
 
@@ -145,7 +176,17 @@ describe('CDEGlossaryTermSummary', () => {
       'Văn bản quy định liên quan',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
 
-    expect(screen.getAllByRole('group')).toHaveLength(8);
+    expect(screen.getAllByRole('group')).toHaveLength(10);
+    expect(
+      screen.queryByRole('group', { name: 'Phiên bản' })
+    ).not.toBeInTheDocument();
+
+    const effectiveDate = screen.getByRole('group', { name: 'Ngày hiệu lực' });
+    const expirationDate = screen.getByRole('group', {
+      name: 'Ngày hết hiệu lực',
+    });
+
+    expect(effectiveDate.nextElementSibling).toBe(expirationDate);
 
     expect(screen.getByText('Khách hàng')).toBeInTheDocument();
     expect(screen.getByText('CRM')).toBeInTheDocument();
@@ -154,9 +195,7 @@ describe('CDEGlossaryTermSummary', () => {
     expect(
       screen.getByText('Quan hệ khách hàng với tài khoản')
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Quy chế quản lý khách hàng')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Quy chế quản lý khách hàng')).toBeInTheDocument();
   });
 
   it('uses English labels when language is set to English', () => {
@@ -178,5 +217,80 @@ describe('CDEGlossaryTermSummary', () => {
       'Entity Relationship',
       'Related Regulatory Documents',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+  });
+
+  it.each([false, true])(
+    'does not offer date editing without permission or in version view (%s)',
+    (versionView) => {
+      mockPermissions = { EditCustomFields: versionView };
+      mockVersionView = versionView;
+      render(
+        <MemoryRouter>
+          <CDEGlossaryTermSummary
+            glossaryTerm={{
+              ...glossaryTerm,
+              extension: {
+                cdeVersion: '1.2',
+                effectiveDate: '2026-01-01',
+              },
+            }}
+          />
+        </MemoryRouter>
+      );
+
+      expect(screen.queryByText('1.2')).not.toBeInTheDocument();
+      expect(screen.getByText('01/01/2026')).toBeInTheDocument();
+      expect(
+        within(
+          screen.getByRole('group', { name: 'Ngày hiệu lực' })
+        ).queryByRole('button')
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it('allows custom-field editors to clear a date while retaining metadata and status', async () => {
+    mockPermissions = { EditCustomFields: true };
+    const term = {
+      ...glossaryTerm,
+      extension: {
+        ...glossaryTerm.extension,
+        custom: 'keep',
+        effectiveDate: '2026-01-01',
+        expirationDate: '2026-12-31',
+      },
+    };
+    render(
+      <MemoryRouter>
+        <CDEGlossaryTermSummary glossaryTerm={term} />
+      </MemoryRouter>
+    );
+    fireEvent.click(
+      within(
+        screen.getByRole('group', { name: 'Ngày hết hiệu lực' })
+      ).getByRole('button')
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(
+      within(dialog).queryByLabelText('Ngày hiệu lực')
+    ).not.toBeInTheDocument();
+
+    const expiration = within(dialog)
+      .getByLabelText('Ngày hết hiệu lực')
+      .closest('.ant-picker');
+    await act(async () => {
+      fireEvent.mouseUp(expiration!.querySelector('.ant-picker-clear')!);
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    const [updated, field] = mockUpdate.mock.calls[0];
+
+    expect(field).toBe('extension');
+    expect(updated.extension).toMatchObject({
+      custom: 'keep',
+      effectiveDate: '2026-01-01',
+    });
+    expect(updated.extension).not.toHaveProperty('expirationDate');
+    expect(updated.entityStatus).toBe(term.entityStatus);
   });
 });

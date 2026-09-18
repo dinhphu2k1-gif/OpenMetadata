@@ -34,15 +34,24 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/lib/table';
+import { Operation } from 'fast-json-patch';
 import { FC, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ImportIcon } from '../../../assets/svg/ic-drag-drop.svg';
 import { Tag as ClassificationTag } from '../../../generated/entity/classification/tag';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { getDomainList } from '../../../rest/domainAPI';
-import { addGlossaryTerm, patchGlossaryTerm } from '../../../rest/glossaryAPI';
+import {
+  addGlossaryTerm,
+  getGlossaryTermsById,
+  patchGlossaryTerm,
+} from '../../../rest/glossaryAPI';
 import { getTags } from '../../../rest/tagAPI';
+import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import IngestionStepper from '../../Settings/Services/Ingestion/IngestionStepper/IngestionStepper.component';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
@@ -90,14 +99,19 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     [t]
   );
 
-  const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicateHandling>('skip');
-  const [validationResult, setValidationResult] = useState<CDEValidationResult | null>(null);
+  const [duplicatePolicy, setDuplicatePolicy] =
+    useState<DuplicateHandling>('skip');
+  const [validationResult, setValidationResult] =
+    useState<CDEValidationResult | null>(null);
   const [parsing, setParsing] = useState<boolean>(false);
   const [selectedFileName, setSelectedFileName] = useState<string>('');
-  const [tableFilter, setTableFilter] = useState<'all' | 'error' | 'valid'>('all');
+  const [tableFilter, setTableFilter] = useState<'all' | 'error' | 'valid'>(
+    'all'
+  );
 
   // Dynamic Metadata
-  const [allDomains, setAllDomains] = useState<EntityReference[]>(availableDomains);
+  const [allDomains, setAllDomains] =
+    useState<EntityReference[]>(availableDomains);
   const [allTags, setAllTags] = useState<ClassificationTag[]>([]);
 
   // Import Execution state
@@ -188,7 +202,9 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       setActiveStep(1); // Chuyển sang bước 2 (Preview & Validate)
     } catch (error) {
       showErrorToast(
-        error instanceof Error ? error : new Error(t('cde.file-parse-error', 'Lỗi phân tích file Excel'))
+        error instanceof Error
+          ? error
+          : new Error(t('cde.file-parse-error', 'Lỗi phân tích file Excel'))
       );
     } finally {
       setParsing(false);
@@ -235,37 +251,43 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       if (row.isExisting) {
         if (duplicatePolicy === 'skip') {
           skippedCount++;
+
           continue;
         }
 
         // Cập nhật bản ghi có sẵn
         if (row.existingId) {
           try {
-            const patchOps = [
+            const current = await getGlossaryTermsById(row.existingId, {
+              fields: 'extension',
+            });
+            const payload = transformRowToGlossaryTermPayload(
+              row,
+              glossaryFQN,
+              [],
+              [],
+              [],
+              [],
+              current.extension
+            );
+            const patchOps: Operation[] = [
               { op: 'replace', path: '/displayName', value: row.displayName },
-              { op: 'replace', path: '/description', value: row.description || '' },
               {
                 op: 'replace',
+                path: '/description',
+                value: row.description || '',
+              },
+              {
+                op: 'add',
                 path: '/extension',
-                value: {
-                  cdeVersion: row.cdeVersion || '1.0',
-                  ...(row.entityRelationship ? { entityRelationship: row.entityRelationship } : {}),
-                  ...(row.relatedRegulatoryDocuments
-                    ? { relatedRegulatoryDocuments: row.relatedRegulatoryDocuments }
-                    : {}),
-                  ...(row.dataQualityRules
-                    ? {
-                        dataQualityRules: ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
-                          row.dataQualityRules.toUpperCase()
-                        )
-                          ? ['Y']
-                          : ['N'],
-                      }
-                    : {}),
-                },
+                value: payload.extension,
               },
               // Luôn đặt về trạng thái Bản nháp (Draft) theo đúng quy tắc nghiệp vụ
-              { op: 'replace', path: '/entityStatus', value: EntityStatus.Draft },
+              {
+                op: 'replace',
+                path: '/entityStatus',
+                value: EntityStatus.Draft,
+              },
             ];
 
             await patchGlossaryTerm(row.existingId, patchOps);
@@ -294,7 +316,11 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           if (newTerm && newTerm.entityStatus !== EntityStatus.Draft) {
             try {
               await patchGlossaryTerm(newTerm.id, [
-                { op: 'replace', path: '/entityStatus', value: EntityStatus.Draft },
+                {
+                  op: 'replace',
+                  path: '/entityStatus',
+                  value: EntityStatus.Draft,
+                },
               ]);
             } catch (patchErr) {
               // Non-blocking: term already created
@@ -338,7 +364,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       key: 'name',
       width: 110,
       render: (name: string, record) => (
-        <span className={record.errors.length ? 'text-danger font-semibold' : 'font-semibold'}>
+        <span
+          className={
+            record.errors.length ? 'text-danger font-semibold' : 'font-semibold'
+          }>
           {name || '(Trống)'}
         </span>
       ),
@@ -365,13 +394,30 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       ellipsis: true,
     },
     {
+      title: t('cde.version'),
+      dataIndex: 'cdeVersion',
+      key: 'cdeVersion',
+      width: 120,
+    },
+    ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
+      title: t(
+        key === 'effectiveDate' ? 'cde.effective-date' : 'cde.expiration-date'
+      ),
+      dataIndex: key,
+      key,
+      width: 160,
+      render: (value: string) => formatCDEDate(value),
+    })),
+    {
       title: 'Thao tác',
       key: 'actionType',
       width: 100,
       align: 'center',
       render: (_, record) =>
         record.isExisting ? (
-          <Tag color="blue">{duplicatePolicy === 'update' ? 'Cập nhật' : 'Trùng mã'}</Tag>
+          <Tag color="blue">
+            {duplicatePolicy === 'update' ? 'Cập nhật' : 'Trùng mã'}
+          </Tag>
         ) : (
           <Tag color="green">Tạo mới</Tag>
         ),
@@ -417,7 +463,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       footer={null}
       maskClosable={false}
       open={visible}
-      title={t('cde.import-modal-title', 'Nhập danh sách CDE từ file Excel (.xlsx)')}
+      title={t(
+        'cde.import-modal-title',
+        'Nhập danh sách CDE từ file Excel (.xlsx)'
+      )}
       width={activeStep === 1 ? 960 : 640}
       onCancel={handleClose}>
       {/* Stepper Header */}
@@ -433,12 +482,15 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             className="m-b-md"
             message={
               <span>
-                <strong>{t('cde.rule-notice', 'Quy định quản trị dữ liệu')}:</strong>{' '}
+                <strong>
+                  {t('cde.rule-notice', 'Quy định quản trị dữ liệu')}:
+                </strong>{' '}
                 {t(
                   'cde.rule-notice-desc',
                   'Mọi bản ghi CDE nạp mới sẽ được khởi tạo ở trạng thái'
                 )}{' '}
-                <Tag color="orange">{t('label.draft', 'Bản nháp (Draft)')}</Tag>.{' '}
+                <Tag color="orange">{t('label.draft', 'Bản nháp (Draft)')}</Tag>
+                .{' '}
                 {t(
                   'cde.rule-notice-maker',
                   'Sau khi nạp, người đề xuất có thể rà soát lại và bấm gửi phê duyệt sang Data Steward.'
@@ -474,11 +526,13 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                       'cde.drag-drop-or-browse-excel',
                       'Kéo thả file Excel (.xlsx) vào đây, hoặc'
                     )}{' '}
-                    <span className="browse-text font-medium">{t('label.browse', 'chọn tệp')}</span>
+                    <span className="browse-text font-medium">
+                      {t('label.browse', 'chọn tệp')}
+                    </span>
                   </span>
                 )}
               </Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text style={{ fontSize: 12 }} type="secondary">
                 {t(
                   'cde.upload-hint',
                   'Hỗ trợ file Microsoft Excel (.xlsx, .xls) hoặc CSV mã hóa UTF-8. Dung lượng tối đa 10MB.'
@@ -489,7 +543,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
 
           <div className="d-flex justify-between items-center m-b-md">
             <Typography.Text type="secondary">
-              {t('cde.download-template-hint', 'Chưa có file mẫu chuẩn 13 cột thuộc tính?')}
+              {t(
+                'cde.download-template-hint',
+                'Chưa có file mẫu chuẩn 15 cột thuộc tính?'
+              )}
             </Typography.Text>
             <Button
               icon={<DownloadOutlined />}
@@ -505,7 +562,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               className="m-b-0"
               label={
                 <Typography.Text strong>
-                  {t('cde.duplicate-policy-label', 'Xử lý khi phát hiện Mã CDE đã tồn tại:')}
+                  {t(
+                    'cde.duplicate-policy-label',
+                    'Xử lý khi phát hiện Mã CDE đã tồn tại:'
+                  )}
                 </Typography.Text>
               }>
               <Radio.Group
@@ -514,12 +574,23 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                 <Space direction="vertical" size="small">
                   <Radio value="skip">
                     <Typography.Text>
-                      <strong>{t('label.skip', 'Bỏ qua (Skip)')}</strong> - {t('cde.skip-desc', 'Giữ nguyên CDE hiện tại, không cập nhật')}
+                      <strong>{t('label.skip', 'Bỏ qua (Skip)')}</strong> -{' '}
+                      {t(
+                        'cde.skip-desc',
+                        'Giữ nguyên CDE hiện tại, không cập nhật'
+                      )}
                     </Typography.Text>
                   </Radio>
                   <Radio value="update">
                     <Typography.Text>
-                      <strong>{t('label.update', 'Ghi đè / Cập nhật (Update)')}</strong> - {t('cde.update-desc', 'Cập nhật nội dung mới và chuyển về trạng thái Bản nháp')}
+                      <strong>
+                        {t('label.update', 'Ghi đè / Cập nhật (Update)')}
+                      </strong>{' '}
+                      -{' '}
+                      {t(
+                        'cde.update-desc',
+                        'Cập nhật nội dung mới và chuyển về trạng thái Bản nháp'
+                      )}
                     </Typography.Text>
                   </Radio>
                 </Space>
@@ -536,23 +607,36 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           <div className="d-flex justify-between items-center m-b-md">
             <Space size="middle">
               <Typography.Text type="secondary">
-                {t('label.file', 'Tệp')}: <Typography.Text strong>{selectedFileName}</Typography.Text>
+                {t('label.file', 'Tệp')}:{' '}
+                <Typography.Text strong>{selectedFileName}</Typography.Text>
               </Typography.Text>
               <Divider type="vertical" />
               <Typography.Text>
-                {t('label.total', 'Tổng số')}: <Typography.Text strong>{validationResult.totalRows}</Typography.Text>
+                {t('label.total', 'Tổng số')}:{' '}
+                <Typography.Text strong>
+                  {validationResult.totalRows}
+                </Typography.Text>
               </Typography.Text>
               <Typography.Text type="success">
-                {t('label.valid', 'Hợp lệ')}: <Typography.Text strong>{validationResult.validCount}</Typography.Text>
+                {t('label.valid', 'Hợp lệ')}:{' '}
+                <Typography.Text strong>
+                  {validationResult.validCount}
+                </Typography.Text>
               </Typography.Text>
               {validationResult.warningCount > 0 && (
                 <Typography.Text type="warning">
-                  {t('label.warning', 'Cảnh báo')}: <Typography.Text strong>{validationResult.warningCount}</Typography.Text>
+                  {t('label.warning', 'Cảnh báo')}:{' '}
+                  <Typography.Text strong>
+                    {validationResult.warningCount}
+                  </Typography.Text>
                 </Typography.Text>
               )}
               {validationResult.errorCount > 0 && (
                 <Typography.Text type="danger">
-                  {t('label.error', 'Lỗi')}: <Typography.Text strong>{validationResult.errorCount}</Typography.Text>
+                  {t('label.error', 'Lỗi')}:{' '}
+                  <Typography.Text strong>
+                    {validationResult.errorCount}
+                  </Typography.Text>
                 </Typography.Text>
               )}
             </Space>
@@ -565,7 +649,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                 {t('label.all', 'Tất cả')} ({validationResult.totalRows})
               </Radio.Button>
               <Radio.Button value="valid">
-                {t('label.valid', 'Hợp lệ')} ({validationResult.validCount + validationResult.warningCount})
+                {t('label.valid', 'Hợp lệ')} (
+                {validationResult.validCount + validationResult.warningCount})
               </Radio.Button>
               {validationResult.errorCount > 0 && (
                 <Radio.Button value="error">
@@ -595,7 +680,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                 'Có {{count}} dòng bị lỗi sẽ bị bỏ qua. Hệ thống chỉ nạp {{validCount}} dòng hợp lệ.',
                 {
                   count: validationResult.errorCount,
-                  validCount: validationResult.validCount + validationResult.warningCount,
+                  validCount:
+                    validationResult.validCount + validationResult.warningCount,
                 }
               )}
               type="warning"
@@ -603,14 +689,24 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           )}
 
           <div className="d-flex justify-between items-center m-t-md">
-            <Button onClick={() => setActiveStep(0)}>{t('label.back', 'Chọn file khác')}</Button>
+            <Button onClick={() => setActiveStep(0)}>
+              {t('label.back', 'Chọn file khác')}
+            </Button>
             <Button
-              disabled={validationResult.validCount + validationResult.warningCount === 0}
+              disabled={
+                validationResult.validCount + validationResult.warningCount ===
+                0
+              }
               type="primary"
               onClick={handleStartImport}>
-              {t('cde.start-import-btn', 'Bắt đầu nạp dữ liệu ({{count}} bản ghi)', {
-                count: validationResult.validCount + validationResult.warningCount,
-              })}
+              {t(
+                'cde.start-import-btn',
+                'Bắt đầu nạp dữ liệu ({{count}} bản ghi)',
+                {
+                  count:
+                    validationResult.validCount + validationResult.warningCount,
+                }
+              )}
             </Button>
           </div>
         </div>
@@ -621,26 +717,38 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
         <div className="cde-progress-step">
           {!isCompleted ? (
             <div className="progress-box">
-              <Typography.Title level={5} className="m-b-md">
+              <Typography.Title className="m-b-md" level={5}>
                 {t('cde.importing-title', 'Đang nạp dữ liệu CDE...')}
               </Typography.Title>
               <Progress percent={importProgress} status="active" />
-              <Typography.Text type="secondary" className="d-block m-t-sm">
-                {t('label.processing', 'Đang xử lý')}: <strong>{currentImportName}</strong>
+              <Typography.Text className="d-block m-t-sm" type="secondary">
+                {t('label.processing', 'Đang xử lý')}:{' '}
+                <strong>{currentImportName}</strong>
               </Typography.Text>
             </div>
           ) : (
             <Result
+              extra={[
+                <Button key="done" type="primary" onClick={handleDone}>
+                  {t('cde.close-and-view-list', 'Đóng & Xem danh sách CDE')}
+                </Button>,
+                <Button key="another" onClick={resetState}>
+                  {t('cde.import-another-file', 'Nạp tiếp file khác')}
+                </Button>,
+              ]}
               status={importStats.failed > 0 ? 'warning' : 'success'}
               subTitle={
-                <Space direction="vertical" size="small" className="w-full">
+                <Space className="w-full" direction="vertical" size="small">
                   <div>
                     {t(
                       'cde.import-success-msg',
                       'Đã tạo mới thành công {{count}} bản ghi CDE ở trạng thái',
                       { count: importStats.created }
                     )}{' '}
-                    <Tag color="orange">{t('label.draft', 'Bản nháp (Draft)')}</Tag>.
+                    <Tag color="orange">
+                      {t('label.draft', 'Bản nháp (Draft)')}
+                    </Tag>
+                    .
                   </div>
                   {importStats.updated > 0 && (
                     <div>
@@ -671,6 +779,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                   )}
                   {importErrors.length > 0 && (
                     <Alert
+                      showIcon
                       className="m-t-sm text-left"
                       description={
                         <ul
@@ -698,24 +807,15 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                         </ul>
                       }
                       message={t('label.failure-reason', 'Lý do lỗi')}
-                      showIcon
                       type="error"
                     />
                   )}
                 </Space>
               }
-              title={t('cde.import-completed-title', 'Hoàn tất nạp dữ liệu CDE!')}
-              extra={[
-                <Button
-                  key="done"
-                  type="primary"
-                  onClick={handleDone}>
-                  {t('cde.close-and-view-list', 'Đóng & Xem danh sách CDE')}
-                </Button>,
-                <Button key="another" onClick={resetState}>
-                  {t('cde.import-another-file', 'Nạp tiếp file khác')}
-                </Button>,
-              ]}
+              title={t(
+                'cde.import-completed-title',
+                'Hoàn tất nạp dữ liệu CDE!'
+              )}
             />
           )}
         </div>

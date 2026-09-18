@@ -13,7 +13,7 @@
 import { Col, Row, Tabs } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FEED_COUNT_INITIAL_DATA } from '../../../constants/entity.constants';
 import { EntityField } from '../../../constants/Feeds.constants';
 import {
@@ -39,6 +39,8 @@ import { FeedCounts } from '../../../interface/feed.interface';
 import { MOCK_GLOSSARY_NO_PERMISSIONS } from '../../../mocks/Glossary.mock';
 import { searchQuery } from '../../../rest/searchAPI';
 import { getFeedCounts } from '../../../utils/CommonUtils';
+import { getApprovedCDEAuditSnapshots } from '../../../utils/CDEApprovedVersionUtils';
+import { getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
 import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
@@ -78,7 +80,7 @@ export const CDE_RESTRICTED_TABS = new Set([
 ]);
 
 const GlossaryTermsV1 = ({
-  glossaryTerm,
+  glossaryTerm: currentGlossaryTerm,
   handleGlossaryTermUpdate,
   handleGlossaryTermDelete,
   onAssetClick,
@@ -95,6 +97,10 @@ const GlossaryTermsV1 = ({
   }>();
   const { fqn: glossaryFqn } = useFqn();
   const navigate = useNavigate();
+  const location = useLocation();
+  const approvedVersion = new URLSearchParams(location.search).get(
+    'approvedVersion'
+  );
   const { currentUser } = useApplicationStore();
   const isAdmin = Boolean(currentUser?.isAdmin);
   const assetTabRef = useRef<AssetsTabRef>(null);
@@ -115,6 +121,117 @@ const GlossaryTermsV1 = ({
 
     return tabs?.length ? tabs : undefined;
   }, [customizedPage?.tabs]);
+  const [viewedVersion, setViewedVersion] = useState<GlossaryTerm | null>(null);
+  const glossaryTerm = useMemo(
+    () =>
+      viewedVersion
+        ? { ...viewedVersion, changeDescription: undefined }
+        : currentGlossaryTerm,
+    [viewedVersion, currentGlossaryTerm]
+  );
+  const isViewingVersion = viewedVersion ? true : isVersionView;
+
+  useEffect(() => {
+    let cancelled = false;
+    setViewedVersion(null);
+    if (approvedVersion) {
+      const currentExt = currentGlossaryTerm.extension as
+        | { cdeVersion?: string; version?: string; phien_ban?: string }
+        | undefined;
+      const currentVer = String(
+        currentExt?.cdeVersion ??
+          currentExt?.version ??
+          currentExt?.phien_ban ??
+          '1.0'
+      ).trim();
+
+      if (currentVer === approvedVersion) {
+        return;
+      }
+
+      Promise.allSettled([
+        getGlossaryTermsVersionsList(currentGlossaryTerm.id),
+        getApprovedCDEAuditSnapshots(currentGlossaryTerm),
+      ])
+        .then(([historyRes, auditRes]) => {
+          if (cancelled) {
+            return;
+          }
+
+          const getSnapshotVer = (term?: GlossaryTerm | null): string => {
+            const ext = term?.extension as
+              | { cdeVersion?: string; version?: string; phien_ban?: string }
+              | undefined;
+            const raw = String(
+              ext?.cdeVersion ?? ext?.version ?? ext?.phien_ban ?? ''
+            ).trim();
+
+            return raw ? raw.replace(/^(version:?\s*|v)/i, '') : '1.0';
+          };
+
+          let candidate1_0: GlossaryTerm | null = null;
+
+          if (historyRes.status === 'fulfilled') {
+            const versions = (historyRes.value.versions ?? [])
+              .map((v) => {
+                try {
+                  return (
+                    typeof v === 'string' ? JSON.parse(v) : v
+                  ) as GlossaryTerm;
+                } catch {
+                  return undefined;
+                }
+              })
+              .filter((v): v is GlossaryTerm => Boolean(v))
+              .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
+
+            for (const p of versions) {
+              const ver = getSnapshotVer(p);
+              if (ver === approvedVersion) {
+                setViewedVersion(p);
+
+                return;
+              }
+            }
+
+            if (versions.length > 0) {
+              candidate1_0 = versions[versions.length - 1];
+            }
+          }
+
+          if (auditRes.status === 'fulfilled') {
+            const match = auditRes.value.find(({ snapshot }) => {
+              const ver = getSnapshotVer(snapshot);
+
+              return ver === approvedVersion;
+            });
+            if (match) {
+              setViewedVersion(match.snapshot);
+
+              return;
+            }
+          }
+
+          if (approvedVersion === '1.0' && candidate1_0) {
+            setViewedVersion(candidate1_0);
+
+            return;
+          }
+
+          setViewedVersion(null);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setViewedVersion(null);
+          }
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentGlossaryTerm.id, approvedVersion]);
+
   const { t } = useTranslation();
 
   const assetPermissions = useMemo(() => {
@@ -126,16 +243,20 @@ const GlossaryTermsV1 = ({
       : MOCK_GLOSSARY_NO_PERMISSIONS;
   }, [glossaryTerm, permissions]);
 
-  const activeTabHandler = useCallback((tab: string) => {
-    navigate(
-      {
-        pathname: version
-          ? getGlossaryTermsVersionsPath(glossaryFqn, version, tab)
-          : getGlossaryTermDetailsPath(glossaryFqn, tab),
-      },
-      { replace: true }
-    );
-  }, [glossaryFqn, navigate, version]);
+  const activeTabHandler = useCallback(
+    (tab: string) => {
+      navigate(
+        {
+          pathname: version
+            ? getGlossaryTermsVersionsPath(glossaryFqn, version, tab)
+            : getGlossaryTermDetailsPath(glossaryFqn, tab),
+          ...(location.search ? { search: location.search } : {}),
+        },
+        { replace: true }
+      );
+    },
+    [glossaryFqn, location.search, navigate, version]
+  );
 
   const isCDEGlossaryTerm = useMemo(
     () =>
@@ -172,7 +293,13 @@ const GlossaryTermsV1 = ({
     ) {
       activeTabHandler(EntityTabs.OVERVIEW);
     }
-  }, [isCDEGlossaryTerm, isDQGlossaryTerm, isAdmin, activeTab, activeTabHandler]);
+  }, [
+    isCDEGlossaryTerm,
+    isDQGlossaryTerm,
+    isAdmin,
+    activeTab,
+    activeTabHandler,
+  ]);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
     setFeedCount(data);
@@ -240,7 +367,7 @@ const GlossaryTermsV1 = ({
     const items = glossaryTermClassBase.getGlossaryTermDetailPageTabs({
       glossaryTerm,
       activeTab,
-      isVersionView: isVersionView ?? false,
+      isVersionView: isViewingVersion,
       assetCount,
       feedCount,
       permissions,
@@ -261,7 +388,7 @@ const GlossaryTermsV1 = ({
       items,
       customizedTabs,
       EntityTabs.OVERVIEW,
-      isVersionView
+      isViewingVersion
     );
 
     if (isDQGlossaryTerm) {
@@ -312,7 +439,7 @@ const GlossaryTermsV1 = ({
     feedCount.conversationCount,
     feedCount.totalTasksCount,
     isSummaryPanelOpen,
-    isVersionView,
+    isViewingVersion,
     assetPermissions,
     handleAssetSave,
     previewAsset,
@@ -333,7 +460,7 @@ const GlossaryTermsV1 = ({
   }, [glossaryFqn, isVersionView]);
 
   const updatedGlossaryTerm = useMemo(() => {
-    const name = isVersionView
+    const name = isViewingVersion
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.NAME,
@@ -341,7 +468,7 @@ const GlossaryTermsV1 = ({
         )
       : glossaryTerm.name;
 
-    const displayName = isVersionView
+    const displayName = isViewingVersion
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.DISPLAYNAME,
@@ -354,7 +481,7 @@ const GlossaryTermsV1 = ({
       name,
       displayName,
     };
-  }, [glossaryTerm, isVersionView]);
+  }, [glossaryTerm, isViewingVersion]);
 
   const isExpandViewSupported = useMemo(
     () =>
@@ -371,7 +498,7 @@ const GlossaryTermsV1 = ({
       customizedPage={customizedPage}
       data={updatedGlossaryTerm}
       isTabExpanded={isTabExpanded}
-      isVersionView={isVersionView}
+      isVersionView={isViewingVersion}
       permissions={permissions}
       type={EntityType.GLOSSARY_TERM}
       onUpdate={onTermUpdate}>
@@ -382,6 +509,14 @@ const GlossaryTermsV1 = ({
             onAddGlossaryTerm={onAddGlossaryTerm}
             onAssetAdd={() => setAssetModalVisible(true)}
             onDelete={handleGlossaryTermDelete}
+            onVersionSelect={(snapshot) =>
+              setViewedVersion(
+                snapshot.version === currentGlossaryTerm.version &&
+                  currentGlossaryTerm.entityStatus === EntityStatus.Approved
+                  ? null
+                  : snapshot
+              )
+            }
           />
         </Col>
 
