@@ -31,7 +31,7 @@ export interface CDEGlossaryTermFormValues {
   name?: string;
   displayName?: string;
   description?: string;
-  cdeVersion?: string;
+  version?: string;
   effectiveDate?: DateTime | null;
   expirationDate?: DateTime | null;
   phien_ban?: string;
@@ -141,9 +141,8 @@ const CDEGlossaryTermForm = ({
         expirationDate: glossaryTerm.extension?.expirationDate
           ? DateTime.fromISO(glossaryTerm.extension.expirationDate)
           : null,
-        cdeVersion:
+        version:
           glossaryTerm.extension?.version ??
-          glossaryTerm.extension?.cdeVersion ??
           glossaryTerm.extension?.phien_ban ??
           '1.0',
       });
@@ -177,10 +176,11 @@ const CDEGlossaryTermForm = ({
     const entityRelationshipVal =
       values.entityRelationship ?? values.moi_quan_he_voi_thuc_the;
 
-    const versionVal = values.cdeVersion?.trim();
+    const versionVal = values.version?.trim();
 
     const preservedExtension = { ...glossaryTerm?.extension };
     [
+      'version',
       'entityRelationship',
       'relatedRegulatoryDocuments',
       'dataQualityRules',
@@ -194,7 +194,6 @@ const CDEGlossaryTermForm = ({
         ...(versionVal
           ? {
               version: versionVal,
-              cdeVersion: versionVal,
             }
           : {}),
         ...(entityRelationshipVal
@@ -257,7 +256,7 @@ const CDEGlossaryTermForm = ({
         editMode ? 'edit' : 'add'
       }`}
       form={form}
-      initialValues={{ cdeVersion: '1.0' }}
+      initialValues={{ version: '1.0' }}
       layout="vertical"
       onFinish={onFinish}>
       <div className="cde-form-grid">
@@ -283,7 +282,7 @@ const CDEGlossaryTermForm = ({
         <Form.Item
           required
           label={t('cde.version')}
-          name="cdeVersion"
+          name="version"
           rules={[{ required: true, whitespace: true }]}>
           <Input data-testid="cde-version" placeholder="1.0" />
         </Form.Item>

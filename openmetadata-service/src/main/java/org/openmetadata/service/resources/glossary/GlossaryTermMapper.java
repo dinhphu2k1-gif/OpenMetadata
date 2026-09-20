@@ -9,6 +9,7 @@ import java.util.List;
 import org.openmetadata.schema.api.data.CreateGlossaryTerm;
 import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.TermRelation;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.mapper.EntityMapper;
@@ -17,6 +18,7 @@ public class GlossaryTermMapper implements EntityMapper<GlossaryTerm, CreateGlos
   @Override
   public GlossaryTerm createToEntity(CreateGlossaryTerm create, String user) {
     return copy(new GlossaryTerm(), create, user)
+        .withEntityStatus(EntityStatus.DRAFT)
         .withSynonyms(create.getSynonyms())
         .withStyle(create.getStyle())
         .withGlossary(getEntityReferenceByName(Entity.GLOSSARY, create.getGlossary()))

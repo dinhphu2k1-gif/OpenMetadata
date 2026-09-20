@@ -16,9 +16,13 @@ import { VotingDataProps } from '../../Entity/Voting/voting.interface';
 
 export interface GlossaryHeaderProps {
   supportAddOwner?: boolean;
+  latestData?: Glossary | GlossaryTerm;
   onDelete: (id: string) => Promise<void>;
   onAssetAdd?: () => void;
   onVersionSelect?: (version: Glossary | GlossaryTerm) => void;
+  onWorkflowTransition?: (
+    entity: Glossary | GlossaryTerm
+  ) => void | Promise<void>;
   updateVote?: (data: VotingDataProps) => Promise<void>;
   onAddGlossaryTerm: (glossaryTerm: GlossaryTerm | undefined) => void;
 }

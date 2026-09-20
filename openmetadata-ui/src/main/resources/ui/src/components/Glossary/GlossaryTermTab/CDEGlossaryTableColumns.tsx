@@ -21,13 +21,13 @@ import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.con
 import { EntityReference, EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
-  cdeVersion?: string;
   version?: string;
   effectiveDate?: string;
   expirationDate?: string;
@@ -138,15 +138,7 @@ export const getCDEGlossaryTableColumns = ({
         );
       }
 
-      const extension = record.extension as
-        | { cdeVersion?: string; version?: string; phien_ban?: string }
-        | undefined;
-      const businessVersion = String(
-        extension?.version ??
-          extension?.cdeVersion ??
-          extension?.phien_ban ??
-          ''
-      ).trim();
+      const businessVersion = getBusinessVersion(record.extension, '');
 
       const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
       const toUrl = businessVersion
@@ -290,10 +282,7 @@ export const getCDEGlossaryTableColumns = ({
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
-        : record.extension?.version ??
-          record.extension?.cdeVersion ??
-          record.extension?.phien_ban ??
-          '1.0',
+        : getBusinessVersion(record.extension),
   },
   {
     title: t('label.status'),

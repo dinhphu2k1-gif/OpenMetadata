@@ -112,6 +112,7 @@ import org.openmetadata.schema.type.csv.CsvImportResult;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.audit.AuditLogEntry;
 import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
@@ -134,6 +135,7 @@ import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.EntityUtil.RelationIncludes;
 import org.openmetadata.service.util.FullyQualifiedName;
+import org.openmetadata.service.util.GlossaryBusinessVersion;
 import org.openmetadata.service.util.IntakeFormValidator;
 import org.openmetadata.service.util.RequestEntityCache;
 import org.openmetadata.service.util.RestUtil;
@@ -142,6 +144,8 @@ import org.openmetadata.service.workflows.searchIndex.ReindexingUtil;
 
 @Slf4j
 public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
+  public static final String LATEST_PUBLISHED_EXTENSION = "glossaryTerm.published.latest";
+  public static final String WORKFLOW_HISTORY_EXTENSION = "glossaryTerm.workflowTransition";
   private static final String ES_MISSING_DATA =
       "Entity Details is unavailable in Elastic Search. Please reindex to get more Information.";
   private static final String UPDATE_FIELDS = "references,relatedTerms,synonyms,style";
@@ -589,32 +593,11 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
 
   @Override
   protected void setDefaultStatus(GlossaryTerm entity, boolean update) {
-    // If the entityStatus is set as Unprocessed then it is the default value from the POJO
+    // Every new Glossary Term starts as Draft. Approval must only happen through the workflow API.
     if (!update
         || entity.getEntityStatus() == null
         || entity.getEntityStatus() == EntityStatus.UNPROCESSED) {
-      // Get reviewers from parent term or glossary to determine appropriate default status
-      List<EntityReference> parentReviewers = null;
-
-      // Get parent reviewers if parent term exists
-      if (entity.getParent() != null) {
-        GlossaryTerm parentTerm =
-            Entity.getEntity(
-                entity.getParent().withType(GLOSSARY_TERM), "reviewers", Include.NON_DELETED);
-        parentReviewers = parentTerm.getReviewers();
-      }
-
-      // Get glossary reviewers if no parent reviewers
-      if (parentReviewers == null && entity.getGlossary() != null) {
-        Glossary glossary =
-            Entity.getEntity(entity.getGlossary(), "reviewers", Include.NON_DELETED);
-        parentReviewers = glossary.getReviewers();
-      }
-
-      // If parentTerm or glossary has reviewers set, the glossary term can only be created in
-      // `Draft` mode, otherwise use `Approved`
-      entity.setEntityStatus(
-          !nullOrEmpty(parentReviewers) ? EntityStatus.DRAFT : EntityStatus.APPROVED);
+      entity.setEntityStatus(EntityStatus.DRAFT);
     }
   }
 
@@ -626,6 +609,15 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   @Override
   public void storeEntity(GlossaryTerm entity, boolean update) {
     store(entity, update);
+    if (entity.getEntityStatus() == EntityStatus.APPROVED) {
+      daoCollection
+          .entityExtensionDAO()
+          .insert(
+              entity.getId(),
+              LATEST_PUBLISHED_EXTENSION,
+              GLOSSARY_TERM,
+              JsonUtils.pojoToJson(entity));
+    }
   }
 
   @Override
@@ -2072,6 +2064,14 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     @Override
     protected boolean consolidateChanges(
         GlossaryTerm original, GlossaryTerm updated, Operation operation) {
+      // A business-version transition must always produce a separate native history entry.
+      // Otherwise session consolidation can leave the new Approved version only in audit logs
+      // while the canonical glossary term still points to the previous business version.
+      if (!Objects.equals(
+          getBusinessVersion(original), getBusinessVersion(updated))) {
+        return false;
+      }
+
       // Never consolidate changes if entityStatus is changing (e.g. Approved -> Draft on create draft,
       // Draft -> In Review on submit, In Review -> Approved on approve)
       if (original.getEntityStatus() != updated.getEntityStatus()) {
@@ -2098,6 +2098,10 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       }
 
       return super.consolidateChanges(original, updated, operation);
+    }
+
+    private String getBusinessVersion(GlossaryTerm term) {
+      return GlossaryBusinessVersion.get(term.getExtension());
     }
 
     @Transaction
@@ -2530,6 +2534,15 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     if (id == null) {
       return null;
     }
+    GlossaryTerm current = dao.findEntityById(id, Include.NON_DELETED);
+    if (current.getEntityStatus() == EntityStatus.APPROVED) {
+      return current;
+    }
+    String published =
+        daoCollection.entityExtensionDAO().getExtension(id, LATEST_PUBLISHED_EXTENSION);
+    if (published != null) {
+      return JsonUtils.readValue(published, GlossaryTerm.class);
+    }
     String extensionPrefix = org.openmetadata.service.util.EntityUtil.getVersionExtensionPrefix(GLOSSARY_TERM);
     List<CollectionDAO.ExtensionRecord> records =
         daoCollection.entityExtensionDAO().getExtensions(id, extensionPrefix);
@@ -2541,13 +2554,98 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     oldVersions.sort(org.openmetadata.service.util.EntityUtil.compareVersion.reversed());
     for (CollectionDAO.EntityVersionPair pair : oldVersions) {
       String json = pair.getEntityJson();
-      if (json != null
-          && (json.contains("\"entityStatus\":\"Approved\"")
-              || json.contains("\"entityStatus\": \"Approved\""))) {
-        return JsonUtils.readValue(json, GlossaryTerm.class);
+      if (json != null) {
+        GlossaryTerm snapshot = JsonUtils.readValue(json, GlossaryTerm.class);
+        if (snapshot.getEntityStatus() == null
+            || snapshot.getEntityStatus() == EntityStatus.UNPROCESSED
+            || snapshot.getEntityStatus() == EntityStatus.APPROVED) {
+          return snapshot.withEntityStatus(EntityStatus.APPROVED);
+        }
       }
     }
-    return null;
+    return getApprovedAuditSnapshot(current);
+  }
+
+  private GlossaryTerm getApprovedAuditSnapshot(GlossaryTerm current) {
+    return getApprovedAuditSnapshots(current).stream().findFirst().orElse(null);
+  }
+
+  public List<GlossaryTerm> getApprovedAuditSnapshots(UUID id) {
+    return getApprovedAuditSnapshots(dao.findEntityById(id, Include.NON_DELETED));
+  }
+
+  private List<GlossaryTerm> getApprovedAuditSnapshots(GlossaryTerm current) {
+    List<GlossaryTerm> snapshots = new ArrayList<>();
+    try {
+      if (Entity.getAuditLogRepository() == null) {
+        return snapshots;
+      }
+      for (AuditLogEntry entry :
+          Entity.getAuditLogRepository()
+              .list(
+                  null,
+                  null,
+                  null,
+                  GLOSSARY_TERM,
+                  current.getFullyQualifiedName(),
+                  null,
+                  null,
+                  null,
+                  null,
+                  200,
+                  null,
+                  null)
+              .getData()) {
+        if (entry.getChangeEvent() == null || entry.getChangeEvent().getEntity() == null) {
+          continue;
+        }
+        Object raw = entry.getChangeEvent().getEntity();
+        GlossaryTerm snapshot =
+            raw instanceof String value
+                ? JsonUtils.readValue(value, GlossaryTerm.class)
+                : JsonUtils.readValue(JsonUtils.pojoToJson(raw), GlossaryTerm.class);
+        if (snapshot.getEntityStatus() == EntityStatus.APPROVED) {
+          snapshots.add(snapshot);
+        }
+      }
+    } catch (RuntimeException exception) {
+      LOG.warn("Unable to resolve legacy approved glossary term snapshot for {}", current.getId());
+    }
+    return snapshots;
+  }
+
+  public Map<UUID, GlossaryTerm> getLatestApprovedSnapshots(List<GlossaryTerm> terms) {
+    if (terms.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    return daoCollection
+        .entityExtensionDAO()
+        .getExtensionBatch(
+            terms.stream().map(term -> term.getId().toString()).toList(),
+            LATEST_PUBLISHED_EXTENSION)
+        .stream()
+        .collect(
+            Collectors.toMap(
+                CollectionDAO.ExtensionRecordWithId::id,
+                record -> JsonUtils.readValue(record.extensionJson(), GlossaryTerm.class)));
+  }
+
+  public void storeWorkflowTransition(String fqn, Map<String, Object> transition) {
+    storeTimeSeries(
+        fqn,
+        WORKFLOW_HISTORY_EXTENSION,
+        "glossaryWorkflowTransition",
+        JsonUtils.pojoToJson(transition));
+  }
+
+  public List<Object> getWorkflowHistory(String fqn) {
+    ListFilter filter =
+        new ListFilter(Include.ALL)
+            .addQueryParam("entityFQNHash", FullyQualifiedName.buildHash(fqn))
+            .addQueryParam("extension", WORKFLOW_HISTORY_EXTENSION);
+    return daoCollection.entityExtensionTimeSeriesDao().listWithOffset(filter, 1000, 0).stream()
+        .map(json -> JsonUtils.readValue(json, Object.class))
+        .toList();
   }
 
   public ResultList<GlossaryTerm> searchGlossaryTermsById(
@@ -2633,21 +2731,23 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       if (parentFqn != null) {
         filter.addQueryParam("parent", parentFqn);
       }
-      if (entityStatus != null && !entityStatus.isEmpty()) {
+      boolean publishedOnly = "Published".equals(entityStatus);
+      if (publishedOnly) {
+        filter.addQueryParam("publishedExtension", LATEST_PUBLISHED_EXTENSION);
+      } else if (entityStatus != null && !entityStatus.isEmpty()) {
         filter.addQueryParam("entityStatus", entityStatus);
       }
 
       ResultList<GlossaryTerm> res = listAfterWithOffset(null, getFields(fieldsParam), filter, limit, offset);
-      if ("Approved".equals(entityStatus) && res != null && res.getData() != null) {
+      if (("Approved".equals(entityStatus) || publishedOnly)
+          && res != null
+          && res.getData() != null) {
+        Map<UUID, GlossaryTerm> snapshots = getLatestApprovedSnapshots(res.getData());
         List<GlossaryTerm> resolved = new ArrayList<>();
         for (GlossaryTerm t : res.getData()) {
-          if (t.getEntityStatus() != EntityStatus.APPROVED) {
-            GlossaryTerm approved = getLatestApprovedSnapshot(t.getId());
-            if (approved != null) {
-              resolved.add(approved);
-            }
-          } else {
-            resolved.add(t);
+          GlossaryTerm approved = snapshots.get(t.getId());
+          if (approved != null) {
+            resolved.add(approved);
           }
         }
         res.setData(resolved);
@@ -2662,7 +2762,13 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     // Build status condition (validate against enum to prevent SQL injection)
     String statusCondition = "";
     boolean filterOnlyApproved = false;
-    if (entityStatus != null && !entityStatus.isBlank()) {
+    if ("Published".equals(entityStatus)) {
+      filterOnlyApproved = true;
+      statusCondition =
+          "AND id IN (SELECT id FROM entity_extension WHERE extension = '"
+              + LATEST_PUBLISHED_EXTENSION
+              + "')";
+    } else if (entityStatus != null && !entityStatus.isBlank()) {
       Set<String> validStatuses =
           Arrays.stream(EntityStatus.values()).map(EntityStatus::value).collect(Collectors.toSet());
       String validatedStatuses =
@@ -2694,17 +2800,20 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       jsons = jsons.subList(0, limit);
     }
 
+    List<GlossaryTerm> currentTerms =
+        jsons.stream().map(json -> JsonUtils.readValue(json, GlossaryTerm.class)).toList();
     List<GlossaryTerm> terms = new ArrayList<>();
-    for (String json : jsons) {
-      GlossaryTerm term = JsonUtils.readValue(json, GlossaryTerm.class);
-      if (filterOnlyApproved && term.getEntityStatus() != EntityStatus.APPROVED) {
-        GlossaryTerm approved = getLatestApprovedSnapshot(term.getId());
-        if (approved != null) {
-          terms.add(approved);
-        }
-      } else {
-        terms.add(term);
-      }
+    if (filterOnlyApproved) {
+      Map<UUID, GlossaryTerm> snapshots = getLatestApprovedSnapshots(currentTerms);
+      currentTerms.forEach(
+          term -> {
+            GlossaryTerm approved = snapshots.get(term.getId());
+            if (approved != null) {
+              terms.add(approved);
+            }
+          });
+    } else {
+      terms.addAll(currentTerms);
     }
 
     // Use bulk method for efficient field fetching
@@ -2890,9 +2999,35 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         glossaryRepository.get(null, glossaryTerm.getGlossary().getId(), Fields.EMPTY_FIELDS);
 
     List<GlossaryTerm> terms = listAllForCSV(fields, glossaryTerm.getFullyQualifiedName());
+    if (isConsumerUser(user)) {
+      Glossary publishedGlossary =
+          glossaryRepository.getLatestApprovedSnapshot(glossary.getId());
+      if (publishedGlossary != null) {
+        glossary = publishedGlossary;
+      }
+      Map<UUID, GlossaryTerm> snapshots = getLatestApprovedSnapshots(terms);
+      terms =
+          terms.stream()
+              .map(term -> snapshots.get(term.getId()))
+              .filter(Objects::nonNull)
+              .toList();
+    }
 
     terms.sort(Comparator.comparing(EntityInterface::getFullyQualifiedName));
     return new GlossaryRepository.GlossaryCsv(glossary, user).exportCsv(terms, callback);
+  }
+
+  private boolean isConsumerUser(String user) {
+    SubjectContext subject = SubjectContext.getSubjectContext(user);
+    boolean elevated =
+        subject.isAdmin()
+            || subject.isBot()
+            || subject.hasAnyRole("DataSteward")
+            || subject.hasAnyRole("DataProposer")
+            || subject.hasAnyRole("Admin")
+            || subject.hasAnyRole("Organization");
+    return !elevated
+        && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
   }
 
   @Override

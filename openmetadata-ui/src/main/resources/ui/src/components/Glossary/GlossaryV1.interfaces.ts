@@ -27,6 +27,6 @@ export type GlossaryV1Props = {
   onAssetClick?: (asset?: EntityDetailsObjectInterface) => void;
   isSummaryPanelOpen: boolean;
   updateVote?: (data: VotingDataProps) => Promise<void>;
-  refreshActiveGlossaryTerm?: () => void;
+  refreshActiveGlossaryTerm?: () => void | Promise<void>;
   refreshGlossaryList?: () => void;
 };

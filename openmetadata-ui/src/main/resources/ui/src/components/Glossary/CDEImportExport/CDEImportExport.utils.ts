@@ -49,7 +49,7 @@ export interface CDEImportRowData {
   personalData: string;
   relatedRegulatoryDocuments: string;
   dataQualityRules: string;
-  cdeVersion: string;
+  version: string;
   effectiveDate?: string;
   expirationDate?: string;
   reviewer: string;
@@ -224,7 +224,7 @@ export const exportCDEToExcel = (
       const dqRules = formatQualityRules(
         ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
       );
-      const version = ext.version ?? ext.cdeVersion ?? ext.phien_ban ?? '1.0';
+      const version = ext.version ?? ext.version ?? ext.phien_ban ?? '1.0';
       const statusLabel = getEntityStatusLabel(
         term.entityStatus ?? EntityStatus.Approved
       );
@@ -397,9 +397,9 @@ const HEADER_KEY_MAPPING: Record<string, string> = {
   chatluongdulieu: 'dataQualityRules',
   dataqualityrules: 'dataQualityRules',
   cldl: 'dataQualityRules',
-  phienban: 'cdeVersion',
-  version: 'cdeVersion',
-  cdeversion: 'cdeVersion',
+  phienban: 'version',
+  version: 'version',
+  cdeversion: 'version',
   nguoikiemsoat: 'reviewer',
   nguoipheduyet: 'reviewer',
   reviewer: 'reviewer',
@@ -1042,7 +1042,7 @@ export const readAndValidateCDEExcel = async (
       personalData: '',
       relatedRegulatoryDocuments: '',
       dataQualityRules: '',
-      cdeVersion: '1.0',
+      version: '1.0',
       reviewer: '',
     };
 
@@ -1194,11 +1194,11 @@ export const readAndValidateCDEExcel = async (
     }
 
     // 10. Thẩm định Phiên bản CDE
-    if (rowData.cdeVersion) {
-      const verRes = validateCDEVersionValue(rowData.cdeVersion);
+    if (rowData.version) {
+      const verRes = validateCDEVersionValue(rowData.version);
       if (!verRes.isValid) {
         errors.push(
-          `Phiên bản '${rowData.cdeVersion}' không đúng định dạng (ví dụ: 1.0, 2.0).`
+          `Phiên bản '${rowData.version}' không đúng định dạng (ví dụ: 1.0, 2.0).`
         );
       }
     }
@@ -1252,7 +1252,7 @@ export const readAndValidateCDEExcel = async (
       personalData: rowData.personalData,
       relatedRegulatoryDocuments: rowData.relatedRegulatoryDocuments,
       dataQualityRules: rowData.dataQualityRules,
-      cdeVersion: rowData.cdeVersion || '1.0',
+      version: rowData.version || '1.0',
       reviewer: rowData.reviewer,
       status: EntityStatus.Draft, // Cố định trạng thái khi import là Draft theo quy định
       isExisting,
@@ -1406,8 +1406,7 @@ export const transformRowToGlossaryTermPayload = (
   const extension = mergeCDEDates(
     {
       ...existingExtension,
-      version: row.cdeVersion || '1.0',
-      cdeVersion: row.cdeVersion || '1.0',
+      version: row.version || '1.0',
       ...(row.entityRelationship
         ? { entityRelationship: row.entityRelationship }
         : {}),

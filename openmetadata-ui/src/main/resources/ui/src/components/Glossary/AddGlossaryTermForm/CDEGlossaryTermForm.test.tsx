@@ -166,7 +166,7 @@ const mockGlossaryTerm: GlossaryTerm = {
     },
   ],
   extension: {
-    cdeVersion: '1.0',
+    version: '1.0',
     entityRelationship: '1 KH - N TK',
     dataQualityRules: ['Y'],
     relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
@@ -262,7 +262,7 @@ describe('CDEGlossaryTermForm', () => {
           }),
         ],
         extension: expect.objectContaining({
-          cdeVersion: '1.0',
+          version: '1.0',
         }),
       })
     );
@@ -339,7 +339,7 @@ describe('CDEGlossaryTermForm', () => {
 
     // Extension fields
     expect(savedData.extension).toEqual({
-      cdeVersion: '1.0',
+      version: '1.0',
       entityRelationship: '1 KH - N TK',
       dataQualityRules: ['Y'],
       relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',

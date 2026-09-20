@@ -27,7 +27,10 @@ import {
 import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../enums/common.enum';
 import { EntityAction, EntityTabs, EntityType } from '../../enums/entity.enum';
 import { Glossary } from '../../generated/entity/data/glossary';
-import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../generated/entity/data/glossaryTerm';
 import { PageType } from '../../generated/system/ui/page';
 import { useCustomPages } from '../../hooks/useCustomPages';
 import { VERSION_VIEW_GLOSSARY_PERMISSION } from '../../mocks/Glossary.mock';
@@ -292,6 +295,26 @@ const GlossaryV1 = ({
         (selectedData.fullyQualifiedName ?? ''),
       parent: activeGlossaryTerm?.fullyQualifiedName,
     });
+
+    if (isGlossaryActive) {
+      const glossary = selectedData as Glossary;
+      const versionTermIds = glossary.extension?.termIds;
+      if (
+        Array.isArray(versionTermIds) ||
+        glossary.entityStatus !== EntityStatus.Approved
+      ) {
+        const currentTermIds = Array.isArray(versionTermIds)
+          ? versionTermIds
+          : [];
+        await updateGlossary({
+          ...glossary,
+          extension: {
+            ...glossary.extension,
+            termIds: Array.from(new Set([...currentTermIds, term.id])),
+          },
+        });
+      }
+    }
 
     onTermModalSuccess(term);
   };

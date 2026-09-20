@@ -104,7 +104,7 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
               ? undefined
               : first?.glossary?.displayName
           ) ||
-          first?.extension?.cdeVersion != null ||
+          first?.extension?.version != null ||
           first?.extension?.version != null
         );
 
@@ -169,7 +169,7 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                 ? undefined
                 : first?.glossary?.displayName
             ) ||
-            first?.extension?.cdeVersion != null ||
+            first?.extension?.version != null ||
             first?.extension?.version != null
           );
 
@@ -187,15 +187,15 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
               }
               const raw = String(
                 p?.extension?.version ??
-                p?.extension?.cdeVersion ??
-                p?.extension?.phien_ban ??
-                '1.0'
+                  p?.extension?.phien_ban ??
+                  '1.0'
               ).trim();
               const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
 
               if (clean === cleanParamVer || toString(p.version) === version) {
                 matchedSnapshotVersion = toString(p.version);
                 matchedCdeVer = clean;
+
                 break;
               }
             }
@@ -217,10 +217,9 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                     : firstApproved;
                 targetVersion = toString(p.version);
                 const raw = String(
-                  p?.extension?.cdeVersion ??
                   p?.extension?.version ??
-                  p?.extension?.phien_ban ??
-                  '1.0'
+                    p?.extension?.phien_ban ??
+                    '1.0'
                 ).trim();
                 matchedCdeVer = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
               } else if (first?.version) {
@@ -283,7 +282,6 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
     }
     const term = selectedData as GlossaryTerm;
     const raw = String(
-      term?.extension?.cdeVersion ??
       term?.extension?.version ??
       term?.extension?.phien_ban ??
       '1.0'

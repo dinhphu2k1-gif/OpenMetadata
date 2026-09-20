@@ -14,7 +14,7 @@ describe('CDE column preference migration', () => {
 
     expect(result[key]).toEqual([
       'cdeDomains',
-      'cdeVersion',
+      'version',
       'effectiveDate',
       'expirationDate',
     ]);

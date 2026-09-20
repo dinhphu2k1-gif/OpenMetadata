@@ -59,7 +59,8 @@ const GlossaryDetails = ({
 }: GlossaryDetailsProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { activeGlossary: glossary } = useGlossaryStore();
+  const { activeGlossary: glossary, updateActiveGlossary } =
+    useGlossaryStore();
   const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
   const currentGlossary = viewedVersion ?? glossary;
 
@@ -153,7 +154,14 @@ const GlossaryDetails = ({
       {
         label: (
           <TabsLabel
-            count={glossary.termCount ?? glossary.childrenCount ?? 0}
+            count={
+              Array.isArray(glossary.extension?.termIds)
+                ? glossary.extension.termIds.length
+                : !isVersionView &&
+                  glossary.entityStatus !== EntityStatus.Approved
+                ? 0
+                : glossary.termCount ?? glossary.childrenCount ?? 0
+            }
             id={EntityTabs.TERMS}
             isActive={activeTab === EntityTabs.TERMS}
             name={tabLabelMap[EntityTabs.TERMS] ?? t('label.term-plural')}
@@ -242,12 +250,15 @@ const GlossaryDetails = ({
             onDelete={handleGlossaryDelete}
             onVersionSelect={(snapshot) =>
               setViewedVersion(
-                (snapshot as Glossary).version === glossary.version &&
-                  (snapshot as Glossary).entityStatus === EntityStatus.Approved
+                (snapshot as Glossary).version === glossary.version
                   ? null
                   : (snapshot as Glossary)
               )
             }
+            onWorkflowTransition={(updated) => {
+              setViewedVersion(null);
+              updateActiveGlossary(updated as Glossary);
+            }}
           />
         </Col>
         <Col className="glossary-page-tabs" span={24}>

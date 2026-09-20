@@ -13,6 +13,8 @@
 
 package org.openmetadata.service.resources.glossary;
 
+import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
+
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,10 +28,13 @@ import jakarta.json.JsonPatch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -43,8 +48,13 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
@@ -52,6 +62,7 @@ import org.openmetadata.schema.api.data.RestoreEntity;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.type.ChangeEvent;
 import org.openmetadata.schema.type.EntityHistory;
+import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.MetadataOperation;
 import org.openmetadata.schema.type.csv.CsvImportResult;
@@ -65,7 +76,9 @@ import org.openmetadata.service.limits.Limits;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.resources.EntityResource;
 import org.openmetadata.service.security.Authorizer;
+import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.CSVExportResponse;
+import org.openmetadata.service.util.GlossaryBusinessVersion;
 
 @Path("/v1/glossaries")
 @Tag(
@@ -144,8 +157,24 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           @DefaultValue("non-deleted")
           Include include) {
     ListFilter filter = new ListFilter(include);
-    return super.listInternal(
-        uriInfo, securityContext, fieldsParam, filter, limitParam, before, after);
+    if (isConsumer(securityContext)) {
+      filter.addQueryParam("publishedExtension", GlossaryRepository.LATEST_PUBLISHED_EXTENSION);
+    }
+    ResultList<Glossary> result =
+        super.listInternal(
+            uriInfo, securityContext, fieldsParam, filter, limitParam, before, after);
+    if (isConsumer(securityContext)) {
+      Map<UUID, Glossary> snapshots = repository.getLatestApprovedSnapshots(result.getData());
+      List<Glossary> published = new ArrayList<>();
+      for (Glossary glossary : result.getData()) {
+        Glossary snapshot = snapshots.get(glossary.getId());
+        if (snapshot != null) {
+          published.add(addHref(uriInfo, snapshot));
+        }
+      }
+      result.setData(published);
+    }
+    return result;
   }
 
   @GET
@@ -190,7 +219,127 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
               schema = @Schema(type = "string", example = "owners:non-deleted,followers:all"))
           @QueryParam("includeRelations")
           String includeRelations) {
-    return getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
+    Glossary glossary =
+        getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
+    if (isConsumer(securityContext) && glossary.getEntityStatus() != EntityStatus.APPROVED) {
+      Glossary published = repository.getLatestApprovedSnapshot(id);
+      if (published == null) {
+        throw new NotFoundException("No approved glossary version exists");
+      }
+      return addHref(uriInfo, published);
+    }
+    return glossary;
+  }
+
+  @GET
+  @Path("/{id}/published/latest")
+  @Operation(operationId = "getLatestPublishedGlossary", summary = "Get latest approved glossary")
+  public Glossary getLatestPublished(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id) {
+    getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    Glossary published = repository.getLatestApprovedSnapshot(id);
+    if (published == null) {
+      throw new NotFoundException("No approved glossary version exists");
+    }
+    return addHref(uriInfo, published);
+  }
+
+  @POST
+  @Path("/{id}/workflow/{action}")
+  @Operation(operationId = "transitionGlossaryWorkflow", summary = "Run a glossary workflow action")
+  public Response transitionWorkflow(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @PathParam("action") String actionValue,
+      @Valid GlossaryWorkflowRequest request) {
+    Glossary current =
+        getInternal(uriInfo, securityContext, id, "owners,reviewers,extension", Include.NON_DELETED, null);
+    GlossaryWorkflowSupport.Action action = GlossaryWorkflowSupport.Action.fromPath(actionValue);
+    SubjectContext subject = getSubjectContext(securityContext);
+    EntityStatus target =
+        GlossaryWorkflowSupport.validate(
+            action,
+            current.getEntityStatus(),
+            current.getVersion(),
+            request,
+            subject,
+            current.getOwners(),
+            current.getReviewers());
+
+    Glossary updated = JsonUtils.readValue(JsonUtils.pojoToJson(current), Glossary.class);
+    updated.setEntityStatus(target);
+    boolean businessVersioned =
+        GlossaryBusinessVersion.appliesTo(
+            current.getName(), current.getDisplayName(), current.getFullyQualifiedName());
+    if (action == GlossaryWorkflowSupport.Action.CREATE_DRAFT && businessVersioned) {
+      if (request.getBusinessVersion() == null || request.getBusinessVersion().isBlank()) {
+        throw new BadRequestException("businessVersion is required for this glossary");
+      }
+      updated.setExtension(
+          GlossaryBusinessVersion.normalize(
+              updated.getExtension(), request.getBusinessVersion()));
+    } else if (request.getBusinessVersion() != null && !businessVersioned) {
+      throw new BadRequestException(
+          "businessVersion is only supported for Data Dictionary and Data Quality");
+    }
+
+    Response response =
+        patchInternal(
+            uriInfo,
+            securityContext,
+            id,
+            JsonUtils.getJsonPatch(current, updated));
+    Map<String, Object> transition = new HashMap<>();
+    transition.put("action", actionValue);
+    transition.put("fromStatus", current.getEntityStatus().value());
+    transition.put("toStatus", target.value());
+    transition.put("actor", securityContext.getUserPrincipal().getName());
+    transition.put("timestamp", System.currentTimeMillis());
+    transition.put("nativeVersion", current.getVersion());
+    if (businessVersioned) {
+      transition.put("businessVersion", GlossaryBusinessVersion.get(updated.getExtension()));
+    }
+    repository.storeWorkflowTransition(current.getFullyQualifiedName(), transition);
+    return response;
+  }
+
+  @GET
+  @Path("/{id}/workflow/history")
+  @Operation(operationId = "getGlossaryWorkflowHistory", summary = "Get glossary workflow history")
+  public List<Object> getWorkflowHistory(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id) {
+    Glossary glossary =
+        getInternal(uriInfo, securityContext, id, "reviewers", Include.NON_DELETED, null);
+    SubjectContext subject = getSubjectContext(securityContext);
+    boolean allowed =
+        subject.isAdmin()
+            || subject.hasAnyRole("DataSteward")
+            || subject.hasAnyRole("Admin")
+            || subject.hasAnyRole("Organization")
+            || subject.isReviewer(glossary.getReviewers());
+    if (!allowed) {
+      throw new ForbiddenException("Only administrators, Data Stewards, and reviewers can view workflow history");
+    }
+    return repository.getWorkflowHistory(glossary.getFullyQualifiedName());
+  }
+
+  private boolean isConsumer(SecurityContext securityContext) {
+    SubjectContext subject = getSubjectContext(securityContext);
+    if (subject == null || subject.isAdmin() || subject.isBot()) {
+      return false;
+    }
+    boolean elevated =
+        subject.hasAnyRole("DataSteward")
+            || subject.hasAnyRole("DataProposer")
+            || subject.hasAnyRole("Admin")
+            || subject.hasAnyRole("Organization");
+    return !elevated
+        && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
   }
 
   @GET
@@ -228,7 +377,15 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           @QueryParam("include")
           @DefaultValue("non-deleted")
           Include include) {
-    return getByNameInternal(uriInfo, securityContext, name, fieldsParam, include);
+    Glossary glossary = getByNameInternal(uriInfo, securityContext, name, fieldsParam, include);
+    if (isConsumer(securityContext) && glossary.getEntityStatus() != EntityStatus.APPROVED) {
+      Glossary published = repository.getLatestApprovedSnapshot(glossary.getId());
+      if (published == null) {
+        throw new NotFoundException("No approved glossary version exists");
+      }
+      return addHref(uriInfo, published);
+    }
+    return glossary;
   }
 
   @GET
@@ -252,7 +409,44 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Parameter(description = "Id of the glossary", schema = @Schema(type = "UUID"))
           @PathParam("id")
           UUID id) {
-    return super.listVersionsInternal(securityContext, id);
+    EntityHistory history = super.listVersionsInternal(securityContext, id);
+    if (isConsumer(securityContext) && history != null && history.getVersions() != null) {
+      List<Object> approved = new ArrayList<>();
+      Set<String> seen = new HashSet<>();
+      for (Object value : history.getVersions()) {
+        try {
+          Glossary glossary =
+              value instanceof Glossary
+                  ? (Glossary) value
+                  : JsonUtils.readValue(
+                      value instanceof String ? (String) value : JsonUtils.pojoToJson(value),
+                      Glossary.class);
+          if (glossary.getEntityStatus() == null
+              || glossary.getEntityStatus() == EntityStatus.UNPROCESSED
+              || glossary.getEntityStatus() == EntityStatus.APPROVED) {
+            approved.add(glossary.withEntityStatus(EntityStatus.APPROVED));
+            seen.add(approvedVersionKey(glossary));
+          }
+        } catch (RuntimeException ignored) {
+          // Ignore malformed legacy history rows.
+        }
+      }
+      for (Glossary snapshot : repository.getApprovedAuditSnapshots(id)) {
+        if (seen.add(approvedVersionKey(snapshot))) {
+          approved.add(snapshot);
+        }
+      }
+      history.setVersions(approved);
+    }
+    return history;
+  }
+
+  private String approvedVersionKey(Glossary glossary) {
+    if (GlossaryBusinessVersion.appliesTo(
+        glossary.getName(), glossary.getDisplayName(), glossary.getFullyQualifiedName())) {
+      return "business:" + GlossaryBusinessVersion.get(glossary.getExtension());
+    }
+    return "native:" + glossary.getVersion();
   }
 
   @GET
@@ -284,7 +478,14 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
               schema = @Schema(type = "string", example = "0.1 or 1.1"))
           @PathParam("version")
           String version) {
-    return super.getVersionInternal(securityContext, id, version);
+    Glossary glossary = super.getVersionInternal(securityContext, id, version);
+    if (isConsumer(securityContext)
+        && glossary.getEntityStatus() != null
+        && glossary.getEntityStatus() != EntityStatus.UNPROCESSED
+        && glossary.getEntityStatus() != EntityStatus.APPROVED) {
+      throw new ForbiddenException("Not authorized to view unapproved version");
+    }
+    return glossary;
   }
 
   @POST
@@ -336,6 +537,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
                         @ExampleObject("[{op:remove, path:/a},{op:add, path: /b, value: val}]")
                       }))
           JsonPatch patch) {
+    rejectDirectStatusPatch(patch);
+    ensureDraft(repository.get(null, id, repository.getFields("id")));
     return patchInternal(uriInfo, securityContext, id, patch);
   }
 
@@ -365,7 +568,28 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
                         @ExampleObject("[{op:remove, path:/a},{op:add, path: /b, value: val}]")
                       }))
           JsonPatch patch) {
+    rejectDirectStatusPatch(patch);
+    ensureDraft(repository.getByName(null, fqn, repository.getFields("id")));
     return patchInternal(uriInfo, securityContext, fqn, patch);
+  }
+
+  private void ensureDraft(Glossary glossary) {
+    if (glossary.getEntityStatus() != EntityStatus.DRAFT) {
+      throw new BadRequestException("Glossary must be Draft before it can be edited");
+    }
+  }
+
+  private void rejectDirectStatusPatch(JsonPatch patch) {
+    if (patch != null
+        && patch.toJsonArray().stream()
+            .anyMatch(
+                operation ->
+                    operation
+                        .asJsonObject()
+                        .getString("path", "")
+                        .startsWith("/entityStatus"))) {
+      throw new BadRequestException("Use the glossary workflow action API to change entityStatus");
+    }
   }
 
   @PUT
@@ -388,6 +612,15 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @Valid CreateGlossary create) {
     Glossary glossary = mapper.createToEntity(create, securityContext.getUserPrincipal().getName());
+    repository.prepareInternal(glossary, true);
+    repository
+        .getByNameOrNull(
+            null,
+            glossary.getFullyQualifiedName(),
+            repository.getFields("id"),
+            Include.NON_DELETED,
+            false)
+        .ifPresent(this::ensureDraft);
     return createOrUpdate(uriInfo, securityContext, glossary);
   }
 

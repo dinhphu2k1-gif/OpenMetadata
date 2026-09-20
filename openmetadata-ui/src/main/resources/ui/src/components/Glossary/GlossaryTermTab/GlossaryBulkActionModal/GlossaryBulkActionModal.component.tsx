@@ -15,8 +15,10 @@ import { Button } from '@openmetadata/ui-core-components';
 import { Modal, Progress, Space, Typography } from 'antd';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
-import { patchGlossaryTerm } from '../../../../rest/glossaryAPI';
+import {
+  GlossaryWorkflowAction,
+  transitionGlossaryTermWorkflow,
+} from '../../../../rest/glossaryAPI';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
@@ -77,7 +79,7 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     ),
     reject: t(
       'message.confirm-bulk-reject-desc',
-      'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.',
+      'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được giữ ở trạng thái Từ chối cho đến khi người đề xuất chọn Chỉnh sửa lại.',
       { count: terms.length }
     ),
     revoke: t(
@@ -91,12 +93,12 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     setIsProcessing(true);
     setProgress(0);
 
-    const targetStatus =
+    const action: GlossaryWorkflowAction =
       actionType === 'submitForReview'
-        ? EntityStatus.InReview
+        ? 'submit'
         : actionType === 'approve'
-        ? EntityStatus.Approved
-        : EntityStatus.Draft;
+        ? 'approve'
+        : actionType;
 
     let successCount = 0;
     let failedCount = 0;
@@ -108,15 +110,9 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         chunk.map(async (term) => {
           try {
             setCurrentTermName(term.displayName || term.name || '');
-            const patch = [
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: targetStatus,
-              },
-            ];
-
-            await patchGlossaryTerm(term.id, patch);
+            await transitionGlossaryTermWorkflow(term.id, action, {
+              expectedNativeVersion: Number(term.version),
+            });
             successCount++;
           } catch {
             failedCount++;

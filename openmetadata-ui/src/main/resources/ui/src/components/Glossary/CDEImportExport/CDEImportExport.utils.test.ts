@@ -108,7 +108,7 @@ describe('CDEImportExport.utils', () => {
             },
           ],
           extension: {
-            cdeVersion: '1.0',
+            version: '1.0',
             effectiveDate: '2026-09-18',
             expirationDate: '2026-12-31',
             entityRelationship: 'Thuộc thực thể Khách hàng',
@@ -248,7 +248,7 @@ describe('CDEImportExport.utils', () => {
         personalData: 'Có',
         relatedRegulatoryDocuments: 'Văn bản 123',
         dataQualityRules: 'Có',
-        cdeVersion: '1.0',
+        version: '1.0',
         reviewer: 'steward',
         status: EntityStatus.Draft,
         errors: [],
@@ -263,7 +263,7 @@ describe('CDEImportExport.utils', () => {
       expect(payload.glossary).toBe('Data Dictionary');
       expect((payload as any).entityStatus).toBeUndefined(); // Không gửi entityStatus trong CreateGlossaryTerm payload
       expect(payload.extension).toEqual({
-        cdeVersion: '1.0',
+        version: '1.0',
         entityRelationship: 'Quan hệ thực thể',
         relatedRegulatoryDocuments: 'Văn bản 123',
         dataQualityRules: ['Y'],
@@ -292,7 +292,7 @@ describe('CDEImportExport.utils', () => {
         personalData: 'Không',
         relatedRegulatoryDocuments: '<p>okela</p>',
         dataQualityRules: 'Có',
-        cdeVersion: '1.3',
+        version: '1.3',
         reviewer: 'KDVT',
         status: EntityStatus.Draft,
         errors: [],
@@ -324,7 +324,7 @@ describe('CDEImportExport.utils', () => {
         payload.tags?.find((t) => t.tagFQN.startsWith('PersonalData.'))
       ).toBeUndefined();
       expect(payload.extension).toEqual({
-        cdeVersion: '1.3',
+        version: '1.3',
         entityRelationship: '<p>test 1 tý</p>',
         relatedRegulatoryDocuments: '<p>okela</p>',
         dataQualityRules: ['Y'],

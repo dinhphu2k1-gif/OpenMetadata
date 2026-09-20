@@ -72,10 +72,26 @@ public class ListFilter extends Filter<ListFilter> {
     conditions.add(getAgentTypeCondition());
     conditions.add(getProviderCondition(tableName));
     conditions.add(getEntityStatusCondition(tableName));
+    conditions.add(getExtensionCondition());
+    conditions.add(getPublishedExtensionCondition(tableName));
     conditions.add(getServerIdCondition(tableName));
     conditions.add(getNameFilterCondition());
     String condition = addCondition(conditions);
     return condition.isEmpty() ? "WHERE TRUE" : "WHERE " + condition;
+  }
+
+  private String getExtensionCondition() {
+    String extension = queryParams.get("extension");
+    return extension == null ? "" : "extension = :extension";
+  }
+
+  private String getPublishedExtensionCondition(String tableName) {
+    String extension = queryParams.get("publishedExtension");
+    String idColumn = tableName == null ? "id" : tableName + ".id";
+    return extension == null
+        ? ""
+        : idColumn
+            + " IN (SELECT id FROM entity_extension WHERE extension = :publishedExtension)";
   }
 
   public ResourceContext getResourceContext(String entityType) {

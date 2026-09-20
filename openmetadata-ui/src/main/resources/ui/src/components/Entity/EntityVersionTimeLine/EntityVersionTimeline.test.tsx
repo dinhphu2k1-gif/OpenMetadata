@@ -108,21 +108,21 @@ describe('VersionButton', () => {
     expect(onVersionSelect).toHaveBeenCalledWith('1.0');
   });
 
-  it('renders CDE version number when extension.cdeVersion is present', () => {
-    const cdeVersionData = {
+  it('renders CDE version number when extension.version is present', () => {
+    const versionData = {
       updatedBy: 'John Doe',
       version: '1.5',
       changeDescription: {} as ChangeDescription,
       updatedAt: 123,
       glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
-      extension: { cdeVersion: '1.2' },
+      extension: { version: '1.2' },
     };
 
     render(
       <VersionButton
         isMajorVersion={isMajorVersion}
         selected={selected}
-        version={cdeVersionData}
+        version={versionData}
         onVersionSelect={onVersionSelect}
       />
     );
@@ -140,7 +140,7 @@ describe('EntityVersionTimeLine for CDE', () => {
       versions: [
         JSON.stringify({
           version: '1.5',
-          extension: { cdeVersion: '1.2' },
+          extension: { version: '1.2' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'user3',
@@ -148,7 +148,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         }),
         JSON.stringify({
           version: '1.4',
-          extension: { cdeVersion: '1.0' },
+          extension: { version: '1.0' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'user4',
@@ -156,7 +156,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         }),
         JSON.stringify({
           version: '1.3',
-          extension: { cdeVersion: '1.0' },
+          extension: { version: '1.0' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'user3',
@@ -164,7 +164,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         }),
         JSON.stringify({
           version: '1.2',
-          extension: { cdeVersion: '1.0' },
+          extension: { version: '1.0' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'admin',
@@ -203,7 +203,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         // v1.2 is only In Review (never approved) -> should be excluded
         JSON.stringify({
           version: '1.5',
-          extension: { cdeVersion: '1.2' },
+          extension: { version: '1.2' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'In Review',
           updatedBy: 'user3',
@@ -212,7 +212,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         // v1.1 has Draft snapshot (1.4) and Approved snapshot (1.3) -> should use approved snapshot
         JSON.stringify({
           version: '1.4',
-          extension: { cdeVersion: '1.1' },
+          extension: { version: '1.1' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Draft',
           updatedBy: 'user3',
@@ -220,7 +220,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         }),
         JSON.stringify({
           version: '1.3',
-          extension: { cdeVersion: '1.1' },
+          extension: { version: '1.1' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'admin',
@@ -229,7 +229,7 @@ describe('EntityVersionTimeLine for CDE', () => {
         // v1.0 is Approved
         JSON.stringify({
           version: '1.1',
-          extension: { cdeVersion: '1.0' },
+          extension: { version: '1.0' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
           updatedBy: 'admin',
@@ -264,7 +264,7 @@ describe('EntityVersionTimeLine for CDE', () => {
       versions: [
         JSON.stringify({
           version: '0.1',
-          extension: { cdeVersion: '1.0' },
+          extension: { version: '1.0' },
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Draft',
           updatedBy: 'user3',

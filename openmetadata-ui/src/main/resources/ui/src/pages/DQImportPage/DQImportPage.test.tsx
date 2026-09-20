@@ -89,12 +89,14 @@ jest.mock('../../rest/glossaryAPI', () => ({
     id: 'term-dq-1',
     name: 'DQ3.1',
     status: 'Draft',
+    version: 0.1,
   }),
   patchGlossaryTerm: jest.fn().mockResolvedValue({
     id: 'term-dq-1',
     name: 'DQ3.1',
     status: 'Draft',
   }),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../rest/tagAPI', () => ({
@@ -323,7 +325,6 @@ describe('DQImportPage', () => {
     expect(glossaryAPI.addGlossaryTerm).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'DQ3.1',
-        status: 'Draft',
       })
     );
 
@@ -339,12 +340,10 @@ describe('DQImportPage', () => {
       fireEvent.click(submitAllBtn);
     });
 
-    expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-dq-1', [
-      {
-        op: 'replace',
-        path: '/entityStatus',
-        value: 'In Review',
-      },
-    ]);
+    expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-dq-1',
+      'submit',
+      { expectedNativeVersion: 0.1 }
+    );
   });
 });

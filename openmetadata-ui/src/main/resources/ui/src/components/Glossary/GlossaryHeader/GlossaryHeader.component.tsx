@@ -22,6 +22,7 @@ import {
 } from 'antd';
 import ButtonGroup from 'antd/lib/button/button-group';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
+import { MenuInfo } from 'rc-menu/lib/interface';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { cloneDeep, isEmpty, toString } from 'lodash';
@@ -37,9 +38,6 @@ import { ReactComponent as ExportIcon } from '../../../assets/svg/ic-export.svg'
 import { ReactComponent as ImportIcon } from '../../../assets/svg/ic-import.svg';
 import { ReactComponent as VersionIcon } from '../../../assets/svg/ic-version.svg';
 import { ReactComponent as IconDropdown } from '../../../assets/svg/menu.svg';
-import { ReactComponent as RevokeIcon } from '../../../assets/svg/ic-cancel-outline.svg';
-import { ReactComponent as PaperPlaneIcon } from '../../../assets/svg/paper-plane.svg';
-import { ReactComponent as CheckIcon } from '../../../assets/svg/ic-check-circle.svg';
 import { ReactComponent as StyleIcon } from '../../../assets/svg/style.svg';
 import { ManageButtonItemLabel } from '../../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
@@ -76,6 +74,9 @@ import {
   getGlossaryTermsVersion,
   getGlossaryVersionsList,
   getGlossaryVersion,
+  GlossaryWorkflowAction,
+  transitionGlossaryTermWorkflow,
+  transitionGlossaryWorkflow,
 } from '../../../rest/glossaryAPI';
 import { API_RES_MAX_SIZE } from '../../../constants/constants';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
@@ -83,6 +84,10 @@ import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
 import { exportDQToExcel } from '../DQImportExport/DQImportExport.utils';
 
 import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
+import {
+  compareBusinessVersions,
+  getBusinessVersion,
+} from '../../../utils/BusinessVersionUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
@@ -96,12 +101,12 @@ import { useRequiredParams } from '../../../utils/useRequiredParams';
 import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
-import { EntityStatusBadge } from '../../Entity/EntityStatusBadge/EntityStatusBadge.component';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
 import StyleModal from '../../Modals/StyleModal/StyleModal.component';
+import { useGlossaryStore } from '../useGlossary.store';
 import { GlossaryHeaderProps } from './GlossaryHeader.interface';
 import './glossery-header.less';
 
@@ -119,16 +124,18 @@ export const suggestNextVersion = (ver: string): string => {
 };
 
 const GlossaryHeader = ({
+  latestData,
   onDelete,
   onAssetAdd,
   onAddGlossaryTerm,
   onVersionSelect,
-  updateVote,
+  onWorkflowTransition,
 }: GlossaryHeaderProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { fqn } = useFqn();
   const { currentUser, selectedPersona } = useApplicationStore();
+  const { activeGlossary } = useGlossaryStore();
   const {
     onUpdate,
     data: selectedData,
@@ -158,19 +165,23 @@ const GlossaryHeader = ({
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
   const [isSubmitForReviewModalOpen, setIsSubmitForReviewModalOpen] =
     useState<boolean>(false);
-  const [submitVersion, setSubmitVersion] = useState<string>('');
   const [isSubmittingForReview, setIsSubmittingForReview] =
     useState<boolean>(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [isReopening, setIsReopening] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] =
     useState<boolean>(false);
   const [draftVersion, setDraftVersion] = useState<string>('');
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
   const [availableVersions, setAvailableVersions] = useState<
-    { label: string; snapshotVersion: string }[]
+    {
+      label: string;
+      snapshotVersion: string;
+      snapshot?: Glossary | GlossaryTerm;
+    }[]
   >([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const isGlossary = entityType === EntityType.GLOSSARY;
@@ -368,18 +379,13 @@ const GlossaryHeader = ({
   const isCustomManagedTerm = isCDEGlossaryTerm || isDQGlossaryTerm;
   const isCustomManaged = isCustomManagedTerm || isCustomManagedGlossary;
 
-  const cdeVersion = useMemo(() => {
+  const businessVersion = useMemo(() => {
     if (!isCustomManagedTerm && !isCustomManagedGlossary) {
       return null;
     }
     const data = selectedData as Glossary | GlossaryTerm;
 
-    return (
-      data?.extension?.version ??
-      data?.extension?.cdeVersion ??
-      data?.extension?.phien_ban ??
-      '1.0'
-    );
+    return getBusinessVersion(data?.extension);
   }, [isCustomManagedTerm, isCustomManagedGlossary, selectedData]);
 
 
@@ -437,7 +443,7 @@ const GlossaryHeader = ({
       path = getGlossaryPath(latestGlossaryData?.fullyQualifiedName);
     } else {
       const targetVersion = isCustomManagedTerm
-        ? String(cdeVersion ?? '1.0')
+        ? String(businessVersion ?? '1.0')
             .trim()
             .replace(/^(version:?\s*|v)/i, '')
         : toString(selectedData.version);
@@ -460,7 +466,11 @@ const GlossaryHeader = ({
       const history = isGlossary
         ? await getGlossaryVersionsList(selectedData.id)
         : await getGlossaryTermsVersionsList(selectedData.id);
-      const versions = (history?.versions ?? [])
+      const versions: {
+        label: string;
+        snapshotVersion: string;
+        snapshot?: Glossary | GlossaryTerm;
+      }[] = (history?.versions ?? [])
         .map((snapshot) =>
           typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
         )
@@ -470,21 +480,49 @@ const GlossaryHeader = ({
               snapshot.entityStatus ?? snapshot.status ?? 'Approved'
             ).toLowerCase() === 'approved'
         )
+        .sort(
+          (first, second) =>
+            Number(second.version ?? 0) - Number(first.version ?? 0)
+        )
         .map((snapshot) => ({
-          label: String(
-            snapshot.extension?.version ??
-              snapshot.extension?.cdeVersion ??
-              snapshot.extension?.phien_ban ??
-              '1.0'
-          )
+          label: getBusinessVersion(snapshot.extension)
             .trim()
             .replace(/^(version:?\s*|v)/i, ''),
           snapshotVersion: toString(snapshot.version),
+          snapshot,
         }));
 
-      const currentVerClean = String(cdeVersion ?? '1.0')
+      const currentVerClean = String(businessVersion ?? '1.0')
         .trim()
         .replace(/^(version:?\s*|v)/i, '');
+
+      if (isGlossary && activeGlossary?.id === selectedData.id) {
+        const latestBusinessVersion = String(
+          getBusinessVersion(activeGlossary.extension)
+        )
+          .trim()
+          .replace(/^(version:?\s*|v)/i, '');
+        if (!versions.some((item) => item.label === latestBusinessVersion)) {
+          versions.unshift({
+            label: latestBusinessVersion,
+            snapshotVersion: toString(activeGlossary.version ?? '0.1'),
+          });
+        }
+      }
+
+      if (!isGlossary && latestData?.id === selectedData.id) {
+        const latestBusinessVersion = String(
+          getBusinessVersion(latestData.extension)
+        )
+          .trim()
+          .replace(/^(version:?\s*|v)/i, '');
+        if (!versions.some((item) => item.label === latestBusinessVersion)) {
+          versions.unshift({
+            label: latestBusinessVersion,
+            snapshotVersion: toString(latestData.version ?? '0.1'),
+          });
+        }
+      }
 
       if (!versions.some((v) => v.label === currentVerClean)) {
         versions.unshift({
@@ -494,10 +532,15 @@ const GlossaryHeader = ({
       }
 
       setAvailableVersions(
-        versions.filter(
-          (item, index) =>
-            versions.findIndex((version) => version.label === item.label) === index
-        )
+        versions
+          .filter(
+            (item, index) =>
+              versions.findIndex((version) => version.label === item.label) ===
+              index
+          )
+          .sort((first, second) =>
+            compareBusinessVersions(second.label, first.label)
+          )
       );
     } catch (error) {
       showErrorToast(error as AxiosError);
@@ -508,10 +551,43 @@ const GlossaryHeader = ({
 
   const selectVersion = async (snapshotVersion: string) => {
     try {
+      const availableVersion = availableVersions.find(
+        (item) => item.snapshotVersion === snapshotVersion
+      );
+      if (availableVersion?.snapshot) {
+        onVersionSelect?.(availableVersion.snapshot);
+
+        return;
+      }
+
+      if (
+        !isGlossary &&
+        latestData?.id === selectedData.id &&
+        toString(latestData.version) === snapshotVersion
+      ) {
+        onVersionSelect?.(latestData);
+
+        return;
+      }
+
+      if (
+        isGlossary &&
+        activeGlossary?.id === selectedData.id &&
+        toString(activeGlossary.version) === snapshotVersion
+      ) {
+        onVersionSelect?.(activeGlossary);
+
+        return;
+      }
+
       const snapshot = isGlossary
         ? await getGlossaryVersion(selectedData.id, snapshotVersion)
         : await getGlossaryTermsVersion(selectedData.id, snapshotVersion);
-      onVersionSelect?.(snapshot);
+      onVersionSelect?.(
+        isGlossary && !snapshot.entityStatus
+          ? { ...snapshot, entityStatus: EntityStatus.Approved }
+          : snapshot
+      );
     } catch (error) {
       showErrorToast(error as AxiosError);
     }
@@ -557,33 +633,17 @@ const GlossaryHeader = ({
       return false;
     }
 
-    if (isProposer && !currentUser?.isAdmin) {
-      return false;
-    }
-
-    const currentUserId = currentUser?.id;
-    const isReviewer = selectedData?.reviewers?.some(
-      (reviewer) => reviewer.id === currentUserId
-    );
-
-    return (
-      Boolean(currentUser?.isAdmin) ||
-      Boolean(isSteward) ||
-      Boolean(isReviewer)
-    );
+    return Boolean(currentUser?.isAdmin) || Boolean(isSteward);
   }, [
     isVersionView,
     glossaryTermStatus,
     currentUser,
-    selectedData,
     isSteward,
-    isProposer,
   ]);
 
   const canCreateDraft = useMemo(() => {
     if (
       isVersionView ||
-      !isCustomManaged ||
       glossaryTermStatus !== EntityStatus.Approved
     ) {
       return false;
@@ -596,33 +656,41 @@ const GlossaryHeader = ({
     );
   }, [
     isVersionView,
-    isCustomManaged,
     glossaryTermStatus,
     isProposer,
     currentUser?.isAdmin,
     permissions,
   ]);
 
+  const runWorkflowAction = async (
+    action: GlossaryWorkflowAction,
+    options?: { businessVersion?: string }
+  ) => {
+    const expectedNativeVersion = Number(selectedData.version);
+    if (!Number.isFinite(expectedNativeVersion)) {
+      throw new Error('Entity native version is required for workflow actions');
+    }
+    const request = {
+      expectedNativeVersion,
+      ...(options?.businessVersion
+        ? { businessVersion: options.businessVersion }
+        : {}),
+    };
+    const updated = isGlossary
+      ? await transitionGlossaryWorkflow(selectedData.id, action, request)
+      : await transitionGlossaryTermWorkflow(selectedData.id, action, request);
+    await onWorkflowTransition?.(updated);
+
+    return updated;
+  };
+
   const handleCreateDraft = async () => {
     try {
       setIsCreatingDraft(true);
       const cleanVer = draftVersion?.trim().replace(/^(version:?\s*|v)/i, '');
-      const currentExtension =
-        (selectedData as Glossary | GlossaryTerm)?.extension ?? {};
-      const updatedDetails = {
-        ...selectedData,
-        entityStatus: EntityStatus.Draft,
-        ...(cleanVer
-          ? {
-              extension: {
-                ...currentExtension,
-                version: cleanVer,
-                cdeVersion: cleanVer,
-              },
-            }
-          : {}),
-      };
-      await onUpdate(updatedDetails);
+      await runWorkflowAction('createDraft', {
+        ...(isCustomManaged && cleanVer ? { businessVersion: cleanVer } : {}),
+      });
       showSuccessToast(t('message.create-draft-success'));
       setIsCreateDraftModalOpen(false);
     } catch (error) {
@@ -635,11 +703,7 @@ const GlossaryHeader = ({
   const handleRevokeApproval = async () => {
     try {
       setIsRevoking(true);
-      const updatedDetails = {
-        ...selectedData,
-        entityStatus: EntityStatus.Draft,
-      };
-      await onUpdate(updatedDetails);
+      await runWorkflowAction('revoke');
       showSuccessToast(t('message.revoke-approval-success'));
       setIsRevokeModalOpen(false);
     } catch (error) {
@@ -652,8 +716,7 @@ const GlossaryHeader = ({
   const canSubmitForReview = useMemo(() => {
     if (
       isVersionView ||
-      (glossaryTermStatus !== EntityStatus.Draft &&
-        glossaryTermStatus !== EntityStatus.Rejected)
+      glossaryTermStatus !== EntityStatus.Draft
     ) {
       return false;
     }
@@ -683,23 +746,7 @@ const GlossaryHeader = ({
   const handleSubmitForReview = async () => {
     try {
       setIsSubmittingForReview(true);
-      const cleanVer = submitVersion?.trim().replace(/^(version:?\s*|v)/i, '');
-      const currentExtension =
-        (selectedData as Glossary | GlossaryTerm)?.extension ?? {};
-      const updatedDetails = {
-        ...selectedData,
-        entityStatus: EntityStatus.InReview,
-        ...(isCustomManaged && cleanVer
-          ? {
-              extension: {
-                ...currentExtension,
-                version: cleanVer,
-                cdeVersion: cleanVer,
-              },
-            }
-          : {}),
-      };
-      await onUpdate(updatedDetails);
+      await runWorkflowAction('submit');
       showSuccessToast(t('message.submit-for-review-success'));
       setIsSubmitForReviewModalOpen(false);
     } catch (error) {
@@ -713,20 +760,20 @@ const GlossaryHeader = ({
     if (isVersionView) {
       return false;
     }
-    if (isProposer && !currentUser?.isAdmin) {
-      return false;
-    }
     const currentUserId = currentUser?.id;
     const isReviewer = selectedData?.reviewers?.some(
       (reviewer) => reviewer.id === currentUserId
     );
+    const hasReviewPermission =
+      Boolean(permissions?.ManageAll) ||
+      Boolean(permissions?.EditAll) ||
+      Boolean(permissions?.EditStatus);
 
     return (
-      Boolean(currentUser?.isAdmin) ||
-      Boolean(permissions?.EditAll) ||
-      Boolean(permissions?.EditStatus) ||
-      Boolean(isReviewer) ||
-      Boolean(isSteward)
+      hasReviewPermission &&
+      (Boolean(currentUser?.isAdmin) ||
+        Boolean(isReviewer) ||
+        Boolean(isSteward))
     );
   }, [
     isVersionView,
@@ -734,7 +781,6 @@ const GlossaryHeader = ({
     permissions,
     selectedData,
     isSteward,
-    isProposer,
   ]);
 
   const canApproveOrReject = useMemo(() => {
@@ -748,11 +794,7 @@ const GlossaryHeader = ({
   const handleApproveTerm = async () => {
     try {
       setIsApproving(true);
-      const updatedDetails = {
-        ...selectedData,
-        entityStatus: EntityStatus.Approved,
-      };
-      await onUpdate(updatedDetails);
+      await runWorkflowAction('approve');
       showSuccessToast(
         t('message.entity-approved-success', {
           entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
@@ -769,11 +811,7 @@ const GlossaryHeader = ({
   const handleRejectTerm = async () => {
     try {
       setIsRejecting(true);
-      const updatedDetails = {
-        ...selectedData,
-        entityStatus: EntityStatus.Draft,
-      };
-      await onUpdate(updatedDetails);
+      await runWorkflowAction('reject');
       showSuccessToast(
         t('message.entity-rejected-success', {
           entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
@@ -784,6 +822,23 @@ const GlossaryHeader = ({
       showErrorToast(error as AxiosError);
     } finally {
       setIsRejecting(false);
+    }
+  };
+
+  const canReopen =
+    !isVersionView &&
+    glossaryTermStatus === EntityStatus.Rejected &&
+    (Boolean(isProposer) || Boolean(currentUser?.isAdmin) || Boolean(permissions?.EditAll));
+
+  const handleReopen = async () => {
+    try {
+      setIsReopening(true);
+      await runWorkflowAction('reopen');
+      showSuccessToast(t('message.create-draft-success'));
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsReopening(false);
     }
   };
 
@@ -869,7 +924,7 @@ const GlossaryHeader = ({
                     />
                   ),
                   key: 'import-button',
-                  onClick: (e) => {
+                  onClick: (e: MenuInfo) => {
                     e.domEvent.stopPropagation();
                     handleGlossaryImport();
                     setShowActions(false);
@@ -946,135 +1001,6 @@ const GlossaryHeader = ({
         ] as ItemType[])
       : []),
 
-    ...(canSubmitForReview
-      ? ([
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.submit-for-review-help')}
-                icon={PaperPlaneIcon}
-                id="submit-for-review-button"
-                name={t('label.submit-for-review')}
-              />
-            ),
-            key: 'submit-for-review-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              if (isCustomManaged) {
-                const currentVer =
-                  (selectedData as Glossary | GlossaryTerm)?.extension?.version ??
-                  (selectedData as Glossary | GlossaryTerm)?.extension?.cdeVersion ??
-                  (selectedData as Glossary | GlossaryTerm)?.extension?.phien_ban ??
-                  '1.0';
-                setSubmitVersion(
-                  String(currentVer)
-                    .trim()
-                    .replace(/^(version:?\s*|v)/i, '')
-                );
-              }
-              setIsSubmitForReviewModalOpen(true);
-              setShowActions(false);
-            },
-          },
-        ] as ItemType[])
-      : []),
-
-    ...(canApproveOrReject
-      ? ([
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.approve-entity-help', {
-                  entity: isGlossary
-                    ? t('label.glossary')
-                    : t('label.glossary-term'),
-                })}
-                icon={CheckIcon}
-                id="approve-button"
-                name={t('label.approve')}
-              />
-            ),
-            key: 'approve-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              setIsApproveModalOpen(true);
-              setShowActions(false);
-            },
-          },
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.reject-entity-help', {
-                  entity: isGlossary
-                    ? t('label.glossary')
-                    : t('label.glossary-term'),
-                })}
-                icon={RevokeIcon}
-                id="reject-button"
-                name={t('label.reject')}
-              />
-            ),
-            key: 'reject-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              setIsRejectModalOpen(true);
-              setShowActions(false);
-            },
-          },
-        ] as ItemType[])
-      : []),
-
-    ...(canCreateDraft
-      ? ([
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.create-draft-help')}
-                icon={EditIcon}
-                id="create-draft-button"
-                name={t('label.create-draft')}
-              />
-            ),
-            key: 'create-draft-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              const currentVer =
-                (selectedData as Glossary | GlossaryTerm)?.extension?.version ??
-                (selectedData as Glossary | GlossaryTerm)?.extension?.cdeVersion ??
-                (selectedData as Glossary | GlossaryTerm)?.extension?.phien_ban ??
-                '1.0';
-              const cleanVer = String(currentVer)
-                .trim()
-                .replace(/^(version:?\s*|v)/i, '');
-              setDraftVersion(suggestNextVersion(cleanVer));
-              setIsCreateDraftModalOpen(true);
-              setShowActions(false);
-            },
-          },
-        ] as ItemType[])
-      : []),
-
-    ...(canRevokeApproval
-      ? ([
-          {
-            label: (
-              <ManageButtonItemLabel
-                description={t('message.revoke-approval-help')}
-                icon={RevokeIcon}
-                id="revoke-approval-button"
-                name={t('label.revoke-approval')}
-              />
-            ),
-            key: 'revoke-approval-button',
-            onClick: (e) => {
-              e.domEvent.stopPropagation();
-              setIsRevokeModalOpen(true);
-              setShowActions(false);
-            },
-          },
-        ] as ItemType[])
-      : []),
-
     ...(permissions.Delete
       ? ([
           {
@@ -1109,7 +1035,7 @@ const GlossaryHeader = ({
     const statusClass = getEntityStatusClass(entityStatus);
 
     if (isCustomManagedTerm || isCustomManagedGlossary) {
-      const rawVersion = String(cdeVersion ?? '1.0').trim();
+      const rawVersion = String(businessVersion ?? '1.0').trim();
       const cleanVersion = rawVersion.replace(/^(version:?\s*)/i, '');
       const versionLabel = `${t('label.version')}: ${cleanVersion}`;
 
@@ -1174,7 +1100,7 @@ const GlossaryHeader = ({
     isGlossary,
     isCustomManagedTerm,
     isCustomManagedGlossary,
-    cdeVersion,
+    businessVersion,
     isVersionView,
     availableVersions,
     isLoadingVersions,
@@ -1229,15 +1155,11 @@ const GlossaryHeader = ({
   ]);
 
   const approvalActionButtons = useMemo(() => {
-    if (isVersionView || !isCustomManaged) {
+    if (isVersionView) {
       return null;
     }
 
-    const currentVer =
-      (selectedData as Glossary | GlossaryTerm)?.extension?.version ??
-      (selectedData as Glossary | GlossaryTerm)?.extension?.cdeVersion ??
-      (selectedData as Glossary | GlossaryTerm)?.extension?.phien_ban ??
-      '1.0';
+    const currentVer = businessVersion ?? '1.0';
     const cleanVer = String(currentVer).trim().replace(/^(version:?\s*|v)/i, '');
 
     return (
@@ -1264,11 +1186,17 @@ const GlossaryHeader = ({
           <Button
             className="m-l-xs"
             type="primary"
-            onClick={() => {
-              setSubmitVersion(cleanVer);
-              setIsSubmitForReviewModalOpen(true);
-            }}>
+            onClick={() => setIsSubmitForReviewModalOpen(true)}>
             {t('label.submit-for-review')}
+          </Button>
+        )}
+
+        {canReopen && (
+          <Button
+            className="m-l-xs"
+            loading={isReopening}
+            onClick={handleReopen}>
+            Chỉnh sửa lại
           </Button>
         )}
 
@@ -1295,13 +1223,15 @@ const GlossaryHeader = ({
     );
   }, [
     isVersionView,
-    isCustomManaged,
     canApproveOrReject,
     canSubmitForReview,
+    canReopen,
+    isReopening,
     canCreateDraft,
     canRevokeApproval,
     glossaryTermStatus,
     selectedData,
+    businessVersion,
     t,
   ]);
 
@@ -1518,7 +1448,9 @@ const GlossaryHeader = ({
         confirmLoading={isCreatingDraft}
         data-testid="cde-create-draft-modal"
         maskClosable={false}
-        okButtonProps={{ disabled: !draftVersion?.trim() }}
+        okButtonProps={{
+          disabled: isCustomManaged && !draftVersion?.trim(),
+        }}
         okText={t('label.create-draft')}
         open={isCreateDraftModalOpen}
         title={
@@ -1532,7 +1464,7 @@ const GlossaryHeader = ({
           <Typography.Text>
             {t('message.confirm-create-draft-message')}
           </Typography.Text>
-          <div>
+          {isCustomManaged && <div>
             <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
               <span className="text-red-500">* </span>
               {t('cde.version')}
@@ -1549,64 +1481,20 @@ const GlossaryHeader = ({
                 }
               }}
             />
-          </div>
+          </div>}
         </div>
       </Modal>
 
-      {isCustomManaged ? (
-        <Modal
-          centered
-          destroyOnClose
-          closable={false}
-          confirmLoading={isSubmittingForReview}
-          data-testid="cde-submit-for-review-modal"
-          maskClosable={false}
-          okButtonProps={{ disabled: !submitVersion?.trim() }}
-          okText={t('label.submit-for-review')}
-          open={isSubmitForReviewModalOpen}
-          title={
-            <Typography.Text strong data-testid="modal-header">
-              {t('message.confirm-submit-for-review-title')}
-            </Typography.Text>
-          }
-          onCancel={() => setIsSubmitForReviewModalOpen(false)}
-          onOk={handleSubmitForReview}>
-          <div className="d-flex flex-col gap-3">
-            <Typography.Text>
-              {t('message.confirm-submit-for-review-message')}
-            </Typography.Text>
-            <div>
-              <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
-                <span className="text-red-500">* </span>
-                {t('cde.version')}
-              </label>
-              <Input
-                autoFocus
-                data-testid="cde-submit-version-input"
-                placeholder="Ví dụ: 1.1, 2.0-Primary..."
-                value={submitVersion}
-                onChange={(e) => setSubmitVersion(e.target.value)}
-                onPressEnter={() => {
-                  if (submitVersion?.trim() && !isSubmittingForReview) {
-                    handleSubmitForReview();
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </Modal>
-      ) : (
-        <ConfirmationModal
-          bodyText={t('message.confirm-submit-for-review-message')}
-          cancelText={t('label.cancel')}
-          confirmText={t('label.submit-for-review')}
-          header={t('message.confirm-submit-for-review-title')}
-          isLoading={isSubmittingForReview}
-          visible={isSubmitForReviewModalOpen}
-          onCancel={() => setIsSubmitForReviewModalOpen(false)}
-          onConfirm={handleSubmitForReview}
-        />
-      )}
+      <ConfirmationModal
+        bodyText={t('message.confirm-submit-for-review-message')}
+        cancelText={t('label.cancel')}
+        confirmText={t('label.submit-for-review')}
+        header={t('message.confirm-submit-for-review-title')}
+        isLoading={isSubmittingForReview}
+        visible={isSubmitForReviewModalOpen}
+        onCancel={() => setIsSubmitForReviewModalOpen(false)}
+        onConfirm={handleSubmitForReview}
+      />
 
       <ConfirmationModal
         bodyText={

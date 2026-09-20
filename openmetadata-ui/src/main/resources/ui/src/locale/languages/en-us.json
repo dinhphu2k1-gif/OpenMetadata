@@ -3695,11 +3695,9 @@
     "confirm-bulk-approve-title": "Confirm Bulk Approval",
     "confirm-bulk-approve-desc": "Are you sure you want to approve {{count}} in-review record(s)?",
     "confirm-bulk-reject-title": "Confirm Bulk Rejection",
-    "confirm-bulk-reject-desc": "Are you sure you want to reject {{count}} in-review record(s)? They will be returned to Draft status.",
+    "confirm-bulk-reject-desc": "Are you sure you want to reject {{count}} in-review record(s)? They will remain Rejected until the proposer chooses Reopen.",
     "confirm-bulk-revoke-title": "Confirm Bulk Revoke Approval",
     "confirm-bulk-revoke-desc": "Are you sure you want to revoke approval for {{count}} approved record(s)? They will be returned to Draft status.",
-    "reject-reason-placeholder": "Enter reason for rejection...",
-    "reject-reason-required": "Please provide a rejection reason.",
     "bulk-progress-processing": "Processing {{current}} / {{total}} records...",
     "bulk-action-completed": "Successfully processed {{success}} record(s){{failedText}}.",
     "all-imported-submitted-success": "Successfully submitted all {{count}} imported records for review!"

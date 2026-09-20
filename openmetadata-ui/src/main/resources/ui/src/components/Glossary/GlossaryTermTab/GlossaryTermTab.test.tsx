@@ -54,6 +54,7 @@ const mockOnEditGlossaryTerm = jest.fn();
 const mockSetGlossaryChildTerms = jest.fn();
 const mockGetFirstLevelGlossaryTermsPaginated = jest.fn();
 const mockGetGlossaryTermChildrenLazy = jest.fn();
+const mockGetGlossaryTermsByIds = jest.fn();
 const mockSearchGlossaryTermsPaginated = jest.fn();
 const mockSearchQuery = jest.fn();
 const mockGetGlossaryTermsVersionsList = jest.fn();
@@ -111,6 +112,9 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryTerms: jest
     .fn()
     .mockImplementation(() => Promise.resolve({ data: mockedGlossaryTerms })),
+  getGlossaryTermsByIds: jest
+    .fn()
+    .mockImplementation((...args) => mockGetGlossaryTermsByIds(...args)),
   patchGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
   getFirstLevelGlossaryTermsPaginated: jest
     .fn()
@@ -126,6 +130,9 @@ jest.mock('../../../rest/glossaryAPI', () => ({
 }));
 
 jest.mock('../../../utils/CDEApprovedVersionUtils', () => ({
+  getCDEAuditSnapshots: jest
+    .fn()
+    .mockImplementation((...args) => mockGetApprovedCDEAuditSnapshots(...args)),
   getApprovedCDEAuditSnapshots: jest
     .fn()
     .mockImplementation((...args) => mockGetApprovedCDEAuditSnapshots(...args)),
@@ -350,6 +357,16 @@ describe('Test GlossaryTermTab component', () => {
     (useApplicationStore as unknown as jest.Mock).mockReturnValue({
       currentUser: { id: 'reviewer-id', name: 'reviewer' },
     });
+    const { useGenericContext } = jest.requireMock(
+      '../../Customization/GenericProvider/GenericProvider'
+    );
+    useGenericContext.mockImplementation(() => ({
+      permissions: MOCK_PERMISSIONS,
+      type: 'glossary',
+    }));
+    (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { id: 'reviewer-id', name: 'reviewer' },
+    });
     mockUpdateTask.mockResolvedValue({});
     mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
       data: mockedGlossaryTerms,
@@ -360,6 +377,7 @@ describe('Test GlossaryTermTab component', () => {
       paging: { after: null },
     });
     mockGetGlossaryTermsVersionsList.mockResolvedValue({ versions: [] });
+    mockGetGlossaryTermsByIds.mockResolvedValue(mockedGlossaryTerms);
     mockGetApprovedCDEAuditSnapshots.mockResolvedValue([]);
     mockSearchQuery.mockResolvedValue({
       hits: {
@@ -439,11 +457,12 @@ describe('Test GlossaryTermTab component', () => {
         paging: { after: null },
       });
 
-      const { container } = render(<GlossaryTermTab isGlossary={false} />, {
+      render(<GlossaryTermTab isGlossary={false} />, {
         wrapper: MemoryRouter,
       });
 
       const searchInput = screen.getByTestId('search-glossary-terms-input');
+
       expect(searchInput).toBeInTheDocument();
 
       fireEvent.change(searchInput, { target: { value: 'nonexistent-term' } });
@@ -802,38 +821,17 @@ describe('Test GlossaryTermTab component', () => {
       expect(mockUpdateTask).not.toHaveBeenCalled();
     });
 
-    it('keeps approved versions visible when the latest CDE version is a draft', async () => {
-      const draft = {
+    it('uses the published CDE representation returned by the backend for consumers', async () => {
+      const published = {
         ...cdeTerm,
-        entityStatus: EntityStatus.Draft,
-        extension: { ...cdeTerm.extension, cdeVersion: '1.3' },
-        version: 1.3,
+        entityStatus: EntityStatus.Approved,
+        extension: { ...cdeTerm.extension, version: '1.2' },
+        version: 1.2,
       };
-      mockSearchQuery.mockResolvedValue({
-        hits: { total: { value: 1 }, hits: [{ _source: draft }] },
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [published],
+        paging: { total: 1 },
       });
-      mockGetGlossaryTermsVersionsList.mockResolvedValue({
-        versions: [
-          draft,
-          {
-            ...draft,
-            version: 1.1,
-            entityStatus: EntityStatus.Approved,
-            extension: { cdeVersion: '1.1' },
-          },
-        ],
-      });
-      mockGetApprovedCDEAuditSnapshots.mockResolvedValue([
-        {
-          snapshot: {
-            ...draft,
-            version: 1.2,
-            entityStatus: EntityStatus.Approved,
-            extension: { cdeVersion: '1.2' },
-          },
-          eventId: 'approved-1-2',
-        },
-      ]);
       (useApplicationStore as unknown as jest.Mock).mockReturnValue({
         currentUser: { id: 'consumer-id', roles: [{ name: 'BasicConsumer' }] },
       });
@@ -844,29 +842,185 @@ describe('Test GlossaryTermTab component', () => {
         expect(mockSetGlossaryChildTerms).toHaveBeenCalledWith(
           expect.arrayContaining([
             expect.objectContaining({
-              versionRowKey: 'Data Dictionary.CDE102@1.2',
-            }),
-            expect.objectContaining({
-              versionRowKey: 'Data Dictionary.CDE102@1.1',
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.2' }),
             }),
           ])
         );
       });
       const rows = mockSetGlossaryChildTerms.mock.lastCall[0];
-      expect(rows).toHaveLength(2);
-      expect(
-        rows.every(
-          (row: ModifiedGlossaryTerm) =>
-            row.entityStatus === EntityStatus.Approved
-        )
-      ).toBe(true);
-      expect(
-        mockSearchQuery.mock.lastCall[0].queryFilter.query.bool.must
-      ).not.toEqual(
-        expect.arrayContaining([
-          { term: { entityStatus: EntityStatus.Approved } },
-        ])
+
+      expect(rows).toHaveLength(1);
+      expect(mockGetGlossaryTermsVersionsList).not.toHaveBeenCalled();
+      expect(mockGetApprovedCDEAuditSnapshots).not.toHaveBeenCalled();
+      expect(mockSearchQuery).not.toHaveBeenCalled();
+    });
+
+    it('hydrates a stale search hit with the current draft before expanding versions', async () => {
+      const approvedSearchHit = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.Approved,
+        extension: { ...cdeTerm.extension, version: '1.1' },
+      };
+      const currentDraft = {
+        ...approvedSearchHit,
+        entityStatus: EntityStatus.Draft,
+        extension: { ...approvedSearchHit.extension, version: '1.2' },
+      };
+      mockSearchQuery.mockResolvedValue({
+        hits: {
+          total: { value: 1 },
+          hits: [{ _source: approvedSearchHit }],
+        },
+      });
+      mockGetGlossaryTermsByIds.mockResolvedValue([currentDraft]);
+      mockGetGlossaryTermsVersionsList.mockResolvedValue({
+        versions: [approvedSearchHit],
+      });
+
+      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+      await waitFor(() => {
+        expect(mockGetGlossaryTermsByIds).toHaveBeenCalledWith(
+          [approvedSearchHit.id],
+          { fields: CDE_GLOSSARY_TERM_FIELDS }
+        );
+        expect(mockSetGlossaryChildTerms).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              entityStatus: EntityStatus.Draft,
+              extension: expect.objectContaining({ version: '1.2' }),
+            }),
+            expect.objectContaining({
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.1' }),
+            }),
+          ])
+        );
+      });
+    });
+
+    it('shows every business version matching the All status filter', async () => {
+      const currentApproved = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.Approved,
+        extension: { ...cdeTerm.extension, version: '1.1' },
+      };
+      const draftSnapshot = {
+        ...currentApproved,
+        entityStatus: EntityStatus.Draft,
+        extension: { ...currentApproved.extension, version: '1.2' },
+        version: 1.2,
+      };
+      const approved1_0 = {
+        ...currentApproved,
+        extension: { ...currentApproved.extension, version: '1.0' },
+        version: 1.0,
+      };
+      mockSearchQuery.mockResolvedValue({
+        hits: {
+          total: { value: 1 },
+          hits: [{ _source: currentApproved }],
+        },
+      });
+      mockGetGlossaryTermsByIds.mockResolvedValue([currentApproved]);
+      mockGetGlossaryTermsVersionsList.mockResolvedValue({
+        versions: [draftSnapshot, approved1_0],
+      });
+
+      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+      await waitFor(() => {
+        const rows = mockSetGlossaryChildTerms.mock.lastCall[0];
+
+        expect(rows).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              entityStatus: EntityStatus.Draft,
+              extension: expect.objectContaining({ version: '1.2' }),
+            }),
+            expect.objectContaining({
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.1' }),
+            }),
+            expect.objectContaining({
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.0' }),
+            }),
+          ])
+        );
+
+        expect(rows).toHaveLength(3);
+      });
+    });
+
+    it('keeps Draft CDE versions visible while viewing an approved Glossary snapshot', async () => {
+      const glossarySnapshot = {
+        id: 'data-dictionary-id',
+        name: 'Data Dictionary',
+        fullyQualifiedName: 'Data Dictionary',
+        entityStatus: EntityStatus.Approved,
+        extension: { version: '1.0', termIds: [cdeTerm.id] },
+      };
+      const currentDraft = {
+        ...cdeTerm,
+        entityStatus: EntityStatus.Draft,
+        extension: { ...cdeTerm.extension, version: '1.2' },
+      };
+      const { useGenericContext } = jest.requireMock(
+        '../../Customization/GenericProvider/GenericProvider'
       );
+      useGenericContext.mockImplementation(() => ({
+        data: glossarySnapshot,
+        isVersionView: true,
+        permissions: MOCK_PERMISSIONS,
+        type: 'glossary',
+      }));
+      mockSearchQuery.mockResolvedValue({
+        hits: {
+          total: { value: 1 },
+          hits: [{ _source: currentDraft }],
+        },
+      });
+      mockGetGlossaryTermsByIds.mockResolvedValue([currentDraft]);
+      mockGetGlossaryTermsVersionsList.mockResolvedValue({
+        versions: [
+          {
+            ...cdeTerm,
+            entityStatus: EntityStatus.Approved,
+            extension: { ...cdeTerm.extension, version: '1.1' },
+          },
+          {
+            ...cdeTerm,
+            entityStatus: EntityStatus.Approved,
+            extension: { ...cdeTerm.extension, version: '1.0' },
+          },
+        ],
+      });
+
+      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+      await waitFor(() => {
+        const rows = mockSetGlossaryChildTerms.mock.lastCall[0];
+
+        expect(rows).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              entityStatus: EntityStatus.Draft,
+              extension: expect.objectContaining({ version: '1.2' }),
+            }),
+            expect.objectContaining({
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.1' }),
+            }),
+            expect.objectContaining({
+              entityStatus: EntityStatus.Approved,
+              extension: expect.objectContaining({ version: '1.0' }),
+            }),
+          ])
+        );
+        expect(rows).toHaveLength(3);
+      });
     });
 
     it('should query SearchIndex.GLOSSARY_TERM for the CDE table', async () => {
@@ -1686,6 +1840,7 @@ describe('Test GlossaryTermTab component', () => {
       const rowCheckboxes = container.querySelectorAll(
         '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
       );
+
       expect(rowCheckboxes.length).toBeGreaterThan(0);
 
       // Select first row checkbox
@@ -1727,6 +1882,7 @@ describe('Test GlossaryTermTab component', () => {
       const rowCheckboxes = container.querySelectorAll(
         '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
       );
+
       expect(rowCheckboxes.length).toBeGreaterThan(0);
 
       fireEvent.click(rowCheckboxes[0]);
@@ -1768,6 +1924,7 @@ describe('Test GlossaryTermTab component', () => {
       const rowCheckboxes = container.querySelectorAll(
         '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
       );
+
       expect(rowCheckboxes.length).toBeGreaterThan(0);
 
       // Select first row (Draft)
@@ -1881,6 +2038,7 @@ describe('Test GlossaryTermTab component', () => {
       const rowCheckboxes = container.querySelectorAll(
         '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
       );
+
       expect(rowCheckboxes.length).toBeGreaterThan(0);
 
       fireEvent.click(rowCheckboxes[0]);
@@ -1918,6 +2076,7 @@ describe('Test GlossaryTermTab component', () => {
       const rowCheckboxes = container.querySelectorAll(
         '.ant-table-tbody .ant-table-selection-column input[type="checkbox"]'
       );
+
       expect(rowCheckboxes.length).toBeGreaterThan(0);
 
       fireEvent.click(rowCheckboxes[0]);

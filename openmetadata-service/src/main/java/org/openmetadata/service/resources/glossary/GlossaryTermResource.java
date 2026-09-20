@@ -16,6 +16,7 @@ package org.openmetadata.service.resources.glossary;
 import static org.openmetadata.service.Entity.ADMIN_USER_NAME;
 import static org.openmetadata.service.Entity.GLOSSARY;
 import static org.openmetadata.service.Entity.GLOSSARY_TERM;
+import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
 
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,10 +32,12 @@ import jakarta.json.JsonPatch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -50,13 +53,15 @@ import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.openmetadata.schema.type.EntityStatus;
-import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.api.AddGlossaryToAssetsRequest;
 import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
@@ -69,11 +74,13 @@ import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.ChangeEvent;
 import org.openmetadata.schema.type.EntityHistory;
 import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.MetadataOperation;
 import org.openmetadata.schema.type.TermRelation;
 import org.openmetadata.schema.type.api.BulkOperationResult;
 import org.openmetadata.schema.type.csv.CsvImportResult;
+import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
@@ -86,7 +93,6 @@ import org.openmetadata.service.jdbi3.ListFilter;
 import org.openmetadata.service.limits.Limits;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.resources.EntityResource;
-import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
 import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
@@ -98,6 +104,7 @@ import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.Fields;
+import org.openmetadata.service.util.GlossaryBusinessVersion;
 import org.openmetadata.service.util.MoveGlossaryTermResponse;
 import org.openmetadata.service.util.RestUtil;
 import org.openmetadata.service.util.WebsocketNotificationHandler;
@@ -301,6 +308,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             .addQueryParam("parent", fqn)
             .addQueryParam("directChildrenOf", parentTermFQNParam)
             .addQueryParam("entityStatus", effectiveEntityStatus);
+    if (isConsumer(securityContext)) {
+      filter.addQueryParam(
+          "publishedExtension", GlossaryTermRepository.LATEST_PUBLISHED_EXTENSION);
+    }
 
     ResultList<GlossaryTerm> terms;
     if (before != null) { // Reverse paging
@@ -313,15 +324,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     if (("Approved".equals(effectiveEntityStatus) || isConsumer(securityContext))
         && terms != null
         && terms.getData() != null) {
+      Map<UUID, GlossaryTerm> snapshots = repository.getLatestApprovedSnapshots(terms.getData());
       List<GlossaryTerm> resolved = new ArrayList<>();
       for (GlossaryTerm t : terms.getData()) {
-        if (t.getEntityStatus() != EntityStatus.APPROVED) {
-          GlossaryTerm approved = repository.getLatestApprovedSnapshot(t.getId());
-          if (approved != null) {
-            resolved.add(approved);
-          }
-        } else {
-          resolved.add(t);
+        GlossaryTerm approved = snapshots.get(t.getId());
+        if (approved != null) {
+          resolved.add(approved);
         }
       }
       terms.setData(resolved);
@@ -441,7 +449,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       if (!isElevatedRole
           && (subjectContext.hasAnyRole("BasicConsumer")
               || subjectContext.hasAnyRole("DataConsumer"))) {
-        return "Approved";
+        return "Published";
       }
     }
     return requestedEntityStatus;
@@ -561,11 +569,125 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm term = getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
     if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
       GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
-      if (snapshot != null) {
-        return addHref(uriInfo, snapshot);
+      if (snapshot == null) {
+        throw new NotFoundException("No approved glossary term version exists");
       }
+      return addHref(uriInfo, snapshot);
     }
     return term;
+  }
+
+  @GET
+  @Path("/{id}/published/latest")
+  @Operation(
+      operationId = "getLatestPublishedGlossaryTerm",
+      summary = "Get latest approved glossary term")
+  public GlossaryTerm getLatestPublished(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id) {
+    getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    GlossaryTerm published = repository.getLatestApprovedSnapshot(id);
+    if (published == null) {
+      throw new NotFoundException("No approved glossary term version exists");
+    }
+    return addHref(uriInfo, published);
+  }
+
+  @POST
+  @Path("/{id}/workflow/{action}")
+  @Operation(
+      operationId = "transitionGlossaryTermWorkflow",
+      summary = "Run a glossary term workflow action")
+  public Response transitionWorkflow(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @PathParam("action") String actionValue,
+      @Valid GlossaryWorkflowRequest request) {
+    GlossaryTerm current =
+        getInternal(
+            uriInfo,
+            securityContext,
+            id,
+            "owners,reviewers,extension,glossary",
+            Include.NON_DELETED,
+            null);
+    GlossaryWorkflowSupport.Action action = GlossaryWorkflowSupport.Action.fromPath(actionValue);
+    SubjectContext subject = getSubjectContext(securityContext);
+    EntityStatus target =
+        GlossaryWorkflowSupport.validate(
+            action,
+            current.getEntityStatus(),
+            current.getVersion(),
+            request,
+            subject,
+            current.getOwners(),
+            current.getReviewers());
+
+    GlossaryTerm updated =
+        JsonUtils.readValue(JsonUtils.pojoToJson(current), GlossaryTerm.class);
+    updated.setEntityStatus(target);
+    boolean businessVersioned =
+        GlossaryBusinessVersion.appliesTo(
+            current.getFullyQualifiedName(),
+            current.getGlossary() == null ? null : current.getGlossary().getName(),
+            current.getGlossary() == null ? null : current.getGlossary().getDisplayName());
+    if (action == GlossaryWorkflowSupport.Action.CREATE_DRAFT && businessVersioned) {
+      if (request.getBusinessVersion() == null || request.getBusinessVersion().isBlank()) {
+        throw new BadRequestException("businessVersion is required for this glossary term");
+      }
+      updated.setExtension(
+          GlossaryBusinessVersion.normalize(
+              updated.getExtension(), request.getBusinessVersion()));
+    } else if (request.getBusinessVersion() != null && !businessVersioned) {
+      throw new BadRequestException(
+          "businessVersion is only supported for Data Dictionary and Data Quality");
+    }
+
+    Response response =
+        patchInternal(
+            uriInfo,
+            securityContext,
+            id,
+            JsonUtils.getJsonPatch(current, updated));
+    Map<String, Object> transition = new HashMap<>();
+    transition.put("action", actionValue);
+    transition.put("fromStatus", current.getEntityStatus().value());
+    transition.put("toStatus", target.value());
+    transition.put("actor", securityContext.getUserPrincipal().getName());
+    transition.put("timestamp", System.currentTimeMillis());
+    transition.put("nativeVersion", current.getVersion());
+    if (businessVersioned) {
+      transition.put("businessVersion", GlossaryBusinessVersion.get(updated.getExtension()));
+    }
+    repository.storeWorkflowTransition(current.getFullyQualifiedName(), transition);
+    return response;
+  }
+
+  @GET
+  @Path("/{id}/workflow/history")
+  @Operation(
+      operationId = "getGlossaryTermWorkflowHistory",
+      summary = "Get glossary term workflow history")
+  public List<Object> getWorkflowHistory(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id) {
+    GlossaryTerm term =
+        getInternal(uriInfo, securityContext, id, "reviewers", Include.NON_DELETED, null);
+    SubjectContext subject = getSubjectContext(securityContext);
+    boolean allowed =
+        subject.isAdmin()
+            || subject.hasAnyRole("DataSteward")
+            || subject.hasAnyRole("Admin")
+            || subject.hasAnyRole("Organization")
+            || subject.isReviewer(term.getReviewers());
+    if (!allowed) {
+      throw new AuthorizationException(
+          "Only administrators, Data Stewards, and reviewers can view workflow history");
+    }
+    return repository.getWorkflowHistory(term.getFullyQualifiedName());
   }
 
   @GET
@@ -625,11 +747,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       try {
         GlossaryTerm term =
             getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
-        if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
+        if (isConsumer(securityContext)
+            && term != null
+            && term.getEntityStatus() != EntityStatus.APPROVED) {
           GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
-          if (snapshot != null) {
-            term = addHref(uriInfo, snapshot);
+          if (snapshot == null) {
+            continue;
           }
+          term = addHref(uriInfo, snapshot);
         }
         result.add(term);
       } catch (EntityNotFoundException | AuthorizationException ex) {
@@ -722,9 +847,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         getByNameInternal(uriInfo, securityContext, fqn, fieldsParam, include, includeRelations);
     if (isConsumer(securityContext) && term != null && term.getEntityStatus() != EntityStatus.APPROVED) {
       GlossaryTerm snapshot = repository.getLatestApprovedSnapshot(term.getId());
-      if (snapshot != null) {
-        return addHref(uriInfo, snapshot);
+      if (snapshot == null) {
+        throw new NotFoundException("No approved glossary term version exists");
       }
+      return addHref(uriInfo, snapshot);
     }
     return term;
   }
@@ -752,26 +878,45 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           UUID id) {
     EntityHistory history = super.listVersionsInternal(securityContext, id);
     if (isConsumer(securityContext) && history != null && history.getVersions() != null) {
-      List<Object> approvedVersions =
-          history.getVersions().stream()
-              .filter(
-                  v -> {
-                    try {
-                      GlossaryTerm t =
-                          (v instanceof GlossaryTerm)
-                              ? (GlossaryTerm) v
-                              : (v instanceof String)
-                                  ? JsonUtils.readValue((String) v, GlossaryTerm.class)
-                                  : JsonUtils.readValue(JsonUtils.pojoToJson(v), GlossaryTerm.class);
-                      return t.getEntityStatus() == EntityStatus.APPROVED;
-                    } catch (Exception e) {
-                      return false;
-                    }
-                  })
-              .collect(Collectors.toList());
+      List<Object> approvedVersions = new ArrayList<>();
+      Set<String> seen = new HashSet<>();
+      for (Object value : history.getVersions()) {
+        try {
+          GlossaryTerm term =
+              value instanceof GlossaryTerm
+                  ? (GlossaryTerm) value
+                  : JsonUtils.readValue(
+                      value instanceof String ? (String) value : JsonUtils.pojoToJson(value),
+                      GlossaryTerm.class);
+          if (term.getEntityStatus() == null
+              || term.getEntityStatus() == EntityStatus.UNPROCESSED
+              || term.getEntityStatus() == EntityStatus.APPROVED) {
+            approvedVersions.add(term.withEntityStatus(EntityStatus.APPROVED));
+            seen.add(approvedVersionKey(term));
+          }
+        } catch (RuntimeException ignored) {
+          // Ignore malformed legacy history rows.
+        }
+      }
+      for (GlossaryTerm snapshot : repository.getApprovedAuditSnapshots(id)) {
+        if (seen.add(approvedVersionKey(snapshot))) {
+          approvedVersions.add(snapshot);
+        }
+      }
       history.setVersions(approvedVersions);
     }
     return history;
+  }
+
+  private String approvedVersionKey(GlossaryTerm term) {
+    boolean businessVersioned =
+        GlossaryBusinessVersion.appliesTo(
+            term.getFullyQualifiedName(),
+            term.getGlossary() == null ? null : term.getGlossary().getName(),
+            term.getGlossary() == null ? null : term.getGlossary().getDisplayName());
+    return businessVersioned
+        ? "business:" + GlossaryBusinessVersion.get(term.getExtension())
+        : "native:" + term.getVersion();
   }
 
   @GET
@@ -806,6 +951,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm termVersion = super.getVersionInternal(securityContext, id, version);
     if (isConsumer(securityContext)
         && termVersion != null
+        && termVersion.getEntityStatus() != null
+        && termVersion.getEntityStatus() != EntityStatus.UNPROCESSED
         && termVersion.getEntityStatus() != EntityStatus.APPROVED) {
       throw new AuthorizationException("Not authorized to view unapproved version");
     }
@@ -891,6 +1038,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                         @ExampleObject("[{op:remove, path:/a},{op:add, path: /b, value: val}]")
                       }))
           JsonPatch patch) {
+    rejectDirectStatusPatch(patch);
+    ensureDraft(repository.get(null, id, repository.getFields("id")));
     return patchInternal(uriInfo, securityContext, id, patch);
   }
 
@@ -920,7 +1069,28 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                         @ExampleObject("[{op:remove, path:/a},{op:add, path: /b, value: val}]")
                       }))
           JsonPatch patch) {
+    rejectDirectStatusPatch(patch);
+    ensureDraft(repository.getByName(null, fqn, repository.getFields("id")));
     return patchInternal(uriInfo, securityContext, fqn, patch);
+  }
+
+  private void ensureDraft(GlossaryTerm term) {
+    if (term.getEntityStatus() != EntityStatus.DRAFT) {
+      throw new BadRequestException("Glossary term must be Draft before it can be edited");
+    }
+  }
+
+  private void rejectDirectStatusPatch(JsonPatch patch) {
+    if (patch != null
+        && patch.toJsonArray().stream()
+            .anyMatch(
+                operation ->
+                    operation
+                        .asJsonObject()
+                        .getString("path", "")
+                        .startsWith("/entityStatus"))) {
+      throw new BadRequestException("Use the glossary term workflow action API to change entityStatus");
+    }
   }
 
   @PUT
@@ -944,6 +1114,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context SecurityContext securityContext,
       @Valid CreateGlossaryTerm create) {
     GlossaryTerm term = mapper.createToEntity(create, securityContext.getUserPrincipal().getName());
+    repository.prepareInternal(term, true);
+    repository
+        .getByNameOrNull(
+            null,
+            term.getFullyQualifiedName(),
+            repository.getFields("id"),
+            Include.NON_DELETED,
+            false)
+        .ifPresent(this::ensureDraft);
     return createOrUpdate(uriInfo, securityContext, term);
   }
 

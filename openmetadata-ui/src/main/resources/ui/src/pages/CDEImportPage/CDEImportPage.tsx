@@ -78,7 +78,9 @@ import {
   getGlossaryTerms,
   getGlossaryTermsById,
   patchGlossaryTerm,
+  transitionGlossaryTermWorkflow,
 } from '../../rest/glossaryAPI';
+import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
 import { getTags } from '../../rest/tagAPI';
 import { getTeams } from '../../rest/teamsAPI';
 import { getUsers } from '../../rest/userAPI';
@@ -148,7 +150,7 @@ const CDEImportPage: FC = () => {
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [createdTerms, setCreatedTerms] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; version: number }[]
   >([]);
   const [isSubmittingAll, setIsSubmittingAll] = useState<boolean>(false);
   const [isSubmittingAllSuccess, setIsSubmittingAllSuccess] =
@@ -361,7 +363,7 @@ const CDEImportPage: FC = () => {
         renderEditCell: textEditor,
       },
       {
-        key: 'cdeVersion',
+        key: 'version',
         name: t('label.cde-version', 'Phiên bản'),
         width: 120,
         editable: true,
@@ -430,7 +432,7 @@ const CDEImportPage: FC = () => {
         personalData: '',
         relatedRegulatoryDocuments: '',
         dataQualityRules: '',
-        cdeVersion: '1.0',
+        version: '1.0',
         effectiveDate: '',
         expirationDate: '',
         reviewer: '',
@@ -466,7 +468,7 @@ const CDEImportPage: FC = () => {
           personalData: r.personalData || '',
           relatedRegulatoryDocuments: r.relatedRegulatoryDocuments || '',
           dataQualityRules: r.dataQualityRules || '',
-          cdeVersion: r.cdeVersion || '1.0',
+          version: r.version || '1.0',
           ...(r.effectiveDate !== undefined
             ? { effectiveDate: formatCDEDate(r.effectiveDate, r.effectiveDate) }
             : {}),
@@ -680,7 +682,7 @@ const CDEImportPage: FC = () => {
       }
 
       // 10. Thẩm định Phiên bản CDE (CDEVersion)
-      const verVal = (rowCopy.cdeVersion || '').trim();
+      const verVal = (rowCopy.version || '').trim();
       if (verVal) {
         const verRes = validateCDEVersionValue(verVal);
         if (!verRes.isValid) {
@@ -869,7 +871,7 @@ const CDEImportPage: FC = () => {
     let skippedCount = 0;
     let failedCount = 0;
     const errorsList: { row: number; name: string; reason: string }[] = [];
-    const createdTermsList: { id: string; name: string }[] = [];
+    const createdTermsList: { id: string; name: string; version: number }[] = [];
 
     const total = rowsToProcess.length;
 
@@ -909,7 +911,7 @@ const CDEImportPage: FC = () => {
               personalData: row.personalData,
               relatedRegulatoryDocuments: row.relatedRegulatoryDocuments,
               dataQualityRules: row.dataQualityRules,
-              cdeVersion: row.cdeVersion || '1.0',
+              version: row.version || '1.0',
               effectiveDate: row.effectiveDate,
               expirationDate: row.expirationDate,
               reviewer: row.reviewer,
@@ -927,13 +929,29 @@ const CDEImportPage: FC = () => {
           );
 
           if (row.existingId) {
+            let editable = current;
+            if (current?.entityStatus === EntityStatus.Approved) {
+              editable = await transitionGlossaryTermWorkflow(
+                current.id,
+                'createDraft',
+                {
+                  expectedNativeVersion: Number(current.version),
+                  businessVersion: getBusinessVersion(payload.extension),
+                }
+              );
+            } else if (current?.entityStatus === EntityStatus.Rejected) {
+              editable = await transitionGlossaryTermWorkflow(
+                current.id,
+                'reopen',
+                { expectedNativeVersion: Number(current.version) }
+              );
+            }
             const patchOps: any[] = [
               { op: 'add', path: '/displayName', value: payload.displayName },
               { op: 'add', path: '/description', value: payload.description },
               { op: 'add', path: '/extension', value: payload.extension },
               { op: 'add', path: '/tags', value: payload.tags },
               { op: 'add', path: '/domains', value: payload.domains },
-              { op: 'add', path: '/entityStatus', value: EntityStatus.Draft },
             ];
             if (payload.owners && payload.owners.length > 0) {
               patchOps.push({
@@ -949,7 +967,7 @@ const CDEImportPage: FC = () => {
                 value: payload.reviewers,
               });
             }
-            await patchGlossaryTerm(row.existingId, patchOps);
+            await patchGlossaryTerm(editable?.id ?? row.existingId, patchOps);
             updatedCount++;
           } else {
             failedCount++;
@@ -986,7 +1004,7 @@ const CDEImportPage: FC = () => {
               personalData: row.personalData,
               relatedRegulatoryDocuments: row.relatedRegulatoryDocuments,
               dataQualityRules: row.dataQualityRules,
-              cdeVersion: row.cdeVersion || '1.0',
+              version: row.version || '1.0',
               effectiveDate: row.effectiveDate,
               expirationDate: row.expirationDate,
               reviewer: row.reviewer,
@@ -1007,6 +1025,7 @@ const CDEImportPage: FC = () => {
             createdTermsList.push({
               id: newTerm.id,
               name: newTerm.name || row.name,
+              version: Number(newTerm.version),
             });
           }
         } catch (error: any) {
@@ -1048,13 +1067,9 @@ const CDEImportPage: FC = () => {
       await Promise.allSettled(
         chunk.map(async (term) => {
           try {
-            await patchGlossaryTerm(term.id, [
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: EntityStatus.InReview,
-              },
-            ]);
+            await transitionGlossaryTermWorkflow(term.id, 'submit', {
+              expectedNativeVersion: term.version,
+            });
             successCount++;
           } catch (err) {
             // ignore individual error

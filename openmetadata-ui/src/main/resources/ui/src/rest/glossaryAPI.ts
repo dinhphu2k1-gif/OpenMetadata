@@ -51,6 +51,29 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
 
 const BASE_URL = '/glossaries';
 
+export type GlossaryWorkflowAction =
+  | 'createDraft'
+  | 'submit'
+  | 'approve'
+  | 'reject'
+  | 'reopen'
+  | 'revoke';
+
+export interface GlossaryWorkflowRequest {
+  expectedNativeVersion: number;
+  businessVersion?: string;
+}
+
+export interface GlossaryWorkflowTransition {
+  action: GlossaryWorkflowAction;
+  fromStatus: string;
+  toStatus: string;
+  actor: string;
+  timestamp: number;
+  nativeVersion: number;
+  businessVersion?: string;
+}
+
 export const getGlossariesList = async (params?: ListParams) => {
   const response = await APIClient.get<PagingResponse<Glossary[]>>(BASE_URL, {
     params,
@@ -94,6 +117,35 @@ export const getGlossariesById = async (id: string, params?: ListParams) => {
   const response = await APIClient.get<Glossary>(`/glossaries/${id}`, {
     params,
   });
+
+  return response.data;
+};
+
+export const getLatestPublishedGlossary = async (id: string) => {
+  const response = await APIClient.get<Glossary>(
+    `/glossaries/${id}/published/latest`
+  );
+
+  return response.data;
+};
+
+export const transitionGlossaryWorkflow = async (
+  id: string,
+  action: GlossaryWorkflowAction,
+  request: GlossaryWorkflowRequest
+) => {
+  const response = await APIClient.post<
+    GlossaryWorkflowRequest,
+    AxiosResponse<Glossary>
+  >(`/glossaries/${id}/workflow/${action}`, request);
+
+  return response.data;
+};
+
+export const getGlossaryWorkflowHistory = async (id: string) => {
+  const response = await APIClient.get<GlossaryWorkflowTransition[]>(
+    `/glossaries/${id}/workflow/history`
+  );
 
   return response.data;
 };
@@ -144,6 +196,35 @@ export const getGlossaryTermsById = async (id: string, params?: ListParams) => {
   const response = await APIClient.get<GlossaryTerm>(`/glossaryTerms/${id}`, {
     params,
   });
+
+  return response.data;
+};
+
+export const getLatestPublishedGlossaryTerm = async (id: string) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/published/latest`
+  );
+
+  return response.data;
+};
+
+export const transitionGlossaryTermWorkflow = async (
+  id: string,
+  action: GlossaryWorkflowAction,
+  request: GlossaryWorkflowRequest
+) => {
+  const response = await APIClient.post<
+    GlossaryWorkflowRequest,
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/workflow/${action}`, request);
+
+  return response.data;
+};
+
+export const getGlossaryTermWorkflowHistory = async (id: string) => {
+  const response = await APIClient.get<GlossaryWorkflowTransition[]>(
+    `/glossaryTerms/${id}/workflow/history`
+  );
 
   return response.data;
 };

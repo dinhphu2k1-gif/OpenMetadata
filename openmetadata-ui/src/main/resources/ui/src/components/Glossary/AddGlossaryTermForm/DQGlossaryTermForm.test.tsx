@@ -128,7 +128,7 @@ const mockGlossaryTerm: GlossaryTerm = {
   extension: {
     cdeCode: 'CDE1',
     cdeName: 'Tên khách hàng',
-    cdeVersion: '1.0',
+    version: '1.0',
     qualityThreshold: '100%',
     ruleExplanation: 'Diễn giải chi tiết',
     otherConstraints: 'Kiểm tra Not Null',
@@ -224,7 +224,7 @@ describe('DQGlossaryTermForm', () => {
     expect(payload.description).toBe('Mô tả quy tắc');
     expect(payload.extension).toEqual(
       expect.objectContaining({
-        cdeVersion: '1.2',
+        version: '1.2',
         qualityThreshold: '99%',
       })
     );

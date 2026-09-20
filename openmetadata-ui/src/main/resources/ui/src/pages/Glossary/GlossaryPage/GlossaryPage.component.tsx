@@ -13,7 +13,7 @@
 
 import { AxiosError } from 'axios';
 import { compare } from 'fast-json-patch';
-import { isEmpty } from 'lodash';
+import { isEmpty, omit } from 'lodash';
 import { RefObject, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -48,10 +48,7 @@ import {
   TabSpecificField,
 } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import {
-  EntityStatus,
-  GlossaryTerm,
-} from '../../../generated/entity/data/glossaryTerm';
+import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
@@ -66,6 +63,7 @@ import {
   updateGlossaryTermVotes,
   updateGlossaryVotes,
 } from '../../../rest/glossaryAPI';
+import { normalizeBusinessVersionExtension } from '../../../utils/BusinessVersionUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
@@ -129,8 +127,14 @@ const GlossaryPage = () => {
       personaName.includes('steward') ||
       personaName.includes('proposer') ||
       personaName.includes('admin');
+    const hasConsumerRole = userRoles.some(
+      (role) => role === 'basicconsumer' || role === 'dataconsumer'
+    );
+    const hasConsumerPersona =
+      personaName.includes('basicconsumer') ||
+      personaName.includes('dataconsumer');
 
-    return !isElevated;
+    return !isElevated && (hasConsumerRole || hasConsumerPersona);
   }, [currentUser, selectedPersona]);
 
   const isImportAction = useMemo(
@@ -195,6 +199,7 @@ const GlossaryPage = () => {
             TabSpecificField.VOTES,
             TabSpecificField.DOMAINS,
             TabSpecificField.TERM_COUNT,
+            TabSpecificField.EXTENSION,
           ],
           limit: PAGE_SIZE_LARGE,
           ...(nextPage && { after: nextPage }),
@@ -215,13 +220,7 @@ const GlossaryPage = () => {
         handlePagingChange(glossaryPaging);
       } while (nextPage && !isGlossaryFound);
 
-      const visibleGlossaries = isConsumer
-        ? allGlossaries.filter(
-            (item) => item.entityStatus === EntityStatus.Approved
-          )
-        : allGlossaries;
-
-      setGlossaries(visibleGlossaries);
+      setGlossaries(allGlossaries);
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
@@ -244,6 +243,7 @@ const GlossaryPage = () => {
           TabSpecificField.VOTES,
           TabSpecificField.DOMAINS,
           TabSpecificField.TERM_COUNT,
+          TabSpecificField.EXTENSION,
         ],
         limit: PAGE_SIZE_LARGE,
         after: after,
@@ -252,13 +252,7 @@ const GlossaryPage = () => {
       allGlossaries = [...allGlossaries, ...data];
       handlePagingChange(glossaryPaging);
 
-      const visibleGlossaries = isConsumer
-        ? allGlossaries.filter(
-            (item) => item.entityStatus === EntityStatus.Approved
-          )
-        : allGlossaries;
-
-      setGlossaries(visibleGlossaries);
+      setGlossaries(allGlossaries);
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
@@ -314,6 +308,7 @@ const GlossaryPage = () => {
           (glossary) => glossary.fullyQualifiedName === glossaryFqn
         );
         if (!foundGlossary && isConsumer && glossaryFqn) {
+          setIsRightPanelLoading(false);
           navigate(ROUTES.FORBIDDEN, { replace: true });
 
           return;
@@ -345,11 +340,24 @@ const GlossaryPage = () => {
           ...activeGlossary,
           ...updatedData,
           ...response,
+          extension:
+            updatedData.extension ??
+            response.extension ??
+            activeGlossary?.extension,
         };
         updateActiveGlossary(updatedGlossaryObj);
-        setGlossaries((prev) =>
-          prev.map((item) =>
-            item.id === response.id ? { ...item, ...response } : item
+        setGlossaries(
+          glossaries.map((item) =>
+            item.id === response.id
+              ? {
+                  ...item,
+                  ...response,
+                  extension:
+                    updatedData.extension ??
+                    response.extension ??
+                    item.extension,
+                }
+              : item
           )
         );
 
@@ -359,10 +367,18 @@ const GlossaryPage = () => {
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+
         throw error;
       }
     },
-    [activeGlossary, updateActiveGlossary, navigate, fetchGlossaryList, setGlossaries]
+    [
+      activeGlossary,
+      updateActiveGlossary,
+      navigate,
+      fetchGlossaryList,
+      glossaries,
+      setGlossaries,
+    ]
   );
 
   const updateVote = useCallback(
@@ -425,7 +441,33 @@ const GlossaryPage = () => {
 
   const handleGlossaryTermUpdate = useCallback(
     async (updatedData: GlossaryTerm) => {
-      const jsonPatch = compare(activeGlossary as GlossaryTerm, updatedData);
+      const normalizedExtension = normalizeBusinessVersionExtension(
+        updatedData.extension
+      );
+      const normalizedUpdatedData: GlossaryTerm = {
+        ...updatedData,
+        extension: normalizedExtension,
+      };
+
+      // Version/audit snapshots do not contain the same server-computed fields as the
+      // canonical entity. Exclude those fields so restoring a business version never emits
+      // invalid remove operations such as `/childrenCount`.
+      const readOnlyFields: Array<keyof GlossaryTerm> = [
+        'changeDescription',
+        'children',
+        'childrenCount',
+        'href',
+        'incrementalChangeDescription',
+        'updatedAt',
+        'updatedBy',
+        'usageCount',
+        'version',
+        'votes',
+      ];
+      const jsonPatch = compare(
+        omit(activeGlossary as GlossaryTerm, readOnlyFields),
+        omit(normalizedUpdatedData, readOnlyFields)
+      );
       if (isEmpty(jsonPatch)) {
         return;
       }
@@ -440,7 +482,7 @@ const GlossaryPage = () => {
         const response = await patchGlossaryTerm(activeGlossary?.id, jsonPatch);
         if (response) {
           setActiveGlossary(response as ModifiedGlossary);
-          if (activeGlossary?.name !== updatedData.name) {
+          if (activeGlossary?.name !== normalizedUpdatedData.name) {
             navigate(getGlossaryPath(response.fullyQualifiedName));
             fetchGlossaryList();
           }
@@ -454,6 +496,7 @@ const GlossaryPage = () => {
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+
         throw error;
       }
     },
@@ -568,8 +611,8 @@ const GlossaryPage = () => {
 
   const resizableLayout = isGlossaryActive ? (
     <ResizableLeftPanels
-      showLearningIcon
       collapsibleFirstPanel
+      showLearningIcon
       className="content-height-with-resizable-panel"
       firstPanel={{
         className:

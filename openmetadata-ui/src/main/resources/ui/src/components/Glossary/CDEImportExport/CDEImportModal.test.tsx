@@ -126,7 +126,7 @@ describe('CDEImportModal', () => {
           personalData: '',
           relatedRegulatoryDocuments: '',
           dataQualityRules: '',
-          cdeVersion: '1.0',
+          version: '1.0',
           expirationDate: '',
           reviewer: '',
           status: EntityStatus.Draft,

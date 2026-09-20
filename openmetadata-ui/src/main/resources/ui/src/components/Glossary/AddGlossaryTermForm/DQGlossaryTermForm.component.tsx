@@ -30,7 +30,7 @@ export interface DQGlossaryTermFormValues {
   name?: string;
   displayName?: string;
   description?: string;
-  cdeVersion?: string;
+  version?: string;
   cdeCode?: string;
   cdeName?: string;
   qualityThreshold?: string;
@@ -111,9 +111,8 @@ const DQGlossaryTermForm = ({
         description: glossaryTerm.description,
         owners: glossaryTerm.owners,
         reviewers: glossaryTerm.reviewers,
-        cdeVersion:
+        version:
           extension.version ??
-          extension.cdeVersion ??
           extension.phien_ban ??
           '1.0',
         cdeCode: extension.cdeCode,
@@ -208,12 +207,11 @@ const DQGlossaryTermForm = ({
               '',
           }
         : {}),
-      ...(values.cdeVersion?.trim()
+      ...(values.version?.trim()
         ? {
-            version: values.cdeVersion.trim(),
-            cdeVersion: values.cdeVersion.trim(),
+            version: values.version.trim(),
           }
-        : { version: '1.0', cdeVersion: '1.0' }),
+        : { version: '1.0' }),
       ...(values.qualityThreshold?.trim()
         ? { qualityThreshold: values.qualityThreshold.trim() }
         : {}),
@@ -284,7 +282,7 @@ const DQGlossaryTermForm = ({
         editMode ? 'edit' : 'add'
       }`}
       form={form}
-      initialValues={{ cdeVersion: '1.0' }}
+      initialValues={{ version: '1.0' }}
       layout="vertical"
       onFinish={onFinish}>
       {/* Khối 1: Thông tin quy tắc nghiệp vụ */}
@@ -311,7 +309,7 @@ const DQGlossaryTermForm = ({
           <Form.Item
             required
             label={t('cde.version', 'Phiên bản')}
-            name="cdeVersion"
+            name="version"
             rules={[{ required: true, whitespace: true }]}>
             <Input data-testid="dq-version" placeholder="1.0" />
           </Form.Item>

@@ -39,8 +39,11 @@ import { FeedCounts } from '../../../interface/feed.interface';
 import { MOCK_GLOSSARY_NO_PERMISSIONS } from '../../../mocks/Glossary.mock';
 import { searchQuery } from '../../../rest/searchAPI';
 import { getFeedCounts } from '../../../utils/CommonUtils';
-import { getApprovedCDEAuditSnapshots } from '../../../utils/CDEApprovedVersionUtils';
 import { getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
+import {
+  compareBusinessVersions,
+  getBusinessVersion,
+} from '../../../utils/BusinessVersionUtils';
 import {
   checkIfExpandViewSupported,
   getDetailsTabWithNewLabel,
@@ -129,50 +132,70 @@ const GlossaryTermsV1 = ({
         : currentGlossaryTerm,
     [viewedVersion, currentGlossaryTerm]
   );
-  const isViewingVersion = viewedVersion ? true : isVersionView;
+  const isViewingVersion = Boolean(viewedVersion) || Boolean(isVersionView);
+
+  const handleVersionSelect = useCallback(
+    (snapshot: GlossaryTerm) => {
+      const snapshotBusinessVersion = getBusinessVersion(snapshot.extension);
+      const currentBusinessVersion = getBusinessVersion(
+        currentGlossaryTerm.extension
+      );
+      const isLatestVersion =
+        snapshot.id === currentGlossaryTerm.id &&
+        snapshot.version === currentGlossaryTerm.version &&
+        compareBusinessVersions(
+          snapshotBusinessVersion,
+          currentBusinessVersion
+        ) === 0;
+      const searchParams = new URLSearchParams(location.search);
+
+      if (isLatestVersion) {
+        setViewedVersion(null);
+        searchParams.delete('approvedVersion');
+      } else {
+        setViewedVersion(snapshot);
+        searchParams.set('approvedVersion', snapshotBusinessVersion);
+      }
+
+      navigate(
+        {
+          pathname: location.pathname,
+          search: searchParams.toString(),
+        },
+        { replace: true }
+      );
+    },
+    [currentGlossaryTerm, location.pathname, location.search, navigate]
+  );
 
   useEffect(() => {
     let cancelled = false;
     setViewedVersion(null);
     if (approvedVersion) {
-      const currentExt = currentGlossaryTerm.extension as
-        | { cdeVersion?: string; version?: string; phien_ban?: string }
-        | undefined;
-      const currentVer = String(
-        currentExt?.cdeVersion ??
-          currentExt?.version ??
-          currentExt?.phien_ban ??
-          '1.0'
-      ).trim();
+      const currentVer = getBusinessVersion(currentGlossaryTerm.extension);
 
-      if (currentVer === approvedVersion) {
+      if (
+        currentVer === approvedVersion &&
+        String(currentGlossaryTerm.entityStatus).toLowerCase() === 'approved'
+      ) {
         return;
       }
 
-      Promise.allSettled([
-        getGlossaryTermsVersionsList(currentGlossaryTerm.id),
-        getApprovedCDEAuditSnapshots(currentGlossaryTerm),
-      ])
-        .then(([historyRes, auditRes]) => {
+      getGlossaryTermsVersionsList(currentGlossaryTerm.id)
+        .then((history) => {
           if (cancelled) {
             return;
           }
 
           const getSnapshotVer = (term?: GlossaryTerm | null): string => {
-            const ext = term?.extension as
-              | { cdeVersion?: string; version?: string; phien_ban?: string }
-              | undefined;
-            const raw = String(
-              ext?.cdeVersion ?? ext?.version ?? ext?.phien_ban ?? ''
-            ).trim();
+            const raw = term ? getBusinessVersion(term.extension, '') : '';
 
             return raw ? raw.replace(/^(version:?\s*|v)/i, '') : '1.0';
           };
 
           let candidate1_0: GlossaryTerm | null = null;
-
-          if (historyRes.status === 'fulfilled') {
-            const versions = (historyRes.value.versions ?? [])
+          let historyMatch: GlossaryTerm | undefined;
+          const versions = (history.versions ?? [])
               .map((v) => {
                 try {
                   return (
@@ -186,30 +209,31 @@ const GlossaryTermsV1 = ({
               .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
 
             for (const p of versions) {
+              if (
+                String(p.entityStatus ?? 'Approved').toLowerCase() !==
+                'approved'
+              ) {
+                continue;
+              }
               const ver = getSnapshotVer(p);
               if (ver === approvedVersion) {
-                setViewedVersion(p);
-
-                return;
+                historyMatch = p;
               }
             }
 
-            if (versions.length > 0) {
-              candidate1_0 = versions[versions.length - 1];
-            }
+            const approvedVersions = versions.filter(
+              (item) =>
+                String(item.entityStatus ?? 'Approved').toLowerCase() ===
+                'approved'
+            );
+            if (approvedVersions.length > 0) {
+              candidate1_0 = approvedVersions[approvedVersions.length - 1];
           }
 
-          if (auditRes.status === 'fulfilled') {
-            const match = auditRes.value.find(({ snapshot }) => {
-              const ver = getSnapshotVer(snapshot);
+          if (historyMatch) {
+            setViewedVersion(historyMatch);
 
-              return ver === approvedVersion;
-            });
-            if (match) {
-              setViewedVersion(match.snapshot);
-
-              return;
-            }
+            return;
           }
 
           if (approvedVersion === '1.0' && candidate1_0) {
@@ -341,6 +365,21 @@ const GlossaryTermsV1 = ({
 
   const onTermUpdate = async (data: GlossaryTerm | Glossary) => {
     await handleGlossaryTermUpdate(data as GlossaryTerm);
+    setViewedVersion(null);
+
+    if (approvedVersion) {
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.delete('approvedVersion');
+      navigate(
+        {
+          pathname: location.pathname,
+          search: searchParams.toString(),
+        },
+        { replace: true }
+      );
+    }
+
+    await refreshActiveGlossaryTerm?.();
     // For name change, do not update the feed. It will be updated when the page is redirected to
     // have the new value.
     if (glossaryTerm.name === data.name) {
@@ -505,18 +544,18 @@ const GlossaryTermsV1 = ({
       <Row data-testid="glossary-term" gutter={[0, 12]}>
         <Col span={24}>
           <GlossaryHeader
+            latestData={currentGlossaryTerm}
             updateVote={updateVote}
             onAddGlossaryTerm={onAddGlossaryTerm}
             onAssetAdd={() => setAssetModalVisible(true)}
             onDelete={handleGlossaryTermDelete}
             onVersionSelect={(snapshot) =>
-              setViewedVersion(
-                snapshot.version === currentGlossaryTerm.version &&
-                  currentGlossaryTerm.entityStatus === EntityStatus.Approved
-                  ? null
-                  : snapshot
-              )
+              handleVersionSelect(snapshot as GlossaryTerm)
             }
+            onWorkflowTransition={async () => {
+              setViewedVersion(null);
+              await refreshActiveGlossaryTerm?.();
+            }}
           />
         </Col>
 

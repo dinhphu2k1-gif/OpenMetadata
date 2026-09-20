@@ -169,7 +169,7 @@ export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
   PERSONAL_DATA: 'cdePersonalData',
   RELATED_REGULATION: 'cdeRelatedRegulation',
   DATA_QUALITY_RULE: 'cdeDataQualityRule',
-  VERSION: 'cdeVersion',
+  VERSION: 'version',
   EFFECTIVE_DATE: 'effectiveDate',
   EXPIRATION_DATE: 'expirationDate',
 };

@@ -49,7 +49,9 @@ import {
   addGlossaryTerm,
   getGlossaryTermsById,
   patchGlossaryTerm,
+  transitionGlossaryTermWorkflow,
 } from '../../../rest/glossaryAPI';
+import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getTags } from '../../../rest/tagAPI';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
@@ -203,8 +205,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     } catch (error) {
       showErrorToast(
         error instanceof Error
-          ? error
-          : new Error(t('cde.file-parse-error', 'Lỗi phân tích file Excel'))
+          ? error.message
+          : t('cde.file-parse-error', 'Lỗi phân tích file Excel')
       );
     } finally {
       setParsing(false);
@@ -270,6 +272,23 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               [],
               current.extension
             );
+            let editable = current;
+            if (current.entityStatus === EntityStatus.Approved) {
+              editable = await transitionGlossaryTermWorkflow(
+                current.id,
+                'createDraft',
+                {
+                  expectedNativeVersion: Number(current.version),
+                  businessVersion: getBusinessVersion(payload.extension),
+                }
+              );
+            } else if (current.entityStatus === EntityStatus.Rejected) {
+              editable = await transitionGlossaryTermWorkflow(
+                current.id,
+                'reopen',
+                { expectedNativeVersion: Number(current.version) }
+              );
+            }
             const patchOps: Operation[] = [
               { op: 'replace', path: '/displayName', value: row.displayName },
               {
@@ -282,15 +301,9 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                 path: '/extension',
                 value: payload.extension,
               },
-              // Luôn đặt về trạng thái Bản nháp (Draft) theo đúng quy tắc nghiệp vụ
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: EntityStatus.Draft,
-              },
             ];
 
-            await patchGlossaryTerm(row.existingId, patchOps);
+            await patchGlossaryTerm(editable.id, patchOps);
             updatedCount++;
           } catch (error: any) {
             failedCount++;
@@ -311,21 +324,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             allTags
           );
 
-          const newTerm = await addGlossaryTerm(payload);
-          // Đảm bảo chắc chắn trạng thái là Draft (Bản nháp)
-          if (newTerm && newTerm.entityStatus !== EntityStatus.Draft) {
-            try {
-              await patchGlossaryTerm(newTerm.id, [
-                {
-                  op: 'replace',
-                  path: '/entityStatus',
-                  value: EntityStatus.Draft,
-                },
-              ]);
-            } catch (patchErr) {
-              // Non-blocking: term already created
-            }
-          }
+          await addGlossaryTerm(payload);
           createdCount++;
         } catch (error: any) {
           failedCount++;
@@ -395,8 +394,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     },
     {
       title: t('cde.version'),
-      dataIndex: 'cdeVersion',
-      key: 'cdeVersion',
+      dataIndex: 'version',
+      key: 'version',
       width: 120,
     },
     ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({

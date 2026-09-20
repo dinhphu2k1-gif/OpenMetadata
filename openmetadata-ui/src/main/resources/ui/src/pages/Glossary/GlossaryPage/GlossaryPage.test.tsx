@@ -144,6 +144,7 @@ jest.mock('../../../rest/glossaryAPI', () => ({
       paging: { total: 1 },
     })
   ),
+  getGlossaryVersionsList: jest.fn().mockResolvedValue({ versions: [] }),
   patchGlossaryTerm: jest
     .fn()
     .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),

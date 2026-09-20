@@ -29,6 +29,7 @@ import {
   Upload,
 } from 'antd';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { Operation } from 'fast-json-patch';
 import DataGrid, { Column, RenderCellProps, textEditor } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { useTranslation } from 'react-i18next';
@@ -63,9 +64,12 @@ import {
   addGlossaryTerm,
   getGlossariesByName,
   getGlossaryTerms,
+  getGlossaryTermsById,
   patchGlossaryTerm,
+  transitionGlossaryTermWorkflow,
 } from '../../rest/glossaryAPI';
 import { getTags } from '../../rest/tagAPI';
+import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
 import { getGlossaryPath } from '../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import './dq-import-page.less';
@@ -121,7 +125,7 @@ const DQImportPage: FC = () => {
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [createdTerms, setCreatedTerms] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; version: number }[]
   >([]);
   const [isSubmittingAll, setIsSubmittingAll] = useState<boolean>(false);
   const [isSubmittingAllSuccess, setIsSubmittingAllSuccess] =
@@ -693,7 +697,7 @@ const DQImportPage: FC = () => {
     let skipped = 0;
     let failed = 0;
     const errors: { row: number; name: string; reason: string }[] = [];
-    const createdTermsList: { id: string; name: string }[] = [];
+    const createdTermsList: { id: string; name: string; version: number }[] = [];
 
     const total = rowsToProcess.length;
 
@@ -708,6 +712,7 @@ const DQImportPage: FC = () => {
       if (isExisting && duplicatePolicy === 'skip') {
         skipped++;
         setImportProgress(Math.round(((i + 1) / total) * 100));
+
         continue;
       }
 
@@ -738,8 +743,27 @@ const DQImportPage: FC = () => {
         );
 
         if (isExisting && duplicatePolicy === 'update' && row.existingId) {
+          let editable = await getGlossaryTermsById(row.existingId, {
+            fields: 'extension',
+          });
+          if (editable.entityStatus === EntityStatus.Approved) {
+            editable = await transitionGlossaryTermWorkflow(
+              editable.id,
+              'createDraft',
+              {
+                expectedNativeVersion: Number(editable.version),
+                businessVersion: getBusinessVersion(payload.extension),
+              }
+            );
+          } else if (editable.entityStatus === EntityStatus.Rejected) {
+            editable = await transitionGlossaryTermWorkflow(
+              editable.id,
+              'reopen',
+              { expectedNativeVersion: Number(editable.version) }
+            );
+          }
           // Cập nhật bản ghi có sẵn bằng JSON Patch
-          const patchJson = [
+          const patchJson: Operation[] = [
             {
               op: 'replace',
               path: '/description',
@@ -757,19 +781,19 @@ const DQImportPage: FC = () => {
             },
           ];
 
-          await patchGlossaryTerm(row.existingId, patchJson);
+          await patchGlossaryTerm(editable.id, patchJson);
           updated++;
         } else {
           // Tạo mới bản ghi: Luôn ở trạng thái Draft
           const newTerm = await addGlossaryTerm({
             ...payload,
-            status: EntityStatus.Draft,
           });
           created++;
           if (newTerm?.id) {
             createdTermsList.push({
               id: newTerm.id,
               name: newTerm.name || termName,
+              version: Number(newTerm.version),
             });
           }
         }
@@ -808,13 +832,9 @@ const DQImportPage: FC = () => {
       await Promise.allSettled(
         chunk.map(async (term) => {
           try {
-            await patchGlossaryTerm(term.id, [
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: EntityStatus.InReview,
-              },
-            ]);
+            await transitionGlossaryTermWorkflow(term.id, 'submit', {
+              expectedNativeVersion: term.version,
+            });
             successCount++;
           } catch (err) {
             // ignore individual error
@@ -1197,6 +1217,7 @@ const DQImportPage: FC = () => {
                         )}
                         {importErrors.length > 0 && (
                           <Alert
+                            showIcon
                             className="m-t-sm text-left"
                             description={
                               <ul
@@ -1227,7 +1248,6 @@ const DQImportPage: FC = () => {
                               </ul>
                             }
                             message={t('label.failure-reason', 'Lý do lỗi')}
-                            showIcon
                             type="error"
                           />
                         )}

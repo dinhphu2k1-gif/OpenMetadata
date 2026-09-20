@@ -47,7 +47,7 @@ export const VersionButton = forwardRef<
 
   const {
     updatedBy,
-    version: versionNumber,
+    version: entityVersionNumber,
     changeDescription,
     updatedAt,
     glossary,
@@ -68,16 +68,14 @@ export const VersionButton = forwardRef<
       typeof glossary === 'string' ? glossary : glossary?.name,
       typeof glossary === 'string' ? undefined : glossary?.displayName
     ) ||
-    version?.extension?.cdeVersion != null ||
     version?.extension?.version != null
   );
 
-  const cdeVersionNumber = useMemo(() => {
+  const businessVersionNumber = useMemo(() => {
     if (!isCDE) {
       return null;
     }
     const raw = String(
-      version?.extension?.cdeVersion ??
       version?.extension?.version ??
       version?.extension?.phien_ban ??
       '1.0'
@@ -86,9 +84,9 @@ export const VersionButton = forwardRef<
     return raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
   }, [isCDE, version?.extension]);
 
-  const versionText = cdeVersionNumber
-    ? `v${cdeVersionNumber}`
-    : `v${parseFloat(versionNumber).toFixed(1)}`;
+  const versionText = businessVersionNumber
+    ? `v${businessVersionNumber}`
+    : `v${parseFloat(entityVersionNumber).toFixed(1)}`;
 
   return (
     <div
@@ -98,7 +96,11 @@ export const VersionButton = forwardRef<
       )}
       data-testid={`version-entry-${versionText}`}
       ref={ref}
-      onClick={() => onVersionSelect(cdeVersionNumber ?? toString(versionNumber))}>
+      onClick={() =>
+        onVersionSelect(
+          businessVersionNumber ?? toString(entityVersionNumber)
+        )
+      }>
       <div className="timeline-wrapper">
         <span
           className={classNames(
@@ -206,7 +208,7 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             ? undefined
             : firstParsed?.glossary?.displayName
         ) ||
-        firstParsed?.extension?.cdeVersion != null ||
+        firstParsed?.extension?.version != null ||
         firstParsed?.extension?.version != null
       );
 
@@ -235,7 +237,6 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
         continue;
       }
       const raw = String(
-        p?.extension?.cdeVersion ??
         p?.extension?.version ??
         p?.extension?.phien_ban ??
         '1.0'
@@ -262,7 +263,6 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             ? JSON.parse(currentParsed)
             : currentParsed;
         const raw = String(
-          p?.extension?.cdeVersion ??
           p?.extension?.version ??
           p?.extension?.phien_ban ??
           '1.0'
@@ -274,7 +274,6 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             ? JSON.parse(uniqueList[0])
             : uniqueList[0];
         const raw = String(
-          firstApproved?.extension?.cdeVersion ??
           firstApproved?.extension?.version ??
           firstApproved?.extension?.phien_ban ??
           '1.0'
@@ -311,7 +310,6 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
       let isSelected = toString(parsed.version) === currentVersion;
       if (isCDE && activeCdeVersion) {
         const raw = String(
-          parsed?.extension?.cdeVersion ??
           parsed?.extension?.version ??
           parsed?.extension?.phien_ban ??
           '1.0'

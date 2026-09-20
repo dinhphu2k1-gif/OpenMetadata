@@ -230,7 +230,7 @@ describe('CDEGlossaryTermSummary', () => {
             glossaryTerm={{
               ...glossaryTerm,
               extension: {
-                cdeVersion: '1.2',
+                version: '1.2',
                 effectiveDate: '2026-01-01',
               },
             }}

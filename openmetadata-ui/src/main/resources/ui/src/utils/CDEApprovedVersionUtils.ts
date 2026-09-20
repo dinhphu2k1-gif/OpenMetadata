@@ -3,17 +3,18 @@ import {
   EntityStatus,
 } from '../generated/entity/data/glossaryTerm';
 import { getAuditLogs } from '../rest/auditLogAPI';
+import { getBusinessVersion } from './BusinessVersionUtils';
 
-export interface ApprovedCDEAuditSnapshot {
+export interface CDEAuditSnapshot {
   snapshot: GlossaryTerm;
   eventId: string;
 }
 
-/** Read approved business versions that session consolidation may have omitted from /versions. */
-export const getApprovedCDEAuditSnapshots = async (
-  term: Pick<GlossaryTerm, 'id' | 'fullyQualifiedName'>
-): Promise<ApprovedCDEAuditSnapshot[]> => {
-  const snapshots = new Map<string, ApprovedCDEAuditSnapshot>();
+const getCDEAuditSnapshotsByStatus = async (
+  term: Pick<GlossaryTerm, 'id' | 'fullyQualifiedName'>,
+  statuses?: Set<EntityStatus>
+): Promise<CDEAuditSnapshot[]> => {
+  const snapshots = new Map<string, CDEAuditSnapshot>();
   let after: string | undefined;
 
   do {
@@ -33,21 +34,16 @@ export const getApprovedCDEAuditSnapshots = async (
         const snapshot = (typeof raw === 'string' ? JSON.parse(raw) : raw) as
           | GlossaryTerm
           | undefined;
+        if (!snapshot || snapshot.id !== term.id) {
+          continue;
+        }
         if (
-          snapshot?.id !== term.id ||
-          snapshot.entityStatus !== EntityStatus.Approved
+          statuses &&
+          (!snapshot.entityStatus || !statuses.has(snapshot.entityStatus))
         ) {
           continue;
         }
-        const extension = snapshot.extension as
-          | { cdeVersion?: string; version?: string; phien_ban?: string }
-          | undefined;
-        const businessVersion = String(
-          extension?.cdeVersion ??
-            extension?.version ??
-            extension?.phien_ban ??
-            '1.0'
-        );
+        const businessVersion = getBusinessVersion(snapshot.extension);
         if (!snapshots.has(businessVersion)) {
           snapshots.set(businessVersion, {
             snapshot,
@@ -63,3 +59,14 @@ export const getApprovedCDEAuditSnapshots = async (
 
   return Array.from(snapshots.values());
 };
+
+/** Read the latest workflow state of every business version from audit logs. */
+export const getCDEAuditSnapshots = (
+  term: Pick<GlossaryTerm, 'id' | 'fullyQualifiedName'>
+) => getCDEAuditSnapshotsByStatus(term);
+
+/** Read approved business versions that session consolidation may have omitted from /versions. */
+export const getApprovedCDEAuditSnapshots = (
+  term: Pick<GlossaryTerm, 'id' | 'fullyQualifiedName'>
+) =>
+  getCDEAuditSnapshotsByStatus(term, new Set([EntityStatus.Approved]));

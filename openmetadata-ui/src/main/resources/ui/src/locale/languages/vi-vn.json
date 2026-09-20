@@ -3712,11 +3712,9 @@
     "confirm-bulk-approve-title": "Xác nhận phê duyệt hàng loạt",
     "confirm-bulk-approve-desc": "Bạn có chắc chắn muốn phê duyệt {{count}} bản ghi đang ở trạng thái Chờ duyệt sang trạng thái Đã duyệt?",
     "confirm-bulk-reject-title": "Xác nhận từ chối hàng loạt",
-    "confirm-bulk-reject-desc": "Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.",
+    "confirm-bulk-reject-desc": "Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được giữ ở trạng thái Từ chối cho đến khi người đề xuất chọn Chỉnh sửa lại.",
     "confirm-bulk-revoke-title": "Xác nhận hủy duyệt hàng loạt",
     "confirm-bulk-revoke-desc": "Bạn có chắc chắn muốn hủy duyệt {{count}} bản ghi đang ở trạng thái Đã duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.",
-    "reject-reason-placeholder": "Nhập lý do từ chối để người đề xuất biết thông tin chỉnh sửa...",
-    "reject-reason-required": "Vui lòng nhập lý do từ chối.",
     "bulk-progress-processing": "Đang xử lý {{current}} / {{total}} bản ghi...",
     "bulk-action-completed": "Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.",
     "all-imported-submitted-success": "Đã gửi phê duyệt toàn bộ {{count}} bản ghi vừa nạp thành công!"

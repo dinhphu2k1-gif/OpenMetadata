@@ -26,7 +26,7 @@ jest.mock('@openmetadata/ui-core-components', () => ({
 }));
 
 jest.mock('../../../../rest/glossaryAPI', () => ({
-  patchGlossaryTerm: jest.fn().mockResolvedValue({}),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../../../utils/ToastUtils', () => ({
@@ -65,6 +65,7 @@ describe('GlossaryBulkActionModal', () => {
       displayName: 'Mã khách hàng',
       fullyQualifiedName: 'Glossary.CDE001',
       entityStatus: EntityStatus.Draft,
+      version: 1.1,
     } as ModifiedGlossaryTerm,
     {
       id: 'term-2',
@@ -72,6 +73,7 @@ describe('GlossaryBulkActionModal', () => {
       displayName: 'Số tài khoản',
       fullyQualifiedName: 'Glossary.CDE002',
       entityStatus: EntityStatus.Draft,
+      version: 1.2,
     } as ModifiedGlossaryTerm,
   ];
 
@@ -82,8 +84,8 @@ describe('GlossaryBulkActionModal', () => {
   it('should render submit for review modal and patch terms with InReview status', async () => {
     render(
       <GlossaryBulkActionModal
+        open
         actionType="submitForReview"
-        open={true}
         terms={mockTerms}
         onCancel={mockOnCancel}
         onSuccess={mockOnSuccess}
@@ -102,13 +104,19 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledTimes(2);
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-        { op: 'replace', path: '/entityStatus', value: EntityStatus.InReview },
-      ]);
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-2', [
-        { op: 'replace', path: '/entityStatus', value: EntityStatus.InReview },
-      ]);
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledTimes(
+        2
+      );
+      expect(
+        glossaryAPI.transitionGlossaryTermWorkflow
+      ).toHaveBeenCalledWith('term-1', 'submit', {
+        expectedNativeVersion: 1.1,
+      });
+      expect(
+        glossaryAPI.transitionGlossaryTermWorkflow
+      ).toHaveBeenCalledWith('term-2', 'submit', {
+        expectedNativeVersion: 1.2,
+      });
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
@@ -116,8 +124,8 @@ describe('GlossaryBulkActionModal', () => {
   it('should render approve modal and patch terms with Approved status', async () => {
     render(
       <GlossaryBulkActionModal
+        open
         actionType="approve"
-        open={true}
         terms={mockTerms}
         onCancel={mockOnCancel}
         onSuccess={mockOnSuccess}
@@ -134,18 +142,20 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-        { op: 'replace', path: '/entityStatus', value: EntityStatus.Approved },
-      ]);
+      expect(
+        glossaryAPI.transitionGlossaryTermWorkflow
+      ).toHaveBeenCalledWith('term-1', 'approve', {
+        expectedNativeVersion: 1.1,
+      });
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
 
-  it('should patch terms with Draft status when rejecting without requiring reason', async () => {
+  it('should reject terms without requiring reason', async () => {
     render(
       <GlossaryBulkActionModal
+        open
         actionType="reject"
-        open={true}
         terms={mockTerms}
         onCancel={mockOnCancel}
         onSuccess={mockOnSuccess}
@@ -162,9 +172,11 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-        { op: 'replace', path: '/entityStatus', value: EntityStatus.Draft },
-      ]);
+      expect(
+        glossaryAPI.transitionGlossaryTermWorkflow
+      ).toHaveBeenCalledWith('term-1', 'reject', {
+        expectedNativeVersion: 1.1,
+      });
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
@@ -172,8 +184,8 @@ describe('GlossaryBulkActionModal', () => {
   it('should patch terms with Draft status when revoking approval', async () => {
     render(
       <GlossaryBulkActionModal
+        open
         actionType="revoke"
-        open={true}
         terms={mockTerms}
         onCancel={mockOnCancel}
         onSuccess={mockOnSuccess}
@@ -190,9 +202,11 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-        { op: 'replace', path: '/entityStatus', value: EntityStatus.Draft },
-      ]);
+      expect(
+        glossaryAPI.transitionGlossaryTermWorkflow
+      ).toHaveBeenCalledWith('term-1', 'revoke', {
+        expectedNativeVersion: 1.1,
+      });
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });

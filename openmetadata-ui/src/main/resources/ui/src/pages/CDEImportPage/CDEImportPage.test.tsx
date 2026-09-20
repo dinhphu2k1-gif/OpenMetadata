@@ -90,12 +90,14 @@ jest.mock('../../rest/glossaryAPI', () => ({
     id: 'term-1',
     name: 'CDE001',
     entityStatus: 'Draft',
+    version: 0.1,
   }),
   patchGlossaryTerm: jest.fn().mockResolvedValue({
     id: 'term-1',
     name: 'CDE001',
     entityStatus: 'Draft',
   }),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../rest/domainAPI', () => ({
@@ -190,7 +192,7 @@ describe('CDEImportPage', () => {
           personalData: 'Có',
           relatedRegulatoryDocuments: 'TT 23',
           dataQualityRules: 'Có',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: 'admin',
           status: 'Draft' as any,
           errors: [],
@@ -335,7 +337,7 @@ describe('CDEImportPage', () => {
           personalData: '',
           relatedRegulatoryDocuments: '',
           dataQualityRules: '',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: '',
           status: 'Draft' as any,
           errors: [],
@@ -419,7 +421,7 @@ describe('CDEImportPage', () => {
           personalData: 'GiaTriSai',
           relatedRegulatoryDocuments: 'VB 1',
           dataQualityRules: 'SaiDinhDangBoolean',
-          cdeVersion: 'ban-1.0',
+          version: 'ban-1.0',
           reviewer: 'Ghost_Reviewer',
           status: 'Draft' as any,
           errors: [],
@@ -497,7 +499,7 @@ describe('CDEImportPage', () => {
           personalData: '',
           relatedRegulatoryDocuments: '',
           dataQualityRules: '',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: '',
           status: 'Draft' as any,
           errors: [],
@@ -544,12 +546,10 @@ describe('CDEImportPage', () => {
     });
 
     const glossaryAPI = require('../../rest/glossaryAPI');
-    expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-      {
-        op: 'replace',
-        path: '/entityStatus',
-        value: 'In Review',
-      },
-    ]);
+    expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-1',
+      'submit',
+      { expectedNativeVersion: 0.1 }
+    );
   });
 });

@@ -14,10 +14,8 @@
 import { isEmpty } from 'lodash';
 import * as XLSX from 'xlsx';
 import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
-import { EntityReference } from '../../../generated/entity/type';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
-import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
 import { DQ_TAG_CLASSIFICATIONS, DQExtension } from '../GlossaryTermTab/DQGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
@@ -190,6 +188,7 @@ export const validateDQDimensionValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.dimension &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -229,6 +228,7 @@ export const validateDQTargetPopulationValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.targetPopulation &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -277,6 +277,7 @@ export const validateDQMethodValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.method &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -339,6 +340,7 @@ export const validateDQFrequencyValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.frequency &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -379,6 +381,7 @@ export const validateDQDataSourceValues = (
     for (const [key, std] of Object.entries(STANDARD_DQ_DATA_SOURCES)) {
       if (norm.includes(key) || norm === normalizeDQText(std.label)) {
         matchedFQN = std.fqn;
+
         break;
       }
     }
@@ -387,6 +390,7 @@ export const validateDQDataSourceValues = (
     if (!matchedFQN && availableTags.length > 0) {
       const found = availableTags.find((t) => {
         const tagNorm = normalizeDQText(t.displayName || t.name);
+
         return (
           t.classification?.name === DQ_TAG_CLASSIFICATIONS.dataSource &&
           (tagNorm === norm || norm.includes(tagNorm))
@@ -590,6 +594,7 @@ export const readAndValidateDQExcel = async (
       Array.isArray(row) &&
       row.some((cell) => {
         const text = normalizeDQText(String(cell || ''));
+
         return (
           text.includes('ma quy tac') ||
           text.includes('tieu chi') ||
@@ -598,6 +603,7 @@ export const readAndValidateDQExcel = async (
       })
     ) {
       headerRowIndex = r;
+
       break;
     }
   }
@@ -640,6 +646,7 @@ export const readAndValidateDQExcel = async (
 
   const getVal = (row: any[], key: string, fallbackIdx: number): string => {
     const idx = colIndexMap[key] !== undefined ? colIndexMap[key] : fallbackIdx;
+
     return String(row[idx] ?? '').trim();
   };
 
@@ -795,7 +802,7 @@ export const transformDQRowToGlossaryTermPayload = (
   description: string;
   glossary: string;
   tags?: TagLabel[];
-  relatedTerms?: EntityReference[];
+  relatedTerms?: string[];
   extension?: Record<string, unknown>;
 } => {
   const tags: TagLabel[] = [];
@@ -857,7 +864,7 @@ export const transformDQRowToGlossaryTermPayload = (
   }
 
   // 6. Liên kết CDE liên quan (relatedTerms)
-  let relatedTerms: EntityReference[] | undefined;
+  let relatedTerms: string[] | undefined;
   if (row.cdeCode && allCdeTerms.length > 0) {
     const cleanCode = row.cdeCode.trim().toUpperCase();
     const matchedCde = allCdeTerms.find(
@@ -866,15 +873,9 @@ export const transformDQRowToGlossaryTermPayload = (
         cde.name.toUpperCase().replace(/\s+/g, '') === cleanCode
     );
     if (matchedCde) {
-      relatedTerms = [
-        {
-          id: matchedCde.id,
-          type: 'glossaryTerm',
-          fullyQualifiedName: matchedCde.fullyQualifiedName,
-          name: matchedCde.name,
-          displayName: matchedCde.displayName,
-        },
-      ];
+      relatedTerms = matchedCde.fullyQualifiedName
+        ? [matchedCde.fullyQualifiedName]
+        : undefined;
     }
   }
 
@@ -938,6 +939,7 @@ export const formatDQImportErrorMessage = (
   );
   if (termAlreadyExistsMatch) {
     const [, termName, glossaryName] = termAlreadyExistsMatch;
+
     return t(
       'dq.error-term-already-exists',
       `Mã quy tắc '${termName}' đã tồn tại trong danh mục '${glossaryName}'.`,
@@ -951,6 +953,7 @@ export const formatDQImportErrorMessage = (
   );
   if (entityNameMatch) {
     const [, termName] = entityNameMatch;
+
     return t(
       'dq.error-term-name-exists',
       `Mã quy tắc '${termName}' đã tồn tại trên hệ thống.`,

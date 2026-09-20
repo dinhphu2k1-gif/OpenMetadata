@@ -25,31 +25,32 @@ const renderCell = (key: string, extension = {}, isLoadMoreButton = false) => {
 };
 
 describe('CDE version and date columns', () => {
-  it('appends the three columns in order before governance columns', () => {
-    expect(columns.slice(-3).map((column) => column.key)).toEqual([
-      'cdeVersion',
+  it('appends version, status, and date columns in order', () => {
+    expect(columns.slice(-4).map((column) => column.key)).toEqual([
+      'version',
+      'entityStatus',
       'effectiveDate',
       'expirationDate',
     ]);
-    expect(columns.slice(-3).map((column) => column.width)).toEqual([
-      120, 160, 160,
+    expect(columns.slice(-4).map((column) => column.width)).toEqual([
+      120, 150, 160, 160,
     ]);
   });
 
   it('matches the detail header business version fallback', () => {
     expect(
-      renderCell('cdeVersion', { cdeVersion: '2.0', phien_ban: '1.0' })
+      renderCell('version', { version: '2.0', phien_ban: '1.0' })
     ).toBe('2.0');
-    expect(renderCell('cdeVersion', { phien_ban: '1.1' })).toBe('1.1');
-    expect(renderCell('cdeVersion', { version: '1.2' })).toBe('1.2');
+    expect(renderCell('version', { phien_ban: '1.1' })).toBe('1.1');
+    expect(renderCell('version', { version: '1.2' })).toBe('1.2');
     expect(
-      columns.find((column) => column.key === 'cdeVersion')?.render?.(
+      columns.find((column) => column.key === 'version')?.render?.(
         undefined,
         { version: 0.3, extension: {} } as ModifiedGlossaryTerm,
         0
       )
     ).toBe('1.0');
-    expect(renderCell('cdeVersion')).toBe('1.0');
+    expect(renderCell('version')).toBe('1.0');
   });
 
   it('formats valid dates and hides missing/invalid ones', () => {
@@ -62,7 +63,7 @@ describe('CDE version and date columns', () => {
     expect(renderCell('effectiveDate')).toBe('--');
   });
 
-  it.each(['cdeVersion', 'effectiveDate', 'expirationDate'])(
+  it.each(['version', 'effectiveDate', 'expirationDate'])(
     'leaves load-more row empty in %s',
     (key) => {
       expect(renderCell(key, {}, true)).toBeNull();
