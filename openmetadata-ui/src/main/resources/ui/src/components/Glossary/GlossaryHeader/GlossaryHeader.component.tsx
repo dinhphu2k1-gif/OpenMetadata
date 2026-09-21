@@ -59,7 +59,6 @@ import {
 } from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   isDataDictionaryGlossary,
@@ -68,12 +67,15 @@ import {
 import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
+  getGlossaryTermVersionPermissions,
   getGlossaryTerms,
   getGlossaryTermsById,
   getGlossaryTermsVersionsList,
   getGlossaryTermsVersion,
   getGlossaryVersionsList,
   getGlossaryVersion,
+  getGlossaryVersionPermissions,
+  GlossaryVersionPermissions,
   GlossaryWorkflowAction,
   transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
@@ -134,7 +136,6 @@ const GlossaryHeader = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { fqn } = useFqn();
-  const { currentUser, selectedPersona } = useApplicationStore();
   const { activeGlossary } = useGlossaryStore();
   const {
     onUpdate,
@@ -185,6 +186,25 @@ const GlossaryHeader = ({
   >([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const isGlossary = entityType === EntityType.GLOSSARY;
+  const [workflowPermissions, setWorkflowPermissions] =
+    useState<GlossaryVersionPermissions>();
+
+  useEffect(() => {
+    const loadWorkflowPermissions = async () => {
+      try {
+        const value = isGlossary
+          ? await getGlossaryVersionPermissions(selectedData.id)
+          : await getGlossaryTermVersionPermissions(selectedData.id);
+        setWorkflowPermissions(value);
+      } catch {
+        setWorkflowPermissions(undefined);
+      }
+    };
+
+    if (selectedData?.id) {
+      loadWorkflowPermissions();
+    }
+  }, [isGlossary, selectedData?.id]);
   const { permissions: globalPermissions } = usePermissionProvider();
 
   const createGlossaryTermPermission = useMemo(
@@ -243,45 +263,8 @@ const GlossaryHeader = ({
     return EntityStatus.Draft;
   }, [selectedData?.entityStatus]);
 
-  const isSteward = useMemo(() => {
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
-
-    return (
-      userRoles.some((r) => r.includes('steward')) ||
-      personaName.includes('steward') ||
-      Boolean(currentUser?.isAdmin)
-    );
-  }, [currentUser, selectedPersona]);
-
-  const isProposer = useMemo(() => {
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
-
-    return (
-      userRoles.some((r) => r.includes('proposer')) ||
-      personaName.includes('proposer') ||
-      Boolean(currentUser?.isAdmin)
-    );
-  }, [currentUser, selectedPersona]);
-
-  const editDisplayNamePermission = useMemo(() => {
-    if (isSteward && !currentUser?.isAdmin) {
-      return false;
-    }
-
-    return permissions.EditAll || permissions.EditDisplayName;
-  }, [permissions, isSteward, currentUser?.isAdmin]);
+  const editDisplayNamePermission =
+    permissions.EditAll || permissions.EditDisplayName;
 
   const isCDEGlossary = useMemo(() => {
     if (!isGlossary) {
@@ -307,21 +290,8 @@ const GlossaryHeader = ({
     );
   }, [isGlossary, selectedData]);
 
-  const canImportCDE = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-
-    return isProposer;
-  }, [currentUser, isProposer]);
-
-  const canImportDQ = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-
-    return isProposer;
-  }, [currentUser, isProposer]);
+  const canImportCDE = importExportPermissions;
+  const canImportDQ = importExportPermissions;
 
   const handleCDEExportClick = useCallback(async () => {
     try {
@@ -385,9 +355,8 @@ const GlossaryHeader = ({
     }
     const data = selectedData as Glossary | GlossaryTerm;
 
-    return getBusinessVersion(data?.extension);
+    return getBusinessVersion(data.businessVersion);
   }, [isCustomManagedTerm, isCustomManagedGlossary, selectedData]);
-
 
   const icon = useMemo(() => {
     if (isGlossary) {
@@ -474,52 +443,55 @@ const GlossaryHeader = ({
         .map((snapshot) =>
           typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
         )
-        .filter(
-          (snapshot) =>
+        .filter((snapshot) =>
+          ['approved', 'archived'].includes(
             String(
               snapshot.entityStatus ?? snapshot.status ?? 'Approved'
-            ).toLowerCase() === 'approved'
+            ).toLowerCase()
+          )
         )
         .sort(
           (first, second) =>
             Number(second.version ?? 0) - Number(first.version ?? 0)
         )
-        .map((snapshot) => ({
-          label: getBusinessVersion(snapshot.extension)
+        .map((snapshot) => {
+          const label = getBusinessVersion(snapshot.businessVersion)
             .trim()
-            .replace(/^(version:?\s*|v)/i, ''),
-          snapshotVersion: toString(snapshot.version),
-          snapshot,
-        }));
+            .replace(/^(version:?\s*|v)/i, '');
+
+          return { label, snapshotVersion: label, snapshot };
+        });
 
       const currentVerClean = String(businessVersion ?? '1.0')
         .trim()
         .replace(/^(version:?\s*|v)/i, '');
 
       if (isGlossary && activeGlossary?.id === selectedData.id) {
-        const latestBusinessVersion = String(
-          getBusinessVersion(activeGlossary.extension)
+        const latestBusinessVersion = getBusinessVersion(
+          activeGlossary.businessVersion
         )
           .trim()
           .replace(/^(version:?\s*|v)/i, '');
         if (!versions.some((item) => item.label === latestBusinessVersion)) {
           versions.unshift({
             label: latestBusinessVersion,
-            snapshotVersion: toString(activeGlossary.version ?? '0.1'),
+            snapshotVersion: latestBusinessVersion,
+            snapshot: activeGlossary,
           });
         }
       }
 
       if (!isGlossary && latestData?.id === selectedData.id) {
-        const latestBusinessVersion = String(
-          getBusinessVersion(latestData.extension)
+        const latestBusinessVersion = getBusinessVersion(
+          latestData.businessVersion
         )
           .trim()
           .replace(/^(version:?\s*|v)/i, '');
         if (!versions.some((item) => item.label === latestBusinessVersion)) {
           versions.unshift({
             label: latestBusinessVersion,
-            snapshotVersion: toString(latestData.version ?? '0.1'),
+            snapshotVersion: latestBusinessVersion,
+            snapshot: latestData,
           });
         }
       }
@@ -527,7 +499,8 @@ const GlossaryHeader = ({
       if (!versions.some((v) => v.label === currentVerClean)) {
         versions.unshift({
           label: currentVerClean,
-          snapshotVersion: toString(selectedData.version ?? '0.1'),
+          snapshotVersion: currentVerClean,
+          snapshot: selectedData,
         });
       }
 
@@ -633,45 +606,33 @@ const GlossaryHeader = ({
       return false;
     }
 
-    return Boolean(currentUser?.isAdmin) || Boolean(isSteward);
-  }, [
-    isVersionView,
-    glossaryTermStatus,
-    currentUser,
-    isSteward,
-  ]);
+    return Boolean(workflowPermissions?.canArchive);
+  }, [isVersionView, glossaryTermStatus, workflowPermissions]);
 
   const canCreateDraft = useMemo(() => {
-    if (
-      isVersionView ||
-      glossaryTermStatus !== EntityStatus.Approved
-    ) {
+    if (isVersionView || glossaryTermStatus !== EntityStatus.Approved) {
       return false;
     }
 
-    return (
-      Boolean(isProposer) ||
-      Boolean(currentUser?.isAdmin) ||
-      Boolean(permissions?.EditAll)
-    );
-  }, [
-    isVersionView,
-    glossaryTermStatus,
-    isProposer,
-    currentUser?.isAdmin,
-    permissions,
-  ]);
+    return Boolean(workflowPermissions?.canEditWorking);
+  }, [isVersionView, glossaryTermStatus, workflowPermissions]);
 
   const runWorkflowAction = async (
     action: GlossaryWorkflowAction,
     options?: { businessVersion?: string }
   ) => {
-    const expectedNativeVersion = Number(selectedData.version);
-    if (!Number.isFinite(expectedNativeVersion)) {
-      throw new Error('Entity native version is required for workflow actions');
+    const expectedRevision = Number(selectedData.workingRevision);
+    if (
+      action !== 'createDraft' &&
+      action !== 'revoke' &&
+      !Number.isFinite(expectedRevision)
+    ) {
+      throw new Error(
+        'Working version revision is required for workflow actions'
+      );
     }
     const request = {
-      expectedNativeVersion,
+      ...(Number.isFinite(expectedRevision) ? { expectedRevision } : {}),
       ...(options?.businessVersion
         ? { businessVersion: options.businessVersion }
         : {}),
@@ -689,7 +650,8 @@ const GlossaryHeader = ({
       setIsCreatingDraft(true);
       const cleanVer = draftVersion?.trim().replace(/^(version:?\s*|v)/i, '');
       await runWorkflowAction('createDraft', {
-        ...(isCustomManaged && cleanVer ? { businessVersion: cleanVer } : {}),
+        businessVersion:
+          cleanVer || suggestNextVersion(selectedData.businessVersion ?? '0.0'),
       });
       showSuccessToast(t('message.create-draft-success'));
       setIsCreateDraftModalOpen(false);
@@ -714,34 +676,11 @@ const GlossaryHeader = ({
   };
 
   const canSubmitForReview = useMemo(() => {
-    if (
-      isVersionView ||
-      glossaryTermStatus !== EntityStatus.Draft
-    ) {
+    if (isVersionView || glossaryTermStatus !== EntityStatus.Draft) {
       return false;
     }
-    const currentUserId = currentUser?.id;
-    const isOwner = selectedData?.owners?.some(
-      (owner) => owner.id === currentUserId
-    );
-
-    return (
-      Boolean(isProposer) ||
-      Boolean(currentUser?.isAdmin) ||
-      Boolean(permissions?.EditAll) ||
-      Boolean(permissions?.EditDescription) ||
-      Boolean(permissions?.EditTags) ||
-      Boolean(permissions?.EditCustomFields) ||
-      Boolean(isOwner)
-    );
-  }, [
-    isVersionView,
-    glossaryTermStatus,
-    currentUser,
-    permissions,
-    selectedData,
-    isProposer,
-  ]);
+    return Boolean(workflowPermissions?.canSubmit);
+  }, [isVersionView, glossaryTermStatus, workflowPermissions]);
 
   const handleSubmitForReview = async () => {
     try {
@@ -756,40 +695,16 @@ const GlossaryHeader = ({
     }
   };
 
-  const isReviewerOrAdmin = useMemo(() => {
-    if (isVersionView) {
+  const canApproveOrReject = useMemo(() => {
+    if (isVersionView || !workflowPermissions) {
       return false;
     }
-    const currentUserId = currentUser?.id;
-    const isReviewer = selectedData?.reviewers?.some(
-      (reviewer) => reviewer.id === currentUserId
-    );
-    const hasReviewPermission =
-      Boolean(permissions?.ManageAll) ||
-      Boolean(permissions?.EditAll) ||
-      Boolean(permissions?.EditStatus);
 
     return (
-      hasReviewPermission &&
-      (Boolean(currentUser?.isAdmin) ||
-        Boolean(isReviewer) ||
-        Boolean(isSteward))
+      glossaryTermStatus === EntityStatus.InReview &&
+      (workflowPermissions.canApprove || workflowPermissions.canReject)
     );
-  }, [
-    isVersionView,
-    currentUser,
-    permissions,
-    selectedData,
-    isSteward,
-  ]);
-
-  const canApproveOrReject = useMemo(() => {
-    if (!isReviewerOrAdmin) {
-      return false;
-    }
-
-    return glossaryTermStatus === EntityStatus.InReview;
-  }, [isReviewerOrAdmin, glossaryTermStatus]);
+  }, [isVersionView, workflowPermissions, glossaryTermStatus]);
 
   const handleApproveTerm = async () => {
     try {
@@ -828,7 +743,7 @@ const GlossaryHeader = ({
   const canReopen =
     !isVersionView &&
     glossaryTermStatus === EntityStatus.Rejected &&
-    (Boolean(isProposer) || Boolean(currentUser?.isAdmin) || Boolean(permissions?.EditAll));
+    Boolean(workflowPermissions?.canEditWorking);
 
   const handleReopen = async () => {
     try {
@@ -1041,19 +956,15 @@ const GlossaryHeader = ({
 
       const currentVersionItem = {
         label: cleanVersion,
-        snapshotVersion: toString(selectedData.version ?? '0.1'),
+        snapshotVersion: cleanVersion,
+        snapshot: selectedData,
       };
       const versionList =
-        availableVersions.length > 0
-          ? availableVersions
-          : [currentVersionItem];
+        availableVersions.length > 0 ? availableVersions : [currentVersionItem];
 
       return (
         <Space align="center" size={8}>
-          <StatusBadge
-            label={entityStatus}
-            status={statusClass}
-          />
+          <StatusBadge label={entityStatus} status={statusClass} />
           <Dropdown
             menu={{
               items: isLoadingVersions
@@ -1089,12 +1000,7 @@ const GlossaryHeader = ({
       );
     }
 
-    return (
-      <StatusBadge
-        label={entityStatus}
-        status={statusClass}
-      />
-    );
+    return <StatusBadge label={entityStatus} status={statusClass} />;
   }, [
     selectedData,
     isGlossary,
@@ -1160,7 +1066,9 @@ const GlossaryHeader = ({
     }
 
     const currentVer = businessVersion ?? '1.0';
-    const cleanVer = String(currentVer).trim().replace(/^(version:?\s*|v)/i, '');
+    const cleanVer = String(currentVer)
+      .trim()
+      .replace(/^(version:?\s*|v)/i, '');
 
     return (
       <Space size={8}>
@@ -1168,7 +1076,11 @@ const GlossaryHeader = ({
           <>
             <Button
               className="m-l-xs"
-              style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#fff' }}
+              style={{
+                backgroundColor: '#10b981',
+                borderColor: '#10b981',
+                color: '#fff',
+              }}
               type="primary"
               onClick={() => setIsApproveModalOpen(true)}>
               {t('label.approve')}
@@ -1316,8 +1228,6 @@ const GlossaryHeader = ({
             {!isVersionView && createButtons}
 
             <ButtonGroup className="spaced" size="small">
-
-
               {!isCustomManaged && !isGlossary && selectedData?.version && (
                 <Tooltip
                   title={t(
@@ -1464,24 +1374,26 @@ const GlossaryHeader = ({
           <Typography.Text>
             {t('message.confirm-create-draft-message')}
           </Typography.Text>
-          {isCustomManaged && <div>
-            <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
-              <span className="text-red-500">* </span>
-              {t('cde.version')}
-            </label>
-            <Input
-              autoFocus
-              data-testid="cde-draft-version-input"
-              placeholder="Ví dụ: 1.1, 2.0..."
-              value={draftVersion}
-              onChange={(e) => setDraftVersion(e.target.value)}
-              onPressEnter={() => {
-                if (draftVersion?.trim() && !isCreatingDraft) {
-                  handleCreateDraft();
-                }
-              }}
-            />
-          </div>}
+          {isCustomManaged && (
+            <div>
+              <label className="d-block text-xs font-medium text-grey-muted m-b-xs">
+                <span className="text-red-500">* </span>
+                {t('cde.version')}
+              </label>
+              <Input
+                autoFocus
+                data-testid="cde-draft-version-input"
+                placeholder="Ví dụ: 1.1, 2.0..."
+                value={draftVersion}
+                onChange={(e) => setDraftVersion(e.target.value)}
+                onPressEnter={() => {
+                  if (draftVersion?.trim() && !isCreatingDraft) {
+                    handleCreateDraft();
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       </Modal>
 

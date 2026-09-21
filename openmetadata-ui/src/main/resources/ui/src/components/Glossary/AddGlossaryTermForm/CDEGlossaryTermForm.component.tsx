@@ -34,7 +34,6 @@ export interface CDEGlossaryTermFormValues {
   version?: string;
   effectiveDate?: DateTime | null;
   expirationDate?: DateTime | null;
-  phien_ban?: string;
   domains?: EntityReference[];
   owners?: EntityReference[];
   reviewers?: EntityReference[];
@@ -141,10 +140,7 @@ const CDEGlossaryTermForm = ({
         expirationDate: glossaryTerm.extension?.expirationDate
           ? DateTime.fromISO(glossaryTerm.extension.expirationDate)
           : null,
-        version:
-          glossaryTerm.extension?.version ??
-          glossaryTerm.extension?.phien_ban ??
-          '1.0',
+        version: glossaryTerm.businessVersion ?? '1.0',
       });
     }
   }, [editMode, form, glossaryTerm]);
@@ -191,11 +187,6 @@ const CDEGlossaryTermForm = ({
     const extension = mergeCDEDates(
       {
         ...preservedExtension,
-        ...(versionVal
-          ? {
-              version: versionVal,
-            }
-          : {}),
         ...(entityRelationshipVal
           ? {
               entityRelationship: entityRelationshipVal,
@@ -221,6 +212,7 @@ const CDEGlossaryTermForm = ({
     );
 
     await onSave({
+      businessVersion: versionVal || '1.0',
       name: String(values.name ?? '').trim(),
       displayName: String(values.displayName ?? '').trim(),
       description: String(values.description ?? ''),
@@ -284,7 +276,11 @@ const CDEGlossaryTermForm = ({
           label={t('cde.version')}
           name="version"
           rules={[{ required: true, whitespace: true }]}>
-          <Input data-testid="cde-version" placeholder="1.0" />
+          <Input
+            data-testid="cde-version"
+            disabled={editMode}
+            placeholder="1.0"
+          />
         </Form.Item>
         {(['effectiveDate', 'expirationDate'] as const).map((key) => (
           <Form.Item

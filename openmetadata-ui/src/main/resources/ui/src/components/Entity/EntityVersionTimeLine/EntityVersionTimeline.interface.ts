@@ -31,6 +31,7 @@ export type EntityVersionButtonProps = {
     changeDescription: ChangeDescription;
     updatedAt: number;
     glossary?: any;
+    businessVersion?: string;
     extension?: any;
     fullyQualifiedName?: string;
   };

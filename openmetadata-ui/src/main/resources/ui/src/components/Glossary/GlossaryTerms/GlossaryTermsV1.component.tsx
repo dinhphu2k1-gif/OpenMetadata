@@ -136,9 +136,11 @@ const GlossaryTermsV1 = ({
 
   const handleVersionSelect = useCallback(
     (snapshot: GlossaryTerm) => {
-      const snapshotBusinessVersion = getBusinessVersion(snapshot.extension);
+      const snapshotBusinessVersion = getBusinessVersion(
+        snapshot.businessVersion
+      );
       const currentBusinessVersion = getBusinessVersion(
-        currentGlossaryTerm.extension
+        currentGlossaryTerm.businessVersion
       );
       const isLatestVersion =
         snapshot.id === currentGlossaryTerm.id &&
@@ -172,7 +174,9 @@ const GlossaryTermsV1 = ({
     let cancelled = false;
     setViewedVersion(null);
     if (approvedVersion) {
-      const currentVer = getBusinessVersion(currentGlossaryTerm.extension);
+      const currentVer = getBusinessVersion(
+        currentGlossaryTerm.businessVersion
+      );
 
       if (
         currentVer === approvedVersion &&
@@ -188,7 +192,9 @@ const GlossaryTermsV1 = ({
           }
 
           const getSnapshotVer = (term?: GlossaryTerm | null): string => {
-            const raw = term ? getBusinessVersion(term.extension, '') : '';
+            const raw = term
+              ? getBusinessVersion(term.businessVersion, '')
+              : '';
 
             return raw ? raw.replace(/^(version:?\s*|v)/i, '') : '1.0';
           };
@@ -196,38 +202,37 @@ const GlossaryTermsV1 = ({
           let candidate1_0: GlossaryTerm | null = null;
           let historyMatch: GlossaryTerm | undefined;
           const versions = (history.versions ?? [])
-              .map((v) => {
-                try {
-                  return (
-                    typeof v === 'string' ? JSON.parse(v) : v
-                  ) as GlossaryTerm;
-                } catch {
-                  return undefined;
-                }
-              })
-              .filter((v): v is GlossaryTerm => Boolean(v))
-              .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
+            .map((v) => {
+              try {
+                return (
+                  typeof v === 'string' ? JSON.parse(v) : v
+                ) as GlossaryTerm;
+              } catch {
+                return undefined;
+              }
+            })
+            .filter((v): v is GlossaryTerm => Boolean(v))
+            .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
 
-            for (const p of versions) {
-              if (
-                String(p.entityStatus ?? 'Approved').toLowerCase() !==
-                'approved'
-              ) {
-                continue;
-              }
-              const ver = getSnapshotVer(p);
-              if (ver === approvedVersion) {
-                historyMatch = p;
-              }
+          for (const p of versions) {
+            if (
+              String(p.entityStatus ?? 'Approved').toLowerCase() !== 'approved'
+            ) {
+              continue;
             }
+            const ver = getSnapshotVer(p);
+            if (ver === approvedVersion) {
+              historyMatch = p;
+            }
+          }
 
-            const approvedVersions = versions.filter(
-              (item) =>
-                String(item.entityStatus ?? 'Approved').toLowerCase() ===
-                'approved'
-            );
-            if (approvedVersions.length > 0) {
-              candidate1_0 = approvedVersions[approvedVersions.length - 1];
+          const approvedVersions = versions.filter(
+            (item) =>
+              String(item.entityStatus ?? 'Approved').toLowerCase() ===
+              'approved'
+          );
+          if (approvedVersions.length > 0) {
+            candidate1_0 = approvedVersions[approvedVersions.length - 1];
           }
 
           if (historyMatch) {

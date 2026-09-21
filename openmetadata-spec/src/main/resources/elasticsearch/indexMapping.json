@@ -301,11 +301,21 @@
     "indexMappingFile": "/elasticsearch/%s/glossary_index_mapping.json",
     "alias": "glossary",
     "parentAliases": [
-      "all",
       "dataAssetEmbeddings"
     ],
     "childAliases": [
       "glossaryTerm"
+    ]
+  },
+  "glossaryPublished": {
+    "indexName": "glossary_published_search_index",
+    "indexMappingFile": "/elasticsearch/%s/glossary_index_mapping.json",
+    "alias": "glossaryPublished",
+    "parentAliases": [
+      "all"
+    ],
+    "childAliases": [
+      "glossaryTermPublished"
     ]
   },
   "glossaryTerm": {
@@ -313,10 +323,19 @@
     "indexMappingFile": "/elasticsearch/%s/glossary_term_index_mapping.json",
     "alias": "glossaryTerm",
     "parentAliases": [
-      "all",
       "glossary",
-      "dataAsset",
       "dataAssetEmbeddings"
+    ],
+    "childAliases": []
+  },
+  "glossaryTermPublished": {
+    "indexName": "glossary_term_published_search_index",
+    "indexMappingFile": "/elasticsearch/%s/glossary_term_index_mapping.json",
+    "alias": "glossaryTermPublished",
+    "parentAliases": [
+      "all",
+      "glossaryPublished",
+      "dataAsset"
     ],
     "childAliases": []
   },

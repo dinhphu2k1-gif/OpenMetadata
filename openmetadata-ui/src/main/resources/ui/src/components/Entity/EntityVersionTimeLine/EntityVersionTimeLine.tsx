@@ -63,26 +63,22 @@ export const VersionButton = forwardRef<
       typeof glossary === 'string' ? glossary : glossary?.name,
       typeof glossary === 'string' ? undefined : glossary?.displayName
     ) ||
-    isDataQualityGlossary(
-      version?.fullyQualifiedName,
-      typeof glossary === 'string' ? glossary : glossary?.name,
-      typeof glossary === 'string' ? undefined : glossary?.displayName
-    ) ||
-    version?.extension?.version != null
+      isDataQualityGlossary(
+        version?.fullyQualifiedName,
+        typeof glossary === 'string' ? glossary : glossary?.name,
+        typeof glossary === 'string' ? undefined : glossary?.displayName
+      ) ||
+      version?.businessVersion != null
   );
 
   const businessVersionNumber = useMemo(() => {
     if (!isCDE) {
       return null;
     }
-    const raw = String(
-      version?.extension?.version ??
-      version?.extension?.phien_ban ??
-      '1.0'
-    ).trim();
+    const raw = String(version?.businessVersion ?? '1.0').trim();
 
     return raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
-  }, [isCDE, version?.extension]);
+  }, [isCDE, version?.businessVersion]);
 
   const versionText = businessVersionNumber
     ? `v${businessVersionNumber}`
@@ -97,9 +93,7 @@ export const VersionButton = forwardRef<
       data-testid={`version-entry-${versionText}`}
       ref={ref}
       onClick={() =>
-        onVersionSelect(
-          businessVersionNumber ?? toString(entityVersionNumber)
-        )
+        onVersionSelect(businessVersionNumber ?? toString(entityVersionNumber))
       }>
       <div className="timeline-wrapper">
         <span
@@ -199,17 +193,16 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
             ? undefined
             : firstParsed?.glossary?.displayName
         ) ||
-        isDataQualityGlossary(
-          firstParsed?.fullyQualifiedName,
-          typeof firstParsed?.glossary === 'string'
-            ? firstParsed.glossary
-            : firstParsed?.glossary?.name,
-          typeof firstParsed?.glossary === 'string'
-            ? undefined
-            : firstParsed?.glossary?.displayName
-        ) ||
-        firstParsed?.extension?.version != null ||
-        firstParsed?.extension?.version != null
+          isDataQualityGlossary(
+            firstParsed?.fullyQualifiedName,
+            typeof firstParsed?.glossary === 'string'
+              ? firstParsed.glossary
+              : firstParsed?.glossary?.name,
+            typeof firstParsed?.glossary === 'string'
+              ? undefined
+              : firstParsed?.glossary?.displayName
+          ) ||
+          firstParsed?.businessVersion != null
       );
 
     if (!detectedCDE) {
@@ -221,10 +214,10 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
     }
 
     // Helper to check if a snapshot has been approved
-    const isApprovedSnapshot = (p: any): boolean => {
+    const isPublishedSnapshot = (p: any): boolean => {
       const status = p?.entityStatus ?? p?.status ?? EntityStatus.Approved;
 
-      return String(status).toLowerCase() === 'approved';
+      return ['approved', 'archived'].includes(String(status).toLowerCase());
     };
 
     // Filter to unique CDE versions (retaining the latest snapshot for each unique CDE version that was approved)
@@ -233,14 +226,10 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
 
     for (const v of rawList) {
       const p = typeof v === 'string' ? JSON.parse(v) : v;
-      if (!isApprovedSnapshot(p)) {
+      if (!isPublishedSnapshot(p)) {
         continue;
       }
-      const raw = String(
-        p?.extension?.version ??
-        p?.extension?.phien_ban ??
-        '1.0'
-      ).trim();
+      const raw = String(p?.businessVersion ?? '1.0').trim();
       const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
 
       if (!seenCdeVersions.has(clean)) {
@@ -262,22 +251,14 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
           typeof currentParsed === 'string'
             ? JSON.parse(currentParsed)
             : currentParsed;
-        const raw = String(
-          p?.extension?.version ??
-          p?.extension?.phien_ban ??
-          '1.0'
-        ).trim();
+        const raw = String(p?.businessVersion ?? '1.0').trim();
         activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
       } else if (uniqueList.length > 0) {
         const firstApproved =
           typeof uniqueList[0] === 'string'
             ? JSON.parse(uniqueList[0])
             : uniqueList[0];
-        const raw = String(
-          firstApproved?.extension?.version ??
-          firstApproved?.extension?.phien_ban ??
-          '1.0'
-        ).trim();
+        const raw = String(firstApproved?.businessVersion ?? '1.0').trim();
         activeCde = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
       }
     }
@@ -287,12 +268,7 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
       filteredVersions: uniqueList,
       activeCdeVersion: activeCde,
     };
-  }, [
-    versionList.versions,
-    currentVersion,
-    isCDEProp,
-    currentCdeVersionProp,
-  ]);
+  }, [versionList.versions, currentVersion, isCDEProp, currentCdeVersionProp]);
 
   const versions = useMemo(() => {
     const maxAllowed = maxVersions ?? -1;
@@ -309,11 +285,7 @@ const EntityVersionTimeLine: React.FC<EntityVersionTimelineProps> = ({
       const parsed = typeof v === 'string' ? JSON.parse(v) : v;
       let isSelected = toString(parsed.version) === currentVersion;
       if (isCDE && activeCdeVersion) {
-        const raw = String(
-          parsed?.extension?.version ??
-          parsed?.extension?.phien_ban ??
-          '1.0'
-        ).trim();
+        const raw = String(parsed?.businessVersion ?? '1.0').trim();
         const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
         isSelected = clean === activeCdeVersion;
       }

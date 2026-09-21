@@ -593,8 +593,12 @@ public final class SearchUtils {
           "domain_search_index",
           Entity.DOMAIN,
           "glossary_term_search_index",
+          "glossary_term_published_search_index",
+          "glossaryTermPublished",
           Entity.GLOSSARY_TERM,
           "glossary_search_index",
+          "glossary_published_search_index",
+          "glossaryPublished",
           Entity.GLOSSARY,
           "tag_search_index",
           Entity.TAG,
@@ -693,8 +697,14 @@ public final class SearchUtils {
       case "metric_search_index", Entity.METRIC -> Entity.METRIC;
       case "search_entity_search_index", Entity.SEARCH_INDEX -> Entity.SEARCH_INDEX;
       case "tag_search_index", Entity.TAG -> Entity.TAG;
-      case "glossary_term_search_index", Entity.GLOSSARY_TERM -> Entity.GLOSSARY_TERM;
-      case "glossary_search_index", Entity.GLOSSARY -> Entity.GLOSSARY;
+      case "glossary_term_search_index",
+          "glossary_term_published_search_index",
+          "glossaryTermPublished",
+          Entity.GLOSSARY_TERM -> Entity.GLOSSARY_TERM;
+      case "glossary_search_index",
+          "glossary_published_search_index",
+          "glossaryPublished",
+          Entity.GLOSSARY -> Entity.GLOSSARY;
       case "domain_search_index", Entity.DOMAIN -> Entity.DOMAIN;
       case "data_product_search_index", Entity.DATA_PRODUCT -> Entity.DATA_PRODUCT;
       case "team_search_index", Entity.TEAM -> Entity.TEAM;

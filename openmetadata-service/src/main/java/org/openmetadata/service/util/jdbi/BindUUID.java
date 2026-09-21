@@ -8,6 +8,7 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
+import java.sql.Types;
 import java.util.UUID;
 import org.jdbi.v3.sqlobject.customizer.SqlStatementCustomizerFactory;
 import org.jdbi.v3.sqlobject.customizer.SqlStatementCustomizingAnnotation;
@@ -19,6 +20,8 @@ import org.jdbi.v3.sqlobject.customizer.SqlStatementParameterCustomizer;
 @SqlStatementCustomizingAnnotation(BindUUID.Factory.class)
 public @interface BindUUID {
   String value();
+
+  boolean nullable() default false;
 
   class Factory implements SqlStatementCustomizerFactory {
     @Override
@@ -32,7 +35,15 @@ public @interface BindUUID {
       BindUUID bind = (BindUUID) annotation;
       return (stmt, arg) -> {
         UUID id = (UUID) arg;
-        stmt.bind(bind.value(), id.toString());
+        if (id == null) {
+          if (!bind.nullable()) {
+            throw new IllegalArgumentException(
+                "UUID parameter '" + bind.value() + "' must not be null");
+          }
+          stmt.bindNull(bind.value(), Types.VARCHAR);
+        } else {
+          stmt.bind(bind.value(), id.toString());
+        }
       };
     }
   }

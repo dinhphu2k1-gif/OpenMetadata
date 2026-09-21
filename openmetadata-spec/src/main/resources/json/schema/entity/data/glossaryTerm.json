@@ -132,6 +132,40 @@
       "description": "Metadata version of the entity.",
       "$ref": "../../type/entityHistory.json#/definitions/entityVersion"
     },
+    "businessVersion": {
+      "description": "Business-facing version of this glossary term working version or published snapshot.",
+      "type": "string"
+    },
+    "workingRevision": {
+      "description": "Optimistic-lock revision of the working business version.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "snapshotId": {
+      "description": "Identifier of the immutable published snapshot represented by this response.",
+      "$ref": "../../type/basic.json#/definitions/uuid"
+    },
+    "publicationSequence": {
+      "description": "Monotonic publication order used to resolve the latest published snapshot.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "publishedAt": {
+      "description": "Time at which this immutable business snapshot was published.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "publishedBy": {
+      "description": "User that published this immutable business snapshot.",
+      "type": "string"
+    },
+    "archivedAt": {
+      "description": "Time at which this published snapshot was archived.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "archivedBy": {
+      "description": "User that archived this published snapshot.",
+      "type": "string"
+    },
     "updatedAt": {
       "description": "Last update time corresponding to the new version of the entity in Unix epoch time milliseconds.",
       "$ref": "../../type/basic.json#/definitions/timestamp"

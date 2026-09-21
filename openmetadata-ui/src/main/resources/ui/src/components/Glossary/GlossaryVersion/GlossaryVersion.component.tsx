@@ -65,10 +65,10 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
   const { t } = useTranslation();
   const loadedIdRef = useRef<string>();
 
-  const isApprovedSnapshot = (p: any): boolean => {
+  const isPublishedSnapshot = (p: any): boolean => {
     const status = p?.entityStatus ?? p?.status ?? EntityStatus.Approved;
 
-    return String(status).toLowerCase() === 'approved';
+    return ['approved', 'archived'].includes(String(status).toLowerCase());
   };
 
   const fetchVersionsInfo = async (): Promise<EntityHistory | null> => {
@@ -95,24 +95,23 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
               ? undefined
               : first?.glossary?.displayName
           ) ||
-          isDataQualityGlossary(
-            first?.fullyQualifiedName,
-            typeof first?.glossary === 'string'
-              ? first.glossary
-              : first?.glossary?.name,
-            typeof first?.glossary === 'string'
-              ? undefined
-              : first?.glossary?.displayName
-          ) ||
-          first?.extension?.version != null ||
-          first?.extension?.version != null
+            isDataQualityGlossary(
+              first?.fullyQualifiedName,
+              typeof first?.glossary === 'string'
+                ? first.glossary
+                : first?.glossary?.name,
+              typeof first?.glossary === 'string'
+                ? undefined
+                : first?.glossary?.displayName
+            ) ||
+            first?.businessVersion != null
         );
 
         if (isCDEEntity) {
           const approved = res.versions.filter((v: any) => {
             const p = typeof v === 'string' ? JSON.parse(v) : v;
 
-            return isApprovedSnapshot(p);
+            return isPublishedSnapshot(p);
           });
           if (approved.length > 0) {
             res.versions = approved;
@@ -160,17 +159,16 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                 ? undefined
                 : first?.glossary?.displayName
             ) ||
-            isDataQualityGlossary(
-              first?.fullyQualifiedName,
-              typeof first?.glossary === 'string'
-                ? first.glossary
-                : first?.glossary?.name,
-              typeof first?.glossary === 'string'
-                ? undefined
-                : first?.glossary?.displayName
-            ) ||
-            first?.extension?.version != null ||
-            first?.extension?.version != null
+              isDataQualityGlossary(
+                first?.fullyQualifiedName,
+                typeof first?.glossary === 'string'
+                  ? first.glossary
+                  : first?.glossary?.name,
+                typeof first?.glossary === 'string'
+                  ? undefined
+                  : first?.glossary?.displayName
+              ) ||
+              first?.businessVersion != null
           );
 
           if (isCDEEntity) {
@@ -182,18 +180,14 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
 
             for (const v of history.versions) {
               const p = typeof v === 'string' ? JSON.parse(v) : v;
-              if (!isApprovedSnapshot(p)) {
+              if (!isPublishedSnapshot(p)) {
                 continue;
               }
-              const raw = String(
-                p?.extension?.version ??
-                  p?.extension?.phien_ban ??
-                  '1.0'
-              ).trim();
+              const raw = String(p?.businessVersion ?? '1.0').trim();
               const clean = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
 
               if (clean === cleanParamVer || toString(p.version) === version) {
-                matchedSnapshotVersion = toString(p.version);
+                matchedSnapshotVersion = clean;
                 matchedCdeVer = clean;
 
                 break;
@@ -207,7 +201,7 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
               const firstApproved = history.versions.find((v: any) => {
                 const p = typeof v === 'string' ? JSON.parse(v) : v;
 
-                return isApprovedSnapshot(p);
+                return isPublishedSnapshot(p);
               });
 
               if (firstApproved) {
@@ -215,15 +209,11 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
                   typeof firstApproved === 'string'
                     ? JSON.parse(firstApproved)
                     : firstApproved;
-                targetVersion = toString(p.version);
-                const raw = String(
-                  p?.extension?.version ??
-                    p?.extension?.phien_ban ??
-                    '1.0'
-                ).trim();
+                const raw = String(p?.businessVersion ?? '1.0').trim();
                 matchedCdeVer = raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
+                targetVersion = matchedCdeVer;
               } else if (first?.version) {
-                targetVersion = toString(first.version);
+                targetVersion = String(first.businessVersion ?? version);
               }
             }
 
@@ -256,39 +246,12 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
     navigate(path);
   };
 
-  const isCDE = useMemo(() => {
-    if (isGlossary) {
-      return false;
-    }
-    const term = selectedData as GlossaryTerm;
-
-    return (
-      isDataDictionaryGlossary(
-        term?.fullyQualifiedName,
-        term?.glossary?.name,
-        term?.glossary?.displayName
-      ) ||
-      isDataQualityGlossary(
-        term?.fullyQualifiedName,
-        term?.glossary?.name,
-        term?.glossary?.displayName
-      )
-    );
-  }, [isGlossary, selectedData]);
-
-  const currentCdeVersion = useMemo(() => {
-    if (!isCDE) {
-      return undefined;
-    }
-    const term = selectedData as GlossaryTerm;
-    const raw = String(
-      term?.extension?.version ??
-      term?.extension?.phien_ban ??
-      '1.0'
-    ).trim();
+  const currentBusinessVersion = useMemo(() => {
+    const entity = selectedData as Glossary | GlossaryTerm;
+    const raw = String(entity?.businessVersion ?? version).trim();
 
     return raw.replace(/^(version:?\s*|v)/i, '') || '1.0';
-  }, [isCDE, selectedData]);
+  }, [selectedData, version]);
 
   const onBackHandler = () => {
     const path = getGlossaryPath(selectedData?.fullyQualifiedName);
@@ -309,7 +272,6 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
     <PageLayoutV1
       pageTitle={t('label.entity-version', { entity: t('label.glossary') })}>
       <div className="version-data">
-        {/* TODO: Need to implement version component for Glossary */}
         {isVersionLoading ? (
           <Loader />
         ) : (
@@ -326,10 +288,10 @@ const GlossaryVersion = ({ isGlossary = false }: GlossaryVersionProps) => {
         )}
       </div>
       <EntityVersionTimeLine
-        currentCdeVersion={currentCdeVersion}
+        currentCdeVersion={currentBusinessVersion}
         currentVersion={toString(version)}
         entityType={EntityType.GLOSSARY}
-        isCDE={isCDE}
+        isCDE
         versionHandler={onVersionChange}
         versionList={versionList}
         onBack={onBackHandler}

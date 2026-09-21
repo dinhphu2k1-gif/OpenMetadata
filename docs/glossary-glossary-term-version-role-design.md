@@ -137,12 +137,13 @@ Quy tắc:
 
 Khi tạo Glossary 1.1 từ Glossary 1.0:
 
-1. Sao chép danh sách Term revision từ published snapshot 1.0.
-2. Tạo working snapshot 1.1 ở trạng thái Draft.
-3. Người dùng thêm, bỏ hoặc thay đổi version Term trong working snapshot.
-4. Published snapshot 1.0 không thay đổi.
+1. Tạo working snapshot 1.1 ở trạng thái Draft với `termRevisions` rỗng.
+2. Không sao chép bất kỳ Term revision nào từ published snapshot 1.0.
+3. Chỉ giữ các trường định danh ổn định cần thiết để tham chiếu đúng Glossary.
+4. Người dùng chủ động thêm Term revision vào working snapshot mới.
+5. Published snapshot 1.0 không thay đổi và vẫn phục vụ Consumer.
 
-Không reset danh sách Term về rỗng theo mặc định. Nếu nghiệp vụ cần một bản trắng, cung cấp lựa chọn riêng “Tạo phiên bản trống”.
+Mọi business version kế tiếp của Glossary được tạo sau khi đã có published snapshot mặc định là một bản trắng. Business version đầu tiên vẫn nhận dữ liệu người dùng vừa nhập khi tạo entity. Hệ thống không cung cấp hành vi ngầm kế thừa danh sách Term từ phiên bản đã phát hành trước đó.
 
 ### 5.3. Điều kiện phê duyệt Glossary
 
@@ -199,9 +200,10 @@ Header cần hiển thị rõ:
 
 ### 6.3. Bảng Term trong Glossary
 
-- Working Glossary hiển thị Term revision thuộc working snapshot.
-- Published Glossary hiển thị Term revision đã được đóng băng trong snapshot.
-- Không lấy “current Term” thay cho revision trong snapshot.
+- Working Glossary xác định tập Term theo working snapshot; Published Glossary xác định tập Term theo revision đã được đóng băng trong snapshot.
+- Với Role quản trị, mỗi CDE thuộc tập snapshot được mở rộng thành các business version mà người dùng có quyền xem. Các dòng cùng mã CDE nằm cạnh nhau, version mới nhất ở trên.
+- Revision được ghim trong snapshot luôn phải xuất hiện; current Term chỉ được hiển thị thêm thành một dòng version khác, không thay thế revision đã đóng băng.
+- Consumer chỉ nhìn thấy exact published Term revision thuộc published Glossary snapshot.
 - Badge trạng thái và business version phải thuộc cùng một revision.
 - Search, filter, pagination và export phải chạy trên cùng tập snapshot; không trộn kết quả current index với historical data.
 
@@ -211,7 +213,7 @@ Header cần hiển thị rõ:
 
 1. Người dùng chọn “Tạo mới” hoặc “Tạo phiên bản mới”.
 2. Màn hình mở form Draft.
-3. Nếu tạo version mới, hệ thống clone dữ liệu từ Approved gần nhất.
+3. Nếu tạo version mới, hệ thống tạo form rỗng và chỉ giữ `id`, `name`, `fullyQualifiedName`, quan hệ `glossary`/`parent` cùng các trường định danh hệ thống bắt buộc.
 4. Người dùng lưu nhiều lần nhưng vẫn ở cùng working version.
 5. Màn hình hiển thị rõ `Draft <businessVersion>`.
 6. Khi chọn “Gửi duyệt”, hệ thống validation và chuyển sang In Review.
@@ -242,7 +244,7 @@ Header cần hiển thị rõ:
 | Gửi duyệt | Hiển thị validation và modal xác nhận | Khóa form, badge In Review, hiện reviewer/assignee. |
 | Approve | Modal xác nhận và danh sách validation | Chuyển sang published snapshot, badge Approved, cập nhật version selector. |
 | Reject | Xác nhận thao tác, không nhập lý do | Badge Rejected và hiển thị người từ chối. |
-| Tạo version kế tiếp | Yêu cầu business version mới | Clone Approved gần nhất thành Draft; bản Approved cũ vẫn phục vụ Consumer. |
+| Tạo version kế tiếp | Yêu cầu business version mới | Tạo Draft rỗng; bản Approved cũ vẫn phục vụ Consumer. |
 | Chọn version lịch sử | Loading riêng cho nội dung | Banner lịch sử, toàn bộ trường chỉ đọc. |
 | Import | Hiển thị bước validation trước khi ghi | Chỉ tạo/cập nhật Draft; không tự động Approved. |
 | Export | Chọn working hoặc published nếu có quyền | File phải ghi rõ business version và trạng thái nguồn. Consumer luôn export published snapshot. |
@@ -261,8 +263,8 @@ sequenceDiagram
     participant C as Consumer
 
     P->>UI: Tạo business version 1.1
-    UI->>API: POST working-version từ Approved 1.0
-    API->>DB: Clone snapshot 1.0 thành Draft 1.1
+    UI->>API: POST working-version 1.1
+    API->>DB: Tạo Draft 1.1 rỗng, chỉ giữ định danh bắt buộc
     P->>UI: Chỉnh sửa và gửi duyệt
     UI->>API: Submit Draft 1.1
     API->>DB: Draft -> InReview
@@ -308,7 +310,7 @@ Frontend phải đọc audit log khi native history thiếu bản Approved. Audi
 
 `termIds` không cho biết Term business/native version nào thuộc bản Glossary đã phát hành. Khi Term hiện hành thay đổi, hệ thống phải suy đoán revision từ history.
 
-Ngoài ra, working Glossary hiện có thể reset `termIds` về rỗng khi tạo version mới, làm hành vi khác với kỳ vọng “kế thừa bản đã phát hành”.
+Implementation cũ có thể sao chép `termIds` hoặc `termRevisions` từ bản đã phát hành vào working Glossary mới. Hành vi này không còn hợp lệ vì mọi Draft mới phải bắt đầu với membership rỗng.
 
 ### 10.5. API Glossary và GlossaryTerm không đồng nhất
 
@@ -357,12 +359,13 @@ Khi bắt đầu giai đoạn 2, toàn bộ dữ liệu và implementation Gloss
 4. Consumer API chỉ đọc published snapshot.
 5. Search/index tách working index và published index hoặc bổ sung published document rõ ràng.
 6. Định nghĩa `businessVersion` thành field chính thức trong working version và published snapshot; không đọc hoặc ghi `cdeVersion`, `phien_ban` và các field legacy.
-7. Xóa storage và API fallback dựa trên latest-published extension, native history hoặc audit log; audit log chỉ còn dùng cho truy vết.
-8. Xóa logic frontend tự dựng Approved version từ history/audit và chỉ sử dụng representation do published API trả về.
-9. Backend trả permission response thống nhất cho working/published view và các workflow action; frontend không tự suy luận quyền từ Role ở nhiều component.
-10. Tách state frontend của working version, latest published version và selected historical version để không ghi đè lẫn nhau.
-11. Cập nhật import để chỉ tạo hoặc sửa working version; cập nhật export để ghi rõ business version, trạng thái và snapshot nguồn.
-12. Bổ sung contract, transaction, authorization, concurrency và search consistency test cho storage/API mới.
+7. Danh sách Glossary Term/CDE trong working version và published snapshot được nhóm và sắp xếp tăng dần theo trường `name` (A-Z). Với Role quản trị, nếu một mã CDE có nhiều business version được phép xem thì hiển thị các version cạnh nhau theo thứ tự giảm dần; Consumer vẫn chỉ nhận exact revision của published snapshot. `displayOrder` của snapshot được tạo theo thứ tự mã CDE để kết quả không phụ thuộc vào thời điểm import hoặc UUID.
+8. Xóa storage và API fallback dựa trên latest-published extension, native history hoặc audit log; audit log chỉ còn dùng cho truy vết.
+9. Xóa logic frontend dựng Approved version từ native history/audit; màn hình so sánh version chỉ ghép các representation do snapshot API và published-history API trả về.
+10. Backend trả permission response thống nhất cho working/published view và các workflow action; frontend không tự suy luận quyền từ Role ở nhiều component.
+11. Tách state frontend của working version, latest published version và selected historical version để không ghi đè lẫn nhau.
+12. Cập nhật import để chỉ tạo hoặc sửa working version; cập nhật export để ghi rõ business version, trạng thái và snapshot nguồn.
+13. Bổ sung contract, transaction, authorization, concurrency và search consistency test cho storage/API mới.
 
 ## 12. Kiểm thử chấp nhận tối thiểu
 
@@ -371,19 +374,22 @@ Khi bắt đầu giai đoạn 2, toàn bộ dữ liệu và implementation Gloss
 3. Proposer nhìn thấy cả working 1.1 và published 1.0 nhưng không có nút Approve.
 4. Reviewer được gán nhìn thấy In Review và có Approve/Reject.
 5. Reviewer không được gán không thể approve qua API.
-6. Glossary 1.0 luôn hiển thị đúng Term revision đã phát hành dù Term đã có version mới.
+6. Glossary 1.0 luôn giữ Term revision đã phát hành dù Term đã có version mới; Role quản trị thấy thêm các version được phép xem ở dòng liền kề, còn Consumer chỉ thấy exact revision.
 7. Search, detail, export và API trả cùng một published snapshot cho Consumer.
 8. Tạo Draft mới không làm biến mất Approved khỏi danh sách Consumer.
 9. Reject lưu đầy đủ trạng thái, người thao tác và thời gian; không yêu cầu lý do.
 10. Hai người cập nhật cùng Draft nhận conflict thay vì ghi đè dữ liệu.
 11. Import chỉ tạo/cập nhật Draft và không tự động công bố dữ liệu.
 12. Không có API Consumer nào trả raw Draft/In Review/Rejected trong response.
+13. Tạo Draft mới cho Glossary đã Approved trả `termRevisions: []` và bảng Term ban đầu rỗng.
+14. Tạo Draft mới cho Glossary Term đã Approved không kế thừa trường nghiệp vụ từ snapshot trước; chỉ giữ định danh và quan hệ bắt buộc.
 
 ## 13. Quyết định thiết kế cốt lõi
 
 - Business version là khái niệm nghiệp vụ độc lập với native metadata version.
 - Published snapshot là bất biến và là nguồn dữ liệu duy nhất cho Consumer.
 - Glossary snapshot phải tham chiếu exact Term revision.
+- Mọi Draft version kế tiếp của Glossary và Glossary Term bắt đầu rỗng; không tự động kế thừa nội dung Approved. Draft đầu tiên của entity mới vẫn giữ dữ liệu vừa nhập.
 - Backend chịu trách nhiệm phân quyền và chọn đúng representation.
 - Audit log chỉ phục vụ truy vết, không phải nguồn chính để dựng published view.
-- Frontend hiển thị dữ liệu do API đã resolve, không tự tái dựng snapshot từ nhiều nguồn.
+- Frontend hiển thị representation do snapshot API và published-history API đã resolve; không tái dựng snapshot từ native history hoặc audit log.

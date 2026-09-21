@@ -77,10 +77,9 @@ import {
   getGlossariesByName,
   getGlossaryTerms,
   getGlossaryTermsById,
-  patchGlossaryTerm,
   transitionGlossaryTermWorkflow,
+  updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
-import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
 import { getTags } from '../../rest/tagAPI';
 import { getTeams } from '../../rest/teamsAPI';
 import { getUsers } from '../../rest/userAPI';
@@ -150,7 +149,7 @@ const CDEImportPage: FC = () => {
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [createdTerms, setCreatedTerms] = useState<
-    { id: string; name: string; version: number }[]
+    { id: string; name: string; workingRevision: number }[]
   >([]);
   const [isSubmittingAll, setIsSubmittingAll] = useState<boolean>(false);
   const [isSubmittingAllSuccess, setIsSubmittingAllSuccess] =
@@ -871,7 +870,11 @@ const CDEImportPage: FC = () => {
     let skippedCount = 0;
     let failedCount = 0;
     const errorsList: { row: number; name: string; reason: string }[] = [];
-    const createdTermsList: { id: string; name: string; version: number }[] = [];
+    const createdTermsList: {
+      id: string;
+      name: string;
+      workingRevision: number;
+    }[] = [];
 
     const total = rowsToProcess.length;
 
@@ -930,44 +933,34 @@ const CDEImportPage: FC = () => {
 
           if (row.existingId) {
             let editable = current;
-            if (current?.entityStatus === EntityStatus.Approved) {
+            if (
+              current?.entityStatus === EntityStatus.Approved ||
+              !current?.workingRevision
+            ) {
               editable = await transitionGlossaryTermWorkflow(
                 current.id,
                 'createDraft',
                 {
-                  expectedNativeVersion: Number(current.version),
-                  businessVersion: getBusinessVersion(payload.extension),
+                  businessVersion: payload.businessVersion,
                 }
               );
             } else if (current?.entityStatus === EntityStatus.Rejected) {
               editable = await transitionGlossaryTermWorkflow(
                 current.id,
                 'reopen',
-                { expectedNativeVersion: Number(current.version) }
+                { expectedRevision: Number(current.workingRevision) }
               );
             }
-            const patchOps: any[] = [
-              { op: 'add', path: '/displayName', value: payload.displayName },
-              { op: 'add', path: '/description', value: payload.description },
-              { op: 'add', path: '/extension', value: payload.extension },
-              { op: 'add', path: '/tags', value: payload.tags },
-              { op: 'add', path: '/domains', value: payload.domains },
-            ];
-            if (payload.owners && payload.owners.length > 0) {
-              patchOps.push({
-                op: 'add',
-                path: '/owners',
-                value: payload.owners,
-              });
-            }
-            if (payload.reviewers && payload.reviewers.length > 0) {
-              patchOps.push({
-                op: 'add',
-                path: '/reviewers',
-                value: payload.reviewers,
-              });
-            }
-            await patchGlossaryTerm(editable?.id ?? row.existingId, patchOps);
+            await updateGlossaryTermWorkingVersion(
+              editable.id,
+              Number(editable.workingRevision),
+              {
+                ...editable,
+                ...payload,
+                id: editable.id,
+                glossary: editable.glossary,
+              } as GlossaryTerm
+            );
             updatedCount++;
           } else {
             failedCount++;
@@ -1019,13 +1012,19 @@ const CDEImportPage: FC = () => {
             allUsers,
             allTeams
           );
-          const newTerm = await addGlossaryTerm(payload);
+          const { businessVersion, ...createPayload } = payload;
+          const newTerm = await addGlossaryTerm(createPayload);
+          const working = await transitionGlossaryTermWorkflow(
+            newTerm.id,
+            'createDraft',
+            { businessVersion }
+          );
           createdCount++;
-          if (newTerm?.id) {
+          if (working?.id && working.workingRevision) {
             createdTermsList.push({
-              id: newTerm.id,
-              name: newTerm.name || row.name,
-              version: Number(newTerm.version),
+              id: working.id,
+              name: working.name || row.name,
+              workingRevision: working.workingRevision,
             });
           }
         } catch (error: any) {
@@ -1068,7 +1067,7 @@ const CDEImportPage: FC = () => {
         chunk.map(async (term) => {
           try {
             await transitionGlossaryTermWorkflow(term.id, 'submit', {
-              expectedNativeVersion: term.version,
+              expectedRevision: term.workingRevision,
             });
             successCount++;
           } catch (err) {

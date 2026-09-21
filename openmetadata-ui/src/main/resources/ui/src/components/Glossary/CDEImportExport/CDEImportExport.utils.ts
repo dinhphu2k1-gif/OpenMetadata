@@ -224,7 +224,7 @@ export const exportCDEToExcel = (
       const dqRules = formatQualityRules(
         ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
       );
-      const version = ext.version ?? ext.version ?? ext.phien_ban ?? '1.0';
+      const version = term.businessVersion ?? ext.version ?? '1.0';
       const statusLabel = getEntityStatusLabel(
         term.entityStatus ?? EntityStatus.Approved
       );
@@ -1403,10 +1403,12 @@ export const transformRowToGlossaryTermPayload = (
   const isDqYes = ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
     row.dataQualityRules.trim().toUpperCase()
   );
+  const canonicalExtension = Object.fromEntries(
+    Object.entries(existingExtension).filter(([key]) => key !== 'version')
+  );
   const extension = mergeCDEDates(
     {
-      ...existingExtension,
-      version: row.version || '1.0',
+      ...canonicalExtension,
       ...(row.entityRelationship
         ? { entityRelationship: row.entityRelationship }
         : {}),
@@ -1421,6 +1423,7 @@ export const transformRowToGlossaryTermPayload = (
   );
 
   return {
+    businessVersion: row.version || '1.0',
     name: row.name,
     displayName: row.displayName,
     description: row.description || '',
@@ -1430,8 +1433,8 @@ export const transformRowToGlossaryTermPayload = (
     reviewers,
     tags: tags.length ? tags : undefined,
     extension: isEmpty(extension) ? undefined : extension,
-    // Không gửi entityStatus ở đây vì CreateGlossaryTerm schema của backend
-    // quy định additionalProperties: false. Trạng thái Draft được gán qua patchGlossaryTerm sau khi tạo.
+    // The caller removes businessVersion before creating the identity entity,
+    // then uses it to create the working Draft.
   };
 };
 

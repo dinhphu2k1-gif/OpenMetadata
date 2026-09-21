@@ -48,7 +48,6 @@ import static org.openmetadata.service.Entity.FIELD_REVIEWERS;
 import static org.openmetadata.service.Entity.FIELD_STYLE;
 import static org.openmetadata.service.Entity.FIELD_TAGS;
 import static org.openmetadata.service.Entity.FIELD_VOTES;
-import static org.openmetadata.service.Entity.GLOSSARY;
 import static org.openmetadata.service.Entity.TEAM;
 import static org.openmetadata.service.Entity.USER;
 import static org.openmetadata.service.Entity.findEntityByNameOrNull;
@@ -4887,25 +4886,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
 
       // Validate that the custom property exists for this entity type
       Schema jsonSchema = TypeRegistry.instance().getSchema(entityTypeName, fieldName);
-      boolean isGlossaryVersionData =
-          GLOSSARY.equals(entityTypeName)
-              && ("version".equals(fieldName) || "termIds".equals(fieldName));
-      if (jsonSchema == null && !isGlossaryVersionData) {
+      if (jsonSchema == null) {
         throw new IllegalArgumentException(CatalogExceptionMessage.unknownCustomField(fieldName));
-      }
-
-      if (isGlossaryVersionData && jsonSchema == null) {
-        if ("version".equals(fieldName)
-            && (!fieldValue.isTextual() || fieldValue.asText().isBlank())) {
-          throw new IllegalArgumentException("Glossary version must be a non-empty string");
-        }
-        if ("termIds".equals(fieldName)
-            && (!fieldValue.isArray()
-                || StreamSupport.stream(fieldValue.spliterator(), false)
-                    .anyMatch(value -> !value.isTextual()))) {
-          throw new IllegalArgumentException("Glossary termIds must be an array of strings");
-        }
-        continue;
       }
 
       // Validate against JSON schema - this handles all validation including type-specific rules
@@ -4937,11 +4919,6 @@ public abstract class EntityRepository<T extends EntityInterface> {
       Entry<String, JsonNode> entry = customFields.next();
       String fieldName = entry.getKey();
       JsonNode fieldValue = entry.getValue();
-
-      if (GLOSSARY.equals(entityTypeName)
-          && ("version".equals(fieldName) || "termIds".equals(fieldName))) {
-        continue;
-      }
 
       String customPropertyType = TypeRegistry.getCustomPropertyType(entityTypeName, fieldName);
       String propertyConfig = TypeRegistry.getCustomPropertyConfig(entityTypeName, fieldName);
@@ -5233,17 +5210,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
     }
     ObjectNode objectNode = JsonUtils.getObjectNode();
     for (ExtensionRecord extensionRecord : records) {
-      if ("glossary.published.latest".equals(extensionRecord.extensionName())
-          || "glossaryTerm.published.latest".equals(extensionRecord.extensionName())) {
-        continue;
-      }
       String fieldName = TypeRegistry.getPropertyName(extensionRecord.extensionName());
       JsonNode fieldValue = JsonUtils.readTree(extensionRecord.extensionJson());
-      if (GLOSSARY.equals(entityType)
-          && ("version".equals(fieldName) || "termIds".equals(fieldName))) {
-        objectNode.set(fieldName, fieldValue);
-        continue;
-      }
       String customPropertyType = TypeRegistry.getCustomPropertyType(entityType, fieldName);
       if ("enum".equals(customPropertyType) && fieldValue.isArray() && fieldValue.size() > 1) {
         List<String> sortedEnumValues =
@@ -8392,7 +8360,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
             }
           }
         } catch (Exception e) {
-          LOG.warn("Failed to inherit reviewers in checkUpdatedByReviewerOrOwner: {}", e.getMessage());
+          LOG.warn(
+              "Failed to inherit reviewers in checkUpdatedByReviewerOrOwner: {}", e.getMessage());
         }
       }
       if (nullOrEmpty(reviewers)) {
@@ -8432,7 +8401,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
                       e -> {
                         if (e.getType().equals(TEAM)) {
                           Team team =
-                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                              Entity.getEntityByName(
+                                  TEAM, e.getName(), "users", Include.NON_DELETED);
                           return team.getUsers().stream()
                               .anyMatch(
                                   u ->
@@ -8489,7 +8459,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
                       e -> {
                         if (e.getType().equals(TEAM)) {
                           Team team =
-                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                              Entity.getEntityByName(
+                                  TEAM, e.getName(), "users", Include.NON_DELETED);
                           return team.getUsers().stream()
                               .anyMatch(
                                   u ->

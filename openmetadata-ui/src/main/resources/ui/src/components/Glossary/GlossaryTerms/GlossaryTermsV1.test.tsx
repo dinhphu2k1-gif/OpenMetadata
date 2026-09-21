@@ -192,7 +192,7 @@ describe('Test Glossary-term component', () => {
     const snapshot = {
       ...mockProps.glossaryTerm,
       entityStatus: EntityStatus.Approved,
-      extension: { version: '1.2' },
+      businessVersion: '1.2',
     };
     (useLocation as jest.Mock).mockReturnValue({
       search: '?approvedVersion=1.2',
@@ -207,7 +207,7 @@ describe('Test Glossary-term component', () => {
       expect((GenericProvider as jest.Mock).mock.lastCall[0]).toEqual(
         expect.objectContaining({
           isVersionView: true,
-          data: expect.objectContaining({ extension: { version: '1.2' } }),
+          data: expect.objectContaining({ businessVersion: '1.2' }),
         })
       );
     });

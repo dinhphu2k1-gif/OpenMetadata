@@ -104,13 +104,18 @@ import { getDomainList } from '../../../rest/domainAPI';
 import { getAllFeeds, updateTask } from '../../../rest/feedsAPI';
 import {
   getFirstLevelGlossaryTermsPaginated,
+  getGlossaryVersionPermissions,
+  getPublishedGlossaryTerms,
+  getWorkingGlossaryTerms,
   getGlossaryTermChildrenLazy,
+  getGlossaryTermWorkingVersion,
   getGlossaryTerms,
   getGlossaryTermsByIds,
   getGlossaryTermsVersionsList,
   patchGlossaryTerm,
   searchGlossaryTermsPaginated,
   transitionGlossaryTermWorkflow,
+  GlossaryVersionPermissions,
 } from '../../../rest/glossaryAPI';
 import { searchQuery } from '../../../rest/searchAPI';
 import { getTags } from '../../../rest/tagAPI';
@@ -163,10 +168,96 @@ import GlossaryBulkActionModal, {
   BulkActionType,
 } from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
+const compareCDETermVersions = (
+  first: ModifiedGlossaryTerm,
+  second: ModifiedGlossaryTerm
+) => {
+  const nameOrder = String(first.name ?? '').localeCompare(
+    String(second.name ?? ''),
+    'vi',
+    { sensitivity: 'base' }
+  );
+  if (nameOrder !== 0) {
+    return nameOrder;
+  }
+
+  return getBusinessVersion(second.businessVersion).localeCompare(
+    getBusinessVersion(first.businessVersion),
+    undefined,
+    { numeric: true }
+  );
+};
+
+const expandCDETermVersions = async (
+  terms: ModifiedGlossaryTerm[],
+  visibleStatuses: EntityStatus[],
+  pinnedSnapshots: Map<string, ModifiedGlossaryTerm> = new Map()
+) => {
+  const histories = await Promise.allSettled(
+    terms.map((term) => getGlossaryTermsVersionsList(term.id))
+  );
+
+  return terms
+    .flatMap((term, index) => {
+      const history = histories[index];
+      const versionSnapshots = new Map<string, ModifiedGlossaryTerm>();
+      if (history.status === 'fulfilled') {
+        const snapshots = (history.value.versions ?? [])
+          .map((value) => {
+            try {
+              return (
+                typeof value === 'string' ? JSON.parse(value) : value
+              ) as ModifiedGlossaryTerm;
+            } catch {
+              return undefined;
+            }
+          })
+          .filter((value): value is ModifiedGlossaryTerm => Boolean(value))
+          .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
+
+        for (const snapshot of snapshots) {
+          const businessVersion = getBusinessVersion(snapshot.businessVersion);
+          if (!versionSnapshots.has(businessVersion)) {
+            versionSnapshots.set(businessVersion, snapshot);
+          }
+        }
+      }
+
+      const pinnedSnapshot = pinnedSnapshots.get(term.id);
+      if (pinnedSnapshot) {
+        versionSnapshots.set(
+          getBusinessVersion(pinnedSnapshot.businessVersion),
+          pinnedSnapshot
+        );
+      }
+
+      const currentVersion = getBusinessVersion(term.businessVersion);
+      versionSnapshots.delete(currentVersion);
+
+      return [
+        term,
+        ...Array.from(
+          versionSnapshots.entries(),
+          ([businessVersion, snapshot]) => ({
+            ...snapshot,
+            id: term.id,
+            fullyQualifiedName: term.fullyQualifiedName,
+            snapshotVersion: snapshot.businessVersion,
+            versionRowKey: `${term.fullyQualifiedName}@${businessVersion}`,
+            children: undefined,
+          })
+        ),
+      ].filter((row) =>
+        visibleStatuses.includes(row.entityStatus ?? EntityStatus.Approved)
+      );
+    })
+    .sort(compareCDETermVersions);
+};
+
 const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   useCDETablePreferences();
   const navigate = useNavigate();
-  const { currentUser, selectedPersona } = useApplicationStore();
+  const { currentUser } = useApplicationStore();
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const {
@@ -183,8 +274,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     permissions,
   } = useGenericContext<Glossary | GlossaryTerm>();
   const displayedGlossary = isGlossary
-    ? ((contextData as Glossary | undefined) ?? activeGlossary)
-    : (activeGlossary ?? contextData ?? ({} as Glossary));
+    ? (contextData as Glossary | undefined) ?? activeGlossary
+    : activeGlossary ?? contextData ?? ({} as Glossary);
   const { t } = useTranslation();
   const isCDEGlossary = useMemo(() => {
     const glossary = isGlossary
@@ -235,85 +326,39 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     };
   }, [glossaryChildTerms, findExpandableKeysForArray]);
 
-  const isConsumer = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return false;
-    }
-    const userRoles = currentUser?.roles?.map((r) => r.name ?? '') ?? [];
-    const isElevated = userRoles.some((r) =>
-      ['DataSteward', 'DataProposer', 'Admin', 'Organization'].includes(r)
-    );
+  const [workflowPermissions, setWorkflowPermissions] =
+    useState<GlossaryVersionPermissions>();
 
-    return (
-      !isElevated &&
-      userRoles.some((r) => ['BasicConsumer', 'DataConsumer'].includes(r))
-    );
-  }, [currentUser]);
-
-  const isUserSteward = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
-
-    return (
-      userRoles.some((r) => r.includes('steward')) ||
-      personaName.includes('steward')
-    );
-  }, [currentUser, selectedPersona]);
-
-  const isUserProposer = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-    if (isUserSteward) {
-      return false;
-    }
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
-
-    return (
-      userRoles.some((r) => r.includes('proposer')) ||
-      personaName.includes('proposer')
-    );
-  }, [currentUser, selectedPersona, isUserSteward]);
-
-  const isGlossaryReviewer = useMemo(() => {
-    return Boolean(
-      activeGlossary.reviewers?.some((r) => r.id === currentUser?.id)
-    );
-  }, [activeGlossary.reviewers, currentUser?.id]);
-
-  const canSubmitForReview = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
+  useEffect(() => {
+    let cancelled = false;
+    if (displayedGlossary.id) {
+      getGlossaryVersionPermissions(displayedGlossary.id)
+        .then((response) => {
+          if (!cancelled) {
+            setWorkflowPermissions(response);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setWorkflowPermissions(undefined);
+          }
+        });
     }
 
-    if (isUserSteward) {
-      return false;
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, [displayedGlossary.id]);
 
-    return isUserProposer;
-  }, [currentUser?.isAdmin, isUserProposer, isUserSteward]);
-
-  const canApproveOrReject = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return true;
-    }
-
-    return isUserSteward || isGlossaryReviewer;
-  }, [currentUser?.isAdmin, isUserSteward, isGlossaryReviewer]);
+  const isConsumer = workflowPermissions
+    ? !workflowPermissions.canViewWorking
+    : !(permissions.EditAll || permissions.EditStatus);
+  const canSubmitForReview =
+    workflowPermissions?.canSubmit ?? Boolean(permissions.EditAll);
+  const canApproveOrReject =
+    Boolean(workflowPermissions?.canApprove) ||
+    Boolean(workflowPermissions?.canReject) ||
+    (!workflowPermissions && Boolean(permissions.EditStatus));
 
   const canSelectRows = useMemo(() => {
     if (isConsumer) {
@@ -1044,7 +1089,113 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     try {
       let data: ModifiedGlossary[] = [];
       let pagingResponse: Paging | undefined;
-      const rawVersionTermIds = displayedGlossary.extension?.termIds;
+      const isPublishedGlossarySnapshot =
+        isGlossary &&
+        Boolean(displayedGlossary.businessVersion) &&
+        [EntityStatus.Approved, EntityStatus.Archived].includes(
+          displayedGlossary.entityStatus as EntityStatus
+        );
+      const isWorkingGlossarySnapshot =
+        isGlossary &&
+        Boolean(displayedGlossary.businessVersion) &&
+        [
+          EntityStatus.Draft,
+          EntityStatus.InReview,
+          EntityStatus.Rejected,
+        ].includes(displayedGlossary.entityStatus as EntityStatus);
+      if (isPublishedGlossarySnapshot || isWorkingGlossarySnapshot) {
+        const snapshotTerms = isPublishedGlossarySnapshot
+          ? await getPublishedGlossaryTerms(
+              displayedGlossary.id,
+              displayedGlossary.businessVersion as string
+            )
+          : await getWorkingGlossaryTerms(displayedGlossary.id);
+        const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
+        const matchingTerms = snapshotTerms
+          .filter((term) => {
+            if (!normalizedSearch) {
+              return true;
+            }
+
+            return [term.name, term.displayName, term.description].some(
+              (value) =>
+                String(value ?? '')
+                  .toLocaleLowerCase()
+                  .includes(normalizedSearch)
+            );
+          })
+          .sort((left, right) =>
+            String(left.name ?? '').localeCompare(
+              String(right.name ?? ''),
+              'vi',
+              { sensitivity: 'base' }
+            )
+          );
+        const offset = (currentPage - 1) * pageSize;
+        let displayedTerms: ModifiedGlossary[];
+        let totalTerms: number;
+        if (isCDEGlossary) {
+          const pageTerms = matchingTerms.slice(offset, offset + pageSize);
+          totalTerms = matchingTerms.length;
+          if (isConsumer) {
+            displayedTerms = pageTerms as unknown as ModifiedGlossary[];
+          } else {
+            const pinnedSnapshots = new Map(
+              pageTerms.map((term) => [term.id, term as ModifiedGlossaryTerm])
+            );
+            let currentTerms = pageTerms as ModifiedGlossaryTerm[];
+            if (pageTerms.length > 0) {
+              const canonicalTerms = await getGlossaryTermsByIds(
+                pageTerms.map((term) => term.id),
+                { fields: CDE_GLOSSARY_TERM_FIELDS }
+              );
+              const canonicalById = new Map(
+                canonicalTerms.map((term) => [term.id, term])
+              );
+              currentTerms = pageTerms.map((term) => {
+                const canonical = canonicalById.get(
+                  term.id
+                ) as ModifiedGlossaryTerm;
+
+                return canonical?.businessVersion ? canonical : term;
+              });
+            }
+            const requestedStatuses = selectedStatus.filter(
+              (status) => status !== 'all'
+            ) as EntityStatus[];
+            const visibleStatuses: EntityStatus[] = isConsumer
+              ? [EntityStatus.Approved]
+              : requestedStatuses.length > 0
+              ? requestedStatuses
+              : [
+                  EntityStatus.Draft,
+                  EntityStatus.InReview,
+                  EntityStatus.Approved,
+                ];
+            displayedTerms = (await expandCDETermVersions(
+              currentTerms,
+              visibleStatuses,
+              pinnedSnapshots
+            )) as ModifiedGlossary[];
+          }
+        } else {
+          const tree = buildTree(
+            matchingTerms as unknown as ModifiedGlossary[]
+          ) as ModifiedGlossary[];
+          displayedTerms = tree.slice(offset, offset + pageSize);
+          totalTerms = tree.length;
+        }
+        setTotalTermsCount(totalTerms);
+        handlePagingChange({ total: totalTerms });
+        setGlossaryChildTerms(displayedTerms);
+        setExpandedRowKeys([]);
+
+        return;
+      }
+
+      const revisionTermIds = displayedGlossary.termRevisions?.map(
+        (revision) => revision.termId
+      );
       const workingVersionStatuses = [
         EntityStatus.Draft,
         EntityStatus.InReview,
@@ -1057,8 +1208,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           displayedGlossary.entityStatus as EntityStatus
         );
       const versionTermIds =
-        isGlossary && Array.isArray(rawVersionTermIds)
-          ? (rawVersionTermIds as string[])
+        isGlossary && Array.isArray(revisionTermIds)
+          ? revisionTermIds
           : isWorkingGlossaryVersion
           ? []
           : undefined;
@@ -1269,9 +1420,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           canonicalTerms.map((term) => [term.id, term])
         );
 
-        // Elasticsearch can lag behind the entity store after a workflow transition.
-        // Always expand CDE versions from the canonical current entity so a new Draft/InReview
-        // version is not lost merely because it is not present in native history yet.
+        // Elasticsearch can lag behind the snapshot store after a workflow transition.
+        // Hydrate each hit from the backend-resolved working/published representation.
         data = data.map(
           (term) =>
             (canonicalById.get(term.id) as ModifiedGlossary | undefined) ?? term
@@ -1281,92 +1431,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       setTotalTermsCount(pagingResponse?.total ?? data.length);
       handlePagingChange(pagingResponse ?? { total: data.length });
       if (isCDEGlossary && !isConsumer) {
-        const histories = await Promise.allSettled(
-          data.map((term) => getGlossaryTermsVersionsList(term.id))
-        );
-        data = (data as unknown as ModifiedGlossaryTerm[]).flatMap(
-          (term, index) => {
-            const history = histories[index];
-            const visibleStatuses = isWorkingGlossaryVersion
-              ? workingVersionStatuses
-              : isVersionView && isGlossary && !isCDEGlossary
-              ? [EntityStatus.Approved]
-              : isConsumer
-              ? [EntityStatus.Approved]
-              : rawStatuses.length > 0
-              ? rawStatuses
-              : [
-                  EntityStatus.Draft,
-                  EntityStatus.InReview,
-                  EntityStatus.Approved,
-                ];
-            if (history.status !== 'fulfilled') {
-              return visibleStatuses.includes(
-                term.entityStatus ?? EntityStatus.Approved
-              )
-                ? [term]
-                : [];
-            }
-
-            const snapshots = (history.value.versions ?? [])
-              .map((value) => {
-                try {
-                  return (
-                    typeof value === 'string' ? JSON.parse(value) : value
-                  ) as ModifiedGlossaryTerm;
-                } catch {
-                  return undefined;
-                }
-              })
-              .filter((value): value is ModifiedGlossaryTerm => Boolean(value))
-              .sort((a, b) => Number(b.version ?? 0) - Number(a.version ?? 0));
-            const versionSnapshots = new Map<string, ModifiedGlossaryTerm>();
-            for (const snapshot of snapshots) {
-              const businessVersion = getBusinessVersion(snapshot.extension);
-              // Native history is sorted newest first. Keep the latest workflow state
-              // for each business version (Draft, InReview, Approved, or Rejected).
-              if (!versionSnapshots.has(businessVersion)) {
-                versionSnapshots.set(businessVersion, snapshot);
-              }
-            }
-
-            const current = term as ModifiedGlossaryTerm;
-            const currentVersion = getBusinessVersion(current.extension);
-            // The canonical entity always wins over history for the same
-            // business version, regardless of its workflow status.
-            versionSnapshots.delete(currentVersion);
-
-            return [
-              current,
-              ...Array.from(
-                versionSnapshots.entries(),
-                ([businessVersion, snapshot]) => ({
-                  ...snapshot,
-                  id: term.id,
-                  fullyQualifiedName: term.fullyQualifiedName,
-                  snapshotVersion: snapshot.auditBusinessVersion
-                    ? undefined
-                    : String(snapshot.version),
-                  versionRowKey: `${term.fullyQualifiedName}@${businessVersion}`,
-                  children: undefined,
-                })
-              ),
-            ]
-              .filter((row) =>
-                visibleStatuses.includes(
-                  row.entityStatus ?? EntityStatus.Approved
-                )
-              )
-              .sort((first, second) => {
-                const firstVersion = getBusinessVersion(first.extension);
-                const secondVersion = getBusinessVersion(second.extension);
-
-                return secondVersion.localeCompare(firstVersion, undefined, {
-                  numeric: true,
-                });
-              });
-          }
-        ) as unknown as ModifiedGlossary[];
+        const visibleStatuses: EntityStatus[] = isWorkingGlossaryVersion
+          ? workingVersionStatuses
+          : rawStatuses.length > 0
+          ? (rawStatuses as EntityStatus[])
+          : [EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved];
+        data = (await expandCDETermVersions(
+          data as unknown as ModifiedGlossaryTerm[],
+          visibleStatuses
+        )) as unknown as ModifiedGlossary[];
       }
       setGlossaryChildTerms(data as ModifiedGlossary[]);
       setExpandedRowKeys([]);
@@ -1648,8 +1721,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
       } else {
         try {
+          const working = await getGlossaryTermWorkingVersion(record.id);
           await transitionGlossaryTermWorkflow(record.id, 'approve', {
-            expectedNativeVersion: Number(record.version),
+            expectedRevision: Number(working.workingRevision),
           });
           refreshGlossaryTerms && refreshGlossaryTerms();
           showSuccessToast(
@@ -1692,8 +1766,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         updateTaskData(data, taskId, record.fullyQualifiedName ?? '');
       } else {
         try {
+          const working = await getGlossaryTermWorkingVersion(record.id);
           await transitionGlossaryTermWorkflow(record.id, 'reject', {
-            expectedNativeVersion: Number(record.version),
+            expectedRevision: Number(working.workingRevision),
           });
           refreshGlossaryTerms && refreshGlossaryTerms();
           showSuccessToast(
@@ -2710,10 +2785,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     () =>
       [
         activeGlossary?.fullyQualifiedName,
-        displayedGlossary.extension?.version,
-        Array.isArray(displayedGlossary.extension?.termIds)
-          ? displayedGlossary.extension.termIds.join(',')
-          : 'legacy-membership',
+        displayedGlossary.businessVersion,
+        displayedGlossary.termRevisions
+          ?.map((revision) => revision.termSnapshotId)
+          .join(',') ?? 'current-membership',
         displayedGlossary.entityStatus,
         isVersionView ? 'version-view' : 'current-view',
         searchTerm,

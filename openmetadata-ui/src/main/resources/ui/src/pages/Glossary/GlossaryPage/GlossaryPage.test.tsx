@@ -15,7 +15,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import ResizableLeftPanels from '../../../components/common/ResizablePanels/ResizableLeftPanels';
 import * as useGlossaryStoreModule from '../../../components/Glossary/useGlossary.store';
 import { MOCK_GLOSSARY } from '../../../mocks/Glossary.mock';
-import { patchGlossaryTerm } from '../../../rest/glossaryAPI';
+import { updateGlossaryTermWorkingVersion } from '../../../rest/glossaryAPI';
 import GlossaryPage from './GlossaryPage.component';
 
 const mockNavigate = jest.fn();
@@ -145,12 +145,18 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     })
   ),
   getGlossaryVersionsList: jest.fn().mockResolvedValue({ versions: [] }),
-  patchGlossaryTerm: jest
+  getGlossaryWorkingVersion: jest
     .fn()
-    .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),
-  patchGlossaries: jest
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  getGlossaryTermWorkingVersion: jest
     .fn()
-    .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  updateGlossaryWorkingVersion: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 2 }),
+  updateGlossaryTermWorkingVersion: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 2 }),
 }));
 
 jest.mock(
@@ -217,10 +223,8 @@ describe('Test GlossaryComponent page', () => {
   });
 
   describe('Render Sad Paths', () => {
-    it('show error if patchGlossaryTerm API resolves without data', async () => {
-      (patchGlossaryTerm as jest.Mock).mockImplementation(() =>
-        Promise.resolve({ data: '' })
-      );
+    it('shows an error if updating the working term resolves without data', async () => {
+      (updateGlossaryTermWorkingVersion as jest.Mock).mockResolvedValue('');
       render(<GlossaryPage {...mockProps} />);
       const handleGlossaryTermUpdate = await screen.findByTestId(
         'handleGlossaryTermUpdate'

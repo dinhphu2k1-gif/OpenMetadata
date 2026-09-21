@@ -18,7 +18,10 @@ import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
-import { EntityReference, EntityStatus } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityReference,
+  EntityStatus,
+} from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
@@ -31,7 +34,6 @@ export type CDEExtension = {
   version?: string;
   effectiveDate?: string;
   expirationDate?: string;
-  phien_ban?: string;
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
   dataQualityRules?: boolean | string | string[];
@@ -138,7 +140,7 @@ export const getCDEGlossaryTableColumns = ({
         );
       }
 
-      const businessVersion = getBusinessVersion(record.extension, '');
+      const businessVersion = getBusinessVersion(record.businessVersion, '');
 
       const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
       const toUrl = businessVersion
@@ -282,7 +284,7 @@ export const getCDEGlossaryTableColumns = ({
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
-        : getBusinessVersion(record.extension),
+        : getBusinessVersion(record.businessVersion),
   },
   {
     title: t('label.status'),
@@ -296,10 +298,7 @@ export const getCDEGlossaryTableColumns = ({
       const status = entityStatus ?? EntityStatus.Approved;
 
       return (
-        <StatusBadge
-          label={status}
-          status={getEntityStatusClass(status)}
-        />
+        <StatusBadge label={status} status={getEntityStatusClass(status)} />
       );
     },
   },

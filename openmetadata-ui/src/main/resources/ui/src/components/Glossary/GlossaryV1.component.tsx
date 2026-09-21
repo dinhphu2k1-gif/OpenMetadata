@@ -27,22 +27,24 @@ import {
 import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../enums/common.enum';
 import { EntityAction, EntityTabs, EntityType } from '../../enums/entity.enum';
 import { Glossary } from '../../generated/entity/data/glossary';
-import {
-  EntityStatus,
-  GlossaryTerm,
-} from '../../generated/entity/data/glossaryTerm';
+import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
 import { PageType } from '../../generated/system/ui/page';
 import { useCustomPages } from '../../hooks/useCustomPages';
 import { VERSION_VIEW_GLOSSARY_PERMISSION } from '../../mocks/Glossary.mock';
 import {
   addGlossaryTerm,
   getFirstLevelGlossaryTermsPaginated,
+  getGlossaryTermWorkingVersion,
   ListGlossaryTermsParams,
-  patchGlossaryTerm,
+  transitionGlossaryTermWorkflow,
+  updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
 import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
 import { updateGlossaryTermByFqn } from '../../utils/GlossaryUtils';
-import { isDataDictionaryGlossary, isDataQualityGlossary } from '../../constants/Glossary.contant';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../constants/Glossary.contant';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
@@ -241,8 +243,15 @@ const GlossaryV1 = ({
     currentData: GlossaryTerm,
     updatedData: GlossaryTerm
   ) => {
-    const jsonPatch = compare(currentData, updatedData);
-    const response = await patchGlossaryTerm(currentData?.id, jsonPatch);
+    const working =
+      currentData.workingRevision != null
+        ? currentData
+        : await getGlossaryTermWorkingVersion(currentData.id);
+    const response = await updateGlossaryTermWorkingVersion(
+      currentData.id,
+      working.workingRevision as number,
+      updatedData
+    );
     if (!response) {
       throw new Error(
         t('server.entity-updating-error', {
@@ -285,38 +294,27 @@ const GlossaryV1 = ({
   );
 
   const handleGlossaryTermAdd = async (formData: GlossaryTermForm) => {
+    const { businessVersion = '1.0', ...createData } = formData;
     const term = await addGlossaryTerm({
-      ...formData,
-      domains: formData.domains?.map((domain) =>
-        domain.fullyQualifiedName ?? domain.name ?? ''
+      ...createData,
+      domains: createData.domains?.map(
+        (domain) => domain.fullyQualifiedName ?? domain.name ?? ''
       ),
       glossary:
         activeGlossaryTerm?.glossary?.name ||
         (selectedData.fullyQualifiedName ?? ''),
       parent: activeGlossaryTerm?.fullyQualifiedName,
     });
-
-    if (isGlossaryActive) {
-      const glossary = selectedData as Glossary;
-      const versionTermIds = glossary.extension?.termIds;
-      if (
-        Array.isArray(versionTermIds) ||
-        glossary.entityStatus !== EntityStatus.Approved
-      ) {
-        const currentTermIds = Array.isArray(versionTermIds)
-          ? versionTermIds
-          : [];
-        await updateGlossary({
-          ...glossary,
-          extension: {
-            ...glossary.extension,
-            termIds: Array.from(new Set([...currentTermIds, term.id])),
-          },
-        });
+    const working = await transitionGlossaryTermWorkflow(
+      term.id,
+      'createDraft',
+      {
+        businessVersion,
+        payload: term,
       }
-    }
+    );
 
-    onTermModalSuccess(term);
+    onTermModalSuccess(working);
   };
 
   const handleGlossaryTermSave = async (formData: GlossaryTermForm) => {

@@ -10,7 +10,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { EntityType } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -190,12 +196,8 @@ jest.mock('../../../rest/glossaryAPI', () => ({
       return Promise.resolve({
         ...mockedGlossaryTerms[0],
         entityStatus: statuses[action as keyof typeof statuses],
-        extension: {
-          ...mockedGlossaryTerms[0].extension,
-          ...(request.businessVersion
-            ? { version: request.businessVersion }
-            : {}),
-        },
+        businessVersion:
+          request.businessVersion ?? mockedGlossaryTerms[0].businessVersion,
       });
     }),
   transitionGlossaryWorkflow: jest.fn(),
@@ -452,7 +454,7 @@ describe('GlossaryHeader component', () => {
     expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       mockedGlossaryTerms[0].id,
       'submit',
-      { expectedNativeVersion: Number(mockedGlossaryTerms[0].version) }
+      { expectedRevision: Number(mockedGlossaryTerms[0].version) }
     );
     expect(mockOnUpdate).not.toHaveBeenCalled();
   });
@@ -549,9 +551,12 @@ describe('GlossaryHeader component', () => {
       data: {
         ...mockedGlossaryTerms[0],
         fullyQualifiedName: 'Data Dictionary.Term1',
-        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
         entityStatus: EntityStatus.InReview,
-        extension: { version: '2.0-Primary' },
+        businessVersion: '2.0-Primary',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true },
@@ -578,10 +583,13 @@ describe('GlossaryHeader component', () => {
       data: {
         ...mockedGlossaryTerms[0],
         fullyQualifiedName: 'Data Dictionary.Term1',
-        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
         entityStatus: EntityStatus.Draft,
         owners: [{ id: 'mock-user-id', type: 'user' }],
-        extension: { version: '1.0' },
+        businessVersion: '1.0',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true },
@@ -611,7 +619,7 @@ describe('GlossaryHeader component', () => {
     expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       mockedGlossaryTerms[0].id,
       'submit',
-      { expectedNativeVersion: Number(mockedGlossaryTerms[0].version) }
+      { expectedRevision: Number(mockedGlossaryTerms[0].version) }
     );
   });
 
@@ -682,9 +690,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { version: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -720,9 +731,7 @@ describe('GlossaryHeader component', () => {
       expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
         expect.objectContaining({
           entityStatus: EntityStatus.Draft,
-          extension: expect.objectContaining({
-            version: '1.1',
-          }),
+          businessVersion: '1.1',
         })
       );
     });
@@ -741,9 +750,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { version: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -776,9 +788,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { version: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -811,9 +826,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Draft,
-          extension: { version: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true, EditAll: true },
@@ -848,7 +866,7 @@ describe('GlossaryHeader component', () => {
           fullyQualifiedName: 'Data Quality.DQ1_1',
           glossary: { name: 'Data Quality', displayName: 'Chất lượng dữ liệu' },
           entityStatus: EntityStatus.Approved,
-          extension: { version: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true, EditAll: true },
@@ -887,7 +905,7 @@ describe('GlossaryHeader component', () => {
         fullyQualifiedName: 'Data Dictionary.Term1',
         glossary: { name: 'Data Dictionary' },
         entityStatus: EntityStatus.Approved,
-        extension: { version: '1.1' },
+        businessVersion: '1.1',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true, EditAll: true },
@@ -897,12 +915,16 @@ describe('GlossaryHeader component', () => {
     const approvedV1Snapshot = {
       version: 1.0,
       entityStatus: 'Approved',
-      extension: { version: '1.0' },
+      businessVersion: '1.0',
     };
     (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
       versions: [
-        { version: 1.2, entityStatus: 'Approved', extension: { version: '1.1' } },
-        { version: 1.1, entityStatus: 'Draft', extension: { version: '1.2' } },
+        {
+          version: 1.2,
+          entityStatus: 'Approved',
+          businessVersion: '1.1',
+        },
+        { version: 1.1, entityStatus: 'Draft', businessVersion: '1.2' },
         approvedV1Snapshot,
       ],
     });
@@ -918,7 +940,9 @@ describe('GlossaryHeader component', () => {
     );
 
     fireEvent.click(screen.getByTestId('version-button'));
-    await waitFor(() => expect(screen.getByText('label.version: 1.0')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('label.version: 1.0')).toBeInTheDocument()
+    );
 
     expect(screen.queryByText('label.version: 1.2')).not.toBeInTheDocument();
 

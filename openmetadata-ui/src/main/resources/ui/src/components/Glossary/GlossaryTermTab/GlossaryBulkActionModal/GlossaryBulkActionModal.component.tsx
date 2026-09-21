@@ -16,13 +16,18 @@ import { Modal, Progress, Space, Typography } from 'antd';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  getGlossaryTermWorkingVersion,
   GlossaryWorkflowAction,
   transitionGlossaryTermWorkflow,
 } from '../../../../rest/glossaryAPI';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
-export type BulkActionType = 'submitForReview' | 'approve' | 'reject' | 'revoke';
+export type BulkActionType =
+  | 'submitForReview'
+  | 'approve'
+  | 'reject'
+  | 'revoke';
 
 export interface GlossaryBulkActionModalProps {
   actionType: BulkActionType;
@@ -110,8 +115,9 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         chunk.map(async (term) => {
           try {
             setCurrentTermName(term.displayName || term.name || '');
+            const working = await getGlossaryTermWorkingVersion(term.id);
             await transitionGlossaryTermWorkflow(term.id, action, {
-              expectedNativeVersion: Number(term.version),
+              expectedRevision: Number(working.workingRevision),
             });
             successCount++;
           } catch {
@@ -132,10 +138,14 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         : '';
 
     showSuccessToast(
-      t('message.bulk-action-completed', 'Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.', {
-        success: successCount,
-        failedText,
-      })
+      t(
+        'message.bulk-action-completed',
+        'Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.',
+        {
+          success: successCount,
+          failedText,
+        }
+      )
     );
 
     setIsProcessing(false);
@@ -184,17 +194,22 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
       title={modalTitle}
       onCancel={handleModalClose}>
       {isProcessing ? (
-        <Space direction="vertical" size="middle" style={{ width: '100%', padding: '24px 0', textAlign: 'center' }}>
+        <Space
+          direction="vertical"
+          size="middle"
+          style={{ width: '100%', padding: '24px 0', textAlign: 'center' }}>
           <Typography.Text className="font-medium text-md">
-            {t('message.bulk-progress-processing', 'Đang xử lý {{current}} / {{total}} bản ghi...', {
-              current: Math.round((progress / 100) * terms.length),
-              total: terms.length,
-            })}
+            {t(
+              'message.bulk-progress-processing',
+              'Đang xử lý {{current}} / {{total}} bản ghi...',
+              {
+                current: Math.round((progress / 100) * terms.length),
+                total: terms.length,
+              }
+            )}
           </Typography.Text>
           <Progress percent={progress} status="active" />
-          <Typography.Text type="secondary">
-            {currentTermName}
-          </Typography.Text>
+          <Typography.Text type="secondary">{currentTermName}</Typography.Text>
         </Space>
       ) : (
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>

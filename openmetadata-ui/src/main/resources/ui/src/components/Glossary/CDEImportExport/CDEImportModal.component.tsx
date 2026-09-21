@@ -34,7 +34,6 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/lib/table';
-import { Operation } from 'fast-json-patch';
 import { FC, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ImportIcon } from '../../../assets/svg/ic-drag-drop.svg';
@@ -48,10 +47,9 @@ import { getDomainList } from '../../../rest/domainAPI';
 import {
   addGlossaryTerm,
   getGlossaryTermsById,
-  patchGlossaryTerm,
   transitionGlossaryTermWorkflow,
+  updateGlossaryTermWorkingVersion,
 } from '../../../rest/glossaryAPI';
-import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getTags } from '../../../rest/tagAPI';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
@@ -273,37 +271,34 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               current.extension
             );
             let editable = current;
-            if (current.entityStatus === EntityStatus.Approved) {
+            if (
+              current.entityStatus === EntityStatus.Approved ||
+              !current.workingRevision
+            ) {
               editable = await transitionGlossaryTermWorkflow(
                 current.id,
                 'createDraft',
                 {
-                  expectedNativeVersion: Number(current.version),
-                  businessVersion: getBusinessVersion(payload.extension),
+                  businessVersion: payload.businessVersion,
                 }
               );
             } else if (current.entityStatus === EntityStatus.Rejected) {
               editable = await transitionGlossaryTermWorkflow(
                 current.id,
                 'reopen',
-                { expectedNativeVersion: Number(current.version) }
+                { expectedRevision: Number(current.workingRevision) }
               );
             }
-            const patchOps: Operation[] = [
-              { op: 'replace', path: '/displayName', value: row.displayName },
+            await updateGlossaryTermWorkingVersion(
+              editable.id,
+              Number(editable.workingRevision),
               {
-                op: 'replace',
-                path: '/description',
-                value: row.description || '',
-              },
-              {
-                op: 'add',
-                path: '/extension',
-                value: payload.extension,
-              },
-            ];
-
-            await patchGlossaryTerm(editable.id, patchOps);
+                ...editable,
+                ...payload,
+                id: editable.id,
+                glossary: editable.glossary,
+              } as GlossaryTerm
+            );
             updatedCount++;
           } catch (error: any) {
             failedCount++;
@@ -324,7 +319,11 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             allTags
           );
 
-          await addGlossaryTerm(payload);
+          const { businessVersion, ...createPayload } = payload;
+          const newTerm = await addGlossaryTerm(createPayload);
+          await transitionGlossaryTermWorkflow(newTerm.id, 'createDraft', {
+            businessVersion,
+          });
           createdCount++;
         } catch (error: any) {
           failedCount++;

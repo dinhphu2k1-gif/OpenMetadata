@@ -11,7 +11,13 @@
  *  limitations under the License.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
 import * as glossaryAPI from '../../../../rest/glossaryAPI';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
@@ -40,9 +46,7 @@ jest.mock('react-i18next', () => ({
       let str =
         typeof defaultValOrOptions === 'string' ? defaultValOrOptions : key;
       const opts =
-        typeof defaultValOrOptions === 'object'
-          ? defaultValOrOptions
-          : options;
+        typeof defaultValOrOptions === 'object' ? defaultValOrOptions : options;
       if (opts && typeof str === 'string') {
         Object.keys(opts).forEach((k) => {
           str = str.replace(new RegExp(`{{${k}}}`, 'g'), String(opts[k]));
@@ -107,16 +111,20 @@ describe('GlossaryBulkActionModal', () => {
       expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledTimes(
         2
       );
-      expect(
-        glossaryAPI.transitionGlossaryTermWorkflow
-      ).toHaveBeenCalledWith('term-1', 'submit', {
-        expectedNativeVersion: 1.1,
-      });
-      expect(
-        glossaryAPI.transitionGlossaryTermWorkflow
-      ).toHaveBeenCalledWith('term-2', 'submit', {
-        expectedNativeVersion: 1.2,
-      });
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+        'term-1',
+        'submit',
+        {
+          expectedRevision: 1.1,
+        }
+      );
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+        'term-2',
+        'submit',
+        {
+          expectedRevision: 1.2,
+        }
+      );
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
@@ -142,11 +150,13 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(
-        glossaryAPI.transitionGlossaryTermWorkflow
-      ).toHaveBeenCalledWith('term-1', 'approve', {
-        expectedNativeVersion: 1.1,
-      });
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+        'term-1',
+        'approve',
+        {
+          expectedRevision: 1.1,
+        }
+      );
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
@@ -162,9 +172,7 @@ describe('GlossaryBulkActionModal', () => {
       />
     );
 
-    expect(
-      screen.getByText('Xác nhận từ chối hàng loạt')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Xác nhận từ chối hàng loạt')).toBeInTheDocument();
 
     const confirmBtn = screen.getByText('Xác nhận');
     await act(async () => {
@@ -172,11 +180,13 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(
-        glossaryAPI.transitionGlossaryTermWorkflow
-      ).toHaveBeenCalledWith('term-1', 'reject', {
-        expectedNativeVersion: 1.1,
-      });
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+        'term-1',
+        'reject',
+        {
+          expectedRevision: 1.1,
+        }
+      );
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
@@ -202,11 +212,13 @@ describe('GlossaryBulkActionModal', () => {
     });
 
     await waitFor(() => {
-      expect(
-        glossaryAPI.transitionGlossaryTermWorkflow
-      ).toHaveBeenCalledWith('term-1', 'revoke', {
-        expectedNativeVersion: 1.1,
-      });
+      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+        'term-1',
+        'revoke',
+        {
+          expectedRevision: 1.1,
+        }
+      );
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });

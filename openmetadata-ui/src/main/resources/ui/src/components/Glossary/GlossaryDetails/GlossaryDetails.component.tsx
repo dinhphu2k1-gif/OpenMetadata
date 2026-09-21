@@ -41,7 +41,6 @@ import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import TabsLabel from '../../common/TabsLabel/TabsLabel.component';
 import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
@@ -59,8 +58,7 @@ const GlossaryDetails = ({
 }: GlossaryDetailsProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { activeGlossary: glossary, updateActiveGlossary } =
-    useGlossaryStore();
+  const { activeGlossary: glossary, updateActiveGlossary } = useGlossaryStore();
   const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
   const currentGlossary = viewedVersion ?? glossary;
 
@@ -129,23 +127,31 @@ const GlossaryDetails = ({
     const glossaryFqn = glossary.fullyQualifiedName ?? glossary.name;
 
     if (activeTab === EntityTabs.RELATIONS_GRAPH && glossaryFqn) {
-      navigate(
-        getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS),
-        { replace: true }
-      );
+      navigate(getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS), {
+        replace: true,
+      });
     }
   }, [activeTab, glossary.fullyQualifiedName, glossary.name, navigate]);
 
   useEffect(() => {
     const glossaryFqn = glossary.fullyQualifiedName ?? glossary.name;
 
-    if (shouldHideActivityFeed && activeTab === EntityTabs.ACTIVITY_FEED && glossaryFqn) {
-      navigate(
-        getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS),
-        { replace: true }
-      );
+    if (
+      shouldHideActivityFeed &&
+      activeTab === EntityTabs.ACTIVITY_FEED &&
+      glossaryFqn
+    ) {
+      navigate(getGlossaryTermDetailsPath(glossaryFqn, EntityTabs.TERMS), {
+        replace: true,
+      });
     }
-  }, [shouldHideActivityFeed, activeTab, glossary.fullyQualifiedName, glossary.name, navigate]);
+  }, [
+    shouldHideActivityFeed,
+    activeTab,
+    glossary.fullyQualifiedName,
+    glossary.name,
+    navigate,
+  ]);
 
   const tabs = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
@@ -155,11 +161,8 @@ const GlossaryDetails = ({
         label: (
           <TabsLabel
             count={
-              Array.isArray(glossary.extension?.termIds)
-                ? glossary.extension.termIds.length
-                : !isVersionView &&
-                  glossary.entityStatus !== EntityStatus.Approved
-                ? 0
+              Array.isArray(glossary.termRevisions)
+                ? glossary.termRevisions.length
                 : glossary.termCount ?? glossary.childrenCount ?? 0
             }
             id={EntityTabs.TERMS}
@@ -203,11 +206,7 @@ const GlossaryDetails = ({
         : []),
     ];
 
-    return getDetailsTabWithNewLabel(
-      items,
-      customizedTabs,
-      EntityTabs.TERMS
-    );
+    return getDetailsTabWithNewLabel(items, customizedTabs, EntityTabs.TERMS);
   }, [
     customizedTabs,
     glossary.fullyQualifiedName,
@@ -274,7 +273,9 @@ const GlossaryDetails = ({
                     isTabExpanded ? t('label.expand') : t('label.collapse')
                   }
                   className={isTabExpanded ? '' : 'rotate-180'}
-                  title={isTabExpanded ? t('label.expand') : t('label.collapse')}
+                  title={
+                    isTabExpanded ? t('label.expand') : t('label.collapse')
+                  }
                   onClick={toggleTabExpanded}
                 />
               )

@@ -1,32 +1,9 @@
-const LEGACY_VERSION_FIELD = ['cde', 'Version'].join('');
-
-type VersionExtension = Record<string, unknown> | undefined;
-
-/** Read current and legacy snapshot versions without writing the legacy field. */
+/** Read the canonical business version. */
 export const getBusinessVersion = (
-  extension: VersionExtension,
+  businessVersion?: string,
   fallback = '1.0'
 ): string => {
-  const value =
-    extension?.version ??
-    extension?.[LEGACY_VERSION_FIELD] ??
-    extension?.phien_ban;
-
-  return String(value ?? fallback).trim();
-};
-
-/** Remove the legacy version field before creating an API payload. */
-export const normalizeBusinessVersionExtension = (
-  extension: VersionExtension
-): Record<string, unknown> => {
-  const version = getBusinessVersion(extension);
-  const normalized = Object.fromEntries(
-    Object.entries(extension ?? {}).filter(
-      ([key]) => key !== 'version' && key !== LEGACY_VERSION_FIELD && key !== 'phien_ban'
-    )
-  );
-
-  return { ...normalized, version };
+  return String(businessVersion ?? fallback).trim();
 };
 
 export const getComparableBusinessVersion = (version: string): number[] => {
@@ -39,7 +16,10 @@ export const getComparableBusinessVersion = (version: string): number[] => {
   return normalized.every(Number.isFinite) ? normalized : [0];
 };
 
-export const compareBusinessVersions = (left: string, right: string): number => {
+export const compareBusinessVersions = (
+  left: string,
+  right: string
+): number => {
   const leftParts = getComparableBusinessVersion(left);
   const rightParts = getComparableBusinessVersion(right);
   const length = Math.max(leftParts.length, rightParts.length);

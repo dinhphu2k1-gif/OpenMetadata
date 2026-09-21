@@ -52,9 +52,7 @@ jest.mock('react-i18next', () => ({
       let str =
         typeof defaultValOrOptions === 'string' ? defaultValOrOptions : key;
       const opts =
-        typeof defaultValOrOptions === 'object'
-          ? defaultValOrOptions
-          : options;
+        typeof defaultValOrOptions === 'object' ? defaultValOrOptions : options;
       if (opts && typeof str === 'string') {
         Object.keys(opts).forEach((k) => {
           str = str.replace(new RegExp(`{{${k}}}`, 'g'), String(opts[k]));
@@ -149,9 +147,7 @@ describe('CDEImportPage', () => {
     expect(screen.getByText(/Duyệt tệp Excel/i)).toBeInTheDocument();
 
     // Check template download button
-    expect(
-      screen.getByText('Tải file Excel mẫu (.xlsx)')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tải file Excel mẫu (.xlsx)')).toBeInTheDocument();
 
     // Check duplicate handling options & descriptions
     expect(screen.getByText('Bỏ qua bản ghi trùng')).toBeInTheDocument();
@@ -160,12 +156,16 @@ describe('CDEImportPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Cập nhật ghi đè bản ghi')).toBeInTheDocument();
     expect(
-      screen.getByText(/Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại/i)
+      screen.getByText(
+        /Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại/i
+      )
     ).toBeInTheDocument();
 
     // Verify NO warning alert / notice exists in Step 1
     expect(
-      screen.queryByText(/Mọi bản ghi CDE nạp mới sẽ được khởi tạo ở trạng thái/i)
+      screen.queryByText(
+        /Mọi bản ghi CDE nạp mới sẽ được khởi tạo ở trạng thái/i
+      )
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Quy định quản trị dữ liệu/i)
@@ -239,7 +239,9 @@ describe('CDEImportPage', () => {
     expect(screen.getByTestId('processed-row')).toBeInTheDocument();
     expect(screen.getByTestId('update-button')).toBeInTheDocument();
     expect(screen.getByTestId('status-filter-group')).toBeInTheDocument();
-    expect(screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)
+    ).toBeInTheDocument();
 
     // Initial state: 2 rows in Step 3 (1 valid + 1 added row with missing fields)
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
@@ -459,13 +461,31 @@ describe('CDEImportPage', () => {
     expect(screen.getByTestId('passed-row')).toHaveTextContent('0');
 
     // Verify errors are captured in details
-    expect(screen.getByText(/Nguồn dữ liệu 'Nguon_Khong_Ton_Tai_123' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Phân loại dữ liệu 'PhanLoaiSai' không hợp lệ/)).toBeInTheDocument();
-    expect(screen.getByText(/Dữ liệu cá nhân 'GiaTriSai' không hợp lệ/)).toBeInTheDocument();
-    expect(screen.getByText(/Chủ sở hữu 'Ghost_Owner' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Người kiểm soát 'Ghost_Reviewer' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Quy định chất lượng dữ liệu phải là 'Có' hoặc 'Không'/)).toBeInTheDocument();
-    expect(screen.getByText(/Phiên bản 'ban-1.0' không đúng định dạng/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Nguồn dữ liệu 'Nguon_Khong_Ton_Tai_123' không tồn tại trên hệ thống/
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Phân loại dữ liệu 'PhanLoaiSai' không hợp lệ/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Dữ liệu cá nhân 'GiaTriSai' không hợp lệ/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Chủ sở hữu 'Ghost_Owner' không tồn tại trên hệ thống/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Người kiểm soát 'Ghost_Reviewer' không tồn tại trên hệ thống/
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Quy định chất lượng dữ liệu phải là 'Có' hoặc 'Không'/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Phiên bản 'ban-1.0' không đúng định dạng/)
+    ).toBeInTheDocument();
   });
 
   it('should render bulk submit button and patch terms to InReview when clicked', async () => {
@@ -549,7 +569,7 @@ describe('CDEImportPage', () => {
     expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       'term-1',
       'submit',
-      { expectedNativeVersion: 0.1 }
+      { expectedRevision: 0.1 }
     );
   });
 });

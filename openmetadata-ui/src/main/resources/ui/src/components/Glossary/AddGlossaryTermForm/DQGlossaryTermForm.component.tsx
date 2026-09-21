@@ -9,7 +9,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../../constants/Glossary.contant';
 import { EntityType } from '../../../enums/entity.enum';
-import { GlossaryTerm, TagLabel, TermRelation } from '../../../generated/entity/data/glossaryTerm';
+import {
+  GlossaryTerm,
+  TagLabel,
+  TermRelation,
+} from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useEntityRules } from '../../../hooks/useEntityRules';
@@ -111,10 +115,7 @@ const DQGlossaryTermForm = ({
         description: glossaryTerm.description,
         owners: glossaryTerm.owners,
         reviewers: glossaryTerm.reviewers,
-        version:
-          extension.version ??
-          extension.phien_ban ??
-          '1.0',
+        version: glossaryTerm.businessVersion ?? '1.0',
         cdeCode: extension.cdeCode,
         cdeName: extension.cdeName,
         qualityThreshold: extension.qualityThreshold,
@@ -125,12 +126,12 @@ const DQGlossaryTermForm = ({
           (tag) => tag.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dimension
         ),
         dataSourceTags: tags.filter(
-          (tag) => tag.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource
+          (tag) =>
+            tag.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.dataSource
         ),
         targetPopulationTags: tags.filter(
           (tag) =>
-            tag.tagFQN.split('.')[0] ===
-            DQ_TAG_CLASSIFICATIONS.targetPopulation
+            tag.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.targetPopulation
         ),
         methodTags: tags.filter(
           (tag) => tag.tagFQN.split('.')[0] === DQ_TAG_CLASSIFICATIONS.method
@@ -195,9 +196,7 @@ const DQGlossaryTermForm = ({
     );
 
     const extension = {
-      ...(values.cdeCode?.trim()
-        ? { cdeCode: values.cdeCode.trim() }
-        : {}),
+      ...(values.cdeCode?.trim() ? { cdeCode: values.cdeCode.trim() } : {}),
       ...(values.cdeName?.trim() || matchedCdeTerm
         ? {
             cdeName:
@@ -207,11 +206,6 @@ const DQGlossaryTermForm = ({
               '',
           }
         : {}),
-      ...(values.version?.trim()
-        ? {
-            version: values.version.trim(),
-          }
-        : { version: '1.0' }),
       ...(values.qualityThreshold?.trim()
         ? { qualityThreshold: values.qualityThreshold.trim() }
         : {}),
@@ -226,8 +220,9 @@ const DQGlossaryTermForm = ({
         : {}),
     };
 
-    const currentRelatedTerms = (glossaryTerm?.relatedTerms ??
-      []) as Array<TermRelation | EntityReference>;
+    const currentRelatedTerms = (glossaryTerm?.relatedTerms ?? []) as Array<
+      TermRelation | EntityReference
+    >;
     const nonCdeRelatedTerms = currentRelatedTerms.filter((rel) => {
       const term = (rel as TermRelation)?.term ?? (rel as EntityReference);
 
@@ -247,6 +242,7 @@ const DQGlossaryTermForm = ({
     }
 
     await onSave({
+      businessVersion: values.version?.trim() || '1.0',
       name: String(values.name ?? '').trim(),
       displayName: String(values.displayName ?? '').trim(),
       description: String(values.description ?? ''),
@@ -296,7 +292,10 @@ const DQGlossaryTermForm = ({
             label={t('dq.rule-code', 'Mã quy tắc CLDL')}
             name="name"
             rules={[{ required: true, whitespace: true }]}>
-            <Input data-testid="dq-rule-code" placeholder="Ví dụ: DQ1.1, DQ3.1..." />
+            <Input
+              data-testid="dq-rule-code"
+              placeholder="Ví dụ: DQ1.1, DQ3.1..."
+            />
           </Form.Item>
           <Form.Item
             label={t('dq.rule-name', 'Tên quy tắc CLDL')}
@@ -311,12 +310,14 @@ const DQGlossaryTermForm = ({
             label={t('cde.version', 'Phiên bản')}
             name="version"
             rules={[{ required: true, whitespace: true }]}>
-            <Input data-testid="dq-version" placeholder="1.0" />
+            <Input
+              data-testid="dq-version"
+              disabled={editMode}
+              placeholder="1.0"
+            />
           </Form.Item>
 
-          <Form.Item
-            label={t('dq.cde-code', 'Mã CDE liên kết')}
-            name="cdeCode">
+          <Form.Item label={t('dq.cde-code', 'Mã CDE liên kết')} name="cdeCode">
             <Select
               allowClear
               showSearch
@@ -450,7 +451,9 @@ const DQGlossaryTermForm = ({
           {t('label.governance', 'Quản trị & Phê duyệt')}
         </div>
         <div className="cde-form-grid">
-          <Form.Item label={t('cde.data-owner', 'Chủ sở hữu dữ liệu')} name="owners">
+          <Form.Item
+            label={t('cde.data-owner', 'Chủ sở hữu dữ liệu')}
+            name="owners">
             <UserTeamSelectableListSearchInput
               hasPermission
               multiple={{
@@ -471,9 +474,7 @@ const DQGlossaryTermForm = ({
               multiple={{ user: true, team: true }}
               owner={reviewers}
               placeholder={t('label.select')}
-              onUpdate={async (value) =>
-                form.setFieldValue('reviewers', value)
-              }
+              onUpdate={async (value) => form.setFieldValue('reviewers', value)}
             />
           </Form.Item>
         </div>

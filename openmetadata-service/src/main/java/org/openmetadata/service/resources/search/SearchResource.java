@@ -68,9 +68,11 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.apps.bundles.searchIndex.OrphanedIndexCleaner;
 import org.openmetadata.service.apps.scheduler.AppScheduler;
 import org.openmetadata.service.exception.UnhandledServerException;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.monitoring.LatencyPhase;
 import org.openmetadata.service.resources.Collection;
+import org.openmetadata.service.resources.glossary.GlossaryAuthorizationResolver;
 import org.openmetadata.service.search.IndexManagementClient.IndexStats;
 import org.openmetadata.service.search.SearchClient;
 import org.openmetadata.service.search.SearchHealthStatus;
@@ -96,10 +98,12 @@ import os.org.opensearch.client.opensearch.core.search.Suggest;
 public class SearchResource {
   private final SearchRepository searchRepository;
   private final Authorizer authorizer;
+  private final GlossaryVersioningService glossaryVersioningService;
 
   public SearchResource(Authorizer authorizer) {
     this.searchRepository = Entity.getSearchRepository();
     this.authorizer = authorizer;
+    this.glossaryVersioningService = new GlossaryVersioningService();
   }
 
   @GET
@@ -231,6 +235,7 @@ public class SearchResource {
     // Add Domain Filter
     List<EntityReference> domains = new ArrayList<>();
     SubjectContext subjectContext = getSubjectContext(securityContext);
+    index = routeGlossaryIndex(subjectContext, index);
     if (!subjectContext.isAdmin()) {
       domains = subjectContext.getUserDomains();
     }
@@ -363,6 +368,7 @@ public class SearchResource {
       String sortFieldParam,
       String sortOrder) {
     String resolvedQuery = nullOrEmpty(query) ? "*" : query;
+    index = routeGlossaryIndex(subjectContext, index);
 
     List<EntityReference> domains = new ArrayList<>();
     if (!subjectContext.isAdmin()) {
@@ -380,6 +386,21 @@ public class SearchResource {
         .withDomains(domains)
         .withApplyDomainFilter(
             !subjectContext.isAdmin() && subjectContext.hasAnyRole(DOMAIN_ONLY_ACCESS_ROLE));
+  }
+
+  /** Consumers must never search mutable glossary projections. */
+  private String routeGlossaryIndex(SubjectContext subjectContext, String index) {
+    if (!GlossaryAuthorizationResolver.isConsumerOnly(subjectContext) || index == null) {
+      return index;
+    }
+    glossaryVersioningService.processPendingOutbox();
+    return switch (index) {
+      case "glossary", "glossary_search_index", "glossaryPublished" -> "glossaryPublished";
+      case "glossaryTerm",
+          "glossary_term_search_index",
+          "glossaryTermPublished" -> "glossaryTermPublished";
+      default -> index;
+    };
   }
 
   @POST
@@ -412,7 +433,10 @@ public class SearchResource {
         new SearchRequest()
             .withQuery(previewRequest.getQuery())
             .withSize(previewRequest.getSize())
-            .withIndex(Entity.getSearchRepository().getIndexOrAliasName(previewRequest.getIndex()))
+            .withIndex(
+                Entity.getSearchRepository()
+                    .getIndexOrAliasName(
+                        routeGlossaryIndex(subjectContext, previewRequest.getIndex())))
             .withFrom(previewRequest.getFrom())
             .withQueryFilter(previewRequest.getQueryFilter())
             .withPostFilter(previewRequest.getPostFilter())
@@ -510,6 +534,7 @@ public class SearchResource {
     // Add Domain Filter
     List<EntityReference> domains = new ArrayList<>();
     SubjectContext subjectContext = getSubjectContext(securityContext);
+    index = routeGlossaryIndex(subjectContext, index);
     if (!subjectContext.isAdmin()) {
       domains = subjectContext.getUserDomains();
     }
@@ -561,7 +586,9 @@ public class SearchResource {
       @Parameter(description = "Index Name", schema = @Schema(type = "string")) @PathParam("index")
           String indexName)
       throws IOException {
-    return searchRepository.getDocument(indexName, id);
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    return searchRepository.getDocument(
+        searchRepository.getIndexOrAliasName(routeGlossaryIndex(subjectContext, indexName)), id);
   }
 
   @GET
@@ -601,7 +628,14 @@ public class SearchResource {
           int size)
       throws IOException {
 
-    return searchRepository.searchByField(fieldName, fieldValue, index, deleted, from, size);
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    return searchRepository.searchByField(
+        fieldName,
+        fieldValue,
+        searchRepository.getIndexOrAliasName(routeGlossaryIndex(subjectContext, index)),
+        deleted,
+        from,
+        size);
   }
 
   @GET
@@ -681,6 +715,8 @@ public class SearchResource {
           String queryText)
       throws IOException {
 
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    index = searchRepository.getIndexOrAliasName(routeGlossaryIndex(subjectContext, index));
     AggregationRequest aggregationRequest =
         new AggregationRequest()
             .withQuery(query)
@@ -715,6 +751,10 @@ public class SearchResource {
       @Context SecurityContext securityContext,
       @Valid AggregationRequest aggregationRequest)
       throws IOException {
+    SubjectContext subjectContext = getSubjectContext(securityContext);
+    aggregationRequest.withIndex(
+        searchRepository.getIndexOrAliasName(
+            routeGlossaryIndex(subjectContext, aggregationRequest.getIndex())));
     return searchRepository.aggregate(aggregationRequest);
   }
 
@@ -761,6 +801,7 @@ public class SearchResource {
 
     List<EntityReference> domains = new ArrayList<>();
     SubjectContext subjectContext = getSubjectContext(securityContext);
+    index = searchRepository.getIndexOrAliasName(routeGlossaryIndex(subjectContext, index));
     if (!subjectContext.isAdmin()) {
       domains = subjectContext.getUserDomains();
     }

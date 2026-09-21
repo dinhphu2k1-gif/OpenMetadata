@@ -234,7 +234,7 @@ describe('CDEImportExport.utils', () => {
   });
 
   describe('transformRowToGlossaryTermPayload', () => {
-    it('should correctly format tags, extension, and always set entityStatus to Draft', () => {
+    it('should correctly format tags, extension, and the canonical business version', () => {
       const row = {
         rowNumber: 2,
         name: 'CDE001',
@@ -262,8 +262,8 @@ describe('CDEImportExport.utils', () => {
       expect(payload.displayName).toBe('Mã số khách hàng');
       expect(payload.glossary).toBe('Data Dictionary');
       expect((payload as any).entityStatus).toBeUndefined(); // Không gửi entityStatus trong CreateGlossaryTerm payload
+      expect(payload.businessVersion).toBe('1.0');
       expect(payload.extension).toEqual({
-        version: '1.0',
         entityRelationship: 'Quan hệ thực thể',
         relatedRegulatoryDocuments: 'Văn bản 123',
         dataQualityRules: ['Y'],
@@ -323,8 +323,8 @@ describe('CDEImportExport.utils', () => {
       expect(
         payload.tags?.find((t) => t.tagFQN.startsWith('PersonalData.'))
       ).toBeUndefined();
+      expect(payload.businessVersion).toBe('1.3');
       expect(payload.extension).toEqual({
-        version: '1.3',
         entityRelationship: '<p>test 1 tý</p>',
         relatedRegulatoryDocuments: '<p>okela</p>',
         dataQualityRules: ['Y'],

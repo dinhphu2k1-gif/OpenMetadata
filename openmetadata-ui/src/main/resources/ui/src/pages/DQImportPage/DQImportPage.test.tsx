@@ -50,9 +50,7 @@ jest.mock('react-i18next', () => ({
       let str =
         typeof defaultValOrOptions === 'string' ? defaultValOrOptions : key;
       const opts =
-        typeof defaultValOrOptions === 'object'
-          ? defaultValOrOptions
-          : options;
+        typeof defaultValOrOptions === 'object' ? defaultValOrOptions : options;
       if (opts && typeof str === 'string') {
         Object.keys(opts).forEach((k) => {
           str = str.replace(new RegExp(`{{${k}}}`, 'g'), String(opts[k]));
@@ -136,14 +134,10 @@ describe('DQImportPage', () => {
     expect(screen.getByText('Cập nhật')).toBeInTheDocument();
 
     // Check upload hint
-    expect(
-      screen.getByText(/Kéo thả tệp Excel/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Kéo thả tệp Excel/i)).toBeInTheDocument();
 
     // Check template button
-    expect(
-      screen.getByText('Tải file mẫu Excel (.xlsx)')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tải file mẫu Excel (.xlsx)')).toBeInTheDocument();
   });
 
   it('should transition to Step 2 (Xem Trước Sửa) with DataGrid, add row, and navigation buttons', async () => {
@@ -343,7 +337,7 @@ describe('DQImportPage', () => {
     expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       'term-dq-1',
       'submit',
-      { expectedNativeVersion: 0.1 }
+      { expectedRevision: 0.1 }
     );
   });
 });

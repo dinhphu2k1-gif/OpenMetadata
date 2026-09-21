@@ -1984,6 +1984,56 @@ CREATE INDEX thread_entity_updated_at_index ON public.thread_entity USING btree 
 
 GRANT ALL ON SCHEMA public TO openmetadata_user;
 
+CREATE TABLE IF NOT EXISTS public.glossary_business_working (
+  workingId varchar(36) PRIMARY KEY, entityType varchar(32) NOT NULL,
+  entityId varchar(36) NOT NULL, glossaryId varchar(36), businessVersion varchar(64) NOT NULL,
+  entityStatus varchar(32) NOT NULL, revision bigint NOT NULL, nativeVersion double precision,
+  payload jsonb NOT NULL, createdAt bigint NOT NULL, createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL, submittedAt bigint,
+  submittedBy varchar(256), rejectedAt bigint, rejectedBy varchar(256),
+  CONSTRAINT uq_glossary_working_entity UNIQUE (entityType, entityId),
+  CONSTRAINT uq_glossary_working_version UNIQUE (entityType, entityId, businessVersion)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_working_parent ON public.glossary_business_working (glossaryId, entityType);
+
+CREATE TABLE IF NOT EXISTS public.glossary_business_snapshot (
+  snapshotId varchar(36) PRIMARY KEY, entityType varchar(32) NOT NULL,
+  entityId varchar(36) NOT NULL, glossaryId varchar(36), businessVersion varchar(64) NOT NULL,
+  nativeVersion double precision, publicationSequence bigint NOT NULL, payload jsonb NOT NULL,
+  contentHash varchar(64) NOT NULL, publishedAt bigint NOT NULL, publishedBy varchar(256) NOT NULL,
+  archivedAt bigint, archivedBy varchar(256),
+  CONSTRAINT uq_glossary_snapshot_version UNIQUE (entityType, entityId, businessVersion),
+  CONSTRAINT uq_glossary_snapshot_sequence UNIQUE (entityType, entityId, publicationSequence)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_latest ON public.glossary_business_snapshot (entityType, entityId, publishedAt DESC);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_parent ON public.glossary_business_snapshot (glossaryId, entityType, publishedAt DESC);
+
+CREATE TABLE IF NOT EXISTS public.glossary_published_head (
+  entityType varchar(32) NOT NULL, entityId varchar(36) NOT NULL,
+  snapshotId varchar(36) NOT NULL UNIQUE, publicationSequence bigint NOT NULL,
+  PRIMARY KEY (entityType, entityId)
+);
+
+CREATE TABLE IF NOT EXISTS public.glossary_snapshot_term (
+  glossarySnapshotId varchar(36) NOT NULL, termSnapshotId varchar(36) NOT NULL,
+  parentTermSnapshotId varchar(36), displayOrder integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (glossarySnapshotId, termSnapshotId)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_term_order ON public.glossary_snapshot_term (glossarySnapshotId, displayOrder);
+
+CREATE TABLE IF NOT EXISTS public.glossary_snapshot_outbox (
+  eventId varchar(36) PRIMARY KEY, snapshotId varchar(36) NOT NULL,
+  eventType varchar(64) NOT NULL, payload jsonb NOT NULL, createdAt bigint NOT NULL,
+  processedAt bigint, attempts integer NOT NULL DEFAULT 0, lastError text,
+  CONSTRAINT uq_glossary_outbox_snapshot_event UNIQUE (snapshotId, eventType)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending ON public.glossary_snapshot_outbox (processedAt, createdAt);
+ALTER TABLE public.glossary_business_working OWNER TO openmetadata_user;
+ALTER TABLE public.glossary_business_snapshot OWNER TO openmetadata_user;
+ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
+ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
+ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
+
 
 --
 -- PostgreSQL database dump complete

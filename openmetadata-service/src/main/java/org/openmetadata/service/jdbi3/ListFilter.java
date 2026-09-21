@@ -72,8 +72,8 @@ public class ListFilter extends Filter<ListFilter> {
     conditions.add(getAgentTypeCondition());
     conditions.add(getProviderCondition(tableName));
     conditions.add(getEntityStatusCondition(tableName));
+    conditions.add(getPublishedSnapshotCondition(tableName));
     conditions.add(getExtensionCondition());
-    conditions.add(getPublishedExtensionCondition(tableName));
     conditions.add(getServerIdCondition(tableName));
     conditions.add(getNameFilterCondition());
     String condition = addCondition(conditions);
@@ -85,13 +85,16 @@ public class ListFilter extends Filter<ListFilter> {
     return extension == null ? "" : "extension = :extension";
   }
 
-  private String getPublishedExtensionCondition(String tableName) {
-    String extension = queryParams.get("publishedExtension");
-    String idColumn = tableName == null ? "id" : tableName + ".id";
-    return extension == null
-        ? ""
-        : idColumn
-            + " IN (SELECT id FROM entity_extension WHERE extension = :publishedExtension)";
+  private String getPublishedSnapshotCondition(String tableName) {
+    String entityType = queryParams.get("publishedSnapshotEntityType");
+    if (entityType == null || entityType.isBlank()) {
+      return "";
+    }
+    String idColumn = tableName == null || tableName.isBlank() ? "id" : tableName + ".id";
+    return "EXISTS (SELECT 1 FROM glossary_published_head published_head "
+        + "WHERE published_head.entityId = "
+        + idColumn
+        + " AND published_head.entityType = :publishedSnapshotEntityType)";
   }
 
   public ResourceContext getResourceContext(String entityType) {

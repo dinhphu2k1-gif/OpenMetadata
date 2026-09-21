@@ -12,7 +12,7 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { Operation } from 'fast-json-patch';
+import { applyPatch, Operation } from 'fast-json-patch';
 import { PagingResponse } from 'Models';
 import { CSVExportResponse } from '../components/Entity/EntityExportModalProvider/EntityExportModalProvider.interface';
 import { VotingDataProps } from '../components/Entity/Voting/voting.interface';
@@ -60,18 +60,19 @@ export type GlossaryWorkflowAction =
   | 'revoke';
 
 export interface GlossaryWorkflowRequest {
-  expectedNativeVersion: number;
+  expectedRevision?: number;
   businessVersion?: string;
+  payload?: Glossary | GlossaryTerm;
 }
 
-export interface GlossaryWorkflowTransition {
-  action: GlossaryWorkflowAction;
-  fromStatus: string;
-  toStatus: string;
-  actor: string;
-  timestamp: number;
-  nativeVersion: number;
-  businessVersion?: string;
+export interface GlossaryVersionPermissions {
+  canViewWorking: boolean;
+  canViewPublished: boolean;
+  canEditWorking: boolean;
+  canSubmit: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+  canArchive: boolean;
 }
 
 export const getGlossariesList = async (params?: ListParams) => {
@@ -89,15 +90,6 @@ export const addGlossaries = async (data: CreateGlossary) => {
     CreateGlossary,
     AxiosResponse<Glossary>
   >(url, data);
-
-  return response.data;
-};
-
-export const patchGlossaries = async (id: string, patch: Operation[]) => {
-  const response = await APIClient.patch<Operation[], AxiosResponse<Glossary>>(
-    `/glossaries/${id}`,
-    patch
-  );
 
   return response.data;
 };
@@ -129,23 +121,85 @@ export const getLatestPublishedGlossary = async (id: string) => {
   return response.data;
 };
 
+export const getGlossaryWorkingVersion = async (id: string) => {
+  const response = await APIClient.get<Glossary>(`/glossaries/${id}/working`);
+
+  return response.data;
+};
+
+export const updateGlossaryWorkingVersion = async (
+  id: string,
+  expectedRevision: number,
+  payload: Glossary
+) => {
+  const response = await APIClient.patch<
+    GlossaryWorkflowRequest,
+    AxiosResponse<Glossary>
+  >(`/glossaries/${id}/working`, { expectedRevision, payload });
+
+  return response.data;
+};
+
+export const patchGlossaries = async (id: string, patch: Operation[]) => {
+  const working = await getGlossaryWorkingVersion(id);
+  const payload = applyPatch(
+    structuredClone(working),
+    patch,
+    true,
+    false
+  ).newDocument;
+
+  return updateGlossaryWorkingVersion(
+    id,
+    working.workingRevision as number,
+    payload
+  );
+};
+
+export const getPublishedGlossaryTerms = async (
+  id: string,
+  businessVersion: string
+) => {
+  const response = await APIClient.get<GlossaryTerm[]>(
+    `/glossaries/${id}/published/${businessVersion}/terms`
+  );
+
+  return response.data;
+};
+
+export const getWorkingGlossaryTerms = async (id: string) => {
+  const response = await APIClient.get<GlossaryTerm[]>(
+    `/glossaries/${id}/working/terms`
+  );
+
+  return response.data;
+};
+
+export const getGlossaryVersionPermissions = async (id: string) => {
+  const response = await APIClient.get<GlossaryVersionPermissions>(
+    `/glossaries/${id}/permissions`
+  );
+
+  return response.data;
+};
+
 export const transitionGlossaryWorkflow = async (
   id: string,
   action: GlossaryWorkflowAction,
   request: GlossaryWorkflowRequest
 ) => {
+  if (action === 'revoke') {
+    const response = await APIClient.post<undefined, AxiosResponse<Glossary>>(
+      `/glossaries/${id}/published/latest/archive`
+    );
+
+    return response.data;
+  }
+  const path = action === 'createDraft' ? 'working' : `working/${action}`;
   const response = await APIClient.post<
     GlossaryWorkflowRequest,
     AxiosResponse<Glossary>
-  >(`/glossaries/${id}/workflow/${action}`, request);
-
-  return response.data;
-};
-
-export const getGlossaryWorkflowHistory = async (id: string) => {
-  const response = await APIClient.get<GlossaryWorkflowTransition[]>(
-    `/glossaries/${id}/workflow/history`
-  );
+  >(`/glossaries/${id}/${path}`, request);
 
   return response.data;
 };
@@ -208,23 +262,53 @@ export const getLatestPublishedGlossaryTerm = async (id: string) => {
   return response.data;
 };
 
+export const getGlossaryTermWorkingVersion = async (id: string) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/working`
+  );
+
+  return response.data;
+};
+
+export const updateGlossaryTermWorkingVersion = async (
+  id: string,
+  expectedRevision: number,
+  payload: GlossaryTerm
+) => {
+  const response = await APIClient.patch<
+    GlossaryWorkflowRequest,
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/working`, { expectedRevision, payload });
+
+  return response.data;
+};
+
+export const getGlossaryTermVersionPermissions = async (id: string) => {
+  const response = await APIClient.get<GlossaryVersionPermissions>(
+    `/glossaryTerms/${id}/permissions`
+  );
+
+  return response.data;
+};
+
 export const transitionGlossaryTermWorkflow = async (
   id: string,
   action: GlossaryWorkflowAction,
   request: GlossaryWorkflowRequest
 ) => {
+  if (action === 'revoke') {
+    const response = await APIClient.post<
+      undefined,
+      AxiosResponse<GlossaryTerm>
+    >(`/glossaryTerms/${id}/published/latest/archive`);
+
+    return response.data;
+  }
+  const path = action === 'createDraft' ? 'working' : `working/${action}`;
   const response = await APIClient.post<
     GlossaryWorkflowRequest,
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/workflow/${action}`, request);
-
-  return response.data;
-};
-
-export const getGlossaryTermWorkflowHistory = async (id: string) => {
-  const response = await APIClient.get<GlossaryWorkflowTransition[]>(
-    `/glossaryTerms/${id}/workflow/history`
-  );
+  >(`/glossaryTerms/${id}/${path}`, request);
 
   return response.data;
 };
@@ -272,12 +356,19 @@ export const addGlossaryTerm = async (
 };
 
 export const patchGlossaryTerm = async (id: string, patch: Operation[]) => {
-  const response = await APIClient.patch<
-    Operation[],
-    AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}`, patch);
+  const working = await getGlossaryTermWorkingVersion(id);
+  const payload = applyPatch(
+    structuredClone(working),
+    patch,
+    true,
+    false
+  ).newDocument;
 
-  return response.data;
+  return updateGlossaryTermWorkingVersion(
+    id,
+    working.workingRevision as number,
+    payload
+  );
 };
 
 export const moveGlossaryTerm = async (id: string, parent: EntityReference) => {
@@ -308,30 +399,42 @@ export const exportGlossaryTermsInCSVFormat = async (glossaryName: string) => {
 };
 
 export const getGlossaryVersionsList = async (id: string) => {
-  const url = `/glossaries/${id}/versions`;
+  const response = await APIClient.get<Glossary[]>(
+    `/glossaries/${id}/published`
+  );
+  const versions = response.data.map((snapshot, index) =>
+    JSON.stringify({
+      ...snapshot,
+      version: snapshot.publicationSequence ?? index + 1,
+    })
+  );
 
-  const response = await APIClient.get<EntityHistory>(url);
-
-  return response.data;
+  return { entityType: 'glossary', versions } as EntityHistory;
 };
 
 export const getGlossaryVersion = async (id: string, version: string) => {
-  const url = `/glossaries/${id}/versions/${version}`;
+  const url = `/glossaries/${id}/published/${version}`;
   const response = await APIClient.get<Glossary>(url);
 
   return response.data;
 };
 
 export const getGlossaryTermsVersionsList = async (id: string) => {
-  const url = `/glossaryTerms/${id}/versions`;
+  const response = await APIClient.get<GlossaryTerm[]>(
+    `/glossaryTerms/${id}/published`
+  );
+  const versions = response.data.map((snapshot, index) =>
+    JSON.stringify({
+      ...snapshot,
+      version: snapshot.publicationSequence ?? index + 1,
+    })
+  );
 
-  const response = await APIClient.get<EntityHistory>(url);
-
-  return response.data;
+  return { entityType: 'glossaryTerm', versions } as EntityHistory;
 };
 
 export const getGlossaryTermsVersion = async (id: string, version: string) => {
-  const url = `/glossaryTerms/${id}/versions/${version}`;
+  const url = `/glossaryTerms/${id}/published/${version}`;
 
   const response = await APIClient.get<GlossaryTerm>(url);
 

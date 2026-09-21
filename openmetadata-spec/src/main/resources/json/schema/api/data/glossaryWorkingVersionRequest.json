@@ -1,0 +1,23 @@
+{
+  "$id": "https://open-metadata.org/schema/api/data/glossaryWorkingVersionRequest.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GlossaryWorkingVersionRequest",
+  "description": "Request used to create or mutate a glossary or glossary term working business version.",
+  "javaType": "org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest",
+  "type": "object",
+  "properties": {
+    "businessVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expectedRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "payload": {
+      "description": "Full working entity payload. The resource validates it against the target entity schema.",
+      "$ref": "../../type/basic.json#/definitions/entityExtension"
+    }
+  },
+  "additionalProperties": false
+}

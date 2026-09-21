@@ -5,40 +5,25 @@
 
 package org.openmetadata.service.util;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.openmetadata.schema.utils.JsonUtils;
+import java.util.regex.Pattern;
 
-/** Canonical reader, writer, and comparator for glossary business versions. */
+/** Canonical validator and comparator for glossary business versions. */
 public final class GlossaryBusinessVersion {
-  public static final String DEFAULT_VERSION = "1.0";
+  private static final Pattern CANONICAL_VERSION =
+      Pattern.compile("^(0|[1-9]\\d*)(\\.(0|[1-9]\\d*))*$");
 
   private GlossaryBusinessVersion() {}
 
-  public static String get(Object extension) {
-    JsonNode node = JsonUtils.valueToTree(extension);
-    for (String field : List.of("version", "cdeVersion", "phien_ban")) {
-      JsonNode value = node.path(field);
-      if (!value.isMissingNode() && !value.isNull() && !value.asText().isBlank()) {
-        return value.asText().trim();
-      }
+  /** Validate and return the canonical business version used by the snapshot store. */
+  public static String requireCanonical(String version) {
+    if (version == null || !CANONICAL_VERSION.matcher(version.trim()).matches()) {
+      throw new IllegalArgumentException(
+          "businessVersion must contain dot-separated non-negative integers");
     }
-    return DEFAULT_VERSION;
-  }
-
-  public static Map<String, Object> normalize(Object extension, String version) {
-    Map<String, Object> normalized = new HashMap<>();
-    if (extension instanceof Map<?, ?> values) {
-      values.forEach((key, value) -> normalized.put(String.valueOf(key), value));
-    }
-    normalized.remove("cdeVersion");
-    normalized.remove("phien_ban");
-    normalized.put("version", version == null || version.isBlank() ? get(extension) : version.trim());
-    return normalized;
+    return version.trim();
   }
 
   public static int compare(String left, String right) {
@@ -56,31 +41,9 @@ public final class GlossaryBusinessVersion {
     return 0;
   }
 
-  public static boolean appliesTo(String... identifiers) {
-    List<String> aliases =
-        List.of(
-            "Data Dictionary",
-            "Từ điển dữ liệu dùng chung",
-            "Data Quality",
-            "Chất lượng dữ liệu",
-            "Kiểm tra chất lượng dữ liệu",
-            "Quy tắc chất lượng dữ liệu",
-            "DataQuality");
-    for (String identifier : identifiers) {
-      if (identifier == null) {
-        continue;
-      }
-      for (String alias : aliases) {
-        if (identifier.equals(alias) || identifier.startsWith(alias + ".")) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
   private static List<BigInteger> parts(String version) {
-    String normalized = version == null ? "" : version.trim().replaceFirst("(?i)^(version|v)\\s*", "");
+    String normalized =
+        version == null ? "" : version.trim().replaceFirst("(?i)^(version|v)\\s*", "");
     List<BigInteger> values = new ArrayList<>();
     for (String part : normalized.split("[.-]")) {
       try {

@@ -35,7 +35,6 @@ import static org.openmetadata.service.util.EntityUtil.compareTagLabel;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -79,7 +78,6 @@ import org.openmetadata.schema.type.csv.CsvHeader;
 import org.openmetadata.schema.type.csv.CsvImportResult;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.audit.AuditLogEntry;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
@@ -89,16 +87,12 @@ import org.openmetadata.service.resources.settings.SettingsCache;
 import org.openmetadata.service.security.policyevaluator.PolicyConditionUpdater;
 import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.EntityFieldUtils;
-import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.EntityUtil.RelationIncludes;
 import org.openmetadata.service.util.FullyQualifiedName;
-import org.openmetadata.service.util.GlossaryBusinessVersion;
 
 @Slf4j
 public class GlossaryRepository extends EntityRepository<Glossary> {
-  public static final String LATEST_PUBLISHED_EXTENSION = "glossary.published.latest";
-  public static final String WORKFLOW_HISTORY_EXTENSION = "glossary.workflowTransition";
   private static final String UPDATE_FIELDS = "";
   private static final String PATCH_FIELDS = "";
 
@@ -187,125 +181,6 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
   @Override
   public void storeEntity(Glossary glossary, boolean update) {
     store(glossary, update);
-    if (glossary.getEntityStatus() == EntityStatus.APPROVED) {
-      daoCollection
-          .entityExtensionDAO()
-          .insert(
-              glossary.getId(),
-              LATEST_PUBLISHED_EXTENSION,
-              GLOSSARY,
-              JsonUtils.pojoToJson(glossary));
-    }
-  }
-
-  public Glossary getLatestApprovedSnapshot(UUID id) {
-    Glossary current = dao.findEntityById(id, Include.NON_DELETED);
-    if (current.getEntityStatus() == EntityStatus.APPROVED) {
-      return current;
-    }
-    String published =
-        daoCollection.entityExtensionDAO().getExtension(id, LATEST_PUBLISHED_EXTENSION);
-    if (published != null) {
-      return JsonUtils.readValue(published, Glossary.class);
-    }
-
-    String extensionPrefix = EntityUtil.getVersionExtensionPrefix(GLOSSARY);
-    List<CollectionDAO.ExtensionRecord> records =
-        daoCollection.entityExtensionDAO().getExtensions(id, extensionPrefix);
-    List<CollectionDAO.EntityVersionPair> versions = new ArrayList<>();
-    records.forEach(record -> versions.add(new CollectionDAO.EntityVersionPair(record)));
-    versions.sort(EntityUtil.compareVersion.reversed());
-    for (CollectionDAO.EntityVersionPair version : versions) {
-      Glossary snapshot = JsonUtils.readValue(version.getEntityJson(), Glossary.class);
-      if (snapshot.getEntityStatus() == null
-          || snapshot.getEntityStatus() == EntityStatus.UNPROCESSED
-          || snapshot.getEntityStatus() == EntityStatus.APPROVED) {
-        return snapshot.withEntityStatus(EntityStatus.APPROVED);
-      }
-    }
-    return getApprovedAuditSnapshot(current);
-  }
-
-  private Glossary getApprovedAuditSnapshot(Glossary current) {
-    return getApprovedAuditSnapshots(current).stream().findFirst().orElse(null);
-  }
-
-  public List<Glossary> getApprovedAuditSnapshots(UUID id) {
-    return getApprovedAuditSnapshots(dao.findEntityById(id, Include.NON_DELETED));
-  }
-
-  private List<Glossary> getApprovedAuditSnapshots(Glossary current) {
-    List<Glossary> snapshots = new ArrayList<>();
-    try {
-      if (Entity.getAuditLogRepository() == null) {
-        return snapshots;
-      }
-      for (AuditLogEntry entry :
-          Entity.getAuditLogRepository()
-              .list(
-                  null,
-                  null,
-                  null,
-                  GLOSSARY,
-                  current.getFullyQualifiedName(),
-                  null,
-                  null,
-                  null,
-                  null,
-                  200,
-                  null,
-                  null)
-              .getData()) {
-        if (entry.getChangeEvent() == null || entry.getChangeEvent().getEntity() == null) {
-          continue;
-        }
-        Object raw = entry.getChangeEvent().getEntity();
-        Glossary snapshot =
-            raw instanceof String value
-                ? JsonUtils.readValue(value, Glossary.class)
-                : JsonUtils.readValue(JsonUtils.pojoToJson(raw), Glossary.class);
-        if (snapshot.getEntityStatus() == EntityStatus.APPROVED) {
-          snapshots.add(snapshot);
-        }
-      }
-    } catch (RuntimeException exception) {
-      LOG.warn("Unable to resolve legacy approved glossary snapshot for {}", current.getId());
-    }
-    return snapshots;
-  }
-
-  public Map<UUID, Glossary> getLatestApprovedSnapshots(List<Glossary> glossaries) {
-    if (glossaries.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    return daoCollection
-        .entityExtensionDAO()
-        .getExtensionBatch(
-            glossaries.stream().map(glossary -> glossary.getId().toString()).toList(),
-            LATEST_PUBLISHED_EXTENSION)
-        .stream()
-        .collect(
-            Collectors.toMap(
-                CollectionDAO.ExtensionRecordWithId::id,
-                record -> JsonUtils.readValue(record.extensionJson(), Glossary.class)));
-  }
-
-  public void storeWorkflowTransition(String fqn, Map<String, Object> transition) {
-    storeTimeSeries(
-        fqn,
-        WORKFLOW_HISTORY_EXTENSION,
-        "glossaryWorkflowTransition",
-        JsonUtils.pojoToJson(transition));
-  }
-
-  public List<Object> getWorkflowHistory(String fqn) {
-    ListFilter filter =
-        new ListFilter(Include.ALL)
-            .addQueryParam("entityFQNHash", FullyQualifiedName.buildHash(fqn))
-            .addQueryParam("extension", WORKFLOW_HISTORY_EXTENSION);
-    return daoCollection.entityExtensionTimeSeriesDao().listWithOffset(filter, 1000, 0).stream()
-        .map(json -> JsonUtils.readValue(json, Object.class))
-        .toList();
   }
 
   @Override
@@ -374,15 +249,18 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
                 "owners,reviewers,tags,relatedTerms,synonyms,extension,parent,domains"),
             glossary.getFullyQualifiedName());
     if (isConsumerUser(user)) {
-      Glossary publishedGlossary = getLatestApprovedSnapshot(glossary.getId());
-      if (publishedGlossary != null) {
-        glossary = publishedGlossary;
+      GlossaryVersionDAO.PublishedSnapshotRecord publishedGlossary =
+          daoCollection.glossaryVersionDAO().findLatestPublished(GLOSSARY, glossary.getId());
+      if (publishedGlossary == null) {
+        throw new jakarta.ws.rs.NotFoundException("No published glossary snapshot exists");
       }
-      Map<UUID, GlossaryTerm> snapshots = repository.getLatestApprovedSnapshots(terms);
+      glossary = JsonUtils.readValue(publishedGlossary.payload(), Glossary.class);
       terms =
-          terms.stream()
-              .map(term -> snapshots.get(term.getId()))
-              .filter(Objects::nonNull)
+          daoCollection
+              .glossaryVersionDAO()
+              .listSnapshotTerms(publishedGlossary.snapshotId())
+              .stream()
+              .map(snapshot -> JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class))
               .toList();
     }
     terms.sort(Comparator.comparing(EntityInterface::getFullyQualifiedName));
@@ -396,10 +274,8 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
             || subject.isBot()
             || subject.hasAnyRole("DataSteward")
             || subject.hasAnyRole("DataProposer")
-            || subject.hasAnyRole("Admin")
-            || subject.hasAnyRole("Organization");
-    return !elevated
-        && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
+            || subject.hasAnyRole("Admin");
+    return !elevated && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
   }
 
   /** Load CSV provided for bulk upload */
@@ -691,6 +567,16 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
       addField(recordList, entity.getStyle() != null ? entity.getStyle().getIconURL() : null);
       addDomains(recordList, getDirectDomains(entity.getDomains()));
       addExtension(recordList, entity.getExtension());
+      addField(recordList, entity.getBusinessVersion());
+      addField(
+          recordList, entity.getEntityStatus() == null ? null : entity.getEntityStatus().value());
+      addField(
+          recordList,
+          entity.getSnapshotId() != null
+              ? "Published"
+              : entity.getWorkingRevision() != null ? "Working" : "Current");
+      addField(
+          recordList, entity.getSnapshotId() == null ? null : entity.getSnapshotId().toString());
       addRecord(csvFile, recordList);
     }
 
@@ -816,7 +702,7 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
     }
 
     private String getBusinessVersion(Glossary glossary) {
-      return GlossaryBusinessVersion.get(glossary.getExtension());
+      return glossary.getBusinessVersion();
     }
 
     @Transaction

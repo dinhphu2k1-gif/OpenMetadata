@@ -52,18 +52,18 @@ import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
+  getGlossaryWorkingVersion,
   getGlossaryTermByFQN,
-  patchGlossaries,
-  patchGlossaryTerm,
+  getGlossaryTermWorkingVersion,
+  updateGlossaryTermWorkingVersion,
+  updateGlossaryWorkingVersion,
   updateGlossaryTermVotes,
   updateGlossaryVotes,
 } from '../../../rest/glossaryAPI';
-import { normalizeBusinessVersionExtension } from '../../../utils/BusinessVersionUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
@@ -103,39 +103,6 @@ const GlossaryPage = () => {
     setActiveGlossary,
     updateActiveGlossary,
   } = useGlossaryStore();
-
-  const { currentUser, selectedPersona } = useApplicationStore();
-  const isConsumer = useMemo(() => {
-    if (currentUser?.isAdmin) {
-      return false;
-    }
-    const userRoles =
-      currentUser?.roles?.map((r) => r.name?.toLowerCase() ?? '') ?? [];
-    const personaName = (
-      selectedPersona?.name ||
-      selectedPersona?.fullyQualifiedName?.split('.').at(-1) ||
-      ''
-    ).toLowerCase();
-
-    const isElevated =
-      userRoles.some(
-        (r) =>
-          r.includes('steward') ||
-          r.includes('proposer') ||
-          r.includes('admin')
-      ) ||
-      personaName.includes('steward') ||
-      personaName.includes('proposer') ||
-      personaName.includes('admin');
-    const hasConsumerRole = userRoles.some(
-      (role) => role === 'basicconsumer' || role === 'dataconsumer'
-    );
-    const hasConsumerPersona =
-      personaName.includes('basicconsumer') ||
-      personaName.includes('dataconsumer');
-
-    return !isElevated && (hasConsumerRole || hasConsumerPersona);
-  }, [currentUser, selectedPersona]);
 
   const isImportAction = useMemo(
     () => action === EntityAction.IMPORT,
@@ -227,7 +194,7 @@ const GlossaryPage = () => {
       setIsLoading(false);
       setInitialised(true);
     }
-  }, [paging.after, glossaryFqn, isConsumer]);
+  }, [paging.after, glossaryFqn]);
 
   const fetchNextGlossaryItems = async (after?: string) => {
     try {
@@ -307,7 +274,7 @@ const GlossaryPage = () => {
         const foundGlossary = glossaries.find(
           (glossary) => glossary.fullyQualifiedName === glossaryFqn
         );
-        if (!foundGlossary && isConsumer && glossaryFqn) {
+        if (!foundGlossary && glossaryFqn) {
           setIsRightPanelLoading(false);
           navigate(ROUTES.FORBIDDEN, { replace: true });
 
@@ -327,14 +294,25 @@ const GlossaryPage = () => {
     } else {
       setIsRightPanelLoading(false);
     }
-  }, [isGlossaryActive, glossaryFqn, glossaries, isConsumer]);
+  }, [isGlossaryActive, glossaryFqn, glossaries]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
       const jsonPatch = compare(activeGlossary as Glossary, updatedData);
+      if (isEmpty(jsonPatch)) {
+        return;
+      }
 
       try {
-        const response = await patchGlossaries(activeGlossary?.id, jsonPatch);
+        const working =
+          activeGlossary?.workingRevision != null
+            ? (activeGlossary as Glossary)
+            : await getGlossaryWorkingVersion(activeGlossary?.id);
+        const response = await updateGlossaryWorkingVersion(
+          activeGlossary?.id,
+          working.workingRevision as number,
+          updatedData
+        );
 
         const updatedGlossaryObj = {
           ...activeGlossary,
@@ -441,13 +419,7 @@ const GlossaryPage = () => {
 
   const handleGlossaryTermUpdate = useCallback(
     async (updatedData: GlossaryTerm) => {
-      const normalizedExtension = normalizeBusinessVersionExtension(
-        updatedData.extension
-      );
-      const normalizedUpdatedData: GlossaryTerm = {
-        ...updatedData,
-        extension: normalizedExtension,
-      };
+      const normalizedUpdatedData = updatedData;
 
       // Version/audit snapshots do not contain the same server-computed fields as the
       // canonical entity. Exclude those fields so restoring a business version never emits
@@ -479,7 +451,15 @@ const GlossaryPage = () => {
       );
 
       try {
-        const response = await patchGlossaryTerm(activeGlossary?.id, jsonPatch);
+        const working =
+          activeGlossary?.workingRevision != null
+            ? (activeGlossary as GlossaryTerm)
+            : await getGlossaryTermWorkingVersion(activeGlossary?.id);
+        const response = await updateGlossaryTermWorkingVersion(
+          activeGlossary?.id,
+          working.workingRevision as number,
+          normalizedUpdatedData
+        );
         if (response) {
           setActiveGlossary(response as ModifiedGlossary);
           if (activeGlossary?.name !== normalizedUpdatedData.name) {

@@ -37,14 +37,25 @@ describe('CDE version and date columns', () => {
     ]);
   });
 
-  it('matches the detail header business version fallback', () => {
+  it('uses only the canonical business version field', () => {
+    const versionColumn = columns.find((column) => column.key === 'version');
+
     expect(
-      renderCell('version', { version: '2.0', phien_ban: '1.0' })
+      versionColumn?.render?.(
+        undefined,
+        { businessVersion: '2.0' } as ModifiedGlossaryTerm,
+        0
+      )
     ).toBe('2.0');
-    expect(renderCell('version', { phien_ban: '1.1' })).toBe('1.1');
-    expect(renderCell('version', { version: '1.2' })).toBe('1.2');
     expect(
-      columns.find((column) => column.key === 'version')?.render?.(
+      versionColumn?.render?.(
+        undefined,
+        { businessVersion: '1.2' } as ModifiedGlossaryTerm,
+        0
+      )
+    ).toBe('1.2');
+    expect(
+      versionColumn?.render?.(
         undefined,
         { version: 0.3, extension: {} } as ModifiedGlossaryTerm,
         0

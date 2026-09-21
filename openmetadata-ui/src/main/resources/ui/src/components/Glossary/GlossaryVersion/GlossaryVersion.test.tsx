@@ -114,7 +114,7 @@ describe('GlossaryVersion', () => {
           id: termId,
           name: 'CDE_01',
           version: '1.5',
-          extension: { version: '1.2' },
+          businessVersion: '1.2',
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'In Review',
         }),
@@ -123,7 +123,7 @@ describe('GlossaryVersion', () => {
           id: termId,
           name: 'CDE_01',
           version: '1.3',
-          extension: { version: '1.1' },
+          businessVersion: '1.1',
           glossary: { name: 'Data Dictionary' },
           entityStatus: 'Approved',
         }),
@@ -135,14 +135,15 @@ describe('GlossaryVersion', () => {
       id: termId,
       name: 'CDE_01',
       version: '1.3',
-      extension: { version: '1.1' },
+      businessVersion: '1.1',
       glossary: { name: 'Data Dictionary' },
       entityStatus: 'Approved',
     });
 
     // User navigates to unapproved version 1.2
     render(
-      <MemoryRouter initialEntries={[`/glossary-term/${termId}/versions/1.2/overview`]}>
+      <MemoryRouter
+        initialEntries={[`/glossary-term/${termId}/versions/1.2/overview`]}>
         <Routes>
           <Route
             element={<GlossaryVersion />}
