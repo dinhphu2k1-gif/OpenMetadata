@@ -125,13 +125,25 @@ const GlossaryTermsV1 = ({
     return tabs?.length ? tabs : undefined;
   }, [customizedPage?.tabs]);
   const [viewedVersion, setViewedVersion] = useState<GlossaryTerm | null>(null);
+  const [transitionedWorking, setTransitionedWorking] =
+    useState<GlossaryTerm | null>(null);
   const glossaryTerm = useMemo(
     () =>
       viewedVersion
         ? { ...viewedVersion, changeDescription: undefined }
-        : currentGlossaryTerm,
-    [viewedVersion, currentGlossaryTerm]
+        : transitionedWorking ?? currentGlossaryTerm,
+    [viewedVersion, transitionedWorking, currentGlossaryTerm]
   );
+  useEffect(() => {
+    if (
+      transitionedWorking &&
+      (transitionedWorking.id !== currentGlossaryTerm.id ||
+        Number(currentGlossaryTerm.workingRevision) >=
+          Number(transitionedWorking.workingRevision))
+    ) {
+      setTransitionedWorking(null);
+    }
+  }, [currentGlossaryTerm, transitionedWorking]);
   const isViewingVersion = Boolean(viewedVersion) || Boolean(isVersionView);
 
   const handleVersionSelect = useCallback(
@@ -521,6 +533,23 @@ const GlossaryTermsV1 = ({
     };
   }, [glossaryTerm, isViewingVersion]);
 
+  const effectivePermissions = useMemo(() => {
+    if (
+      glossaryTerm.entityStatus !== EntityStatus.InReview &&
+      glossaryTerm.entityStatus !== EntityStatus.Rejected
+    ) {
+      return permissions;
+    }
+
+    return {
+      ...permissions,
+      EditAll: false,
+      EditCustomFields: false,
+      EditOwners: false,
+      EditTags: false,
+    };
+  }, [glossaryTerm.entityStatus, permissions]);
+
   const isExpandViewSupported = useMemo(
     () =>
       checkIfExpandViewSupported(tabItems[0], activeTab, PageType.GlossaryTerm),
@@ -537,7 +566,7 @@ const GlossaryTermsV1 = ({
       data={updatedGlossaryTerm}
       isTabExpanded={isTabExpanded}
       isVersionView={isViewingVersion}
-      permissions={permissions}
+      permissions={effectivePermissions}
       type={EntityType.GLOSSARY_TERM}
       onUpdate={onTermUpdate}>
       <Row data-testid="glossary-term" gutter={[0, 12]}>
@@ -551,8 +580,9 @@ const GlossaryTermsV1 = ({
             onVersionSelect={(snapshot) =>
               handleVersionSelect(snapshot as GlossaryTerm)
             }
-            onWorkflowTransition={async () => {
+            onWorkflowTransition={async (updated) => {
               setViewedVersion(null);
+              setTransitionedWorking(updated as GlossaryTerm);
               await refreshActiveGlossaryTerm?.();
             }}
           />

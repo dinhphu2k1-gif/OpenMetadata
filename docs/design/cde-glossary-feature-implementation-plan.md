@@ -38,7 +38,7 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F02 | Lịch sử Approved và deep link | F01 | Read-only pilot |
 | F07 | Lưu Draft Data Dictionary khởi tạo sẵn | F00 | Dictionary maker |
 | F03 | Tạo và lưu Draft CDE | F00, F07 | CDE maker |
-| F04 | Submit, Reject và Reopen CDE | F03 | CDE checker |
+| F04 | Submit, Reject và Reopen CDE | F01, F03 | CDE checker |
 | F05 | Approve và publish CDE | F01, F04 | Vòng đời CDE |
 | F06 | Tạo business version CDE kế tiếp | F05 | Nhiều version CDE |
 | F08 | Thêm/bớt CDE revision trong working Data Dictionary | F05, F07 | Soạn gói phát hành |
@@ -254,21 +254,50 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 ### F04 — Submit, Reject và Reopen CDE
 
-**Phạm vi**
+**Ranh giới chức năng và state machine**
 
-- Draft → InReview qua submit.
-- InReview → Rejected qua reject.
-- Rejected → Draft qua reopen.
-- Transition sai trạng thái bị từ chối.
-- Reviewer phải được gán hoặc có policy; lưu actor và timestamp.
-- InReview khóa form; Rejected hiển thị người từ chối.
+- F04 chỉ triển khai ba transition trên working version của CDE: `Draft → InReview` qua `submit`, `InReview → Rejected` qua `reject` và `Rejected → Draft` qua `reopen`. `approve` và việc tạo published snapshot thuộc F05, không nằm trong F04.
+- Transition chỉ thay đổi trạng thái workflow, revision và transition metadata. Không thay đổi `businessVersion` hoặc business payload; không tạo native metadata version, published snapshot, published head hay publication outbox.
+- Không có transition tắt hoặc idempotent success: gọi action khi working record không ở đúng source state bị từ chối và không thay đổi dữ liệu. Working record không tồn tại trả `404 Not Found`.
+- `InReview` khóa toàn bộ business field. `Rejected` vẫn chỉ đọc cho tới khi `reopen` thành công; sau đó CDE trở lại `Draft` và mới được Save qua contract F03.
+- `reject` không nhận lý do từ chối trong F04, thống nhất với thiết kế UI hiện tại.
+
+**API contract và optimistic locking**
+
+- Dùng ba endpoint `POST /v1/glossaryTerms/{id}/working/submit`, `/reject` và `/reopen`; frontend gọi wrapper hiện có `transitionGlossaryTermWorkflow`, không tạo API client mới.
+- Cả ba endpoint nhận typed request `{ "expectedRevision": <integer> }`. `expectedRevision` bắt buộc là integer từ 1 trở lên; thiếu, sai kiểu, ngoài miền hoặc có field ngoài allowlist trả `400 Bad Request`.
+- Frontend lấy `expectedRevision` từ `workingRevision` của working representation gần nhất. Backend không nhận `workingRevision`, actor, timestamp, source status hoặc target status từ client.
+- Mutation dùng compare-and-set nguyên tử theo cả source state và `expectedRevision`. Revision cũ hoặc state đã bị request khác thay đổi trả `409 Conflict`; request thất bại không thay đổi status, revision, payload hoặc transition metadata.
+- Thành công tăng `workingRevision` đúng một đơn vị và trả working representation mới, gồm status/revision mới cùng transition metadata để UI thay state. Frontend không tự tính revision hoặc status.
+- Sai transition do client gọi action không phù hợp với trạng thái hiện tại trả `409 Conflict`. Payload/schema request không hợp lệ trả `400`; không đủ quyền trả `403 Forbidden`.
+
+**Authorization, validation và audit metadata**
+
+- Backend kiểm tra capability hiệu lực trên working payload hiện tại, bao gồm owners/reviewers đã được Save ở F03; không dựa vào quan hệ native có thể đã cũ và không suy quyền chỉ từ tên role.
+- `submit` yêu cầu `canSubmit`; `reject` yêu cầu `canReject`; `reopen` yêu cầu `canEditWorking`. Assigned Reviewer chỉ được reject khi được gán hoặc policy hiệu lực cho phép; Reviewer không mặc nhiên được submit/reopen. Proposer không được reject nếu không có capability review. Admin/Steward/policy holder tuân theo capability backend trả về.
+- Trước `submit`, backend validate lại working payload và các entity reference theo cùng invariant F03. F04 không bổ sung field nghiệp vụ bắt buộc mới và không bắt buộc danh sách reviewer phải khác rỗng vì Admin/Steward hoặc policy holder vẫn có thể review.
+- Mọi transition ghi `updatedBy/updatedAt` từ principal/backend clock. `submit` đồng thời ghi `submittedBy/submittedAt`; `reject` ghi `rejectedBy/rejectedAt`. `reopen` giữ lại metadata lần reject gần nhất để UI còn truy vết người từ chối; `updatedBy/updatedAt` của response thể hiện actor/time reopen. Client không được gửi hoặc sửa các field này.
+- Working response phải expose `updatedBy`, `updatedAt`, `submittedBy`, `submittedAt`, `rejectedBy` và `rejectedAt` khi có giá trị. Lịch sử transition append-only và màn hình audit đầy đủ thuộc F16.
+- Consumer-only không được xem working payload và không được gọi bất kỳ transition nào. Transition không làm CDE xuất hiện trong published read model.
+
+**UI**
+
+- Draft chỉ hiển thị `Gửi duyệt` khi `canSubmit`; InReview chỉ hiển thị `Từ chối` khi `canReject`; Rejected chỉ hiển thị `Chỉnh sửa lại` khi `canEditWorking`. UI dùng capability backend, không suy quyền từ role.
+- Submit và reject có modal xác nhận; reject không có ô nhập lý do. Trong khi request chạy, action bị disable, có loading và chặn double-submit.
+- Sau thành công, UI thay working state bằng response backend, cập nhật badge/form lock và dùng `workingRevision` mới cho mutation tiếp theo. Rejected hiển thị `rejectedBy/rejectedAt`.
+- Khi nhận `409`, UI giữ state hiện tại, không tự retry hoặc tự đổi badge/revision; hiển thị conflict và hành động tải working version mới nhất. Lỗi `403/404/5xx` không để lại optimistic state giả.
 
 **Test/DoD**
 
-- Test transition hợp lệ và không hợp lệ.
-- Reviewer không được gán và Proposer approve/reject đều bị 403.
-- Consumer không nhìn thấy InReview/Rejected.
-- E2E Draft → InReview → Rejected → Draft.
+- Integration test đủ ba transition hợp lệ: `Draft → InReview`, `InReview → Rejected`, `Rejected → Draft`; mỗi lần giữ nguyên business version/payload, tăng revision đúng một và ghi đúng transition actor/time.
+- Test mọi action từ sai source state nhận `409` và không đổi dữ liệu; working không tồn tại nhận `404`; request thiếu/sai `expectedRevision` hoặc có field ngoài allowlist nhận `400`.
+- Hai request dùng cùng revision: đúng một request thành công, request còn lại nhận `409`; không có lost update hoặc transition kép.
+- Authorization integration test bao phủ Admin/Steward/policy holder, Proposer, owner, assigned Reviewer, Reviewer không được gán, Consumer-only và user đồng thời có nhiều role. Đặc biệt Proposer không có quyền review và Reviewer không có capability edit không thể `reopen`.
+- Test chứng minh transition đọc owners/reviewers từ working payload mới nhất, không dùng assignment native đã cũ.
+- Test chứng minh F04 không thay đổi business payload/business version và không tạo native version, snapshot, published head hoặc publication outbox; Consumer không nhìn thấy CDE InReview/Rejected.
+- API response test bao phủ status/revision mới và các field `updated*`, `submitted*`, `rejected*`; reopen vẫn giữ metadata lần reject gần nhất.
+- Frontend test bao phủ action visibility theo state/capability, modal, loading, double-submit, request mang `expectedRevision`, thay state từ response, form lock/unlock và conflict `409` không tạo optimistic state giả.
+- E2E: Draft revision N → submit → InReview revision N+1 → reject → Rejected revision N+2 có rejector → reopen → Draft revision N+3 có thể tiếp tục Save; Consumer không nhìn thấy ở mọi bước.
 
 ### F05 — Approve và publish CDE
 

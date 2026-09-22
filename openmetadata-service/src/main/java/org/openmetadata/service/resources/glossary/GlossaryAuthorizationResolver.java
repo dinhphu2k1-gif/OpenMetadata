@@ -67,6 +67,10 @@ public final class GlossaryAuthorizationResolver {
     require(capabilities.canApprove(), "Only an assigned reviewer or Data Steward can review");
   }
 
+  public static void requireReject(Capabilities capabilities) {
+    require(capabilities.canReject(), "Not authorized to reject the working version");
+  }
+
   private static void require(boolean allowed, String message) {
     if (!allowed) {
       throw new ForbiddenException(message);

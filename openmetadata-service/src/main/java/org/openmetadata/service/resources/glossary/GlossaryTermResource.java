@@ -32,6 +32,7 @@ import jakarta.json.JsonPatch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -63,6 +64,7 @@ import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossaryTerm;
 import org.openmetadata.schema.api.data.CdeDraftUpdateRequest;
+import org.openmetadata.schema.api.data.CdeWorkflowTransitionRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.LoadGlossary;
 import org.openmetadata.schema.api.data.MoveGlossaryTermRequest;
@@ -223,10 +225,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
-    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
-    GlossaryAuthorizationResolver.requireSubmit(capabilities(securityContext, term));
-    requireExpectedRevision(request);
+      @NotNull @Valid CdeWorkflowTransitionRequest request) {
+    versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
@@ -234,7 +234,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             request.getExpectedRevision(),
             EntityStatus.DRAFT,
             EntityStatus.IN_REVIEW,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working -> authorizeAndValidateSubmit(securityContext, working)));
   }
 
   @POST
@@ -246,10 +247,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
-    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
-    GlossaryAuthorizationResolver.requireReview(capabilities(securityContext, term));
-    requireExpectedRevision(request);
+      @NotNull @Valid CdeWorkflowTransitionRequest request) {
+    versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
@@ -257,7 +256,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             request.getExpectedRevision(),
             EntityStatus.IN_REVIEW,
             EntityStatus.REJECTED,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireReject(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @POST
@@ -269,10 +271,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
-    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
-    GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, term));
-    requireExpectedRevision(request);
+      @NotNull @Valid CdeWorkflowTransitionRequest request) {
+    versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
@@ -280,7 +280,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             request.getExpectedRevision(),
             EntityStatus.REJECTED,
             EntityStatus.DRAFT,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireEdit(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @POST
@@ -380,26 +383,66 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, GlossaryTerm term) {
     GlossaryTerm authorizationTerm = term;
+    boolean workingPayload = false;
     try {
       WorkingVersionRecord working =
           versioningService.getWorking(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
       authorizationTerm = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+      workingPayload = true;
     } catch (NotFoundException ignored) {
       // Published-only identities retain their persisted authorization relationships.
     }
-    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm);
+    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm, workingPayload);
   }
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
       SecurityContext securityContext, GlossaryTerm authorizationTerm) {
-    return GlossaryAuthorizationResolver.resolve(
+    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm, true);
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
+      SecurityContext securityContext,
+      GlossaryTerm authorizationTerm,
+      boolean workingPayload) {
+    GlossaryAuthorizationResolver.Capabilities resolved =
+        GlossaryAuthorizationResolver.resolve(
             getSubjectContext(securityContext),
             authorizationTerm.getOwners(),
-            authorizationTerm.getReviewers())
-        .restrictToPolicy(
-            policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_ALL),
-            policyAllows(
-                securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_STATUS));
+            authorizationTerm.getReviewers());
+    boolean canEdit =
+        policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_ALL);
+    boolean canChangeStatus =
+        policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_STATUS);
+    GlossaryAuthorizationResolver.Capabilities policyRestricted =
+        resolved.restrictToPolicy(canEdit, canChangeStatus);
+    if (!workingPayload) {
+      return policyRestricted;
+    }
+
+    // Working owners/reviewers are authoritative for F04 even when native relationships lag.
+    return new GlossaryAuthorizationResolver.Capabilities(
+        resolved.canViewWorking() || policyRestricted.canViewWorking(),
+        resolved.canViewPublished(),
+        resolved.canEditWorking() || policyRestricted.canEditWorking(),
+        resolved.canSubmit() || policyRestricted.canSubmit(),
+        policyRestricted.canApprove(),
+        resolved.canReject() || policyRestricted.canReject(),
+        policyRestricted.canArchive());
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForWorking(
+      SecurityContext securityContext, WorkingVersionRecord working) {
+    GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+    return capabilitiesForAuthorizationTerm(securityContext, payload);
+  }
+
+  private void authorizeAndValidateSubmit(
+      SecurityContext securityContext, WorkingVersionRecord working) {
+    GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+    GlossaryAuthorizationResolver.requireSubmit(
+        capabilitiesForAuthorizationTerm(securityContext, payload));
+    DataDictionaryResolver.requireCdePayload(payload, working.glossaryId());
+    repository.prepareInternal(payload, true);
   }
 
   private boolean policyAllows(

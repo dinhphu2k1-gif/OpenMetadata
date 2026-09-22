@@ -19,7 +19,19 @@ final class GlossaryVersionResponses {
     payload.put("businessVersion", record.businessVersion());
     payload.put("workingRevision", record.revision());
     payload.put("entityStatus", record.entityStatus());
+    payload.put("updatedAt", record.updatedAt());
+    payload.put("updatedBy", record.updatedBy());
+    putIfPresent(payload, "submittedAt", record.submittedAt());
+    putIfPresent(payload, "submittedBy", record.submittedBy());
+    putIfPresent(payload, "rejectedAt", record.rejectedAt());
+    putIfPresent(payload, "rejectedBy", record.rejectedBy());
     return payload;
+  }
+
+  private static void putIfPresent(Map<String, Object> target, String key, Object value) {
+    if (value != null) {
+      target.put(key, value);
+    }
   }
 
   static Map<String, Object> published(PublishedSnapshotRecord record) {

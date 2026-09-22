@@ -12,6 +12,7 @@
  */
 import Icon, { DownOutlined } from '@ant-design/icons';
 import {
+  Alert,
   Button,
   Dropdown,
   Input,
@@ -68,6 +69,7 @@ import {
   exportGlossaryInCSVFormat,
   getGlossariesById,
   getGlossaryTermVersionPermissions,
+  getGlossaryTermWorkingVersion,
   getGlossaryTerms,
   getGlossaryTermsById,
   getGlossaryTermsVersionsList,
@@ -175,6 +177,8 @@ const GlossaryHeader = ({
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const [isReopening, setIsReopening] = useState(false);
+  const [hasWorkflowConflict, setHasWorkflowConflict] = useState(false);
+  const [isReloadingWorking, setIsReloadingWorking] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] =
     useState<boolean>(false);
   const [draftVersion, setDraftVersion] = useState<string>('');
@@ -689,10 +693,35 @@ const GlossaryHeader = ({
     };
     const updated = isGlossary
       ? await transitionGlossaryWorkflow(selectedData.id, action, request)
+      : action === 'submit' || action === 'reject' || action === 'reopen'
+      ? await transitionGlossaryTermWorkflow(selectedData.id, action, {
+          expectedRevision,
+        })
       : await transitionGlossaryTermWorkflow(selectedData.id, action, request);
     await onWorkflowTransition?.(updated);
+    setHasWorkflowConflict(false);
 
     return updated;
+  };
+
+  const handleWorkflowError = (error: unknown) => {
+    if (!isGlossary && (error as AxiosError)?.response?.status === 409) {
+      setHasWorkflowConflict(true);
+    }
+    showErrorToast(error as AxiosError);
+  };
+
+  const handleReloadWorking = async () => {
+    try {
+      setIsReloadingWorking(true);
+      const working = await getGlossaryTermWorkingVersion(selectedData.id);
+      await onWorkflowTransition?.(working);
+      setHasWorkflowConflict(false);
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsReloadingWorking(false);
+    }
   };
 
   const handleCreateDraft = async () => {
@@ -739,7 +768,7 @@ const GlossaryHeader = ({
       showSuccessToast(t('message.submit-for-review-success'));
       setIsSubmitForReviewModalOpen(false);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      handleWorkflowError(error);
     } finally {
       setIsSubmittingForReview(false);
     }
@@ -784,7 +813,7 @@ const GlossaryHeader = ({
       );
       setIsRejectModalOpen(false);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      handleWorkflowError(error);
     } finally {
       setIsRejecting(false);
     }
@@ -801,7 +830,7 @@ const GlossaryHeader = ({
       await runWorkflowAction('reopen');
       showSuccessToast(t('message.create-draft-success'));
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      handleWorkflowError(error);
     } finally {
       setIsReopening(false);
     }
@@ -1154,18 +1183,22 @@ const GlossaryHeader = ({
               onClick={() => setIsApproveModalOpen(true)}>
               {t('label.approve')}
             </Button>
-            <Button
-              danger
-              className="m-l-xs"
-              onClick={() => setIsRejectModalOpen(true)}>
-              {t('label.reject')}
-            </Button>
+            {workflowPermissions?.canReject && (
+              <Button
+                danger
+                className="m-l-xs"
+                disabled={isRejecting}
+                onClick={() => setIsRejectModalOpen(true)}>
+                {t('label.reject')}
+              </Button>
+            )}
           </>
         )}
 
         {canSubmitForReview && glossaryTermStatus !== EntityStatus.InReview && (
           <Button
             className="m-l-xs"
+            disabled={isSubmittingForReview}
             type="primary"
             onClick={() => setIsSubmitForReviewModalOpen(true)}>
             {t('label.submit-for-review')}
@@ -1205,7 +1238,9 @@ const GlossaryHeader = ({
   }, [
     isVersionView,
     canApproveOrReject,
+    workflowPermissions,
     canSubmitForReview,
+    isSubmittingForReview,
     canReopen,
     isReopening,
     canCreateDraft,
@@ -1379,6 +1414,16 @@ const GlossaryHeader = ({
           </div>
         </div>
       </div>
+      {!isGlossary &&
+        glossaryTermStatus === EntityStatus.Rejected &&
+        selectedData.rejectedBy && (
+          <Typography.Text className="text-grey-muted" type="secondary">
+            Từ chối bởi {selectedData.rejectedBy}
+            {selectedData.rejectedAt
+              ? ` lúc ${new Date(selectedData.rejectedAt).toLocaleString()}`
+              : ''}
+          </Typography.Text>
+        )}
       {selectedData && (
         <EntityDeleteModal
           bodyText={getEntityDeleteMessage(selectedData.name, '')}
@@ -1436,6 +1481,23 @@ const GlossaryHeader = ({
         onCancel={() => setIsRevokeModalOpen(false)}
         onConfirm={handleRevokeApproval}
       />
+
+      {hasWorkflowConflict && !isGlossary && (
+        <Alert
+          showIcon
+          action={
+            <Button
+              loading={isReloadingWorking}
+              size="small"
+              onClick={handleReloadWorking}>
+              Tải bản làm việc mới nhất
+            </Button>
+          }
+          className="m-b-sm"
+          message="Bản làm việc đã thay đổi. Trạng thái hiện tại được giữ nguyên cho đến khi bạn tải lại."
+          type="warning"
+        />
+      )}
 
       <Modal
         centered

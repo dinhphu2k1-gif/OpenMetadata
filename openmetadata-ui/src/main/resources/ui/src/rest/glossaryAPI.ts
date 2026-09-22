@@ -24,6 +24,7 @@ import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssets
 import { CreateGlossary } from '../generated/api/data/createGlossary';
 import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
 import { CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
+import { CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityReference, Glossary } from '../generated/entity/data/glossary';
@@ -320,11 +321,21 @@ export const getGlossaryTermVersionPermissions = async (id: string) => {
   return response.data;
 };
 
-export const transitionGlossaryTermWorkflow = async (
+export async function transitionGlossaryTermWorkflow(
+  id: string,
+  action: 'submit' | 'reject' | 'reopen',
+  request: CdeWorkflowTransitionRequest
+): Promise<GlossaryTerm>;
+export async function transitionGlossaryTermWorkflow(
+  id: string,
+  action: Exclude<GlossaryWorkflowAction, 'submit' | 'reject' | 'reopen'>,
+  request: GlossaryWorkflowRequest
+): Promise<GlossaryTerm>;
+export async function transitionGlossaryTermWorkflow(
   id: string,
   action: GlossaryWorkflowAction,
-  request: GlossaryWorkflowRequest
-) => {
+  request: GlossaryWorkflowRequest | CdeWorkflowTransitionRequest
+) {
   if (action === 'revoke') {
     const response = await APIClient.post<
       undefined,
@@ -340,7 +351,7 @@ export const transitionGlossaryTermWorkflow = async (
   >(`/glossaryTerms/${id}/${path}`, request);
 
   return response.data;
-};
+}
 
 // Batch fetch up to 100 glossary terms by Id in a single round-trip.
 // 100 matches the backend MAX_BATCH_BY_IDS cap — going higher would 400

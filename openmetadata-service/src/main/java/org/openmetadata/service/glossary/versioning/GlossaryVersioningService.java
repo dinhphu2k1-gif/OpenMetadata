@@ -17,6 +17,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.openmetadata.schema.type.EntityStatus;
@@ -150,24 +151,67 @@ public class GlossaryVersioningService {
       EntityStatus expectedStatus,
       EntityStatus targetStatus,
       String actor) {
+    return transition(
+        entityType, entityId, expectedRevision, expectedStatus, targetStatus, actor, null, false);
+  }
+
+  public WorkingVersionRecord transition(
+      String entityType,
+      UUID entityId,
+      long expectedRevision,
+      EntityStatus expectedStatus,
+      EntityStatus targetStatus,
+      String actor,
+      Consumer<WorkingVersionRecord> authorizationAndValidation) {
+    return transition(
+        entityType,
+        entityId,
+        expectedRevision,
+        expectedStatus,
+        targetStatus,
+        actor,
+        authorizationAndValidation,
+        true);
+  }
+
+  private WorkingVersionRecord transition(
+      String entityType,
+      UUID entityId,
+      long expectedRevision,
+      EntityStatus expectedStatus,
+      EntityStatus targetStatus,
+      String actor,
+      Consumer<WorkingVersionRecord> authorizationAndValidation,
+      boolean invalidStateIsConflict) {
     WorkingVersionRecord result =
         Entity.getJdbi()
             .inTransaction(
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
                   WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
+                  if (authorizationAndValidation != null) {
+                    authorizationAndValidation.accept(working);
+                  }
+                  if (working.revision() != expectedRevision) {
+                    throw conflict("Working version revision conflict");
+                  }
                   if (!expectedStatus.value().equals(working.entityStatus())) {
-                    throw new BadRequestException(
+                    String message =
                         "Invalid working transition "
                             + working.entityStatus()
                             + " -> "
-                            + targetStatus);
+                            + targetStatus;
+                    if (invalidStateIsConflict) {
+                      throw conflict(message);
+                    }
+                    throw new BadRequestException(message);
                   }
                   int updated =
                       dao.transitionWorking(
                           entityType,
                           entityId,
                           expectedRevision,
+                          expectedStatus.value(),
                           targetStatus.value(),
                           System.currentTimeMillis(),
                           actor);

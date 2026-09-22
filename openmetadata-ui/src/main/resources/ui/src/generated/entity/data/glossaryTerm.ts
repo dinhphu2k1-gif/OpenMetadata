@@ -149,6 +149,14 @@ export interface GlossaryTerm {
    * User who made the update.
    */
   updatedBy?: string;
+  /** Time at which the working version was most recently submitted. */
+  submittedAt?: number;
+  /** User who most recently submitted the working version. */
+  submittedBy?: string;
+  /** Time at which the working version was most recently rejected. */
+  rejectedAt?: number;
+  /** User who most recently rejected the working version. */
+  rejectedBy?: string;
   /**
    * Count of how many times this and it's children glossary terms are used as labels.
    */

@@ -50,20 +50,20 @@ public interface GlossaryVersionDAO {
       @Bind("actor") String actor);
 
   @SqlQuery(
-      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy, submittedAt, submittedBy, rejectedAt, rejectedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND entityId = :entityId")
   @RegisterRowMapper(WorkingVersionMapper.class)
   WorkingVersionRecord findWorking(
       @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
 
   @SqlQuery(
-      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy, submittedAt, submittedBy, rejectedAt, rejectedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType")
   @RegisterRowMapper(WorkingVersionMapper.class)
   List<WorkingVersionRecord> listWorking(@Bind("entityType") String entityType);
 
   @SqlQuery(
-      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy, submittedAt, submittedBy, rejectedAt, rejectedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND entityId IN (<entityIds>)")
   @RegisterRowMapper(WorkingVersionMapper.class)
   List<WorkingVersionRecord> findWorkingBatchInternal(
@@ -74,7 +74,7 @@ public interface GlossaryVersionDAO {
   }
 
   @SqlQuery(
-      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy, submittedAt, submittedBy, rejectedAt, rejectedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND glossaryId = :glossaryId "
           + "ORDER BY updatedAt DESC, entityId")
   @RegisterRowMapper(WorkingVersionMapper.class)
@@ -82,7 +82,7 @@ public interface GlossaryVersionDAO {
       @Bind("entityType") String entityType, @BindUUID("glossaryId") UUID glossaryId);
 
   @SqlQuery(
-      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy, submittedAt, submittedBy, rejectedAt, rejectedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND entityId = :entityId FOR UPDATE")
   @RegisterRowMapper(WorkingVersionMapper.class)
   WorkingVersionRecord lockWorking(
@@ -114,11 +114,12 @@ public interface GlossaryVersionDAO {
           + "submittedBy = CASE WHEN :entityStatus = 'InReview' THEN :actor ELSE submittedBy END, "
           + "rejectedAt = CASE WHEN :entityStatus = 'Rejected' THEN :now ELSE rejectedAt END, "
           + "rejectedBy = CASE WHEN :entityStatus = 'Rejected' THEN :actor ELSE rejectedBy END "
-          + "WHERE entityType = :entityType AND entityId = :entityId AND revision = :expectedRevision")
+          + "WHERE entityType = :entityType AND entityId = :entityId AND entityStatus = :expectedStatus AND revision = :expectedRevision")
   int transitionWorking(
       @Bind("entityType") String entityType,
       @BindUUID("entityId") UUID entityId,
       @Bind("expectedRevision") long expectedRevision,
+      @Bind("expectedStatus") String expectedStatus,
       @Bind("entityStatus") String entityStatus,
       @Bind("now") long now,
       @Bind("actor") String actor);
@@ -310,7 +311,11 @@ public interface GlossaryVersionDAO {
       long createdAt,
       String createdBy,
       long updatedAt,
-      String updatedBy) {}
+      String updatedBy,
+      Long submittedAt,
+      String submittedBy,
+      Long rejectedAt,
+      String rejectedBy) {}
 
   record PublishedSnapshotRecord(
       UUID snapshotId,
@@ -353,7 +358,11 @@ public interface GlossaryVersionDAO {
           rs.getLong("createdAt"),
           rs.getString("createdBy"),
           rs.getLong("updatedAt"),
-          rs.getString("updatedBy"));
+          rs.getString("updatedBy"),
+          nullableLong(rs, "submittedAt"),
+          rs.getString("submittedBy"),
+          nullableLong(rs, "rejectedAt"),
+          rs.getString("rejectedBy"));
     }
   }
 

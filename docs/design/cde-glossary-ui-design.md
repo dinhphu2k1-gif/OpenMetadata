@@ -523,20 +523,23 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * *Request Body:* `{ "expectedRevision": 1, "payload": { ... } }`
   * *Hành vi:* Ghi đè trực tiếp tại chỗ vào bản Draft hiện hành, **không tạo `businessVersion` mới**.
 * **Gửi duyệt CDE:**
-  * Gọi: `transitionGlossaryTermWorkflow(id, 'submit', {})`
+  * Gọi: `transitionGlossaryTermWorkflow(id, 'submit', { expectedRevision: workingRevision })`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/submit`
+  * *Request Body:* `{ "expectedRevision": 1 }`, lấy từ `workingRevision` của working representation gần nhất.
   * *Hành vi:* Chuyển trạng thái sang `InReview`, khóa toàn bộ form sửa.
 * **Phê duyệt CDE:**
   * Gọi: `transitionGlossaryTermWorkflow(id, 'approve', {})`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/approve`
   * *Hành vi:* Chuyển trạng thái sang `Approved`, đóng gói snapshot bất biến phát hành cho Consumer.
 * **Từ chối CDE:**
-  * Gọi: `transitionGlossaryTermWorkflow(id, 'reject', {})`
+  * Gọi: `transitionGlossaryTermWorkflow(id, 'reject', { expectedRevision: workingRevision })`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/reject`
+  * *Request Body:* `{ "expectedRevision": 1 }`, lấy từ `workingRevision` của working representation gần nhất.
   * *Hành vi:* Chuyển trạng thái sang `Rejected`.
 * **Chỉnh sửa lại CDE bị từ chối:**
-  * Gọi: `transitionGlossaryTermWorkflow(id, 'reopen', {})`
+  * Gọi: `transitionGlossaryTermWorkflow(id, 'reopen', { expectedRevision: workingRevision })`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/reopen`
+  * *Request Body:* `{ "expectedRevision": 1 }`, lấy từ `workingRevision` của working representation gần nhất.
   * *Hành vi:* Chuyển từ `Rejected` về lại `Draft` để Proposer tiếp tục hoàn thiện.
 
 ---
