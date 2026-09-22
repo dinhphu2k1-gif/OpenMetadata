@@ -101,8 +101,8 @@ const GlossaryTermsV1 = ({
   const { fqn: glossaryFqn } = useFqn();
   const navigate = useNavigate();
   const location = useLocation();
-  const approvedVersion = new URLSearchParams(location.search).get(
-    'approvedVersion'
+  const businessVersion = new URLSearchParams(location.search).get(
+    'businessVersion'
   );
   const { currentUser } = useApplicationStore();
   const isAdmin = Boolean(currentUser?.isAdmin);
@@ -153,18 +153,16 @@ const GlossaryTermsV1 = ({
 
       if (isLatestVersion) {
         setViewedVersion(null);
-        searchParams.delete('approvedVersion');
       } else {
         setViewedVersion(snapshot);
-        searchParams.set('approvedVersion', snapshotBusinessVersion);
       }
+      searchParams.set('businessVersion', snapshotBusinessVersion);
 
       navigate(
         {
           pathname: location.pathname,
           search: searchParams.toString(),
-        },
-        { replace: true }
+        }
       );
     },
     [currentGlossaryTerm, location.pathname, location.search, navigate]
@@ -173,13 +171,13 @@ const GlossaryTermsV1 = ({
   useEffect(() => {
     let cancelled = false;
     setViewedVersion(null);
-    if (approvedVersion) {
+    if (businessVersion) {
       const currentVer = getBusinessVersion(
         currentGlossaryTerm.businessVersion
       );
 
       if (
-        currentVer === approvedVersion &&
+        currentVer === businessVersion &&
         String(currentGlossaryTerm.entityStatus).toLowerCase() === 'approved'
       ) {
         return;
@@ -221,7 +219,7 @@ const GlossaryTermsV1 = ({
               continue;
             }
             const ver = getSnapshotVer(p);
-            if (ver === approvedVersion) {
+            if (ver === businessVersion) {
               historyMatch = p;
             }
           }
@@ -241,7 +239,7 @@ const GlossaryTermsV1 = ({
             return;
           }
 
-          if (approvedVersion === '1.0' && candidate1_0) {
+          if (businessVersion === '1.0' && candidate1_0) {
             setViewedVersion(candidate1_0);
 
             return;
@@ -259,7 +257,7 @@ const GlossaryTermsV1 = ({
     return () => {
       cancelled = true;
     };
-  }, [currentGlossaryTerm.id, approvedVersion]);
+  }, [currentGlossaryTerm.id, businessVersion]);
 
   const { t } = useTranslation();
 
@@ -464,13 +462,9 @@ const GlossaryTermsV1 = ({
           : tab
       );
 
-      if (!isAdmin) {
-        return cdeTabs.filter(
-          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
-        );
-      }
-
-      return cdeTabs;
+      return cdeTabs.filter(
+        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+      );
     }
 
     return detailTabs;

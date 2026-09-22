@@ -442,6 +442,17 @@ public class GlossaryVersioningService {
             .listSnapshotTerms(glossary.snapshotId()));
   }
 
+  public List<WorkingVersionRecord> listWorkingTermsByGlossary(UUID glossaryId) {
+    return Entity.getJdbi()
+        .onDemand(GlossaryVersionDAO.class)
+        .listWorkingByGlossary(GLOSSARY_TERM, glossaryId);
+  }
+
+  public boolean isLatestPublished(
+      String entityType, UUID entityId, String businessVersion) {
+    return businessVersion.equals(getLatestPublished(entityType, entityId).businessVersion());
+  }
+
   public List<PublishedSnapshotRecord> listWorkingGlossaryTerms(UUID glossaryId) {
     WorkingVersionRecord working = getWorking(GLOSSARY, glossaryId);
     com.fasterxml.jackson.databind.JsonNode revisions =

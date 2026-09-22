@@ -403,18 +403,16 @@ export const getGlossaryVersionsList = async (id: string) => {
   const response = await APIClient.get<Glossary[]>(
     `/glossaries/${id}/published`
   );
-  const versions = response.data.map((snapshot, index) =>
-    JSON.stringify({
-      ...snapshot,
-      version: snapshot.publicationSequence ?? index + 1,
-    })
-  );
+  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
 
   return { entityType: 'glossary', versions } as EntityHistory;
 };
 
-export const getGlossaryVersion = async (id: string, version: string) => {
-  const url = `/glossaries/${id}/published/${version}`;
+export const getGlossaryVersion = async (
+  id: string,
+  businessVersion: string
+) => {
+  const url = `/glossaries/${id}/published/${businessVersion}`;
   const response = await APIClient.get<Glossary>(url);
 
   return response.data;
@@ -424,18 +422,16 @@ export const getGlossaryTermsVersionsList = async (id: string) => {
   const response = await APIClient.get<GlossaryTerm[]>(
     `/glossaryTerms/${id}/published`
   );
-  const versions = response.data.map((snapshot, index) =>
-    JSON.stringify({
-      ...snapshot,
-      version: snapshot.publicationSequence ?? index + 1,
-    })
-  );
+  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
 
   return { entityType: 'glossaryTerm', versions } as EntityHistory;
 };
 
-export const getGlossaryTermsVersion = async (id: string, version: string) => {
-  const url = `/glossaryTerms/${id}/published/${version}`;
+export const getGlossaryTermsVersion = async (
+  id: string,
+  businessVersion: string
+) => {
+  const url = `/glossaryTerms/${id}/published/${businessVersion}`;
 
   const response = await APIClient.get<GlossaryTerm>(url);
 

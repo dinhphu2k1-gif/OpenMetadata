@@ -45,6 +45,7 @@ export type CDEExtension = {
 type CDEGlossaryTableColumnsProps = {
   handleLoadMoreChildren: (record: ModifiedGlossaryTerm) => void;
   loadingChildren: Record<string, boolean>;
+  parentBusinessVersion?: string;
   t: TFunction;
 };
 
@@ -110,6 +111,7 @@ export const renderCDEQualityRule = (
 export const getCDEGlossaryTableColumns = ({
   handleLoadMoreChildren,
   loadingChildren,
+  parentBusinessVersion,
   t,
 }: CDEGlossaryTableColumnsProps): ColumnsType<ModifiedGlossaryTerm> => [
   {
@@ -144,7 +146,15 @@ export const getCDEGlossaryTableColumns = ({
 
       const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
       const toUrl = businessVersion
-        ? `${basePath}?approvedVersion=${encodeURIComponent(businessVersion)}`
+        ? `${basePath}?businessVersion=${encodeURIComponent(
+            businessVersion
+          )}${
+            parentBusinessVersion
+              ? `&parentBusinessVersion=${encodeURIComponent(
+                  parentBusinessVersion
+                )}`
+              : ''
+          }`
         : basePath;
 
       return (

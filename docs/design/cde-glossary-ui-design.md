@@ -20,26 +20,29 @@ Thiết kế ưu tiên nguyên tắc: Consumer luôn nhìn thấy bản Approved
 
 ### 2.2. Thành tố dữ liệu dùng chung (CDE)
 
-- **Bản chất kỹ thuật:** CDE chính là entity `GlossaryTerm` trong OpenMetadata. Toàn bộ kiến trúc bên dưới (model, schema, phân quyền, quan hệ hierarchy và REST API) tuân thủ 100% chuẩn chung `Glossary` và `GlossaryTerm`, tránh phát sinh các entity hoặc khái niệm kỹ thuật dư thừa.
+- **Bản chất kỹ thuật:** CDE chính là entity `GlossaryTerm` trong OpenMetadata và sử dụng model, schema, phân quyền, quan hệ với `Glossary` cùng REST API chuẩn. Trong phạm vi nghiệp vụ này, chỉ hỗ trợ một cấp quan hệ: Data Dictionary (`Glossary`) là cha và CDE (`GlossaryTerm`) là con trực tiếp.
 - **Tầng nghiệp vụ (UI):** CDE (Common Data Element) là thuật ngữ hiển thị cho người dùng đối với các mục từ (`GlossaryTerm`) thuộc Từ điển dữ liệu dùng chung (`Data Dictionary`).
 - Mỗi CDE có workflow và business version riêng, độc lập với native metadata version của OpenMetadata.
+- Không tồn tại quan hệ CDE cha — CDE con: không gán `parent` là một `GlossaryTerm`, không tạo hoặc hiển thị sub-term, và backend phải từ chối payload tạo CDE lồng nhau.
 
 ### 2.3. Hai loại version
 
 | Loại version | Ví dụ | Mục đích | Vai trò hiển thị UI |
 | --- | --- | --- | --- |
-| Business version | `1.0`, `1.1`, `2.0` | Định danh phiên bản nghiệp vụ chính thức khi phát hành Từ điển hoặc CDE. | **Phiên bản hiển thị chính (Primary UI Version)** trên toàn bộ giao diện: Header, danh sách, bảng dữ liệu, dropdown chọn version, badge và xuất dữ liệu. Người dùng chỉ làm việc và nhận biết phiên bản này. |
+| Business version (`businessVersion`) | `1.0`, `1.1`, `2.0` | Định danh phiên bản nghiệp vụ chính thức khi phát hành Từ điển hoặc CDE. | **Định danh version duy nhất ở tầng sản phẩm** trên UI, URL, business API/response, selector, badge, breadcrumb và xuất dữ liệu. |
 | Native metadata version | `0.1`, `0.2`, `1.0` | OpenMetadata sử dụng để lưu lịch sử thay đổi kỹ thuật của entity dưới backend. | **Kỹ thuật / Nội bộ**: Ẩn khỏi màn hình nghiệp vụ chính; không hiển thị thay thế cho business version. |
 
 Quy tắc:
-- Trong Từ điển dữ liệu dùng chung, **business version là nội dung được hiển thị chính cho người dùng**. Mọi thao tác tìm kiếm, lọc, chọn phiên bản lịch sử, đối soát hay xem chi tiết đều quy chiếu theo business version.
-- Quá trình lưu nháp (Save Draft) chỉ cập nhật đè tại chỗ (in-place), không tăng ngầm `nativeVersion` để tránh phình to dung lượng lưu trữ (storage bloating).
-- Hai loại version phải được đặt tên và xử lý tách biệt trong model/code. Không dùng `version` mà không xác định đó là `nativeVersion` hay `businessVersion`.
+- Trong Từ điển dữ liệu dùng chung, `businessVersion` là định danh version duy nhất ở tầng sản phẩm. Mọi thao tác tìm kiếm, lọc, chọn lịch sử, deep link, đối soát và xem chi tiết đều quy chiếu theo `businessVersion`.
+- Quy ước URL của quan hệ một cấp Data Dictionary — CDE: `businessVersion` luôn chỉ phiên bản của entity đang xem; khi entity là CDE, `parentBusinessVersion` chỉ phiên bản Data Dictionary cha. Mọi URL mở CDE bắt buộc có đồng thời `businessVersion` và `parentBusinessVersion`; thiếu một trong hai param là URL không hợp lệ và trả `404 Not Found`. Tên param không gắn với loại nghiệp vụ cụ thể để có thể tái sử dụng cho mô hình cha — con tương tự; thiết kế này không hàm ý hỗ trợ CDE lồng nhau.
+- UI, frontend business model và business API/response dùng `businessVersion` cho entity hiện tại; browser URL của CDE bắt buộc dùng thêm `parentBusinessVersion` để giữ ngữ cảnh cha; không tạo alias `version`/`nativeVersion` và không ánh xạ `publicationSequence` thành version nghiệp vụ.
+- Cơ chế native metadata version của OpenMetadata vẫn tồn tại hoàn toàn ở tầng kỹ thuật nội bộ để bảo toàn framework; tính năng này không xóa hoặc thay đổi cơ chế đó.
+- Quá trình lưu nháp (Save Draft) chỉ cập nhật working record tại chỗ và không dùng native metadata version làm business version.
 
 ### 2.4. Working version và published version
 
 - **Working version**: bản đang soạn thảo hoặc đang chờ duyệt. Chỉ người có quyền quản trị nội dung được nhìn thấy.
-- **Published version**: snapshot bất biến đã Approved. Consumer sử dụng bản này.
+- **Published version**: version đã Approved. Published Data Dictionary mới nhất là danh mục sống và được phép thay đổi thành phần CDE theo quyền; các published version lịch sử và mọi CDE snapshot Approved vẫn bất biến.
 - Mỗi Từ điển hoặc CDE chỉ có tối đa một working version tại một thời điểm, nhưng có thể có nhiều published version trong lịch sử.
 
 ## 3. Mô hình trạng thái
@@ -59,7 +62,7 @@ Quy tắc:
 - `Draft`: được chỉnh sửa bởi Proposer và các Role có quyền quản trị.
 - `InReview`: khóa các trường nghiệp vụ; chỉ cho phép Reviewer/Steward phê duyệt hoặc từ chối.
 - `Rejected`: không hiển thị cho Consumer; người soạn thảo có thể đưa về Draft để sửa.
-- `Approved`: snapshot bất biến và được hiển thị cho Consumer.
+- `Approved`: được hiển thị cho Consumer. CDE Approved và Data Dictionary Approved lịch sử là bất biến; riêng Data Dictionary Approved mới nhất cho phép người có quyền thêm/bớt CDE mà không đổi `businessVersion`.
 - Không coi thiếu `entityStatus` là Approved. Phương án triển khai mới không hỗ trợ dữ liệu thiếu trạng thái; môi trường phải được khởi tạo lại với dữ liệu tuân thủ schema mới.
 
 ## 4. Role và phạm vi trách nhiệm
@@ -77,6 +80,8 @@ Quy tắc:
 | Basic Consumer | Chỉ đọc nội dung đã được phê duyệt với tập chức năng tối thiểu. |
 
 Quyền thực tế phải được backend xác định từ Role, policy, quyền trên entity và reviewer assignment. Frontend chỉ dùng kết quả quyền từ backend để điều khiển giao diện.
+
+Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BasicConsumer` hoặc `DataConsumer`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc Reviewer được gán có quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
 
 ### 4.2. Ma trận nội dung được nhìn thấy
 
@@ -129,8 +134,9 @@ Published Glossary không được chỉ lưu danh sách `termIds`. Snapshot ph�
 
 Quy tắc:
 
-- Snapshot Approved là bất biến.
-- Glossary luôn hiển thị đúng phiên bản Term (CDE) đã được đóng gói lúc phát hành.
+- Data Dictionary Approved mới nhất được phép thay đổi danh sách CDE theo quyền và optimistic locking; mỗi thay đổi phải được audit. Khi một Data Dictionary version mới trở thành latest, version trước được chốt thành historical snapshot bất biến.
+- Latest Data Dictionary có thể tham chiếu CDE `Draft`, `InReview`, `Rejected` hoặc `Approved`. Consumer chỉ nhận các CDE `Approved`; người có quyền working nhận các trạng thái theo quyền.
+- Data Dictionary historical luôn hiển thị đúng phiên bản Term (CDE) đã được chốt khi version đó rời vị trí latest.
 - Glossary version mới được tạo sau đó không làm thay đổi nội dung của Glossary version cũ.
 - Xóa hoặc đổi tên Glossary hiện hành không được phá vỡ snapshot đã phát hành.
 
@@ -142,7 +148,7 @@ Khi tạo Glossary version mới từ Glossary version cũ:
 2. Không sao chép bất kỳ term revision nào từ published snapshot.
 3. Chỉ giữ các trường định danh ổn định cần thiết để tham chiếu đúng Glossary.
 4. Người dùng chủ động thêm term revision vào working snapshot mới.
-5. Published snapshot không thay đổi và vẫn phục vụ Consumer.
+5. Published historical snapshot không thay đổi và vẫn phục vụ Consumer; khi version mới được Approved, published head chuyển sang version mới và version cũ được khóa bất biến.
 
 Mọi business version kế tiếp của Glossary được tạo sau khi đã có published snapshot mặc định là một bản trắng. Business version đầu tiên vẫn nhận dữ liệu người dùng vừa nhập khi tạo entity. Hệ thống không cung cấp hành vi ngầm kế thừa danh sách Term từ phiên bản đã phát hành trước đó.
 
@@ -170,7 +176,7 @@ Mỗi CDE khi được phê duyệt sẽ tạo ra một snapshot bất biến ch
 Quy tắc:
 
 - Mỗi CDE chỉ có tối đa một working version (`Draft` hoặc `InReview`) tại một thời điểm, nhưng lưu giữ toàn bộ lịch sử các published version đã `Approved`.
-- Chỉnh sửa và lưu nháp nhiều lần (Save Draft) chỉ cập nhật đè trực tiếp (in-place update) lên bản Draft hiện hành, **không tăng ngầm `nativeVersion`** và không tạo thêm bản ghi snapshot kỹ thuật ngầm nhằm tối ưu dung lượng lưu trữ (tránh storage bloating).
+- Chỉnh sửa và lưu nháp nhiều lần (Save Draft) chỉ cập nhật đè trực tiếp (in-place update) lên bản Draft hiện hành, **không tạo `businessVersion` mới** và không tạo thêm published snapshot ngầm nhằm tối ưu dung lượng lưu trữ (tránh storage bloating).
 - Snapshot Approved của CDE là bất biến; việc sửa đổi hoặc tạo version mới của CDE không làm thay đổi nội dung các published snapshot đã có.
 
 ### 5.5. Tạo business version mới của CDE
@@ -185,12 +191,11 @@ Khi tạo CDE version mới (ví dụ `1.1` từ bản `1.0` đã Approved):
 
 ### 6.1. Danh sách Glossary (Panel menu bên trái)
 
-Panel bên trái (`GlossaryLeftPanel`) đóng vai trò là danh mục điều hướng để người dùng chuyển đổi giữa các Glossary:
+Panel bên trái (`GlossaryLeftPanel`) giữ hành vi mặc định của OpenMetadata đối với người dùng không phải Consumer-only:
 
-- **Hiển thị:** Danh sách các Glossary (Icon + Tên hiển thị (DisplayName)) và nút `+ Thêm Glossary` (đối với Role có quyền tạo).
-- **Phân quyền hiển thị:**
-  - *Nhóm quản trị / soạn thảo (Admin, Steward, Proposer, Reviewer):* Hiển thị các Glossary trong phạm vi quản lý.
-  - *Nhóm tra cứu (Data Consumer, Basic Consumer):* Chỉ hiển thị các Glossary đã có ít nhất một phiên bản được `Approved`.
+- **Người dùng không phải Consumer-only:** Giữ nguyên luồng danh sách, tạo mới, empty state, điều hướng, identity và working data theo quyền OpenMetadata hiện có. Không thay đổi route hoặc thay thế representation của nhóm này. Trong phạm vi sản phẩm, backend vẫn kiểm tra Data Dictionary theo quy tắc nghiệp vụ tương ứng.
+- **Consumer-only:** Chỉ hiển thị nội dung đã có published snapshot `Approved`; không fallback sang identity, `Draft`, `InReview` hoặc `Rejected`.
+- **Không có dữ liệu:** Consumer-only nhận danh sách rỗng hoặc `403`/`404` khi truy cập trực tiếp entity chưa publish. Người dùng có quyền quản trị/soạn thảo nhận empty state và action mặc định theo quyền; UI không chuyển họ sang 404 chỉ vì chưa có published snapshot.
 
 Toàn bộ thông tin chi tiết về phiên bản, trạng thái, mô tả và thao tác phê duyệt được quản lý tại **Trang chi tiết Glossary bên phải (Mục 6.2)**.
 
@@ -199,21 +204,21 @@ Toàn bộ thông tin chi tiết về phiên bản, trạng thái, mô tả và 
 #### Chi tiết các thành phần trên Header:
 1. **Tên Glossary:** Sử dụng cơ chế mặc định của OpenMetadata (hiển thị ưu tiên `displayName` trên giao diện, fallback về `name` nếu trống; `name` cố định dùng cho FQN và URL).
 2. **Bộ chọn Business Version (Dropdown Selector) & Đồng bộ URL qua Query Param:**
-   - **Cơ chế đồng bộ Query Param (`?version={businessVersion}`):**
-     - Khi người dùng chọn một phiên bản trong Dropdown, URL lập tức cập nhật: `.../glossary/{glossaryFqn}?version={businessVersion}` (ví dụ: `?version=1.0`).
-     - **Tải lại trang (F5) / Bookmark:** Giao diện đọc trực tiếp query param `version` trên URL để tải chính xác phiên bản đang xem, không bị nhảy về phiên bản khác.
+   - **Cơ chế đồng bộ Query Param (`?businessVersion={businessVersion}`):**
+     - Khi người dùng chọn một phiên bản trong Dropdown, URL lập tức cập nhật: `.../glossary/{glossaryFqn}?businessVersion={businessVersion}` (ví dụ: `?businessVersion=1.0`).
+     - **Tải lại trang (F5) / Bookmark:** Giao diện đọc trực tiếp query param `businessVersion` trên URL để tải chính xác phiên bản đang xem, không bị nhảy về phiên bản khác.
      - **Chia sẻ liên kết (Deep linking):** Cho phép copy URL gửi cho người dùng khác truy cập trực tiếp đúng bản phát hành cần tra cứu hoặc kiểm duyệt.
-     - **URL mặc định (không truyền param `version`):**
-       - *Consumer:* Tự động mở bản phát hành `Approved` mới nhất.
-       - *Nhóm Quản trị/Soạn thảo:* Mặc định mở bản làm việc `Draft`/`In Review` đang soạn (nếu có), hoặc bản `Approved` mới nhất.
+     - **URL mặc định (không truyền param `businessVersion`):**
+       - *Consumer-only:* Tự động mở bản phát hành `Approved` mới nhất.
+       - *Người dùng không phải Consumer-only:* Giữ nguyên cách OpenMetadata chọn identity/working/published representation theo quyền hiện có.
    - **Phân quyền trong danh sách Dropdown:**
-      - *Consumer:* Trong dropdown chỉ hiển thị các phiên bản đã `Approved`. Nếu tự ý gõ param `?version=...` trỏ tới một bản `Draft`/`In Review`/`Rejected` chưa duyệt, hệ thống từ chối truy cập (trả lỗi 403 hoặc 404), giao diện hiển thị màn hình báo lỗi và tuyệt đối không hiển thị bất kỳ nút action nào.
-     - *Admin / Steward / Proposer:* Liệt kê đầy đủ bản đang làm việc (`Draft` / `In Review`) và toàn bộ lịch sử các bản `Approved`.
+      - *Consumer:* Trong dropdown chỉ hiển thị các phiên bản đã `Approved`. Nếu tự ý gõ param `?businessVersion=...` trỏ tới một bản `Draft`/`In Review`/`Rejected` chưa duyệt, hệ thống từ chối truy cập (trả `404 Not Found`), giao diện hiển thị màn hình báo lỗi và tuyệt đối không hiển thị bất kỳ nút action nào.
+     - *Người có `canViewWorking` (Admin / Steward / Proposer / owner / Reviewer được gán):* Liệt kê bản đang làm việc mà họ được phép xem và toàn bộ lịch sử các bản `Approved`.
 3. **Badge trạng thái (Status Badge):**
    - `[ Draft ]`: Màu xám/vàng - Bản đang soạn thảo, cho phép thêm/bớt/sửa CDE.
    - `[ In Review ]`: Màu xanh dương - Đang chờ duyệt, khóa toàn bộ form.
    - `[ Rejected ]`: Màu đỏ - Bị từ chối phê duyệt.
-   - `[ Approved ]`: Màu xanh lá - Bản phát hành chính thức, bất biến.
+   - `[ Approved ]`: Màu xanh lá - Bản phát hành chính thức; latest cho phép quản lý thành phần CDE theo quyền, historical bất biến.
 4. **Cụm nút thao tác (Action Buttons phân cấp theo Action Hierarchy):**
 
 Bố cục góc phải Header: `[ Bộ chọn Version ]  [ Nút trực diện ]  [ Menu ba chấm (...) ]`
@@ -223,7 +228,7 @@ Bố cục góc phải Header: `[ Bộ chọn Version ]  [ Nút trực diện ] 
 | **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` <br>• `+ Thêm CDE` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **In Review** | • `Phê duyệt` (Steward/Reviewer - Xanh lá)<br>• `Từ chối` (Steward/Reviewer - Đỏ)<br>• `Chờ duyệt` (Proposer - Read-only) | • `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Rejected** | • `Chỉnh sửa lại` (Proposer - đưa về Draft) | • `Xóa bản nháp` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Approved (Mới nhất)** | • `+ Thêm CDE`<br>• `Tạo phiên bản mới` | • `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` | Toàn bộ chỉ đọc; `Export` (trong menu `...`). |
+| **Approved (Mới nhất)** | • `+ Thêm CDE`<br>• `Bớt CDE`<br>• `Tạo phiên bản mới` | • `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` | Toàn bộ chỉ đọc; chỉ thấy CDE Approved; `Export` (trong menu `...`). |
 | **Approved (Lịch sử cũ)** | Không hiển thị nút thao tác (ẩn toàn bộ nút Thêm/Sửa; màn hình chuyển sang chế độ chỉ đọc). | • `Xuất dữ liệu (Export)` | Chỉ đọc; `Export` (trong menu `...`). |
 
 ---
@@ -236,10 +241,12 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
 1. **Các dòng hiển thị ngang hàng (Flat List - Không phân biệt dòng chính/dòng con):**
    - Tất cả các phiên bản của CDE được hiển thị bình đẳng thành các dòng độc lập, ngang hàng nhau trên bảng dữ liệu.
    - Không áp dụng cơ chế phân cấp chính/con hay thụt lề `↳`.
+   - Mọi CDE là con trực tiếp của Data Dictionary; backend từ chối `parent` trỏ tới một CDE khác.
    - Các dòng có cùng mã CDE được xếp cạnh nhau, sắp xếp theo thứ tự phiên bản mới nhất ở trên để người dùng dễ theo dõi.
 2. **Quyền xem theo Role (Người dùng tự do tra cứu theo quyền):**
    - **Data Consumer:** Nhìn thấy tất cả các dòng phiên bản có trạng thái `Approved`. Người dùng tùy ý lựa chọn, tìm kiếm và xem chi tiết bất kỳ phiên bản CDE đã duyệt nào mà mình cần. Tuyệt đối không hiển thị các bản đang là `Draft`, `In Review` hoặc `Rejected`.
    - **Nhóm Quản trị (Admin, Steward, Proposer):** Nhìn thấy đầy đủ tất cả các dòng phiên bản (bao gồm cả `Draft`, `In Review`, `Rejected`, `Approved`) để phục vụ quản lý và chỉnh sửa.
+   - Trên Data Dictionary version mới nhất, các CDE working được phép tham gia danh sách nhưng chỉ xuất hiện với người có quyền working. Trên version lịch sử chỉ còn dữ liệu đã được chốt và không cho phép thêm/bớt.
 3. **Công cụ Tìm kiếm, Lọc và Phân trang (Search, Filters & Pagination):**
    - **Thanh tìm kiếm văn bản (Text Search Bar):**
      - *Vị trí:* Nằm ở góc trái thanh công cụ phía trên bảng (chiều rộng 280px, có nút xóa nhanh `x`).
@@ -284,22 +291,22 @@ Màn hình chi tiết CDE trong phân hệ Từ điển dữ liệu dùng chung 
 
 #### 1. Header và Khu vực điều khiển:
 - **Breadcrumbs điều hướng phân cấp rõ 2 tầng phiên bản:**  
-  `Glossaries > [DisplayName của Glossary] (v{glossaryVersion}) > [DisplayName của CDE] (v{cdeVersion})`  
+  `Glossaries > [DisplayName của Glossary] (v{parentBusinessVersion}) > [DisplayName của CDE] (v{businessVersion})`
   *(Ví dụ: `Glossaries > Từ điển dữ liệu dùng chung (v2.0) > Mã khách hàng (v1.1)`)*.
 - **Tên CDE:** Kế thừa cơ chế mặc định của OpenMetadata (hiển thị ưu tiên `displayName` tiếng Việt có dấu; fallback về `name` kỹ thuật nếu trống; `name` dùng cho FQN và URL).
 - **Bộ chọn Business Version (Dropdown Selector) & Đồng bộ URL chuẩn REST:**
   - **Định dạng URL chuẩn:**  
-    `/glossary/{cdeFqn}?glossaryVersion={glossaryVersion}&version={cdeVersion}`  
-    *(Ví dụ: `/glossary/DataDictionary.CDE1?glossaryVersion=2.0&version=1.1`)*.
-    - `glossaryVersion`: Xác định rõ CDE này đang được xem trong ngữ cảnh bản phát hành nào của Từ điển dùng chung (`Data Dictionary v2.0`).
-    - `version`: Xác định chính xác phiên bản nghiệp vụ của CDE đang xem (`CDE1 v1.1`).
-  - **Cơ chế tự động suy diễn (Smart Fallback):**
-    - *Khi click từ bảng CDE trong Từ điển v2.0:* Link tự động đính kèm `?glossaryVersion=2.0&version=1.1`.
-    - *Nếu URL chỉ truyền `?glossaryVersion=2.0` (không truyền `version`):* Backend tự động tra cứu trong Snapshot của `Data Dictionary v2.0` để resolve ra đúng phiên bản CDE thuộc gói phát hành đó.
-    - *Nếu URL chỉ truyền `?version=1.1` (truy cập CDE độc lập qua tìm kiếm/bookmark):* Giao diện hiển thị CDE v1.1 kèm nhãn ngữ cảnh: *“Thuộc bản phát hành Từ điển: Data Dictionary v2.0”*.
-    - *Nếu không truyền tham số nào:* Consumer tự động mở bản `Approved` mới nhất; nhóm Quản trị mở bản `Draft`/`In Review` đang soạn (nếu có).
+    `/glossary/{cdeFqn}?businessVersion={businessVersion}&parentBusinessVersion={parentBusinessVersion}`
+    *(Ví dụ: `/glossary/DataDictionary.CDE1?businessVersion=1.1&parentBusinessVersion=2.0`)*.
+    - `parentBusinessVersion`: Xác định rõ CDE này đang được xem trong ngữ cảnh bản phát hành nào của Từ điển dùng chung (`Data Dictionary v2.0`).
+    - `businessVersion`: Xác định chính xác phiên bản nghiệp vụ của CDE đang xem (`CDE1 v1.1`).
+  - **Quy tắc ngữ cảnh bắt buộc:**
+    - *Khi click từ bảng CDE trong Từ điển v2.0:* Link bắt buộc đính kèm `?businessVersion=1.1&parentBusinessVersion=2.0`.
+    - *Nếu URL thiếu `businessVersion`, thiếu `parentBusinessVersion` hoặc thiếu cả hai:* Trả `404 Not Found`; không fallback sang working/latest và không lộ payload.
+    - Không hỗ trợ chế độ xem CDE độc lập và không tự suy diễn Data Dictionary version từ CDE version hoặc CDE version từ Data Dictionary version.
+    - CDE `businessVersion` phải thuộc thành phần của Data Dictionary `parentBusinessVersion`: dùng danh mục sống nếu đó là latest, hoặc snapshot bất biến nếu là historical; không khớp thì trả `404 Not Found`.
   - **Phân quyền trong danh sách Dropdown:**
-    - *Consumer:* Trong dropdown chỉ hiển thị các bản `Approved`. Nếu tự ý gõ param URL trỏ tới bản `Draft`/`In Review`/`Rejected`, hệ thống chặn truy cập (trả lỗi 403 hoặc 404), hiển thị màn hình báo lỗi và tuyệt đối không hiển thị bất kỳ nút action nào.
+    - *Consumer:* Trong dropdown chỉ hiển thị các bản `Approved`. Nếu tự ý gõ param URL trỏ tới bản `Draft`/`In Review`/`Rejected`, hệ thống chặn truy cập (trả `404 Not Found`), hiển thị màn hình báo lỗi và tuyệt đối không hiển thị bất kỳ nút action nào.
     - *Nhóm Quản trị (Admin, Steward, Proposer):* Chọn được tất cả các phiên bản đang có (`Draft`, `In Review`, `Rejected`, `Approved`).
 - **Badge trạng thái (Status Badge):**
   - `[ Draft ]`: Bản nháp đang soạn thảo.
@@ -339,7 +346,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 #### 3. Các Tab chức năng:
 - **Tab Tổng quan (`Overview`):** Hiển thị toàn bộ thông tin cơ bản, mô tả, phân loại tags và các thuộc tính mở rộng Custom Properties của CDE.
 - **Tab Tài sản liên kết (`Assets`):** Danh sách các bảng dữ liệu, cột kỹ thuật được gắn ánh xạ (mapping) với CDE này.
-*(Hệ thống chủ động ẩn các tab kỹ thuật dư thừa như Sub-terms, Activity Feed, Data Observability và Custom Properties raw theo cơ chế `CDE_RESTRICTED_TABS` để giao diện gọn gàng và tối ưu trải nghiệm).*
+*(Sub-terms không thuộc mô hình nghiệp vụ và không được tạo. UI ẩn Sub-terms cùng các tab kỹ thuật dư thừa như Activity Feed, Data Observability và Custom Properties raw theo cơ chế `CDE_RESTRICTED_TABS`.)*
 
 
 ## 8. Hành vi khi người dùng thao tác
@@ -352,7 +359,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 | Approve | Modal xác nhận và danh sách validation | Chuyển sang published snapshot, badge Approved, cập nhật version selector. |
 | Reject | Xác nhận thao tác, không nhập lý do | Badge Rejected và hiển thị người từ chối. |
 | Tạo version kế tiếp | Yêu cầu business version mới | Tạo Draft rỗng; bản Approved cũ vẫn phục vụ Consumer. |
-| Chọn version lịch sử | Cập nhật Query Param `?version=...`, loading riêng cho nội dung | Nạp dữ liệu snapshot của version đã chọn, toàn bộ trường chỉ đọc (Read-only), ẩn các nút Thêm/Sửa. |
+| Chọn version lịch sử | Với Data Dictionary, cập nhật `?businessVersion=...`; với CDE, bắt buộc cập nhật đầy đủ `?businessVersion=...&parentBusinessVersion=...`, loading riêng cho nội dung | Nạp dữ liệu snapshot theo đúng cặp version đã chọn, toàn bộ trường chỉ đọc (Read-only), ẩn các nút Thêm/Sửa. |
 | Import | Hiển thị bước validation trước khi ghi | Chỉ tạo/cập nhật Draft; không tự động Approved. |
 | Export | Bấm chọn Export trong menu dấu ba chấm (...) | Xuất toàn bộ dữ liệu CDE mà người dùng được phép xem theo quyền ra file. |
 
@@ -390,12 +397,16 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 | **Lấy danh sách Glossary** | `GET /v1/glossaries` | `GlossaryResource.java` | `getGlossariesList(params)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy chi tiết Glossary theo FQN** | `GET /v1/glossaries/name/{fqn}` | `GlossaryResource.java` | `getGlossariesByName(fqn, params)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy bản Approved mới nhất (Glossary)** | `GET /v1/glossaries/{id}/published/latest` | `GlossaryResource.java` | `getLatestPublishedGlossary(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Lấy danh sách bản Approved (Glossary)** | `GET /v1/glossaries/{id}/published` | `GlossaryResource.java` | `getGlossaryVersionsList(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Lấy Glossary theo businessVersion** | `GET /v1/glossaries/{id}/published/{businessVersion}` | `GlossaryResource.java` | `getGlossaryVersion(id, businessVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy bản Draft hiện hành (Glossary)** | `GET /v1/glossaries/{id}/working` | `GlossaryResource.java` | `getGlossaryWorkingVersion(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lưu nháp in-place (Glossary)** | `PATCH /v1/glossaries/{id}/working` | `GlossaryResource.java` | `updateGlossaryWorkingVersion(id, rev, data)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Chuyển trạng thái Workflow (Glossary)** | `POST /v1/glossaries/{id}/working/{action}` | `GlossaryResource.java` | `transitionGlossaryWorkflow(id, action, req)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy danh sách CDE dạng phẳng (Flat list)** | `GET /v1/glossaryTerms` | `GlossaryTermResource.java` | `getGlossaryTerms(params)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy chi tiết CDE theo FQN** | `GET /v1/glossaryTerms/name/{fqn}` | `GlossaryTermResource.java` | `getGlossaryTermByFQN(fqn, params)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy bản Approved mới nhất (CDE)** | `GET /v1/glossaryTerms/{id}/published/latest` | `GlossaryTermResource.java` | `getLatestPublishedGlossaryTerm(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Lấy danh sách bản Approved (CDE)** | `GET /v1/glossaryTerms/{id}/published` | `GlossaryTermResource.java` | `getGlossaryTermsVersionsList(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Lấy CDE theo businessVersion** | `GET /v1/glossaryTerms/{id}/published/{businessVersion}` | `GlossaryTermResource.java` | `getGlossaryTermsVersion(id, businessVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lấy bản Draft hiện hành (CDE)** | `GET /v1/glossaryTerms/{id}/working` | `GlossaryTermResource.java` | `getGlossaryTermWorkingVersion(id)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Lưu nháp in-place (CDE)** | `PATCH /v1/glossaryTerms/{id}/working` | `GlossaryTermResource.java` | `updateGlossaryTermWorkingVersion(id, rev, data)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Chuyển trạng thái Workflow (CDE)** | `POST /v1/glossaryTerms/{id}/working/{action}` | `GlossaryTermResource.java` | `transitionGlossaryTermWorkflow(id, action, req)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
@@ -411,26 +422,22 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Frontend Function:** `getGlossariesList({ fields: 'owners,reviewers,tags' })`
 * **Màn hình sử dụng:** `GlossaryLeftPanel.component.tsx` (Mục 6.1).
 * **Quy tắc phân quyền Backend:**
-  * *Data Consumer / Basic Consumer:* Backend tự động lọc, chỉ trả về các Glossary đã có ít nhất một phiên bản được `Approved`.
-  * *Admin / Steward / Proposer:* Trả về toàn bộ Glossary trong hệ thống/miền quản lý.
+  * *Consumer-only (`canViewWorking = false`):* Backend chỉ trả nội dung có published snapshot `Approved`; nếu chưa publish thì không trả identity hoặc working payload.
+  * *Người dùng không phải Consumer-only:* Giữ nguyên kết quả và thứ tự representation mặc định của OpenMetadata theo role, policy, ownership và reviewer assignment. Không áp dụng bộ lọc published-only cho nhóm này.
+  * Không dùng điều kiện “có role Consumer” làm điều kiện đủ để lọc published-only, vì một người dùng có thể đồng thời là owner, Reviewer hoặc có quyền quản trị/soạn thảo.
 
-#### 2. Lấy thông tin chi tiết Glossary theo Version & Đồng bộ URL:
-* **Backend Endpoint:** `GET /v1/glossaries/name/{glossaryFqn}`
-* **Frontend Function:** `getGlossariesByName(glossaryFqn, { version: businessVersion })`
-* **Màn hình sử dụng:** `GlossaryHeader.component.tsx` (Mục 6.2).
-* **Tham số Query Params:**
-  * `version={businessVersion}`: (Tùy chọn, ví dụ `?version=1.0`). Đọc từ URL query param của trình duyệt.
-* **Hành vi xử lý:**
-  * **Có truyền `version`:** Backend nạp đúng snapshot của phiên bản đó. Nếu Consumer cố tình truyền version của bản `Draft`/`InReview`/`Rejected`, Backend trả về lỗi `403 Forbidden` hoặc `404 Not Found`. Khi nhận lỗi này, Frontend chuyển sang view thông báo lỗi, tuyệt đối không render form hay bất kỳ nút thao tác nào.
-  * **Không truyền `version` (URL mặc định):**
-    * *Consumer:* Tự động trả về bản snapshot `Approved` mới nhất.
-    * *Steward / Proposer:* Tự động trả về bản đang làm việc `Draft`/`InReview` (nếu có), hoặc bản `Approved` mới nhất nếu không có bản nháp.
+#### 2. Lấy chi tiết mặc định và lịch sử Approved của Glossary:
+* **Chi tiết mặc định:** `GET /v1/glossaries/name/{glossaryFqn}` qua `getGlossariesByName(glossaryFqn, params)`; không truyền query version nghiệp vụ. Consumer-only nhận bản `Approved` mới nhất, còn người dùng khác giữ nguyên cách OpenMetadata phân giải representation theo quyền.
+* **Danh sách lịch sử Approved:** `GET /v1/glossaries/{id}/published` qua `getGlossaryVersionsList(id)`.
+* **Chi tiết một bản phát hành:** `GET /v1/glossaries/{id}/published/{businessVersion}` qua `getGlossaryVersion(id, businessVersion)`.
+* **Đồng bộ URL:** Query `?businessVersion={businessVersion}` chỉ là trạng thái định tuyến của trình duyệt. Frontend đọc giá trị này và gọi endpoint `/published/{businessVersion}`; không chuyển nó thành query `version` của endpoint theo FQN.
+* **Quy tắc:** Endpoint `/published` chỉ trả snapshot `Approved`. `businessVersion` không tồn tại hoặc không phải bản đã publish trả `404 Not Found` và không lộ payload. Historical snapshot luôn chỉ đọc.
 
-#### 3. Lấy danh sách Version của Glossary cho Dropdown Selector:
-* **Backend Endpoint:** `GET /v1/glossaries/{id}/versions`
-* **Frontend Function:** `getGlossaryVersionsList(id)`
-* **Màn hình sử dụng:** Dropdown chọn phiên bản trên Header Từ điển.
-* **Quy tắc Backend:** Consumer chỉ nhận danh sách các bản có `status = Approved`.
+#### 3. Bộ chọn Business Version của Glossary:
+* Selector lấy các bản `Approved` từ `GET /v1/glossaries/{id}/published`; nếu người dùng có `canViewWorking`, UI có thể ghép thêm working entry lấy từ endpoint `/working` theo quyền.
+* Badge, breadcrumb, selector và URL đều dùng đúng trường `businessVersion` trong response.
+* Danh sách sắp xếp giảm dần theo từng đoạn số, vì vậy `1.10` đứng trước `1.2`.
+* Không dùng `version`, `nativeVersion` hoặc `publicationSequence` làm alias cho `businessVersion`.
 
 #### 4. Thao tác vòng đời trên Glossary (Maker - Checker):
 * **Tạo phiên bản mới (Upgrade Version):**
@@ -439,7 +446,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Lưu nháp in-place (Save Draft):**
   * Gọi: `updateGlossaryWorkingVersion(id, expectedRevision, payload)`
   * Endpoint backend: `PATCH /v1/glossaries/{id}/working`
-  * *Hành vi:* Ghi đè trực tiếp tại chỗ, **không tăng `nativeVersion` ngầm**.
+  * *Hành vi:* Ghi đè trực tiếp tại chỗ, **không tạo `businessVersion` mới**.
 * **Gửi duyệt Glossary:**
   * Gọi: `transitionGlossaryWorkflow(id, 'submit', {})`
   * Endpoint backend: `POST /v1/glossaries/{id}/working/submit`
@@ -447,7 +454,11 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Phê duyệt Glossary:**
   * Gọi: `transitionGlossaryWorkflow(id, 'approve', {})`
   * Endpoint backend: `POST /v1/glossaries/{id}/working/approve`
-  * *Hành vi:* Đóng gói snapshot bất biến, chuyển trạng thái $\rightarrow$ `Approved`.
+  * *Hành vi:* Chuyển trạng thái $\rightarrow$ `Approved` và đặt làm published head. Version này là latest-mutable cho tới khi một Data Dictionary version mới được Approved; khi đó version cũ được chốt thành historical snapshot bất biến.
+* **Thêm/bớt CDE trên Data Dictionary Approved mới nhất:**
+  * Chỉ Admin/Steward/Proposer có policy phù hợp được thao tác; dùng optimistic locking và ghi audit actor/revision.
+  * Cho phép tham chiếu CDE `Draft`, `InReview`, `Rejected` hoặc `Approved` thuộc đúng Data Dictionary. Consumer read model luôn lọc cứng chỉ trả CDE `Approved`.
+  * Không cho phép thay đổi Data Dictionary historical.
 * **Từ chối Glossary:**
   * Gọi: `transitionGlossaryWorkflow(id, 'reject', {})`
   * Endpoint backend: `POST /v1/glossaries/{id}/working/reject`
@@ -470,7 +481,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Màn hình sử dụng:** Bảng danh sách CDE trong Từ điển (`GlossaryTermsV1.component.tsx`).
 * **Tham số Query Params:**
   * `glossary={glossaryId}`: ID của Glossary cha.
-  * `version={glossaryBusinessVersion}`: Phiên bản Glossary đang xem.
+  * `parentBusinessVersion={parentBusinessVersion}`: Phiên bản nghiệp vụ của Data Dictionary cha đang cung cấp ngữ cảnh cho CDE.
   * `q={keyword}`: Từ khóa tìm kiếm theo Mã hoặc Tên CDE.
   * `domain={domain}`: Lọc theo Miền nghiệp vụ.
   * `status={status}`: Lọc theo trạng thái (`Approved`, `Draft`, `InReview`, `Rejected`).
@@ -483,22 +494,19 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 
 ### 9.5. Nhóm API Chi tiết CDE (CDE / GlossaryTerm Level)
 
-#### 1. Lấy chi tiết CDE theo Version & Đồng bộ URL:
-* **Backend Endpoint:** `GET /v1/glossaryTerms/name/{cdeFqn}`
-* **Frontend Function:** `getGlossaryTermByFQN(cdeFqn, { glossaryVersion, version })`
-* **Màn hình sử dụng:** Trang chi tiết CDE (`GlossaryTermTab.component.tsx`, Mục 7.1).
-* **Tham số Query Params:**
-  * `glossaryVersion={glossaryVersion}`: (Tùy chọn, ví dụ `?glossaryVersion=2.0`). Xác định bản phát hành Từ điển cha đang duyệt.
-  * `version={cdeVersion}`: (Tùy chọn, ví dụ `?version=1.1`). Xác định phiên bản nghiệp vụ CDE cần xem.
-* **Hành vi xử lý:**
-  * Trả về toàn bộ thông tin CDE: Mã, Tên, Mô tả, Tags (DataSource, DataClassification, PersonalData), Reviewers, Owners, Domains và 5 Custom Properties trong `extension`.
-  * Nếu Consumer cố tình truy cập URL trỏ vào bản chưa duyệt (`Draft`/`InReview`/`Rejected`), Backend trả lỗi `403 Forbidden` hoặc `404 Not Found`. Khi nhận lỗi này, Frontend chuyển sang view thông báo lỗi, tuyệt đối không render form hay bất kỳ nút thao tác nào.
+#### 1. Lấy chi tiết mặc định và lịch sử Approved của CDE:
+* **Phân giải identity:** `GET /v1/glossaryTerms/name/{cdeFqn}` qua `getGlossaryTermByFQN(cdeFqn, params)` chỉ dùng để xác định identity kỹ thuật cần thiết cho các API lịch sử; frontend không hiển thị payload này như nội dung CDE khi URL thiếu cặp version bắt buộc.
+* **Danh sách lịch sử Approved:** `GET /v1/glossaryTerms/{id}/published` qua `getGlossaryTermsVersionsList(id)`.
+* **Chi tiết một bản phát hành:** `GET /v1/glossaryTerms/{id}/published/{businessVersion}` qua `getGlossaryTermsVersion(id, businessVersion)`.
+* **Đồng bộ URL:** `businessVersion` là trạng thái định tuyến của trình duyệt và được ánh xạ vào path `/published/{businessVersion}`; không truyền thành query `version` của endpoint theo FQN.
+* **Ngữ cảnh Data Dictionary:** Frontend/backend đọc thành phần của `parentBusinessVersion` và kiểm tra CDE `businessVersion` có thuộc Data Dictionary hay không. Nếu `parentBusinessVersion` là latest thì dùng danh mục sống có lọc quyền; nếu là historical thì dùng `termRevisions` bất biến. Không khớp trả `404`.
+* URL CDE bắt buộc có đồng thời `businessVersion` và `parentBusinessVersion`. Thiếu một trong hai param hoặc thiếu cả hai đều trả `404 Not Found`; không tự resolve param còn thiếu và không hỗ trợ CDE độc lập.
+* `businessVersion` hoặc `parentBusinessVersion` không tồn tại, không phải bản đã publish hoặc không khớp nhau trả `404 Not Found` và không lộ payload. Historical snapshot luôn chỉ đọc.
 
-#### 2. Lấy danh sách Version của CDE cho Dropdown Selector:
-* **Backend Endpoint:** `GET /v1/glossaryTerms/{id}/versions`
-* **Frontend Function:** `getGlossaryTermsVersionsList(id)`
-* **Màn hình sử dụng:** Dropdown chọn phiên bản CDE trên Header.
-* **Quy tắc Backend:** Consumer chỉ nhận danh sách các bản đã `Approved`.
+#### 2. Bộ chọn Business Version của CDE:
+* Selector lấy các bản `Approved` từ `GET /v1/glossaryTerms/{id}/published`; working entry của người có quyền được lấy riêng từ `/working`.
+* Badge và selector dùng `businessVersion` của CDE; breadcrumb và URL dùng đồng thời `businessVersion` của CDE và `parentBusinessVersion` của Data Dictionary cha. Không dùng `version`, `nativeVersion` hoặc `publicationSequence` làm alias.
+* Danh sách sắp xếp giảm dần theo từng đoạn số, vì vậy `1.10` đứng trước `1.2`.
 
 #### 3. Thao tác vòng đời CDE (Maker - Checker):
 * **Tạo mới CDE (Bản v1.0):**
@@ -513,7 +521,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Gọi: `updateGlossaryTermWorkingVersion(id, expectedRevision, payload)`
   * Endpoint backend: `PATCH /v1/glossaryTerms/{id}/working`
   * *Request Body:* `{ "expectedRevision": 1, "payload": { ... } }`
-  * *Hành vi:* Ghi đè trực tiếp tại chỗ vào bản Draft hiện hành, **không tăng `nativeVersion` ngầm**.
+  * *Hành vi:* Ghi đè trực tiếp tại chỗ vào bản Draft hiện hành, **không tạo `businessVersion` mới**.
 * **Gửi duyệt CDE:**
   * Gọi: `transitionGlossaryTermWorkflow(id, 'submit', {})`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/submit`
@@ -550,9 +558,9 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 
 1. **Phân quyền và biểu diễn dữ liệu ở tầng Backend (Server-side Enforcement):**
    * Backend xác định Role từ JWT Token và Policy để trả về đúng dữ liệu đại diện (`representation`).
+   * Phân loại Consumer-only theo quyền hiệu lực trên entity: `canViewPublished = true` và `canViewWorking = false`. Owner/Reviewer assignment và policy có thể nâng quyền xem working; không được lọc published-only chỉ vì người dùng đồng thời mang role Consumer.
    * Tuyệt đối không trả toàn bộ danh sách/lịch sử về Frontend để Frontend tự ẩn/hiện bằng JavaScript.
 2. **Khóa lạc quan (Optimistic Locking):**
    * Mọi request chỉnh sửa (`PATCH /working`) phải gửi kèm `expectedRevision`. Nếu bản ghi đã bị thay đổi bởi người khác, Backend trả lỗi `409 Conflict` để UI thông báo người dùng tải lại trang.
 3. **Bảo toàn chuẩn OpenMetadata:**
    * Không tự ý tạo thêm endpoint riêng ngoài chuẩn `/glossaries` và `/glossaryTerms`. Mọi thông tin mở rộng của CDE được lưu trữ và truy xuất chuẩn hóa qua trường `extension` (Custom Properties).
-

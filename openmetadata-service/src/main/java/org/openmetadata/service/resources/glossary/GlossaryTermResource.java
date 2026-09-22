@@ -101,7 +101,6 @@ import org.openmetadata.service.security.Authorizer;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContextInterface;
-import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.Fields;
@@ -367,7 +366,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @PathParam("id") UUID id) {
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     Map<String, Boolean> permissions = capabilities(securityContext, term).asMap();
-    permissions.put("isConsumer", isConsumer(securityContext));
+    permissions.put("isConsumer", isConsumer(securityContext, term));
     return permissions;
   }
 
@@ -378,9 +377,6 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, GlossaryTerm term) {
-    if (isConsumer(securityContext)) {
-      return GlossaryAuthorizationResolver.publishedReadOnly();
-    }
     return GlossaryAuthorizationResolver.resolve(
             getSubjectContext(securityContext), term.getOwners(), term.getReviewers())
         .restrictToPolicy(
@@ -578,11 +574,9 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               Include.NON_DELETED,
               false));
     }
-    String effectiveEntityStatus = resolveEffectiveEntityStatus(securityContext, entityStatus);
+    String effectiveEntityStatus = entityStatus;
     boolean publishedOnly =
-        isConsumer(securityContext)
-            || "Approved".equals(effectiveEntityStatus)
-            || "Published".equals(effectiveEntityStatus);
+        "Approved".equals(effectiveEntityStatus) || "Published".equals(effectiveEntityStatus);
     ListFilter filter =
         new ListFilter(include)
             .addQueryParam("parent", fqn)
@@ -614,7 +608,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       }
       terms.setData(resolved);
     } else if (terms != null && terms.getData() != null) {
-      terms.setData(resolveManagerRepresentations(terms.getData()));
+      terms.setData(resolveRepresentations(securityContext, terms.getData()));
     }
     return addHref(uriInfo, terms);
   }
@@ -702,7 +696,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       glossaryFqn = DataDictionaryResolver.DATA_DICTIONARY_NAME;
     }
 
-    String effectiveEntityStatus = resolveEffectiveEntityStatus(securityContext, entityStatus);
+    String effectiveEntityStatus = entityStatus;
     boolean publishedOnly =
         "Published".equals(effectiveEntityStatus) || "Approved".equals(effectiveEntityStatus);
     String repositoryStatus = publishedOnly ? "Published" : effectiveEntityStatus;
@@ -743,34 +737,30 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               .map(snapshot -> JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class))
               .toList());
     } else if (result != null && result.getData() != null) {
-      result.setData(resolveManagerRepresentations(result.getData()));
+      result.setData(resolveRepresentations(securityContext, result.getData()));
     }
 
     return addHref(uriInfo, result);
   }
-
-  private String resolveEffectiveEntityStatus(
-      SecurityContext securityContext, String requestedEntityStatus) {
-    SubjectContext subjectContext = getSubjectContext(securityContext);
-    if (!subjectContext.isAdmin() && !subjectContext.isBot()) {
-      boolean isElevatedRole =
-          subjectContext.hasAnyRole("DataSteward")
-              || subjectContext.hasAnyRole("DataProposer")
-              || subjectContext.hasAnyRole("Admin");
-      if (!isElevatedRole
-          && (subjectContext.hasAnyRole("BasicConsumer")
-              || subjectContext.hasAnyRole("DataConsumer"))) {
-        return "Published";
-      }
-    }
-    return requestedEntityStatus;
+  private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
+    GlossaryTerm authorizationTerm =
+        repository.get(
+            null,
+            term.getId(),
+            repository.getFields("owners,reviewers,glossary"),
+            Include.NON_DELETED,
+            false);
+    GlossaryAuthorizationResolver.Capabilities effective =
+        capabilities(securityContext, authorizationTerm);
+    return effective.canViewPublished() && !effective.canViewWorking();
   }
 
-  private boolean isConsumer(SecurityContext securityContext) {
-    return GlossaryAuthorizationResolver.isConsumerOnly(getSubjectContext(securityContext));
+  private boolean isConsumer(SecurityContext securityContext, UUID id) {
+    return isConsumer(securityContext, requireCde(id));
   }
 
-  private List<GlossaryTerm> resolveManagerRepresentations(List<GlossaryTerm> terms) {
+  private List<GlossaryTerm> resolveRepresentations(
+      SecurityContext securityContext, List<GlossaryTerm> terms) {
     List<UUID> ids = terms.stream().map(GlossaryTerm::getId).toList();
     Map<UUID, WorkingVersionRecord> workingVersions =
         versioningService.getWorkingBatch(GlossaryVersioningService.GLOSSARY_TERM, ids);
@@ -779,6 +769,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return terms.stream()
         .map(
             term -> {
+              if (isConsumer(securityContext, term)) {
+                PublishedSnapshotRecord published = publishedVersions.get(term.getId());
+                return published == null
+                    ? null
+                    : JsonUtils.readValue(published.payload(), GlossaryTerm.class);
+              }
               WorkingVersionRecord working = workingVersions.get(term.getId());
               if (working != null) {
                 return JsonUtils.readValue(
@@ -790,6 +786,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                   ? term
                   : JsonUtils.readValue(published.payload(), GlossaryTerm.class);
             })
+        .filter(java.util.Objects::nonNull)
         .toList();
   }
 
@@ -895,7 +892,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm term =
         getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
     DataDictionaryResolver.requireCde(term);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, term)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY_TERM, id);
       return addHref(uriInfo, JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class));
@@ -1006,20 +1003,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         LOG.warn("byIds: unexpected error hydrating glossary term {}", id, ex);
       }
     }
-    if (isConsumer(securityContext)) {
-      Map<UUID, PublishedSnapshotRecord> snapshots =
-          versioningService.getLatestPublishedBatch(
-              GlossaryVersioningService.GLOSSARY_TERM,
-              result.stream().map(GlossaryTerm::getId).toList());
-      return result.stream()
-          .map(term -> snapshots.get(term.getId()))
-          .filter(java.util.Objects::nonNull)
-          .map(
-              snapshot ->
-                  addHref(uriInfo, JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class)))
-          .toList();
-    }
-    return resolveManagerRepresentations(result).stream()
+    return resolveRepresentations(securityContext, result).stream()
         .map(term -> addHref(uriInfo, term))
         .toList();
   }
@@ -1097,7 +1081,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm term =
         getByNameInternal(uriInfo, securityContext, fqn, fieldsParam, include, includeRelations);
     DataDictionaryResolver.requireCde(term);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, term)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(
               GlossaryVersioningService.GLOSSARY_TERM, term.getId());
@@ -1145,7 +1129,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           @PathParam("id")
           UUID id) {
     requireCde(id);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, id)) {
       throw new AuthorizationException(
           "Native metadata history is not available to consumers; use /published");
     }
@@ -1182,7 +1166,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           @PathParam("version")
           String version) {
     requireCde(id);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, id)) {
       throw new AuthorizationException(
           "Native metadata history is not available to consumers; use /published");
     }

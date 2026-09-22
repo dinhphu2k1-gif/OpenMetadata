@@ -1,4 +1,4 @@
-# Kế hoạch bàn giao Từ điển dữ liệu dùng chung theo từng chức năng
+# Kế hoạch triển khai Từ điển dữ liệu dùng chung theo từng chức năng
 
 ## 1. Tài liệu nguồn và phạm vi
 
@@ -7,7 +7,7 @@ Kế hoạch này là kế hoạch triển khai của tài liệu [Thiết kế 
 ### Trong phạm vi
 
 - Duy nhất Glossary có định danh nghiệp vụ **Data Dictionary**, hiển thị là **Từ điển dữ liệu dùng chung**.
-- Các GlossaryTerm trực thuộc Data Dictionary, được gọi là **Thành tố dữ liệu dùng chung (CDE)**.
+- Các GlossaryTerm trực thuộc Data Dictionary, được gọi là **Thành tố dữ liệu dùng chung (CDE)**. Data Dictionary là cha duy nhất; mọi CDE là con trực tiếp và không tồn tại quan hệ CDE cha — CDE con.
 - Business version, working/published snapshot, maker-checker workflow, phân quyền, danh sách CDE, tìm kiếm/lọc, import/export và Assets được mô tả trong tài liệu thiết kế.
 - Data Dictionary là Glossary nghiệp vụ duy nhất được hỗ trợ; toàn bộ GlossaryTerm của nó được xử lý như CDE theo BusinessWorkflow.
 
@@ -53,13 +53,15 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 
 F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhánh CDE F03–F06 và Data Dictionary F07–F10 có thể phát triển riêng, nhưng không publish Data Dictionary trước khi invariant tham chiếu CDE snapshot đã được kiểm chứng.
 
+F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Các role khác tiếp tục sử dụng luồng, route, empty state và representation mặc định của OpenMetadata theo quyền hiện có; F01 không thay đổi hành vi của nhóm này.
+
 ### Ma trận truy vết về tài liệu thiết kế
 
 | ID | Mục thiết kế được hiện thực |
 | --- | --- |
 | F00 | §2.2–2.4 Phạm vi CDE/version; §3 Trạng thái; §9.7 Phân quyền backend |
 | F01 | §4.2 Nội dung được thấy; §6.1–6.2 Glossary UI; §7.1 CDE UI; §9.3, §9.5 |
-| F02 | §2.3 Business version; §6.2 và §7.1 URL/version selector; §9.3, §9.5 |
+| F02 | §2.3 Business version; §6.2 và §7.1 URL/businessVersion selector; §9.3, §9.5 |
 | F03 | §5.4 Snapshot CDE; §7.1 Draft UI; §8 Save Draft; §9.5.3 |
 | F04 | §3 State machine; §4.3 Ma trận thao tác; §7.1; §8; §9.5.3 |
 | F05 | §5.4 Snapshot bất biến; §7.1 Approved; §8 Approve; §9.5.3; §9.7 |
@@ -83,46 +85,58 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Data Dictionary là Glossary nghiệp vụ duy nhất, có vòng đời Draft → InReview → Approved/Rejected và business version.
 - CDE kế thừa workflow và vòng đời từ Data Dictionary, không có cấu hình workflow riêng.
+- Khóa mô hình một cấp: Data Dictionary là cha, CDE là con trực tiếp; từ chối mọi payload gán một CDE làm `parent` của CDE khác.
 - Tạo resolver backend dùng chung để nhận diện Data Dictionary bằng định danh ổn định, không hard-code display name rải rác.
-- Loại bỏ entry point và route của Native Glossary khỏi frontend.
+- Giữ nguyên các entry point, route, empty state và hành vi quản trị mặc định của OpenMetadata cho người dùng không phải Consumer-only; chỉ giới hạn nghiệp vụ Data Dictionary tại các API thuộc phạm vi tính năng.
 
 **Test/DoD**
 
 - Backend từ chối tạo hoặc sử dụng Glossary nghiệp vụ ngoài Data Dictionary qua các API thuộc phạm vi tính năng này.
-- UI không hiển thị trang, action hoặc điều hướng sang Native Glossary.
+- Admin/Steward/Proposer/owner/Reviewer vẫn sử dụng được route, empty state và action mặc định theo quyền; không bị chuyển sang 404 chỉ vì chưa có published snapshot.
+- F00 không tạo bootstrap identity hoặc snapshot `Approved` giả.
 - Term không thể cấu hình workflow khác Data Dictionary cha.
+- Không tạo, đọc hoặc hiển thị cây CDE/sub-term; API thuộc tính năng từ chối quan hệ CDE cha — CDE con.
 - UI và API chỉ triển khai trực tiếp luồng Data Dictionary/CDE, không có nhánh cấu hình lựa chọn hành vi.
 
 ### F01 — Consumer xem Approved mới nhất
 
 **Phạm vi**
 
-- GET mặc định resolve published head cho Consumer.
-- Sidebar chỉ trả Glossary đã có published snapshot.
-- Entity chưa publish không được fallback sang identity hoặc Draft.
-- Trang Glossary/CDE read-only; không render action trong lúc chờ permission.
+- Chỉ Consumer-only (`canViewPublished = true`, `canViewWorking = false`) bị giới hạn published-only. Không phân loại published-only chỉ dựa trên việc người dùng có role `BasicConsumer`/`DataConsumer` nếu họ đồng thời có quyền quản trị, soạn thảo, owner hoặc Reviewer assignment.
+- GET mặc định resolve published head cho Consumer-only; entity chưa publish không được fallback sang identity hoặc working payload.
+- Sidebar của Consumer-only chỉ trả Data Dictionary đã có published snapshot.
+- Với người dùng không phải Consumer-only, GET/list và UI giữ nguyên hành vi identity/working/published, route và empty state mặc định của OpenMetadata.
+- F01 không thêm redirect, bộ lọc published-only hoặc representation fallback mới cho người dùng không phải Consumer-only.
+- Trang Glossary/CDE của Consumer-only luôn read-only; không render action trong lúc chờ permission.
 
 **Test/DoD**
 
 - Consumer vẫn thấy v1.0 khi v1.1 đang Draft, InReview hoặc Rejected.
-- Working endpoint hay FQN chưa publish trả 403/404 và không lộ payload.
+- Consumer-only gọi working endpoint hoặc FQN chưa publish nhận 403/404 và không lộ payload.
+- Admin/Steward/Proposer/owner/Reviewer giữ nguyên kết quả và điều hướng mặc định của OpenMetadata khi chưa có published snapshot.
+- Owner/Reviewer có quyền working không bị nhận nhầm là Consumer-only dù đồng thời mang role Consumer.
+- Khi chưa có dữ liệu, người dùng không phải Consumer-only thấy empty state/action mặc định theo quyền thay vì trang 404; Consumer-only nhận danh sách rỗng hoặc 403/404 khi truy cập trực tiếp.
 - Có E2E Consumer xem Data Dictionary và CDE Approved.
 
-### F02 — Lịch sử Approved và deep link
+### F02 — Lịch sử Approved theo businessVersion và deep link
 
 **Phạm vi**
 
-- Không expose native history ở tầng sản phẩm; dùng `/published` cho business history.
-- Data Dictionary hỗ trợ query version; CDE hỗ trợ `glossaryVersion` và `version` để giữ tương thích với REST contract kỹ thuật.
-- Nếu chỉ có `glossaryVersion`, resolve CDE revision từ Data Dictionary snapshot.
-- Selector, badge và breadcrumb đồng bộ URL; historical snapshot luôn read-only.
+- `businessVersion` là định danh version của entity hiện tại; mọi browser URL mở CDE bắt buộc dùng thêm `parentBusinessVersion` để xác định version Data Dictionary cha. UI, frontend business model và business API/response không dùng alias `version`/`nativeVersion`, đồng thời không ánh xạ `publicationSequence` thành version nghiệp vụ.
+- Data Dictionary dùng URL `?businessVersion={businessVersion}`; frontend lấy danh sách qua `GET /v1/glossaries/{id}/published` và lấy chi tiết qua `GET /v1/glossaries/{id}/published/{businessVersion}`.
+- CDE là con trực tiếp của Data Dictionary và dùng URL `?businessVersion={businessVersion}&parentBusinessVersion={parentBusinessVersion}`. `businessVersion` là version CDE; `parentBusinessVersion` là version Data Dictionary cha. Lịch sử CDE được lấy qua `GET /v1/glossaryTerms/{id}/published` và `/published/{businessVersion}`.
+- URL CDE thiếu `businessVersion`, thiếu `parentBusinessVersion` hoặc thiếu cả hai trả `404` và không lộ payload. Không hỗ trợ CDE độc lập, không tự resolve param còn thiếu và không suy diễn Data Dictionary version từ CDE version hoặc ngược lại. Khi có đủ hai param, CDE version phải thuộc snapshot Data Dictionary; không khớp trả `404`. Không áp dụng quy tắc này cho CDE cha — CDE con vì quan hệ đó không tồn tại.
+- Query param của trình duyệt chỉ là routing state; không truyền thành query `version` của endpoint theo FQN.
+- Selector và badge dùng `businessVersion` của CDE; breadcrumb và URL dùng đồng thời `businessVersion` của CDE và `parentBusinessVersion` của Data Dictionary cha. Historical snapshot luôn read-only. Danh sách version sắp xếp giảm dần theo từng đoạn số.
+- F02 chỉ đọc dữ liệu Approved đã tồn tại; không triển khai publish. Cơ chế version kỹ thuật nội bộ và hành vi OpenMetadata mặc định của người dùng không phải Consumer-only không bị thay đổi.
 
 **Test/DoD**
 
-- F5, bookmark và back/forward giữ đúng version.
-- Version không tồn tại trả 404; Consumer trỏ vào non-Approved bị chặn.
-- Version 1.10 sắp sau 1.2 bằng comparator số.
-- Native version không xuất hiện trong UI hoặc business response.
+- F5, bookmark và back/forward trên CDE giữ đúng cả `businessVersion`, `parentBusinessVersion` và nội dung snapshot.
+- URL CDE thiếu một trong hai param bắt buộc, version không tồn tại, chưa Approved hoặc không khớp Data Dictionary snapshot trả `404` và không lộ payload.
+- `1.10` sắp trước `1.2` bằng comparator theo từng đoạn số.
+- UI và business API/response dùng `businessVersion` cho entity hiện tại; URL CDE bắt buộc dùng thêm `parentBusinessVersion` cho ngữ cảnh cha; không có field/param `version` hoặc `nativeVersion`, và không ánh xạ từ `publicationSequence`.
+- URL Data Dictionary mặc định không có business version giữ hành vi F01: Consumer-only nhận Approved mới nhất; người dùng khác giữ nguyên representation mặc định của OpenMetadata. Quy tắc fallback này không áp dụng cho URL CDE.
 
 ### F03 — Tạo và lưu Draft CDE
 
@@ -130,7 +144,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Tạo identity và working record nhất quán.
 - PATCH working bắt buộc expectedRevision integer; chỉ Draft được sửa.
-- Save tăng workingRevision, không tăng native version.
+- Save tăng `workingRevision`, không tạo `businessVersion` mới.
 - UI có loading/disabled; sau save dùng revision mới từ response.
 - 409 yêu cầu reload, không tự retry ghi đè.
 
@@ -138,7 +152,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Create và save nhiều lần.
 - Hai writer cùng revision: một thành công, một nhận 409.
-- Không fallback từ workingRevision sang native version.
+- Không dùng `workingRevision` làm fallback cho `businessVersion`.
 - Consumer/Reviewer mặc định không tạo hoặc sửa Draft.
 
 ### F04 — Submit, Reject và Reopen CDE
@@ -195,46 +209,50 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 **Phạm vi**
 
+- Tạo identity và working record nhất quán theo luồng tạo Data Dictionary.
 - Áp dụng optimistic locking như F03 ở cấp Data Dictionary.
 - Working payload luôn có termRevisions hợp lệ.
-- Bản đầu tiên giữ dữ liệu vừa nhập; Save không đổi published Data Dictionary.
+- Bản Draft đầu tiên giữ dữ liệu người dùng vừa nhập; Save không đổi published Data Dictionary.
 - Header có Save Draft, badge và permission-driven actions.
 
 **Test/DoD**
 
+- Create lần đầu tạo đúng một Data Dictionary identity và working record tương ứng.
 - Concurrent save trả 409.
 - Save Draft không làm đổi term snapshot.
 - Request tạo hoặc vận hành Glossary nghiệp vụ ngoài Data Dictionary bị từ chối rõ ràng.
 
-### F08 — Thêm/bớt CDE revision trong working Data Dictionary
+### F08 — Thêm/bớt CDE revision trong working hoặc latest Data Dictionary
 
 **Phạm vi**
 
-- Chỉ thêm CDE snapshot Approved, tồn tại và thuộc đúng Data Dictionary.
+- Working Data Dictionary và Data Dictionary Approved mới nhất cho phép người có quyền thêm/bớt CDE thuộc đúng Data Dictionary; historical Data Dictionary luôn khóa.
+- Latest Data Dictionary được phép tham chiếu CDE `Draft`, `InReview`, `Rejected` hoặc `Approved`. Consumer read model chỉ trả CDE `Approved`; manager nhận các trạng thái theo quyền.
 - Lưu cặp termId và termBusinessVersion, không chỉ termId.
 - Add/remove dùng optimistic locking.
-- Nút Thêm CDE chỉ thao tác trên working version; Approved không bị mutate.
+- Mọi mutation latest ghi audit actor/revision và không đổi `businessVersion`.
 
 **Test/DoD**
 
-- Không thêm Draft/Rejected CDE hoặc CDE của Glossary khác.
+- Không thêm CDE của Glossary khác; Consumer không thấy CDE Draft/InReview/Rejected đã được thêm vào latest.
 - Add/remove conflict trả 409.
 - CDE version mới không tự thay thế version đã chọn.
 - Reload giữ đúng revisions và display order.
+- Add/remove trên historical Data Dictionary bị từ chối.
 
 ### F09 — Workflow và publish Data Dictionary
 
 **Phạm vi**
 
 - Submit, Reject, Reopen, Approve và authorization tương tự CDE.
-- Trước approve, validate mọi term revision còn tồn tại và Approved.
+- Trước approve, validate mọi term revision còn tồn tại và thuộc đúng Data Dictionary; trạng thái CDE được bảo vệ ở read model theo quyền.
 - Snapshot Data Dictionary và liên kết CDE snapshots ghi trong cùng transaction.
-- InReview/historical Approved khóa add/remove.
+- InReview và historical Approved khóa add/remove; Approved latest cho phép add/remove theo F08.
 
 **Test/DoD**
 
 - Data Dictionary v1.0 vẫn trả CDE v1.0 sau khi CDE v1.1 được publish.
-- Một term revision lỗi làm approve thất bại toàn bộ.
+- Một term revision không tồn tại hoặc thuộc Data Dictionary khác làm approve thất bại toàn bộ.
 - Reviewer assignment và concurrency có integration test.
 - E2E publish Data Dictionary có nhiều CDE revisions.
 
@@ -244,7 +262,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Version lớn hơn latest published.
 - termRevisions luôn rỗng; không kế thừa ngầm CDE list.
-- Giữ identity fields; Approved cũ tiếp tục phục vụ Consumer.
+- Giữ identity fields; khi version mới được Approved, Approved cũ được chốt thành historical snapshot bất biến và tiếp tục phục vụ Consumer.
 
 **Test/DoD**
 
@@ -259,7 +277,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 - Backend read model trả một row cho termId, businessVersion và status.
 - Manager nhận working + published theo quyền; Consumer chỉ nhận published.
 - Total count tính sau authorization.
-- Row key gồm termId và businessVersion; click row tạo URL đúng context.
+- Row key gồm termId và businessVersion; click row tạo URL có đủ `businessVersion` của CDE và `parentBusinessVersion` của Data Dictionary cha.
 
 **Test/DoD**
 
@@ -364,7 +382,7 @@ Checklist bắt buộc cho mỗi PR:
 - [ ] Có positive và negative authorization tests.
 - [ ] Có test 409 nếu là mutation.
 - [ ] Có negative test chứng minh Native Glossary không được expose qua UI hoặc business API.
-- [ ] Không trộn native version, business version và working revision.
+- [ ] Không trộn `businessVersion`, `workingRevision` và lịch sử metadata kỹ thuật nội bộ.
 - [ ] UI có loading, empty, error và stale-request handling.
 - [ ] Có thể rollback bản triển khai mà không xóa dữ liệu.
 

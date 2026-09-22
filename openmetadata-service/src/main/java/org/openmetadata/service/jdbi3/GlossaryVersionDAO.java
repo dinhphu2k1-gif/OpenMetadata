@@ -69,6 +69,14 @@ public interface GlossaryVersionDAO {
 
   @SqlQuery(
       "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          + "FROM glossary_business_working WHERE entityType = :entityType AND glossaryId = :glossaryId "
+          + "ORDER BY updatedAt DESC, entityId")
+  @RegisterRowMapper(WorkingVersionMapper.class)
+  List<WorkingVersionRecord> listWorkingByGlossary(
+      @Bind("entityType") String entityType, @BindUUID("glossaryId") UUID glossaryId);
+
+  @SqlQuery(
+      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND entityId = :entityId FOR UPDATE")
   @RegisterRowMapper(WorkingVersionMapper.class)
   WorkingVersionRecord lockWorking(

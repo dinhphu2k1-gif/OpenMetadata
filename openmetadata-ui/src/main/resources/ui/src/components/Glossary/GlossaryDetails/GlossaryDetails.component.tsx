@@ -15,7 +15,7 @@ import { Col, Row, Tabs } from 'antd';
 import { isEmpty, noop } from 'lodash';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FEED_COUNT_INITIAL_DATA } from '../../../constants/entity.constants';
 import { EntityTabs, EntityType } from '../../../enums/entity.enum';
 import { PageType } from '../../../generated/system/ui/page';
@@ -58,6 +58,7 @@ const GlossaryDetails = ({
 }: GlossaryDetailsProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { activeGlossary: glossary, updateActiveGlossary } = useGlossaryStore();
   const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
   const currentGlossary = viewedVersion ?? glossary;
@@ -247,13 +248,18 @@ const GlossaryDetails = ({
             updateVote={updateVote}
             onAddGlossaryTerm={onAddGlossaryTerm}
             onDelete={handleGlossaryDelete}
-            onVersionSelect={(snapshot) =>
-              setViewedVersion(
-                (snapshot as Glossary).version === glossary.version
-                  ? null
-                  : (snapshot as Glossary)
-              )
-            }
+            onVersionSelect={(snapshot) => {
+              const selected = snapshot as Glossary;
+              const searchParams = new URLSearchParams(location.search);
+              searchParams.set(
+                'businessVersion',
+                String(selected.businessVersion)
+              );
+              navigate(
+                { pathname: location.pathname, search: searchParams.toString() }
+              );
+              setViewedVersion(selected);
+            }}
             onWorkflowTransition={(updated) => {
               setViewedVersion(null);
               updateActiveGlossary(updated as Glossary);

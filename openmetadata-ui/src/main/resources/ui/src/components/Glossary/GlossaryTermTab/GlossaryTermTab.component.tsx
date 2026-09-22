@@ -1020,6 +1020,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   );
 
   const fetchChildTerms = async (parentFQN: string, after?: string) => {
+    if (isCDEGlossary) {
+      return;
+    }
     setLoadingChildren((prev) => ({ ...prev, [parentFQN]: true }));
     try {
       const response = isDQGlossary
@@ -2160,6 +2163,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         ...getCDEGlossaryTableColumns({
           handleLoadMoreChildren,
           loadingChildren,
+          parentBusinessVersion: displayedGlossary.businessVersion,
           t,
         }),
         ...governanceColumns,
@@ -3018,7 +3022,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                     ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
                     : undefined
                 }
-                expandable={expandableConfig}
+                expandable={isCDEGlossary ? undefined : expandableConfig}
                 extraTableFilters={extraTableFilters}
                 extraTableFiltersClassName={
                   isDQGlossary
@@ -3097,7 +3101,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
                   : undefined
               }
-              expandable={expandableConfig}
+              expandable={isCDEGlossary ? undefined : expandableConfig}
               extraTableFilters={extraTableFilters}
               extraTableFiltersClassName={
                 isDQGlossary

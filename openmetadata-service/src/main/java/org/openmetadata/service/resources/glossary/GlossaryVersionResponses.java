@@ -25,8 +25,6 @@ final class GlossaryVersionResponses {
   static Map<String, Object> published(PublishedSnapshotRecord record) {
     Map<String, Object> payload = payload(record.payload());
     payload.put("businessVersion", record.businessVersion());
-    payload.put("snapshotId", record.snapshotId());
-    payload.put("publicationSequence", record.publicationSequence());
     if (record.archivedAt() != null) {
       payload.put("entityStatus", "Archived");
       payload.put("archivedAt", record.archivedAt());

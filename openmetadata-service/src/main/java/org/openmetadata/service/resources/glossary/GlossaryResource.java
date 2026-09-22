@@ -325,11 +325,23 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    DataDictionaryResolver.requireDataDictionary(
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
-    return versioningService.listPublishedGlossaryTerms(id, businessVersion).stream()
-        .map(GlossaryVersionResponses::published)
-        .toList();
+    Glossary glossary =
+        DataDictionaryResolver.requireDataDictionary(
+            getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
+    List<Map<String, Object>> terms =
+        new java.util.ArrayList<>(
+            versioningService.listPublishedGlossaryTerms(id, businessVersion).stream()
+                .map(GlossaryVersionResponses::published)
+                .toList());
+    if (!isConsumer(securityContext, glossary)
+        && versioningService.isLatestPublished(
+            GlossaryVersioningService.GLOSSARY, id, businessVersion)) {
+      terms.addAll(
+          versioningService.listWorkingTermsByGlossary(id).stream()
+              .map(GlossaryVersionResponses::working)
+              .toList());
+    }
+    return terms;
   }
 
   @POST
@@ -365,16 +377,13 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     Map<String, Boolean> permissions = capabilities(securityContext, glossary).asMap();
-    permissions.put("isConsumer", isConsumer(securityContext));
+    permissions.put("isConsumer", isConsumer(securityContext, glossary));
     return permissions;
   }
 
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, Glossary glossary) {
     DataDictionaryResolver.requireDataDictionary(glossary);
-    if (isConsumer(securityContext)) {
-      return GlossaryAuthorizationResolver.publishedReadOnly();
-    }
     return GlossaryAuthorizationResolver.resolve(
             getSubjectContext(securityContext), glossary.getOwners(), glossary.getReviewers())
         .restrictToPolicy(
@@ -460,13 +469,20 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     ListFilter filter =
         new ListFilter(include)
             .addQueryParam("exactName", DataDictionaryResolver.DATA_DICTIONARY_NAME);
-    if (isConsumer(securityContext)) {
-      filter.addQueryParam("publishedSnapshotEntityType", GlossaryVersioningService.GLOSSARY);
-    }
     ResultList<Glossary> result =
         super.listInternal(
             uriInfo, securityContext, fieldsParam, filter, limitParam, before, after);
-    if (isConsumer(securityContext)) {
+    boolean consumerOnly =
+        !result.getData().isEmpty()
+            && isConsumer(
+                securityContext,
+                repository.get(
+                    null,
+                    result.getData().get(0).getId(),
+                    repository.getFields("owners,reviewers"),
+                    Include.NON_DELETED,
+                    false));
+    if (consumerOnly) {
       Map<UUID, PublishedSnapshotRecord> snapshots =
           versioningService.getLatestPublishedBatch(
               GlossaryVersioningService.GLOSSARY,
@@ -550,7 +566,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
     DataDictionaryResolver.requireDataDictionary(glossary);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, glossary)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY, id);
       return addHref(uriInfo, JsonUtils.readValue(snapshot.payload(), Glossary.class));
@@ -589,8 +605,21 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     return addHref(uriInfo, published);
   }
 
-  private boolean isConsumer(SecurityContext securityContext) {
-    return GlossaryAuthorizationResolver.isConsumerOnly(getSubjectContext(securityContext));
+  private boolean isConsumer(SecurityContext securityContext, Glossary glossary) {
+    Glossary authorizationGlossary =
+        repository.get(
+            null,
+            glossary.getId(),
+            repository.getFields("owners,reviewers"),
+            Include.NON_DELETED,
+            false);
+    GlossaryAuthorizationResolver.Capabilities effective =
+        capabilities(securityContext, authorizationGlossary);
+    return effective.canViewPublished() && !effective.canViewWorking();
+  }
+
+  private boolean isConsumer(SecurityContext securityContext, UUID id) {
+    return isConsumer(securityContext, requireDataDictionary(id));
   }
 
   @GET
@@ -631,7 +660,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         DataDictionaryResolver.requireDataDictionary(
             getByNameInternal(uriInfo, securityContext, name, fieldsParam, include));
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, glossary)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(
               GlossaryVersioningService.GLOSSARY, glossary.getId());
@@ -679,7 +708,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           @PathParam("id")
           UUID id) {
     requireDataDictionary(id);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, id)) {
       throw new ForbiddenException(
           "Native metadata history is not available to consumers; use /published");
     }
@@ -716,7 +745,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           @PathParam("version")
           String version) {
     requireDataDictionary(id);
-    if (isConsumer(securityContext)) {
+    if (isConsumer(securityContext, id)) {
       throw new ForbiddenException(
           "Native metadata history is not available to consumers; use /published");
     }

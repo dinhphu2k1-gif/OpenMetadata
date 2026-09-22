@@ -83,7 +83,7 @@ public final class GlossaryAuthorizationResolver {
       boolean canArchive) {
     public Capabilities restrictToPolicy(boolean canEdit, boolean canChangeStatus) {
       return new Capabilities(
-          canEdit || canChangeStatus,
+          canViewWorking || canEdit || canChangeStatus,
           canViewPublished,
           canEdit,
           canEdit || canChangeStatus,

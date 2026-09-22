@@ -28,7 +28,7 @@ import classNames from 'classnames';
 import { cloneDeep, isEmpty, toString } from 'lodash';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ReactComponent as IconTerm } from '../../../assets/svg/book.svg';
 import { ReactComponent as EditIcon } from '../../../assets/svg/edit-new.svg';
 import { ReactComponent as GlossaryIcon } from '../../../assets/svg/glossary.svg';
@@ -72,6 +72,7 @@ import {
   getGlossaryTermsById,
   getGlossaryTermsVersionsList,
   getGlossaryTermsVersion,
+  getPublishedGlossaryTerms,
   getGlossaryVersionsList,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
@@ -135,6 +136,7 @@ const GlossaryHeader = ({
 }: GlossaryHeaderProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { fqn } = useFqn();
   const { activeGlossary } = useGlossaryStore();
   const {
@@ -259,10 +261,14 @@ const GlossaryHeader = ({
   // To fetch the latest glossary data
   // necessary to handle back click functionality to work properly in version page
   const fetchCurrentGlossaryInfo = async () => {
+    const entityId = id ?? selectedData.id;
+    if (!entityId) {
+      return;
+    }
     try {
       const res = isGlossary
-        ? await getGlossariesById(id)
-        : await getGlossaryTermsById(id);
+        ? await getGlossariesById(entityId)
+        : await getGlossaryTermsById(entityId);
 
       setLatestGlossaryData(res);
     } catch (error) {
@@ -459,7 +465,7 @@ const GlossaryHeader = ({
       const history = isGlossary
         ? await getGlossaryVersionsList(selectedData.id)
         : await getGlossaryTermsVersionsList(selectedData.id);
-      const versions: {
+      let versions: {
         label: string;
         snapshotVersion: string;
         snapshot?: Glossary | GlossaryTerm;
@@ -467,12 +473,11 @@ const GlossaryHeader = ({
         .map((snapshot) =>
           typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
         )
-        .filter((snapshot) =>
-          ['approved', 'archived'].includes(
+        .filter(
+          (snapshot) =>
             String(
               snapshot.entityStatus ?? snapshot.status ?? 'Approved'
-            ).toLowerCase()
-          )
+            ).toLowerCase() === 'approved'
         )
         .sort(
           (first, second) =>
@@ -526,6 +531,27 @@ const GlossaryHeader = ({
           snapshotVersion: currentVerClean,
           snapshot: selectedData,
         });
+      }
+
+      const parentBusinessVersion = new URLSearchParams(location.search).get(
+        'parentBusinessVersion'
+      );
+      if (!isGlossary && parentBusinessVersion) {
+        const glossaryId = (selectedData as GlossaryTerm).glossary?.id;
+        const contextualTerm = glossaryId
+          ? (
+              await getPublishedGlossaryTerms(
+                glossaryId,
+                parentBusinessVersion
+              )
+            ).find((term) => term.id === selectedData.id)
+          : undefined;
+        const contextualBusinessVersion = contextualTerm
+          ? getBusinessVersion(contextualTerm.businessVersion, '')
+          : '';
+        versions = versions.filter(
+          (item) => item.label === contextualBusinessVersion
+        );
       }
 
       setAvailableVersions(
@@ -986,7 +1012,7 @@ const GlossaryHeader = ({
       const versionList =
         availableVersions.length > 0 ? availableVersions : [currentVersionItem];
 
-      if (isConsumer || isWorkflowPermissionLoading) {
+      if (isWorkflowPermissionLoading) {
         return (
           <Space align="center" size={8}>
             <StatusBadge label={entityStatus} status={statusClass} />
@@ -1048,7 +1074,6 @@ const GlossaryHeader = ({
     isVersionView,
     availableVersions,
     isLoadingVersions,
-    isConsumer,
     isWorkflowPermissionLoading,
     glossaryTermStatus,
     navigate,
@@ -1206,6 +1231,9 @@ const GlossaryHeader = ({
     const glossaryDisplayName = (selectedData as GlossaryTerm)?.glossary
       ?.displayName;
     const glossaryName = (selectedData as GlossaryTerm)?.glossary?.name;
+    const parentBusinessVersion = new URLSearchParams(location.search).get(
+      'parentBusinessVersion'
+    );
 
     const newData = [
       {
@@ -1215,16 +1243,26 @@ const GlossaryHeader = ({
       },
       ...arr.slice(0, -1).map((d, index) => {
         dataFQN.push(d);
+        const glossaryPath = getGlossaryPath(
+          dataFQN.join(FQN_SEPARATOR_CHAR)
+        );
         const nameToDisplay =
           index === 0 &&
           glossaryDisplayName &&
           (d === glossaryName || d === glossaryDisplayName)
-            ? glossaryDisplayName
+            ? `${glossaryDisplayName}${
+                parentBusinessVersion ? ` (v${parentBusinessVersion})` : ''
+              }`
             : d;
 
         return {
           name: nameToDisplay,
-          url: getGlossaryPath(dataFQN.join(FQN_SEPARATOR_CHAR)),
+          url:
+            index === 0 && parentBusinessVersion
+              ? `${glossaryPath}?businessVersion=${encodeURIComponent(
+                  parentBusinessVersion
+                )}`
+              : glossaryPath,
           activeTitle: false,
         };
       }),
@@ -1240,13 +1278,14 @@ const GlossaryHeader = ({
     selectedData?.fullyQualifiedName,
     selectedData?.name,
     (selectedData as GlossaryTerm)?.glossary?.displayName,
+    location.search,
   ]);
 
   useEffect(() => {
     if (isVersionView) {
       fetchCurrentGlossaryInfo();
     }
-  }, [id]);
+  }, [id, isVersionView, selectedData.id]);
 
   return (
     <>

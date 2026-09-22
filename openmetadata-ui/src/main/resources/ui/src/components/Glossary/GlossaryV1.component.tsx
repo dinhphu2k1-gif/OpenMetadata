@@ -117,6 +117,13 @@ const GlossaryV1 = ({
   } = useGlossaryStore();
 
   const { id, fullyQualifiedName } = activeGlossary ?? {};
+  const isCDEGlossaryTerm =
+    !isGlossaryActive &&
+    isDataDictionaryGlossary(
+      selectedData.fullyQualifiedName,
+      (selectedData as GlossaryTerm).glossary?.name,
+      (selectedData as GlossaryTerm).glossary?.displayName
+    );
 
   const [afterCursor, setAfterCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
@@ -429,7 +436,7 @@ const GlossaryV1 = ({
     if (permission?.ViewAll || permission?.ViewBasic) {
       // Only load terms if we're viewing a glossary term, not a glossary
       // GlossaryTermTab handles pagination for glossaries
-      if (!isGlossaryActive) {
+      if (!isGlossaryActive && !isCDEGlossaryTerm) {
         loadGlossaryTerms();
       } else {
         setIsLoading(false);

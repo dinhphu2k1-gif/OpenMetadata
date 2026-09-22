@@ -10,27 +10,17 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { ReactNode, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../../../constants/constants';
-import { isDataDictionaryGlossary } from '../../../constants/Glossary.contant';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
-import { useFqn } from '../../../hooks/useFqn';
+import AddGlossaryPageComponent from '../../../pages/AddGlossary/AddGlossaryPage.component';
 import GlossaryPage from '../../../pages/Glossary/GlossaryPage/GlossaryPage.component';
 import { userPermissions } from '../../../utils/PermissionsUtils';
+import GlossaryVersion from '../../Glossary/GlossaryVersion/GlossaryVersion.component';
 import AdminProtectedRoute from '../AdminProtectedRoute';
-
-const DataDictionaryRoute = ({ children }: { children: ReactNode }) => {
-  const { fqn } = useFqn();
-
-  return isDataDictionaryGlossary(fqn) ? (
-    children
-  ) : (
-    <Navigate replace to={ROUTES.DATA_DICTIONARY} />
-  );
-};
 
 const GlossaryRouter = () => {
   const { permissions } = usePermissionProvider();
@@ -44,52 +34,58 @@ const GlossaryRouter = () => {
   return (
     <Routes>
       <Route
-        element={<Navigate replace to={ROUTES.DATA_DICTIONARY} />}
-        path="/"
+        element={
+          <AddGlossaryPageComponent
+            pageTitle={t('label.add-entity', {
+              entity: t('label.glossary'),
+            })}
+          />
+        }
+        path={ROUTES.ADD_GLOSSARY.replace(ROUTES.GLOSSARY, '')}
+      />
+      <Route
+        element={<GlossaryVersion isGlossary />}
+        path={ROUTES.GLOSSARY_VERSION.replace(ROUTES.GLOSSARY, '')}
       />
       <Route
         element={
-          <DataDictionaryRoute>
-            <AdminProtectedRoute hasPermission={glossaryPermission}>
-              <GlossaryPage pageTitle={t('label.glossary')} />
-            </AdminProtectedRoute>
-          </DataDictionaryRoute>
+          <AdminProtectedRoute hasPermission={glossaryPermission}>
+            <GlossaryPage pageTitle={t('label.glossary')} />
+          </AdminProtectedRoute>
+        }
+        path={ROUTES.GLOSSARY.replace(ROUTES.GLOSSARY, '')}
+      />
+      <Route
+        element={
+          <AdminProtectedRoute hasPermission={glossaryPermission}>
+            <GlossaryPage pageTitle={t('label.glossary')} />
+          </AdminProtectedRoute>
         }
         path={ROUTES.GLOSSARY_DETAILS.replace(ROUTES.GLOSSARY, '')}
       />
       <Route
         element={
-          <DataDictionaryRoute>
-            <AdminProtectedRoute hasPermission={glossaryPermission}>
-              <GlossaryPage pageTitle={t('label.glossary')} />
-            </AdminProtectedRoute>
-          </DataDictionaryRoute>
+          <AdminProtectedRoute hasPermission={glossaryPermission}>
+            <GlossaryPage pageTitle={t('label.glossary')} />
+          </AdminProtectedRoute>
         }
         path={ROUTES.GLOSSARY_DETAILS_WITH_ACTION.replace(ROUTES.GLOSSARY, '')}
       />
       <Route
         element={
-          <DataDictionaryRoute>
-            <AdminProtectedRoute hasPermission={glossaryPermission}>
-              <GlossaryPage pageTitle={t('label.glossary')} />
-            </AdminProtectedRoute>
-          </DataDictionaryRoute>
+          <AdminProtectedRoute hasPermission={glossaryPermission}>
+            <GlossaryPage pageTitle={t('label.glossary')} />
+          </AdminProtectedRoute>
         }
         path={ROUTES.GLOSSARY_DETAILS_WITH_TAB.replace(ROUTES.GLOSSARY, '')}
       />
       <Route
         element={
-          <DataDictionaryRoute>
-            <AdminProtectedRoute hasPermission={glossaryPermission}>
-              <GlossaryPage pageTitle={t('label.glossary')} />
-            </AdminProtectedRoute>
-          </DataDictionaryRoute>
+          <AdminProtectedRoute hasPermission={glossaryPermission}>
+            <GlossaryPage pageTitle={t('label.glossary')} />
+          </AdminProtectedRoute>
         }
         path={ROUTES.GLOSSARY_DETAILS_WITH_SUBTAB.replace(ROUTES.GLOSSARY, '')}
-      />
-      <Route
-        element={<Navigate replace to={ROUTES.DATA_DICTIONARY} />}
-        path="*"
       />
     </Routes>
   );

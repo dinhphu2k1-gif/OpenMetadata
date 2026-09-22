@@ -16,7 +16,7 @@ import { compare } from 'fast-json-patch';
 import { isEmpty, omit } from 'lodash';
 import { RefObject, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DeleteType } from '../../../components/common/DeleteWidget/DeleteWidget.interface';
 import ErrorPlaceHolder from '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import Loader from '../../../components/common/Loader/Loader';
@@ -34,13 +34,14 @@ import {
   pagingObject,
   ROUTES,
 } from '../../../constants/constants';
+import { GLOSSARIES_DOCS } from '../../../constants/docs.constants';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { observerOptions } from '../../../constants/Mydata.constants';
 import { useAsyncDeleteProvider } from '../../../context/AsyncDeleteProvider/AsyncDeleteProvider';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import { ClientErrors } from '../../../enums/Axios.enum';
-import { ERROR_PLACEHOLDER_TYPE } from '../../../enums/common.enum';
+import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../../enums/common.enum';
 import {
   EntityAction,
   EntityType,
@@ -55,7 +56,9 @@ import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
+  getGlossaryVersion,
   getGlossaryWorkingVersion,
+  getPublishedGlossaryTerms,
   getGlossaryTermByFQN,
   getGlossaryTermWorkingVersion,
   updateGlossaryTermWorkingVersion,
@@ -76,10 +79,17 @@ const GlossaryPage = () => {
   const { fqn: glossaryFqn } = useFqn();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { handleOnAsyncEntityDeleteConfirm } = useAsyncDeleteProvider();
   const { action } = useRequiredParams<{ action: EntityAction }>();
   const [initialised, setInitialised] = useState(false);
-  const [hasLoadError, setHasLoadError] = useState(false);
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+  const businessVersion = searchParams.get('businessVersion');
+  const parentBusinessVersion = searchParams.get('parentBusinessVersion');
+  const isHistoricalView = Boolean(businessVersion || parentBusinessVersion);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMoreGlossaryLoading, setIsMoreGlossaryLoading] =
@@ -117,29 +127,40 @@ const GlossaryPage = () => {
     return true;
   }, [glossaryFqn]);
 
-  const { viewBasicGlossaryPermission, viewAllGlossaryPermission } =
-    useMemo(() => {
-      const resourceType = isGlossaryActive
-        ? ResourceEntity.GLOSSARY
-        : ResourceEntity.GLOSSARY_TERM;
+  const {
+    createGlossaryPermission,
+    viewBasicGlossaryPermission,
+    viewAllGlossaryPermission,
+  } = useMemo(() => {
+    const resourceType = isGlossaryActive
+      ? ResourceEntity.GLOSSARY
+      : ResourceEntity.GLOSSARY_TERM;
 
-      return {
-        viewBasicGlossaryPermission: checkPermission(
-          Operation.ViewBasic,
-          resourceType,
-          permissions
-        ),
-        viewAllGlossaryPermission: checkPermission(
-          Operation.ViewAll,
-          resourceType,
-          permissions
-        ),
-      };
-    }, [permissions, isGlossaryActive]);
+    return {
+      createGlossaryPermission: checkPermission(
+        Operation.Create,
+        resourceType,
+        permissions
+      ),
+      viewBasicGlossaryPermission: checkPermission(
+        Operation.ViewBasic,
+        resourceType,
+        permissions
+      ),
+      viewAllGlossaryPermission: checkPermission(
+        Operation.ViewAll,
+        resourceType,
+        permissions
+      ),
+    };
+  }, [permissions, isGlossaryActive]);
+
+  const handleAddGlossaryClick = useCallback(() => {
+    navigate(ROUTES.ADD_GLOSSARY);
+  }, [navigate]);
 
   const fetchGlossaryList = useCallback(async () => {
     try {
-      setHasLoadError(false);
       let allGlossaries: Glossary[] = [];
       let nextPage = paging.after;
       let isGlossaryFound = false;
@@ -176,21 +197,14 @@ const GlossaryPage = () => {
         handlePagingChange(glossaryPaging);
       } while (nextPage && !isGlossaryFound);
 
-      if (isGlossaryActive && glossaryFqn && !isGlossaryFound) {
-        navigate(ROUTES.NOT_FOUND, { replace: true });
-
-        return;
-      }
-
       setGlossaries(allGlossaries);
     } catch (error) {
-      setHasLoadError(true);
       showErrorToast(error as AxiosError);
     } finally {
       setIsLoading(false);
       setInitialised(true);
     }
-  }, [paging.after, glossaryFqn, isGlossaryActive, navigate]);
+  }, [paging.after, glossaryFqn]);
 
   const fetchNextGlossaryItems = async (after?: string) => {
     try {
@@ -237,9 +251,14 @@ const GlossaryPage = () => {
 
   const fetchGlossaryTermDetails = useCallback(async () => {
     setIsRightPanelLoading(true);
-    setHasLoadError(false);
+    if (!businessVersion || !parentBusinessVersion) {
+      navigate(ROUTES.NOT_FOUND, { replace: true });
+      setIsRightPanelLoading(false);
+
+      return;
+    }
     try {
-      const response = await getGlossaryTermByFQN(glossaryFqn, {
+      const current = await getGlossaryTermByFQN(glossaryFqn, {
         fields: [
           TabSpecificField.RELATED_TERMS,
           TabSpecificField.REVIEWERS,
@@ -252,21 +271,28 @@ const GlossaryPage = () => {
           TabSpecificField.CHILDREN_COUNT,
         ],
       });
+      const parentTerms = await getPublishedGlossaryTerms(
+        current.glossary.id,
+        parentBusinessVersion
+      );
+      const response = parentTerms.find((term) => term.id === current.id);
+      if (!response || response.businessVersion !== businessVersion) {
+        navigate(ROUTES.NOT_FOUND, { replace: true });
+
+        return;
+      }
       setActiveGlossary(response as ModifiedGlossary);
     } catch (error) {
       const status = (error as AxiosError)?.response?.status;
       if (status === ClientErrors.FORBIDDEN) {
         navigate(ROUTES.FORBIDDEN, { replace: true });
-      } else if (status === ClientErrors.NOT_FOUND) {
+      } else if (status === ClientErrors.NOT_FOUND || isHistoricalView) {
         navigate(ROUTES.NOT_FOUND, { replace: true });
-      } else {
-        setHasLoadError(true);
-        showErrorToast(error as AxiosError);
       }
     } finally {
       setIsRightPanelLoading(false);
     }
-  }, [glossaryFqn]);
+  }, [businessVersion, glossaryFqn, isHistoricalView, parentBusinessVersion]);
 
   useEffect(() => {
     setIsRightPanelLoading(true);
@@ -284,7 +310,18 @@ const GlossaryPage = () => {
           return;
         }
 
-        setActiveGlossary(foundGlossary || glossaries[0]);
+        const current = foundGlossary || glossaries[0];
+        if (businessVersion && current) {
+          setIsRightPanelLoading(true);
+          getGlossaryVersion(current.id, businessVersion)
+            .then((snapshot) => setActiveGlossary(snapshot))
+            .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
+            .finally(() => setIsRightPanelLoading(false));
+
+          return;
+        }
+
+        setActiveGlossary(current);
 
         if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
           navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
@@ -297,7 +334,7 @@ const GlossaryPage = () => {
     } else {
       setIsRightPanelLoading(false);
     }
-  }, [isGlossaryActive, glossaryFqn, glossaries]);
+  }, [businessVersion, isGlossaryActive, glossaryFqn, glossaries]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
@@ -531,18 +568,6 @@ const GlossaryPage = () => {
     return <Loader />;
   }
 
-  if (hasLoadError) {
-    return (
-      <div className="full-height">
-        <ErrorPlaceHolder
-          className="mt-0-important border-none"
-          type={ERROR_PLACEHOLDER_TYPE.CUSTOM}>
-          {t('server.unexpected-error')}
-        </ErrorPlaceHolder>
-      </div>
-    );
-  }
-
   if (!(viewBasicGlossaryPermission || viewAllGlossaryPermission)) {
     return (
       <div className="d-flex justify-center items-center">
@@ -561,9 +586,25 @@ const GlossaryPage = () => {
     return (
       <div className="full-height">
         <ErrorPlaceHolder
+          buttonId="add-glossary"
           className="mt-0-important border-none"
+          doc={GLOSSARIES_DOCS}
           heading={t('label.glossary')}
-          type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
+          permission={createGlossaryPermission}
+          permissionValue={
+            createGlossaryPermission
+              ? t('label.create-entity', {
+                  entity: t('label.glossary'),
+                })
+              : ''
+          }
+          size={SIZE.X_LARGE}
+          type={
+            createGlossaryPermission
+              ? ERROR_PLACEHOLDER_TYPE.CREATE
+              : ERROR_PLACEHOLDER_TYPE.NO_DATA
+          }
+          onClick={handleAddGlossaryClick}
         />
       </div>
     );
@@ -575,7 +616,7 @@ const GlossaryPage = () => {
     <GlossaryV1
       isGlossaryActive={isGlossaryActive}
       isSummaryPanelOpen={Boolean(previewAsset)}
-      isVersionsView={false}
+      isVersionsView={isHistoricalView}
       refreshActiveGlossaryTerm={fetchGlossaryTermDetails}
       refreshGlossaryList={fetchGlossaryList}
       selectedData={activeGlossary as Glossary}
