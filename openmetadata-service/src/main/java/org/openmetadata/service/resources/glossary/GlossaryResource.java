@@ -55,6 +55,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
+import org.openmetadata.schema.api.data.GlossaryDraftPayload;
+import org.openmetadata.schema.api.data.GlossaryDraftUpdateRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.RestoreEntity;
 import org.openmetadata.schema.entity.data.Glossary;
@@ -67,8 +69,11 @@ import org.openmetadata.schema.type.csv.CsvImportResult;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.OpenMetadataApplicationConfig;
+import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
+import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository.GlossaryCsv;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
@@ -99,6 +104,12 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
 
   public GlossaryResource(Authorizer authorizer, Limits limits) {
     super(Entity.GLOSSARY, authorizer, limits);
+  }
+
+  @Override
+  public void initialize(OpenMetadataApplicationConfig config) throws IOException {
+    super.initialize(config);
+    DataDictionaryBootstrap.initialize();
   }
 
   @GET
@@ -172,19 +183,33 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid GlossaryDraftUpdateRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, glossary));
-    requireExpectedRevision(request);
-    DataDictionaryResolver.requireDataDictionaryPayload(request.getPayload());
+    WorkingVersionRecord current =
+        versioningService.getWorking(GlossaryVersioningService.GLOSSARY, id);
+    Map<String, Object> payload = GlossaryVersionResponses.working(current);
+    GlossaryDraftPayload changes = request.getPayload();
+    payload.put("description", changes.getDescription());
+    payload.put("owners", changes.getOwners());
+    payload.put("reviewers", changes.getReviewers());
+    payload.put("domains", changes.getDomains());
+    payload.put("tags", changes.getTags());
+    payload.put("extension", changes.getExtension());
+    Glossary validated = JsonUtils.readValue(JsonUtils.pojoToJson(payload), Glossary.class);
+    validated.setOwners(EntityRepository.validateOwners(validated.getOwners()));
+    EntityRepository.validateReviewers(validated.getReviewers());
+    validated.setDomains(repository.validateDomainsByRef(validated.getDomains()));
+    repository.prepareInternal(validated, true);
+    payload = JsonUtils.readValue(JsonUtils.pojoToJson(validated), Map.class);
     WorkingVersionRecord working =
         versioningService.saveWorking(
             GlossaryVersioningService.GLOSSARY,
             id,
             request.getExpectedRevision(),
             glossary.getVersion(),
-            request.getPayload(),
+            payload,
             securityContext.getUserPrincipal().getName());
     return GlossaryVersionResponses.working(working);
   }

@@ -117,7 +117,12 @@ public class GlossaryVersioningService {
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
                   WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
-                  if (!EntityStatus.DRAFT.value().equals(working.entityStatus())
+                  if (GLOSSARY.equals(entityType)
+                      && !EntityStatus.DRAFT.value().equals(working.entityStatus())) {
+                    throw new BadRequestException("Only Draft glossary versions can be edited");
+                  }
+                  if (!GLOSSARY.equals(entityType)
+                      && !EntityStatus.DRAFT.value().equals(working.entityStatus())
                       && !EntityStatus.REJECTED.value().equals(working.entityStatus())) {
                     throw new BadRequestException(
                         "Only Draft or Rejected working versions can be edited");

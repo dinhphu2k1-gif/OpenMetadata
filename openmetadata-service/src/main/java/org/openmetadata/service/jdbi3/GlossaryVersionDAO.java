@@ -58,6 +58,12 @@ public interface GlossaryVersionDAO {
 
   @SqlQuery(
       "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
+          + "FROM glossary_business_working WHERE entityType = :entityType")
+  @RegisterRowMapper(WorkingVersionMapper.class)
+  List<WorkingVersionRecord> listWorking(@Bind("entityType") String entityType);
+
+  @SqlQuery(
+      "SELECT workingId, entityType, entityId, glossaryId, businessVersion, entityStatus, revision, nativeVersion, payload, createdAt, createdBy, updatedAt, updatedBy "
           + "FROM glossary_business_working WHERE entityType = :entityType AND entityId IN (<entityIds>)")
   @RegisterRowMapper(WorkingVersionMapper.class)
   List<WorkingVersionRecord> findWorkingBatchInternal(

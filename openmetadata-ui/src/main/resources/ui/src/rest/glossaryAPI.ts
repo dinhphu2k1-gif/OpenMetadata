@@ -59,6 +59,15 @@ export type GlossaryWorkflowAction =
   | 'reopen'
   | 'revoke';
 
+export interface GlossaryDraftPayload {
+  description: string;
+  owners: Glossary['owners'];
+  reviewers: Glossary['reviewers'];
+  domains: Glossary['domains'];
+  tags: Glossary['tags'];
+  extension?: Glossary['extension'];
+}
+
 export interface GlossaryWorkflowRequest {
   expectedRevision?: number;
   businessVersion?: string;
@@ -133,10 +142,18 @@ export const updateGlossaryWorkingVersion = async (
   expectedRevision: number,
   payload: Glossary
 ) => {
+  const mutablePayload: GlossaryDraftPayload = {
+    description: payload.description,
+    owners: payload.owners ?? [],
+    reviewers: payload.reviewers ?? [],
+    domains: payload.domains ?? [],
+    tags: payload.tags ?? [],
+    extension: payload.extension,
+  };
   const response = await APIClient.patch<
-    GlossaryWorkflowRequest,
+    { expectedRevision: number; payload: GlossaryDraftPayload },
     AxiosResponse<Glossary>
-  >(`/glossaries/${id}/working`, { expectedRevision, payload });
+  >(`/glossaries/${id}/working`, { expectedRevision, payload: mutablePayload });
 
   return response.data;
 };

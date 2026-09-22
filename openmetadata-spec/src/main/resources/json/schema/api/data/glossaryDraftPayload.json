@@ -1,0 +1,34 @@
+{
+  "$id": "https://open-metadata.org/schema/api/data/glossaryDraftPayload.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GlossaryDraftPayload",
+  "description": "Complete set of client-mutable fields for a Data Dictionary draft.",
+  "javaType": "org.openmetadata.schema.api.data.GlossaryDraftPayload",
+  "type": "object",
+  "properties": {
+    "description": { "$ref": "../../type/basic.json#/definitions/markdown" },
+    "owners": { "$ref": "../../type/entityReferenceList.json" },
+    "reviewers": {
+      "type": "array",
+      "items": { "$ref": "../../type/entityReference.json" },
+      "default": []
+    },
+    "domains": { "$ref": "../../type/entityReferenceList.json" },
+    "tags": {
+      "type": "array",
+      "items": { "$ref": "../../type/tagLabel.json" },
+      "default": []
+    },
+    "extension": {
+      "$ref": "../../type/basic.json#/definitions/entityExtension"
+    }
+  },
+  "required": [
+    "description",
+    "owners",
+    "reviewers",
+    "domains",
+    "tags"
+  ],
+  "additionalProperties": false
+}

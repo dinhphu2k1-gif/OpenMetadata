@@ -1,0 +1,19 @@
+{
+  "$id": "https://open-metadata.org/schema/api/data/glossaryDraftUpdateRequest.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GlossaryDraftUpdateRequest",
+  "description": "Optimistic-lock request for replacing Data Dictionary draft business fields.",
+  "javaType": "org.openmetadata.schema.api.data.GlossaryDraftUpdateRequest",
+  "type": "object",
+  "properties": {
+    "expectedRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "payload": {
+      "$ref": "glossaryDraftPayload.json"
+    }
+  },
+  "required": ["expectedRevision", "payload"],
+  "additionalProperties": false
+}

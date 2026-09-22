@@ -34,7 +34,6 @@ import {
   pagingObject,
   ROUTES,
 } from '../../../constants/constants';
-import { GLOSSARIES_DOCS } from '../../../constants/docs.constants';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { observerOptions } from '../../../constants/Mydata.constants';
 import { useAsyncDeleteProvider } from '../../../context/AsyncDeleteProvider/AsyncDeleteProvider';
@@ -57,6 +56,7 @@ import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
   getGlossaryVersion,
+  getGlossaryVersionPermissions,
   getGlossaryWorkingVersion,
   getPublishedGlossaryTerms,
   getGlossaryTermByFQN,
@@ -128,7 +128,6 @@ const GlossaryPage = () => {
   }, [glossaryFqn]);
 
   const {
-    createGlossaryPermission,
     viewBasicGlossaryPermission,
     viewAllGlossaryPermission,
   } = useMemo(() => {
@@ -137,11 +136,6 @@ const GlossaryPage = () => {
       : ResourceEntity.GLOSSARY_TERM;
 
     return {
-      createGlossaryPermission: checkPermission(
-        Operation.Create,
-        resourceType,
-        permissions
-      ),
       viewBasicGlossaryPermission: checkPermission(
         Operation.ViewBasic,
         resourceType,
@@ -154,10 +148,6 @@ const GlossaryPage = () => {
       ),
     };
   }, [permissions, isGlossaryActive]);
-
-  const handleAddGlossaryClick = useCallback(() => {
-    navigate(ROUTES.ADD_GLOSSARY);
-  }, [navigate]);
 
   const fetchGlossaryList = useCallback(async () => {
     try {
@@ -321,7 +311,16 @@ const GlossaryPage = () => {
           return;
         }
 
-        setActiveGlossary(current);
+        setIsRightPanelLoading(true);
+        getGlossaryVersionPermissions(current.id)
+          .then((capabilities) =>
+            capabilities.canViewWorking
+              ? getGlossaryWorkingVersion(current.id)
+              : current
+          )
+          .then((resolved) => setActiveGlossary(resolved))
+          .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
+          .finally(() => setIsRightPanelLoading(false));
 
         if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
           navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
@@ -329,7 +328,6 @@ const GlossaryPage = () => {
           });
         }
 
-        setIsRightPanelLoading(false);
       }
     } else {
       setIsRightPanelLoading(false);
@@ -354,16 +352,7 @@ const GlossaryPage = () => {
           updatedData
         );
 
-        const updatedGlossaryObj = {
-          ...activeGlossary,
-          ...updatedData,
-          ...response,
-          extension:
-            updatedData.extension ??
-            response.extension ??
-            activeGlossary?.extension,
-        };
-        updateActiveGlossary(updatedGlossaryObj);
+        updateActiveGlossary(response);
         setGlossaries(
           glossaries.map((item) =>
             item.id === response.id
@@ -573,9 +562,7 @@ const GlossaryPage = () => {
       <div className="d-flex justify-center items-center">
         <ErrorPlaceHolder
           className="mt-0-important border-none"
-          permissionValue={t('label.view-entity', {
-            entity: t('label.glossary'),
-          })}
+          permissionValue={t('label.view-entity', { entity: t('label.glossary') })}
           type={ERROR_PLACEHOLDER_TYPE.PERMISSION}
         />
       </div>
@@ -586,25 +573,12 @@ const GlossaryPage = () => {
     return (
       <div className="full-height">
         <ErrorPlaceHolder
-          buttonId="add-glossary"
           className="mt-0-important border-none"
-          doc={GLOSSARIES_DOCS}
           heading={t('label.glossary')}
-          permission={createGlossaryPermission}
-          permissionValue={
-            createGlossaryPermission
-              ? t('label.create-entity', {
-                  entity: t('label.glossary'),
-                })
-              : ''
-          }
+          permission={false}
+          permissionValue=""
           size={SIZE.X_LARGE}
-          type={
-            createGlossaryPermission
-              ? ERROR_PLACEHOLDER_TYPE.CREATE
-              : ERROR_PLACEHOLDER_TYPE.NO_DATA
-          }
-          onClick={handleAddGlossaryClick}
+          type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
         />
       </div>
     );
