@@ -55,6 +55,7 @@ import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
+  getLatestPublishedGlossary,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
   getGlossaryWorkingVersion,
@@ -127,27 +128,25 @@ const GlossaryPage = () => {
     return true;
   }, [glossaryFqn]);
 
-  const {
-    viewBasicGlossaryPermission,
-    viewAllGlossaryPermission,
-  } = useMemo(() => {
-    const resourceType = isGlossaryActive
-      ? ResourceEntity.GLOSSARY
-      : ResourceEntity.GLOSSARY_TERM;
+  const { viewBasicGlossaryPermission, viewAllGlossaryPermission } =
+    useMemo(() => {
+      const resourceType = isGlossaryActive
+        ? ResourceEntity.GLOSSARY
+        : ResourceEntity.GLOSSARY_TERM;
 
-    return {
-      viewBasicGlossaryPermission: checkPermission(
-        Operation.ViewBasic,
-        resourceType,
-        permissions
-      ),
-      viewAllGlossaryPermission: checkPermission(
-        Operation.ViewAll,
-        resourceType,
-        permissions
-      ),
-    };
-  }, [permissions, isGlossaryActive]);
+      return {
+        viewBasicGlossaryPermission: checkPermission(
+          Operation.ViewBasic,
+          resourceType,
+          permissions
+        ),
+        viewAllGlossaryPermission: checkPermission(
+          Operation.ViewAll,
+          resourceType,
+          permissions
+        ),
+      };
+    }, [permissions, isGlossaryActive]);
 
   const fetchGlossaryList = useCallback(async () => {
     try {
@@ -313,11 +312,27 @@ const GlossaryPage = () => {
 
         setIsRightPanelLoading(true);
         getGlossaryVersionPermissions(current.id)
-          .then((capabilities) =>
-            capabilities.canViewWorking
-              ? getGlossaryWorkingVersion(current.id)
-              : current
-          )
+          .then(async (capabilities) => {
+            if (!capabilities.canViewWorking) {
+              return current;
+            }
+
+            try {
+              return await getGlossaryWorkingVersion(current.id);
+            } catch (error) {
+              // Approving a Data Dictionary consumes its working record. The
+              // default route must then resolve the published head instead of
+              // treating the expected working 404 as a missing dictionary.
+              if (
+                (error as AxiosError)?.response?.status ===
+                ClientErrors.NOT_FOUND
+              ) {
+                return getLatestPublishedGlossary(current.id);
+              }
+
+              throw error;
+            }
+          })
           .then((resolved) => setActiveGlossary(resolved))
           .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
           .finally(() => setIsRightPanelLoading(false));
@@ -327,7 +342,6 @@ const GlossaryPage = () => {
             replace: true,
           });
         }
-
       }
     } else {
       setIsRightPanelLoading(false);
@@ -562,7 +576,9 @@ const GlossaryPage = () => {
       <div className="d-flex justify-center items-center">
         <ErrorPlaceHolder
           className="mt-0-important border-none"
-          permissionValue={t('label.view-entity', { entity: t('label.glossary') })}
+          permissionValue={t('label.view-entity', {
+            entity: t('label.glossary'),
+          })}
           type={ERROR_PLACEHOLDER_TYPE.PERMISSION}
         />
       </div>

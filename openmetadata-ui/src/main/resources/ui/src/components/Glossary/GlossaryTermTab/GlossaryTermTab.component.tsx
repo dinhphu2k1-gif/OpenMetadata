@@ -551,6 +551,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           'all',
           EntityStatus.Draft,
           EntityStatus.InReview,
+          EntityStatus.Rejected,
           EntityStatus.Approved,
         ]
   );
@@ -561,6 +562,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           'all',
           EntityStatus.Draft,
           EntityStatus.InReview,
+          EntityStatus.Rejected,
           EntityStatus.Approved,
         ]
   );
@@ -637,6 +639,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   const previousGlossaryFQNRef = useRef<string>();
   const lastFetchKeyRef = useRef('');
+  const termsWorkflowKeyRef = useRef('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [isExpandingAll, setIsExpandingAll] = useState(false);
@@ -1101,6 +1104,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return;
     }
 
+    const workflowKey = [
+      displayedGlossary.id,
+      displayedGlossary.entityStatus,
+      displayedGlossary.businessVersion,
+      displayedGlossary.termRevisions
+        ?.map((revision) => revision.termSnapshotId)
+        .join(','),
+    ].join('|');
+    termsWorkflowKeyRef.current = workflowKey;
     setIsTableLoading(true);
     try {
       let data: ModifiedGlossary[] = [];
@@ -1204,13 +1216,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             ) as EntityStatus[];
             const visibleStatuses: EntityStatus[] = isConsumer
               ? [EntityStatus.Approved]
-              : requestedStatuses.length > 0
-              ? requestedStatuses
-              : [
+              : selectedStatus.includes('all') || requestedStatuses.length === 0
+              ? [
                   EntityStatus.Draft,
                   EntityStatus.InReview,
+                  EntityStatus.Rejected,
                   EntityStatus.Approved,
-                ];
+                ]
+              : requestedStatuses;
             displayedTerms = (await expandCDETermVersions(
               currentTerms,
               visibleStatuses,
@@ -1224,6 +1237,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           displayedTerms = tree.slice(offset, offset + pageSize);
           totalTerms = tree.length;
         }
+        // A workflow transition can start a new request before the previous
+        // one finishes. Do not let that stale response clear the refreshed
+        // CDE list (the rows otherwise reappear only after a page reload).
+        if (workflowKey !== termsWorkflowKeyRef.current) {
+          return;
+        }
+
         setTotalTermsCount(totalTerms);
         handlePagingChange({ total: totalTerms });
         setGlossaryChildTerms(displayedTerms);
@@ -1256,6 +1276,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           : undefined;
 
       if (!isWorkingGlossaryVersion && versionTermIds?.length === 0) {
+        if (workflowKey !== termsWorkflowKeyRef.current) {
+          return;
+        }
+
         setTotalTermsCount(0);
         handlePagingChange({ total: 0 });
         setGlossaryChildTerms([]);
@@ -1469,25 +1493,39 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         );
       }
 
-      setTotalTermsCount(pagingResponse?.total ?? data.length);
-      handlePagingChange(pagingResponse ?? { total: data.length });
       if (isCDEGlossary && !isConsumer) {
         const visibleStatuses: EntityStatus[] = isWorkingGlossaryVersion
           ? workingVersionStatuses
           : rawStatuses.length > 0
           ? (rawStatuses as EntityStatus[])
-          : [EntityStatus.Draft, EntityStatus.InReview, EntityStatus.Approved];
+          : [
+              EntityStatus.Draft,
+              EntityStatus.InReview,
+              EntityStatus.Rejected,
+              EntityStatus.Approved,
+            ];
         data = (await expandCDETermVersions(
           data as unknown as ModifiedGlossaryTerm[],
           visibleStatuses
         )) as unknown as ModifiedGlossary[];
       }
+
+      if (workflowKey !== termsWorkflowKeyRef.current) {
+        return;
+      }
+
+      setTotalTermsCount(pagingResponse?.total ?? data.length);
+      handlePagingChange(pagingResponse ?? { total: data.length });
       setGlossaryChildTerms(data as ModifiedGlossary[]);
       setExpandedRowKeys([]);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      if (workflowKey === termsWorkflowKeyRef.current) {
+        showErrorToast(error as AxiosError);
+      }
     } finally {
-      setIsTableLoading(false);
+      if (workflowKey === termsWorkflowKeyRef.current) {
+        setIsTableLoading(false);
+      }
     }
   };
 
@@ -2841,7 +2879,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         displayedGlossary.termRevisions
           ?.map((revision) => revision.termSnapshotId)
           .join(',') ?? 'current-membership',
-        displayedGlossary.entityStatus,
         isVersionView ? 'version-view' : 'current-view',
         searchTerm,
         selectedStatus.join(','),
@@ -2861,8 +2898,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       ].join('|'),
     [
       activeGlossary?.fullyQualifiedName,
-      displayedGlossary.extension,
-      displayedGlossary.entityStatus,
+      displayedGlossary.businessVersion,
+      displayedGlossary.termRevisions,
       isVersionView,
       searchTerm,
       selectedStatus,

@@ -1032,24 +1032,74 @@ describe('Test GlossaryTermTab component', () => {
       expect(mockSearchQuery).not.toHaveBeenCalled();
     });
 
-    it('shows unpinned authoring CDEs in a working Data Dictionary', async () => {
-      const workingGlossary = {
+    it.each([EntityStatus.Draft, EntityStatus.Rejected])(
+      'shows unpinned %s CDEs in a working Data Dictionary',
+      async (termStatus) => {
+        const workingGlossary = {
+          id: 'data-dictionary-id',
+          name: 'Data Dictionary',
+          fullyQualifiedName: 'Data Dictionary',
+          entityStatus: EntityStatus.Draft,
+          businessVersion: '1.0',
+          workingRevision: 1,
+          termRevisions: [],
+        };
+        const unpinnedTerm = {
+          ...cdeTerm,
+          id: 'unpinned-draft-id',
+          name: 'alo1',
+          fullyQualifiedName: 'Data Dictionary.alo1',
+          entityStatus: termStatus,
+          businessVersion: '1.0',
+          workingRevision: 1,
+        };
+        const { useGenericContext } = jest.requireMock(
+          '../../Customization/GenericProvider/GenericProvider'
+        );
+        useGenericContext.mockImplementation(() => ({
+          data: workingGlossary,
+          isVersionView: false,
+          permissions: MOCK_PERMISSIONS,
+          type: 'glossary',
+        }));
+        mockGetWorkingGlossaryTerms.mockResolvedValue([]);
+        mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+          data: [unpinnedTerm],
+          paging: { total: 1 },
+        });
+        mockGetGlossaryTermsByIds.mockResolvedValue([unpinnedTerm]);
+
+        render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+        await waitFor(() => {
+          expect(mockSetGlossaryChildTerms.mock.lastCall[0]).toEqual([
+            expect.objectContaining({
+              id: 'unpinned-draft-id',
+              name: 'alo1',
+              entityStatus: termStatus,
+            }),
+          ]);
+        });
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
+          'Data Dictionary',
+          API_RES_MAX_SIZE,
+          undefined,
+          'Draft,In Review,Rejected',
+          undefined,
+          undefined,
+          'data-dictionary-id'
+        );
+      }
+    );
+
+    it('keeps the CDE list when only the Data Dictionary workflow status changes', async () => {
+      let workingGlossary = {
         id: 'data-dictionary-id',
         name: 'Data Dictionary',
         fullyQualifiedName: 'Data Dictionary',
         entityStatus: EntityStatus.Draft,
         businessVersion: '1.0',
-        workingRevision: 1,
         termRevisions: [],
-      };
-      const unpinnedDraft = {
-        ...cdeTerm,
-        id: 'unpinned-draft-id',
-        name: 'alo1',
-        fullyQualifiedName: 'Data Dictionary.alo1',
-        entityStatus: EntityStatus.Draft,
-        businessVersion: '1.0',
-        workingRevision: 1,
       };
       const { useGenericContext } = jest.requireMock(
         '../../Customization/GenericProvider/GenericProvider'
@@ -1060,33 +1110,26 @@ describe('Test GlossaryTermTab component', () => {
         permissions: MOCK_PERMISSIONS,
         type: 'glossary',
       }));
-      mockGetWorkingGlossaryTerms.mockResolvedValue([]);
-      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
-        data: [unpinnedDraft],
-        paging: { total: 1 },
-      });
-      mockGetGlossaryTermsByIds.mockResolvedValue([unpinnedDraft]);
+      mockGetWorkingGlossaryTerms.mockResolvedValue([cdeTerm]);
+      mockGetGlossaryTermsByIds.mockResolvedValue([cdeTerm]);
 
-      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+      const { rerender } = render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
 
       await waitFor(() => {
-        expect(mockSetGlossaryChildTerms.mock.lastCall[0]).toEqual([
-          expect.objectContaining({
-            id: 'unpinned-draft-id',
-            name: 'alo1',
-            entityStatus: EntityStatus.Draft,
-          }),
-        ]);
+        expect(mockGetWorkingGlossaryTerms).toHaveBeenCalledTimes(1);
       });
-      expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
-        'Data Dictionary',
-        API_RES_MAX_SIZE,
-        undefined,
-        'Draft,In Review,Rejected',
-        undefined,
-        undefined,
-        'data-dictionary-id'
-      );
+
+      workingGlossary = {
+        ...workingGlossary,
+        entityStatus: EntityStatus.InReview,
+        termRevisions: [],
+      };
+      rerender(<GlossaryTermTab isGlossary />);
+
+      expect(mockGetWorkingGlossaryTerms).toHaveBeenCalledTimes(1);
+      expect(mockSetGlossaryChildTerms).not.toHaveBeenLastCalledWith([]);
     });
 
     it('sorts terms from a Glossary snapshot alphabetically by name', async () => {

@@ -145,6 +145,13 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     })
   ),
   getGlossaryVersionsList: jest.fn().mockResolvedValue({ versions: [] }),
+  getGlossaryVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+  }),
+  getLatestPublishedGlossary: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, entityStatus: 'Approved' }),
   getGlossaryWorkingVersion: jest
     .fn()
     .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
