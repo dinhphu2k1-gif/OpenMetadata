@@ -308,7 +308,12 @@ export const getCDEGlossaryTableColumns = ({
       const status = entityStatus ?? EntityStatus.Approved;
 
       return (
-        <StatusBadge label={status} status={getEntityStatusClass(status)} />
+        <div className="d-flex flex-column gap-1">
+          <StatusBadge label={status} status={getEntityStatusClass(status)} />
+          {status === EntityStatus.Draft && (
+            <Tag color="default">Chưa thêm vào gói phát hành</Tag>
+          )}
+        </div>
       );
     },
   },

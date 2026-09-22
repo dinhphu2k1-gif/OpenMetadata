@@ -117,16 +117,10 @@ public class GlossaryVersioningService {
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
                   WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
-                  if (GLOSSARY.equals(entityType)
-                      && !EntityStatus.DRAFT.value().equals(working.entityStatus())) {
-                    throw new BadRequestException("Only Draft glossary versions can be edited");
+                  if (!EntityStatus.DRAFT.value().equals(working.entityStatus())) {
+                    throw new BadRequestException("Only Draft working versions can be edited");
                   }
-                  if (!GLOSSARY.equals(entityType)
-                      && !EntityStatus.DRAFT.value().equals(working.entityStatus())
-                      && !EntityStatus.REJECTED.value().equals(working.entityStatus())) {
-                    throw new BadRequestException(
-                        "Only Draft or Rejected working versions can be edited");
-                  }
+                  long now = System.currentTimeMillis();
                   int updated =
                       dao.updateWorking(
                           entityType,
@@ -135,9 +129,12 @@ public class GlossaryVersioningService {
                           working.entityStatus(),
                           nativeVersion,
                           JsonUtils.pojoToJson(
-                              normalizeWorkingPayload(
-                                  payload, working.businessVersion(), working.entityStatus())),
-                          System.currentTimeMillis(),
+                              withAudit(
+                                  normalizeWorkingPayload(
+                                      payload, working.businessVersion(), working.entityStatus()),
+                                  actor,
+                                  now)),
+                          now,
                           actor);
                   requireUpdated(updated);
                   return dao.findWorking(entityType, entityId);
@@ -737,6 +734,17 @@ public class GlossaryVersioningService {
     payload.remove("publishedBy");
     payload.remove("archivedAt");
     payload.remove("archivedBy");
+    return payload;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Object withAudit(Object sourcePayload, String actor, long updatedAt) {
+    java.util.Map<String, Object> payload =
+        new java.util.LinkedHashMap<>((java.util.Map<String, Object>) sourcePayload);
+    payload.put("updatedBy", actor);
+    payload.put("updatedAt", updatedAt);
+    payload.remove("createdBy");
+    payload.remove("createdAt");
     return payload;
   }
 

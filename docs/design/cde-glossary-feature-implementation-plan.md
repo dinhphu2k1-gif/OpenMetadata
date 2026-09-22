@@ -195,20 +195,62 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 ### F03 — Tạo và lưu Draft CDE
 
-**Phạm vi**
+**Ranh giới chức năng và invariant**
 
-- Tạo identity và working record nhất quán.
-- PATCH working bắt buộc expectedRevision integer; chỉ Draft được sửa.
-- Save tăng `workingRevision`, không tạo `businessVersion` mới.
-- UI có loading/disabled; sau save dùng revision mới từ response.
-- 409 yêu cầu reload, không tự retry ghi đè.
+- F03 tạo CDE business version đầu tiên. Một lần tạo thành công sinh đúng một `GlossaryTerm` identity thuộc Data Dictionary và đúng một working record có `businessVersion = "1.0"`, `entityStatus = Draft`, `workingRevision = 1`.
+- `businessVersion = "1.0"` của lần tạo đầu tiên do server gán cố định; client không được gửi hoặc lựa chọn version khác. `POST /v1/glossaryTerms/{id}/working` không tham gia luồng tạo mới F03 và chỉ được dùng để tạo business version kế tiếp ở F06.
+- Identity và working record phải được ghi trong cùng database transaction. Nếu bất kỳ bước nào thất bại thì rollback toàn bộ; không để lại identity mồ côi, working record mồ côi, relationship, index document hoặc event cho dữ liệu thất bại.
+- Native `GlossaryTerm` identity chỉ cung cấp định danh kỹ thuật và quan hệ nền của OpenMetadata. Working record là nguồn business content có thẩm quyền; Create/Save Draft không dùng direct native PATCH để lưu business content và không dùng native metadata version làm business version.
+- Mỗi CDE có đúng Data Dictionary làm cha nghiệp vụ trực tiếp. Payload phải trỏ tới Data Dictionary identity đã bootstrap và không được có `parent` là một CDE; backend từ chối sub-term, Glossary khác và mọi cấu hình workflow/versioning riêng trên CDE.
+- Tạo CDE thiết lập quan hệ sở hữu kỹ thuật với Data Dictionary nhưng không tự thêm revision vào `termRevisions`, không tăng `workingRevision` của Data Dictionary và không tạo snapshot. F08 chịu trách nhiệm đưa/bỏ một CDE revision vào gói phát hành Data Dictionary.
+- Trước khi được thêm vào gói phát hành ở F08, Draft CDE chỉ được mở trong editor có ngữ cảnh Data Dictionary bởi người có `canViewWorking`; UI không điều hướng nó vào published/historical deep-link và Consumer không thể phát hiện identity hoặc working payload này.
+- Một identity chỉ có tối đa một working version. Tên kỹ thuật/FQN phải duy nhất trong Data Dictionary; retry sau create đã commit trả conflict rõ ràng thay vì tạo bản ghi thứ hai.
+
+**API Create và validation**
+
+- UI gọi duy nhất `POST /v1/glossaryTerms` để tạo mới; backend không yêu cầu frontend gọi tiếp `POST /v1/glossaryTerms/{id}/working`. Response là working representation vừa tạo, không phải native identity projection.
+- Create request dùng typed `CreateGlossaryTerm` contract. Các field nghiệp vụ được hỗ trợ trong F03 gồm `name`, `displayName`, `description`, `owners`, `reviewers`, `domains`, `tags` và `extension`; `name` chỉ được nhập khi create và trở thành định danh bất biến sau khi identity được tạo.
+- `glossary` bắt buộc resolve đúng Data Dictionary bằng định danh ổn định. `parent` phải absent/null. Các field native ngoài phạm vi sản phẩm như sub-term hierarchy, workflow config, `versioningMode`, `provider`, publication/audit metadata và các field server-owned không được client điều khiển.
+- Backend validate canonical `name`, uniqueness của FQN, reference của owners/reviewers/domains/tags và schema Custom Properties của `extension`; không tin dữ liệu đã được frontend validate.
+- Create thành công trả ít nhất `id`, `name`, `fullyQualifiedName`, `glossary`, toàn bộ business payload, `businessVersion = "1.0"`, `entityStatus = Draft`, `workingRevision = 1`, `updatedBy` và `updatedAt` lấy từ principal/backend clock.
+- Duplicate name/FQN hoặc concurrent create cùng identity trả `409 Conflict`; payload sai schema, có `parent`, trỏ sai Glossary hoặc cố gán field server-owned trả `400 Bad Request`; không có quyền tạo trả `403 Forbidden`.
+- Index/change event cần thiết cho identity chỉ được phát sau commit và phải idempotent. Không phát published outbox, không tạo published head hoặc CDE snapshot trong F03.
+
+**API Save Draft**
+
+- `GET /v1/glossaryTerms/{id}/working` yêu cầu `canViewWorking`, chỉ trả working representation và trả `404 Not Found` nếu working record không tồn tại; không fallback sang identity hoặc published snapshot.
+- F03 cung cấp truy vấn authoring tối thiểu qua `GET /v1/glossaryTerms?glossary={dataDictionaryFqn}` để người có `canViewWorking` tìm lại CDE có working record sau reload. Backend resolve mỗi row thành working representation và lọc quyền trước khi trả; đây không phải bảng lịch sử/flat list đầy đủ của F11 và không làm CDE trở thành thành viên của `termRevisions`.
+- `PATCH /v1/glossaryTerms/{id}/working` dùng typed request gồm `expectedRevision` và full mutable business payload; không dùng `entityExtension`/`GlossaryTerm` tổng quát làm public mutation contract.
+- `expectedRevision` bắt buộc là integer từ 1 trở lên. Thiếu, sai kiểu hoặc ngoài miền hợp lệ trả `400 Bad Request`.
+- Full mutable payload của Save gồm `displayName`, `description`, `owners`, `reviewers`, `domains`, `tags` và `extension`. Các array bắt buộc hiện diện và dùng `[]` để xóa toàn bộ; `extension` bắt buộc hiện diện nhưng được phép `null` để xóa toàn bộ Custom Properties. Field bị thiếu hoặc ngoài allowlist trả `400`, không được hiểu là “giữ nguyên”.
+- Các field `id`, `name`, `fullyQualifiedName`, `glossary`, `parent`, `businessVersion`, `workingRevision`, `entityStatus`, native `version`, workflow/versioning config, publication metadata và audit metadata do server quản lý. Payload cố thay đổi chúng trả `400`.
+- Chỉ working record ở `Draft` được PATCH. `InReview` và `Rejected` đều bị từ chối và không thay đổi payload/revision/audit; bản `Rejected` phải qua `reopen` của F04 để trở lại `Draft` trước khi sửa.
+- Save thành công cập nhật working record tại chỗ, giữ nguyên identity và `businessVersion = "1.0"`, tăng `workingRevision` đúng một đơn vị, ghi `updatedBy/updatedAt` từ backend và trả working representation mới.
+- Save dùng compare-and-set theo `expectedRevision`. Revision cũ trả `409 Conflict`; request thất bại không thay đổi payload, revision, audit metadata, Data Dictionary working record hoặc bất kỳ snapshot/head/outbox nào.
+
+**Authorization và UI**
+
+- Vì CDE chưa tồn tại tại thời điểm Create, backend kiểm tra quyền tạo trên Data Dictionary cha bằng capability/policy hiệu lực. Save kiểm tra `canEditWorking` trên CDE; xem Draft kiểm tra `canViewWorking`. Frontend chỉ render action theo capability backend trả về, không suy quyền từ tên role.
+- Admin/policy holder và Proposer/owner được cấp capability phù hợp có thể tạo/sửa. Consumer-only không được xem, tạo hoặc sửa. Reviewer được gán có thể được cấp quyền xem working để duyệt ở F04 nhưng mặc định không được tạo hoặc sửa Draft.
+- Form Create và Save disable action, hiển thị loading và chặn double-submit trong khi request đang chạy. Sau Create/Save thành công, UI thay state bằng response backend và dùng `workingRevision` trả về cho mutation tiếp theo.
+- Khu vực authoring của Data Dictionary hiển thị các CDE working mà người dùng được phép xem, kể cả khi chưa thuộc `termRevisions`, với nhãn rõ ràng `Chưa thêm vào gói phát hành`. Chọn row mở editor trong context Data Dictionary; reload vẫn tìm lại được Draft qua truy vấn authoring tối thiểu.
+- Khi Save nhận `409`, UI giữ dữ liệu chưa lưu, không đóng editor và không tự retry. UI hiển thị conflict cùng hành động tải bản mới nhất; trước khi thay state phải cảnh báo dữ liệu chưa lưu sẽ bị mất.
+- UI không hiển thị control tạo sub-term hoặc chọn Glossary cha; Data Dictionary được lấy từ context hiện tại. Hủy hoặc lỗi Create không chèn CDE giả vào bảng/cache phía client.
 
 **Test/DoD**
 
-- Create và save nhiều lần.
-- Hai writer cùng revision: một thành công, một nhận 409.
-- Không dùng `workingRevision` làm fallback cho `businessVersion`.
-- Consumer/Reviewer mặc định không tạo hoặc sửa Draft.
+- Integration test Create trên database sạch tạo đúng một identity và một working Draft v1.0, trả `workingRevision = 1`, không tạo published snapshot/head/outbox và không đổi `termRevisions` hay revision của Data Dictionary.
+- Inject failure giữa insert identity, relationship và insert working chứng minh transaction rollback toàn bộ; không có identity/working mồ côi, index document hoặc event cho transaction thất bại.
+- Hai request Create đồng thời với cùng Data Dictionary/name: đúng một request thành công, request còn lại nhận `409`; retry không tạo thêm identity hoặc working record.
+- Test từ chối Glossary khác, `parent` CDE/sub-term, workflow config riêng, field server-owned, reference không tồn tại, tag/custom property sai schema và FQN không hợp lệ.
+- Save nhiều lần giữ nguyên `businessVersion = "1.0"` và tăng revision tuần tự `1 → 2 → 3`; restart/reload vẫn trả đúng một identity và working payload mới nhất.
+- Hai writer dùng cùng revision: đúng một writer thành công; writer còn lại nhận `409`, payload/audit của writer thành công không bị ghi đè.
+- PATCH thiếu/sai `expectedRevision`, thiếu field bắt buộc hoặc có field ngoài allowlist trả `400`; working không tồn tại trả `404`; PATCH `InReview` hoặc `Rejected` bị từ chối và không đổi dữ liệu.
+- Test chứng minh client không thể đổi `name`, FQN, Glossary, parent, business version, status, revision hoặc actor/timestamp qua Save Draft; không dùng `workingRevision` hay native `version` làm fallback cho `businessVersion`.
+- Authorization integration test bao phủ Admin/policy holder, Proposer/owner được cấp quyền, Viewer có `canViewWorking` nhưng không có `canEditWorking`, Reviewer mặc định, Consumer-only và user đồng thời có nhiều role.
+- Test truy vấn authoring chứng minh maker tìm lại được Draft chưa thuộc `termRevisions` sau reload, kết quả đã lọc theo quyền và Consumer không nhận identity/working row.
+- Frontend test bao phủ single-request Create, loading/double-submit, không gửi `parent`, thay state/revision từ response, validation failure, Create failure không để cache row giả và conflict `409` giữ dữ liệu chưa lưu.
+- E2E: mở Data Dictionary Draft → tạo CDE → sửa và Save nhiều lần → reload/restart → Draft vẫn có version `1.0`, revision/nội dung đúng; Consumer không nhìn thấy và Data Dictionary `termRevisions` vẫn không đổi cho tới F08.
 
 ### F04 — Submit, Reject và Reopen CDE
 

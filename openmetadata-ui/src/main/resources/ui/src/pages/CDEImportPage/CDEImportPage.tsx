@@ -1012,13 +1012,9 @@ const CDEImportPage: FC = () => {
             allUsers,
             allTeams
           );
-          const { businessVersion, ...createPayload } = payload;
-          const newTerm = await addGlossaryTerm(createPayload);
-          const working = await transitionGlossaryTermWorkflow(
-            newTerm.id,
-            'createDraft',
-            { businessVersion }
-          );
+          const { businessVersion: _serverOwnedBusinessVersion, ...createPayload } =
+            payload;
+          const working = await addGlossaryTerm(createPayload);
           createdCount++;
           if (working?.id && working.workingRevision) {
             createdTermsList.push({

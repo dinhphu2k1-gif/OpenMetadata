@@ -13,7 +13,7 @@
  *  limitations under the License.
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ReactNode } from 'react';
 import { getGlossaryTermByFQN } from '../../../rest/glossaryAPI';
 import GlossaryTermModal from './GlossaryTermModal.component';
@@ -49,7 +49,13 @@ jest.mock('../AddGlossaryTermForm/AddGlossaryTermForm.component', () =>
 );
 
 jest.mock('../AddGlossaryTermForm/CDEGlossaryTermForm.component', () =>
-  jest.fn().mockReturnValue(<div data-testid="cde-term-form" />)
+  jest.fn().mockImplementation(({ onSave }) => (
+    <button
+      data-testid="cde-term-form"
+      onClick={() => onSave({ name: 'CDE_001' })}>
+      submit form
+    </button>
+  ))
 );
 
 jest.mock('../AddGlossaryTermForm/DQGlossaryTermForm.component', () =>
@@ -149,5 +155,34 @@ describe('GlossaryTermModal', () => {
 
     expect(modal).toHaveClass('cde-glossary-term-modal--add');
     expect(modal).toHaveStyle({ width: '1240px' });
+  });
+
+  it('keeps the modal open and blocks a second submit while Create is pending', async () => {
+    let finish!: () => void;
+    const onSave = jest.fn(
+      () => new Promise<void>((resolve) => (finish = resolve))
+    );
+    render(<GlossaryTermModal {...defaultProps} onSave={onSave} />);
+
+    fireEvent.click(await screen.findByTestId('cde-term-form'));
+    fireEvent.click(screen.getByTestId('cde-term-form'));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('edit-glossary-modal')).toBeInTheDocument();
+    finish();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+  });
+
+  it('keeps unsaved form data visible after a 409 conflict', async () => {
+    const onSave = jest.fn().mockRejectedValue({ response: { status: 409 } });
+    render(<GlossaryTermModal {...defaultProps} onSave={onSave} />);
+
+    fireEvent.click(await screen.findByTestId('cde-term-form'));
+
+    expect(
+      await screen.findByText('message.concurrent-update-conflict')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('cde-term-form')).toBeInTheDocument();
+    expect(screen.getByText('label.load-latest')).toBeInTheDocument();
   });
 });

@@ -62,6 +62,7 @@ import org.openmetadata.schema.api.AddGlossaryToAssetsRequest;
 import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossaryTerm;
+import org.openmetadata.schema.api.data.CdeDraftUpdateRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.LoadGlossary;
 import org.openmetadata.schema.api.data.MoveGlossaryTermRequest;
@@ -100,6 +101,7 @@ import org.openmetadata.service.security.AuthorizationLogic;
 import org.openmetadata.service.security.Authorizer;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
+import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContextInterface;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.EntityUtil;
@@ -197,18 +199,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid CdeDraftUpdateRequest request) {
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, term));
-    requireExpectedRevision(request);
-    DataDictionaryResolver.requireCdePayload(request.getPayload(), term.getGlossary().getId());
+    GlossaryTerm payload = mutableDraftPayload(term, request);
+    repository.prepareInternal(payload, true);
     return GlossaryVersionResponses.working(
         versioningService.saveWorking(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
             request.getExpectedRevision(),
             term.getVersion(),
-            request.getPayload(),
+            payload,
             securityContext.getUserPrincipal().getName()));
   }
 
@@ -377,11 +379,27 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, GlossaryTerm term) {
+    GlossaryTerm authorizationTerm = term;
+    try {
+      WorkingVersionRecord working =
+          versioningService.getWorking(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
+      authorizationTerm = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+    } catch (NotFoundException ignored) {
+      // Published-only identities retain their persisted authorization relationships.
+    }
+    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm);
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
+      SecurityContext securityContext, GlossaryTerm authorizationTerm) {
     return GlossaryAuthorizationResolver.resolve(
-            getSubjectContext(securityContext), term.getOwners(), term.getReviewers())
+            getSubjectContext(securityContext),
+            authorizationTerm.getOwners(),
+            authorizationTerm.getReviewers())
         .restrictToPolicy(
-            policyAllows(securityContext, term.getId(), MetadataOperation.EDIT_ALL),
-            policyAllows(securityContext, term.getId(), MetadataOperation.EDIT_STATUS));
+            policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_ALL),
+            policyAllows(
+                securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_STATUS));
   }
 
   private boolean policyAllows(
@@ -608,7 +626,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       }
       terms.setData(resolved);
     } else if (terms != null && terms.getData() != null) {
-      terms.setData(resolveRepresentations(securityContext, terms.getData()));
+      List<GlossaryTerm> resolved =
+          glossaryIdParam == null
+              ? resolveRepresentations(securityContext, terms.getData())
+              : resolveAuthoringRepresentations(securityContext, terms.getData());
+      terms.setData(resolved);
+      if (glossaryIdParam != null && terms.getPaging() != null) {
+        if (resolved.isEmpty()) {
+          terms.setPaging(new org.openmetadata.schema.type.Paging().withTotal(0));
+        } else {
+          terms.getPaging().withTotal(resolved.size());
+        }
+      }
     }
     return addHref(uriInfo, terms);
   }
@@ -788,6 +817,52 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             })
         .filter(java.util.Objects::nonNull)
         .toList();
+  }
+
+  private List<GlossaryTerm> resolveAuthoringRepresentations(
+      SecurityContext securityContext, List<GlossaryTerm> terms) {
+    Map<UUID, WorkingVersionRecord> working =
+        versioningService.getWorkingBatch(
+            GlossaryVersioningService.GLOSSARY_TERM,
+            terms.stream().map(GlossaryTerm::getId).toList());
+    return terms.stream()
+        .map(term -> working.get(term.getId()))
+        .filter(java.util.Objects::nonNull)
+        .map(
+            record ->
+                JsonUtils.readValue(
+                    JsonUtils.pojoToJson(GlossaryVersionResponses.working(record)),
+                    GlossaryTerm.class))
+        .filter(term -> capabilitiesForAuthorizationTerm(securityContext, term).canViewWorking())
+        .toList();
+  }
+
+  private GlossaryTerm mutableDraftPayload(
+      GlossaryTerm identity, CdeDraftUpdateRequest request) {
+    if (request == null || request.getExpectedRevision() == null) {
+      throw new BadRequestException("expectedRevision is required");
+    }
+    List<EntityReference> owners =
+        EntityRepository.validateOwners(new ArrayList<>(request.getOwners()));
+    EntityRepository.validateReviewers(request.getReviewers());
+    List<EntityReference> domains =
+        request.getDomains().stream()
+            .map(reference -> Entity.getEntityReference(reference, Include.NON_DELETED))
+            .toList();
+    return new GlossaryTerm()
+        .withId(identity.getId())
+        .withName(identity.getName())
+        .withFullyQualifiedName(identity.getFullyQualifiedName())
+        .withGlossary(identity.getGlossary())
+        .withDisplayName(request.getDisplayName())
+        .withDescription(request.getDescription())
+        .withOwners(owners)
+        .withReviewers(request.getReviewers())
+        .withDomains(domains)
+        .withTags(request.getTags())
+        .withExtension(request.getExtension())
+        .withEntityStatus(EntityStatus.DRAFT)
+        .withVersion(identity.getVersion());
   }
 
   @GET
@@ -1192,9 +1267,38 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @Valid CreateGlossaryTerm create) {
-    DataDictionaryResolver.requireDataDictionaryName(create.getGlossary());
+    DataDictionaryResolver.requireDirectCdeCreate(create);
     GlossaryTerm term = mapper.createToEntity(create, securityContext.getUserPrincipal().getName());
-    return create(uriInfo, securityContext, term);
+    Glossary glossary =
+        DataDictionaryResolver.requireDataDictionary(
+            Entity.getEntity(term.getGlossary(), "owners,reviewers", Include.NON_DELETED));
+    WorkingVersionRecord glossaryWorking =
+        versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossary.getId());
+    Glossary authorizationGlossary = JsonUtils.readValue(glossaryWorking.payload(), Glossary.class);
+    GlossaryAuthorizationResolver.requireEdit(
+        GlossaryAuthorizationResolver.resolve(
+            getSubjectContext(securityContext),
+            authorizationGlossary.getOwners(),
+            authorizationGlossary.getReviewers()));
+    CreateResourceContext<GlossaryTerm> createContext =
+        new CreateResourceContext<>(entityType, term);
+    OperationContext createOperation =
+        new OperationContext(entityType, MetadataOperation.CREATE);
+    limits.enforceLimits(securityContext, createContext, createOperation);
+    authorizer.authorize(
+        securityContext,
+        createOperation,
+        createContext);
+    try {
+      WorkingVersionRecord working =
+          repository.createInitialDraft(term, securityContext.getUserPrincipal().getName());
+      return Response.status(Response.Status.CREATED)
+          .entity(GlossaryVersionResponses.working(working))
+          .build();
+    } catch (org.jdbi.v3.core.statement.UnableToExecuteStatementException exception) {
+      throw new jakarta.ws.rs.ClientErrorException(
+          "A CDE with this name already exists", Response.Status.CONFLICT, exception);
+    }
   }
 
   @POST
@@ -1217,16 +1321,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @Valid List<CreateGlossaryTerm> creates) {
-    creates.forEach(
-        create -> DataDictionaryResolver.requireDataDictionaryName(create.getGlossary()));
-    List<GlossaryTerm> terms =
-        creates.stream()
-            .map(
-                create ->
-                    mapper.createToEntity(create, securityContext.getUserPrincipal().getName()))
-            .toList();
-    List<GlossaryTerm> result = repository.createMany(uriInfo, terms);
-    return Response.ok(result).build();
+    throw new BadRequestException(
+        "Bulk native CDE creation is disabled; create each CDE through atomic POST /glossaryTerms");
   }
 
   @PATCH

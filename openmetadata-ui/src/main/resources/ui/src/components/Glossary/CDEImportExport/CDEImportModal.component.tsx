@@ -319,11 +319,9 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             allTags
           );
 
-          const { businessVersion, ...createPayload } = payload;
-          const newTerm = await addGlossaryTerm(createPayload);
-          await transitionGlossaryTermWorkflow(newTerm.id, 'createDraft', {
-            businessVersion,
-          });
+          const { businessVersion: _serverOwnedBusinessVersion, ...createPayload } =
+            payload;
+          await addGlossaryTerm(createPayload);
           createdCount++;
         } catch (error: any) {
           failedCount++;

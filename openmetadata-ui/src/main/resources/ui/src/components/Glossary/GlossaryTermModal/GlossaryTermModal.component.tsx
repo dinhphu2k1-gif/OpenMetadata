@@ -11,10 +11,10 @@
  *  limitations under the License.
  */
 import { Button } from '@openmetadata/ui-core-components';
-import { Modal } from 'antd';
+import { Alert, Modal } from 'antd';
 import { useForm } from 'antd/lib/form/Form';
 import { AxiosError } from 'axios';
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EntityType, TabSpecificField } from '../../../enums/entity.enum';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
@@ -50,7 +50,9 @@ const GlossaryTermModal: FC<Props> = ({
   const [form] = useForm();
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [glossaryTerm, setGlossaryTerm] = useState<GlossaryTerm>();
+  const [conflict, setConflict] = useState(false);
 
   const isCustomModal = isCDEGlossary || isDQGlossary;
 
@@ -123,10 +125,19 @@ const GlossaryTermModal: FC<Props> = ({
   }, [glossaryTermFQN, isCustomModal]);
 
   const handleSave = async (values: GlossaryTermForm) => {
+    if (savingRef.current) {
+      return;
+    }
+    savingRef.current = true;
     setSaving(true);
     try {
       await onSave(values);
     } catch (error) {
+      if ((error as AxiosError)?.response?.status === 409) {
+        setConflict(true);
+
+        return;
+      }
       if ((error as AxiosError)?.response?.status === 400) {
         const errorMessage =
           (error as AxiosError<{ message: string }>)?.response?.data?.message ??
@@ -154,6 +165,7 @@ const GlossaryTermModal: FC<Props> = ({
 
       throw error;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -166,6 +178,7 @@ const GlossaryTermModal: FC<Props> = ({
     }
     if (!visible) {
       form.resetFields();
+      setConflict(false);
     }
   }, [visible]);
 
@@ -191,6 +204,7 @@ const GlossaryTermModal: FC<Props> = ({
         <Button
           color="primary"
           data-testid="save-glossary-term"
+          isDisabled={saving}
           isLoading={saving}
           key="save-btn"
           onPress={form.submit}>
@@ -212,6 +226,36 @@ const GlossaryTermModal: FC<Props> = ({
       <EntityAttachmentProvider
         entityFqn={glossaryTermFQN}
         entityType={EntityType.GLOSSARY_TERM}>
+        {conflict && (
+          <Alert
+            showIcon
+            action={
+              <Button
+                color="secondary"
+                onPress={() => {
+                  if (
+                    window.confirm(
+                      t(
+                        'message.unsaved-changes-will-be-lost',
+                        'Dữ liệu chưa lưu sẽ bị thay thế. Tiếp tục?'
+                      )
+                    )
+                  ) {
+                    setConflict(false);
+                    fetchCurrentEntity();
+                  }
+                }}>
+                {t('label.load-latest', 'Tải bản mới nhất')}
+              </Button>
+            }
+            className="m-b-md"
+            message={t(
+              'message.concurrent-update-conflict',
+              'Bản nháp đã được người khác cập nhật. Dữ liệu bạn nhập vẫn được giữ lại.'
+            )}
+            type="warning"
+          />
+        )}
         {isLoading ? (
           <Loader />
         ) : isCDEGlossary ? (

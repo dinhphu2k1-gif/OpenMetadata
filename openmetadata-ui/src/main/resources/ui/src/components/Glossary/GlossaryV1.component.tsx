@@ -38,7 +38,6 @@ import {
   getGlossaryTermWorkingVersion,
   getGlossaryVersionPermissions,
   ListGlossaryTermsParams,
-  transitionGlossaryTermWorkflow,
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
 import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
@@ -303,27 +302,20 @@ const GlossaryV1 = ({
   );
 
   const handleGlossaryTermAdd = async (formData: GlossaryTermForm) => {
-    const { businessVersion = '1.0', ...createData } = formData;
     const term = await addGlossaryTerm({
-      ...createData,
-      domains: createData.domains?.map(
+      name: formData.name,
+      displayName: formData.displayName,
+      description: formData.description,
+      owners: formData.owners,
+      reviewers: formData.reviewers,
+      tags: formData.tags,
+      extension: formData.extension,
+      domains: formData.domains?.map(
         (domain) => domain.fullyQualifiedName ?? domain.name ?? ''
       ),
-      glossary:
-        activeGlossaryTerm?.glossary?.name ||
-        (selectedData.fullyQualifiedName ?? ''),
-      parent: activeGlossaryTerm?.fullyQualifiedName,
+      glossary: selectedData.fullyQualifiedName ?? '',
     });
-    const working = await transitionGlossaryTermWorkflow(
-      term.id,
-      'createDraft',
-      {
-        businessVersion,
-        payload: term,
-      }
-    );
-
-    onTermModalSuccess(working);
+    onTermModalSuccess(term);
   };
 
   const handleGlossaryTermSave = async (formData: GlossaryTermForm) => {
@@ -331,7 +323,6 @@ const GlossaryV1 = ({
     if (editMode) {
       if (newTermData && activeGlossaryTerm) {
         const {
-          name,
           displayName,
           description,
           synonyms,
@@ -341,13 +332,11 @@ const GlossaryV1 = ({
           reviewers,
           owners,
           relatedTerms,
-          style,
           domains,
           extension,
         } = formData || {};
 
-        newTermData.name = name;
-        newTermData.style = style;
+        newTermData.name = activeGlossaryTerm.name;
         newTermData.displayName = displayName;
         newTermData.description = description;
         newTermData.synonyms = synonyms;

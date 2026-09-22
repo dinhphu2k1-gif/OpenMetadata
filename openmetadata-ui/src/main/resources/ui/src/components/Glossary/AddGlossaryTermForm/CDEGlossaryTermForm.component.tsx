@@ -172,8 +172,6 @@ const CDEGlossaryTermForm = ({
     const entityRelationshipVal =
       values.entityRelationship ?? values.moi_quan_he_voi_thuc_the;
 
-    const versionVal = values.version?.trim();
-
     const preservedExtension = { ...glossaryTerm?.extension };
     [
       'version',
@@ -212,7 +210,6 @@ const CDEGlossaryTermForm = ({
     );
 
     await onSave({
-      businessVersion: versionVal || '1.0',
       name: String(values.name ?? '').trim(),
       displayName: String(values.displayName ?? '').trim(),
       description: String(values.description ?? ''),
@@ -259,6 +256,7 @@ const CDEGlossaryTermForm = ({
           rules={[{ required: true, whitespace: true }]}>
           <Input
             data-testid="cde-term-code"
+            disabled={editMode}
             placeholder={t('cde.term-code-placeholder', 'Ví dụ: CDE_CIF_001')}
           />
         </Form.Item>
@@ -276,11 +274,7 @@ const CDEGlossaryTermForm = ({
           label={t('cde.version')}
           name="version"
           rules={[{ required: true, whitespace: true }]}>
-          <Input
-            data-testid="cde-version"
-            disabled={editMode}
-            placeholder="1.0"
-          />
+          <Input data-testid="cde-version" disabled placeholder="1.0" />
         </Form.Item>
         {(['effectiveDate', 'expirationDate'] as const).map((key) => (
           <Form.Item

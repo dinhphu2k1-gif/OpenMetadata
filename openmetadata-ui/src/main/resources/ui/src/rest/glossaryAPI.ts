@@ -23,6 +23,7 @@ import { SearchIndex } from '../enums/search.enum';
 import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssetsRequest';
 import { CreateGlossary } from '../generated/api/data/createGlossary';
 import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
+import { CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityReference, Glossary } from '../generated/entity/data/glossary';
@@ -293,10 +294,20 @@ export const updateGlossaryTermWorkingVersion = async (
   expectedRevision: number,
   payload: GlossaryTerm
 ) => {
+  const request: CdeDraftUpdateRequest = {
+    expectedRevision,
+    displayName: payload.displayName ?? null,
+    description: payload.description,
+    owners: payload.owners ?? [],
+    reviewers: payload.reviewers ?? [],
+    domains: payload.domains ?? [],
+    tags: payload.tags ?? [],
+    extension: (payload.extension as Record<string, unknown>) ?? null,
+  };
   const response = await APIClient.patch<
-    GlossaryWorkflowRequest,
+    CdeDraftUpdateRequest,
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/working`, { expectedRevision, payload });
+  >(`/glossaryTerms/${id}/working`, request);
 
   return response.data;
 };
@@ -601,7 +612,9 @@ export const getFirstLevelGlossaryTermsPaginated = async (
     PagingResponse<GlossaryTermWithChildren[]>
   >(apiUrl, {
     params: {
-      directChildrenOf: parentFQN,
+      ...(parentFQN === 'Data Dictionary'
+        ? { glossary: parentFQN }
+        : { directChildrenOf: parentFQN }),
       fields: fields ?? [
         TabSpecificField.CHILDREN_COUNT,
         TabSpecificField.OWNERS,

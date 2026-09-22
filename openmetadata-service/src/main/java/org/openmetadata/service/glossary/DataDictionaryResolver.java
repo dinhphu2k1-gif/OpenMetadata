@@ -94,6 +94,23 @@ public final class DataDictionaryResolver {
     resolveDataDictionary(glossaryReference);
   }
 
+  public static void requireDirectCdeCreate(
+      org.openmetadata.schema.api.data.CreateGlossaryTerm create) {
+    requireDataDictionaryName(create.getGlossary());
+    if (create.getParent() != null) {
+      throw new BadRequestException("A CDE must be a direct child of the Data Dictionary");
+    }
+    if (create.getProvider() != null
+        || create.getStyle() != null
+        || create.getSynonyms() != null
+        || create.getRelatedTerms() != null
+        || create.getReferences() != null
+        || create.getConceptMappings() != null
+        || Boolean.TRUE.equals(create.getMutuallyExclusive())) {
+      throw new BadRequestException("Create CDE contains fields outside the F03 allowlist");
+    }
+  }
+
   private static Map<String, Object> payloadValues(Object payload) {
     Object parsed =
         payload instanceof String

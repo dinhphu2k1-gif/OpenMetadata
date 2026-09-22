@@ -115,6 +115,7 @@ import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.jdbi3.FeedRepository.TaskWorkflow;
 import org.openmetadata.service.jdbi3.FeedRepository.ThreadContext;
@@ -170,6 +171,94 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     if (searchRepository != null) {
       inheritedFieldEntitySearch = new DefaultInheritedFieldEntitySearch(searchRepository);
     }
+  }
+
+  /**
+   * Creates the technical CDE identity and its first business Draft in one transaction. Lifecycle
+   * side effects deliberately run only after commit, so a failed working insert cannot leave an
+   * index/event for an orphan identity.
+   */
+  public WorkingVersionRecord createInitialDraft(GlossaryTerm term, String actor) {
+    prepareInternal(term, false);
+    term.setUpdatedBy(actor);
+    long now = System.currentTimeMillis();
+    term.setUpdatedAt(now);
+    term.setVersion(0.1);
+    GlossaryTerm identity =
+        JsonUtils.readValue(JsonUtils.pojoToJson(term), GlossaryTerm.class)
+            .withDisplayName(null)
+            .withDescription(null)
+            .withOwners(null)
+            .withReviewers(null)
+            .withDomains(null)
+            .withTags(null)
+            .withExtension(null);
+    WorkingVersionRecord working =
+        Entity.getJdbi()
+            .inTransaction(
+                handle -> {
+                  CollectionDAO collection = handle.attach(CollectionDAO.class);
+                  GlossaryVersionDAO versions = handle.attach(GlossaryVersionDAO.class);
+                  collection.glossaryTermDAO().insert(identity, identity.getFullyQualifiedName());
+                  collection
+                      .relationshipDAO()
+                      .insert(
+                          term.getGlossary().getId(),
+                          term.getId(),
+                          GLOSSARY,
+                          GLOSSARY_TERM,
+                          Relationship.CONTAINS.ordinal());
+                  for (EntityReference owner : listOrEmpty(term.getOwners())) {
+                    collection
+                        .relationshipDAO()
+                        .insert(
+                            owner.getId(),
+                            term.getId(),
+                            owner.getType(),
+                            GLOSSARY_TERM,
+                            Relationship.OWNS.ordinal());
+                  }
+                  for (EntityReference reviewer : listOrEmpty(term.getReviewers())) {
+                    collection
+                        .relationshipDAO()
+                        .insert(
+                            reviewer.getId(),
+                            term.getId(),
+                            reviewer.getType(),
+                            GLOSSARY_TERM,
+                            Relationship.REVIEWS.ordinal());
+                  }
+                  for (EntityReference domain : listOrEmpty(term.getDomains())) {
+                    collection
+                        .relationshipDAO()
+                        .insert(
+                            domain.getId(),
+                            term.getId(),
+                            Entity.DOMAIN,
+                            GLOSSARY_TERM,
+                            Relationship.HAS.ordinal());
+                  }
+                  GlossaryTerm payload =
+                      JsonUtils.readValue(JsonUtils.pojoToJson(term), GlossaryTerm.class)
+                          .withBusinessVersion("1.0")
+                          .withWorkingRevision(null)
+                          .withEntityStatus(EntityStatus.DRAFT);
+                  versions.insertWorking(
+                      UUID.randomUUID(),
+                      GLOSSARY_TERM,
+                      term.getId(),
+                      term.getGlossary().getId(),
+                      "1.0",
+                      EntityStatus.DRAFT.value(),
+                      term.getVersion(),
+                      JsonUtils.pojoToJson(payload),
+                      now,
+                      actor);
+                  return versions.findWorking(GLOSSARY_TERM, term.getId());
+                });
+    postCreate(identity);
+    writeThroughCache(identity, false);
+    return working;
   }
 
   public ResultList<EntityReference> getGlossaryTermAssets(

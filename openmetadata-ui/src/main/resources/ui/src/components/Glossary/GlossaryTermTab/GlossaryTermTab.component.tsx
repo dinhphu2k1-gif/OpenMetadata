@@ -1225,12 +1225,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         );
       const versionTermIds =
         isGlossary && Array.isArray(revisionTermIds)
-          ? revisionTermIds
+          ? isWorkingGlossaryVersion
+            ? undefined
+            : revisionTermIds
           : isWorkingGlossaryVersion
-          ? []
+          ? undefined
           : undefined;
 
-      if (versionTermIds?.length === 0) {
+      if (!isWorkingGlossaryVersion && versionTermIds?.length === 0) {
         setTotalTermsCount(0);
         handlePagingChange({ total: 0 });
         setGlossaryChildTerms([]);
