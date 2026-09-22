@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.ws.rs.BadRequestException;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.schema.api.data.CreateGlossaryTerm;
 import org.openmetadata.schema.type.ProviderType;
@@ -23,6 +24,19 @@ class DataDictionaryResolverTest {
   @Test
   void acceptsOnlyTheDirectCdeCreateContract() {
     assertDoesNotThrow(() -> DataDictionaryResolver.requireDirectCdeCreate(validCreate()));
+  }
+
+  @Test
+  void acceptsNeutralDefaultsAddedByGeneratedClients() {
+    CreateGlossaryTerm create =
+        validCreate()
+            .withSynonyms(List.of())
+            .withRelatedTerms(List.of())
+            .withReferences(List.of())
+            .withConceptMappings(List.of())
+            .withMutuallyExclusive(false);
+
+    assertDoesNotThrow(() -> DataDictionaryResolver.requireDirectCdeCreate(create));
   }
 
   @Test
@@ -51,5 +65,10 @@ class DataDictionaryResolverTest {
         () ->
             DataDictionaryResolver.requireDirectCdeCreate(
                 validCreate().withMutuallyExclusive(true)));
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            DataDictionaryResolver.requireDirectCdeCreate(
+                validCreate().withSynonyms(List.of("unsupported"))));
   }
 }

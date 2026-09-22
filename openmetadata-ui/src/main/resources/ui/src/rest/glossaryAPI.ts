@@ -604,7 +604,8 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   after?: string,
   entityStatus?: string,
   fields?: string[],
-  before?: string
+  before?: string,
+  glossaryId?: string
 ) => {
   const apiUrl = `/glossaryTerms`;
 
@@ -612,8 +613,8 @@ export const getFirstLevelGlossaryTermsPaginated = async (
     PagingResponse<GlossaryTermWithChildren[]>
   >(apiUrl, {
     params: {
-      ...(parentFQN === 'Data Dictionary'
-        ? { glossary: parentFQN }
+      ...(parentFQN === 'Data Dictionary' || glossaryId
+        ? { glossary: glossaryId ?? parentFQN }
         : { directChildrenOf: parentFQN }),
       fields: fields ?? [
         TabSpecificField.CHILDREN_COUNT,

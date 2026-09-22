@@ -21,6 +21,7 @@ import {
 import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
+import { API_RES_MAX_SIZE } from '../../../constants/constants';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
 import { SearchIndex } from '../../../enums/search.enum';
@@ -1029,6 +1030,63 @@ describe('Test GlossaryTermTab component', () => {
         '1.0'
       );
       expect(mockSearchQuery).not.toHaveBeenCalled();
+    });
+
+    it('shows unpinned authoring CDEs in a working Data Dictionary', async () => {
+      const workingGlossary = {
+        id: 'data-dictionary-id',
+        name: 'Data Dictionary',
+        fullyQualifiedName: 'Data Dictionary',
+        entityStatus: EntityStatus.Draft,
+        businessVersion: '1.0',
+        workingRevision: 1,
+        termRevisions: [],
+      };
+      const unpinnedDraft = {
+        ...cdeTerm,
+        id: 'unpinned-draft-id',
+        name: 'alo1',
+        fullyQualifiedName: 'Data Dictionary.alo1',
+        entityStatus: EntityStatus.Draft,
+        businessVersion: '1.0',
+        workingRevision: 1,
+      };
+      const { useGenericContext } = jest.requireMock(
+        '../../Customization/GenericProvider/GenericProvider'
+      );
+      useGenericContext.mockImplementation(() => ({
+        data: workingGlossary,
+        isVersionView: false,
+        permissions: MOCK_PERMISSIONS,
+        type: 'glossary',
+      }));
+      mockGetWorkingGlossaryTerms.mockResolvedValue([]);
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [unpinnedDraft],
+        paging: { total: 1 },
+      });
+      mockGetGlossaryTermsByIds.mockResolvedValue([unpinnedDraft]);
+
+      render(<GlossaryTermTab isGlossary />, { wrapper: MemoryRouter });
+
+      await waitFor(() => {
+        expect(mockSetGlossaryChildTerms.mock.lastCall[0]).toEqual([
+          expect.objectContaining({
+            id: 'unpinned-draft-id',
+            name: 'alo1',
+            entityStatus: EntityStatus.Draft,
+          }),
+        ]);
+      });
+      expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
+        'Data Dictionary',
+        API_RES_MAX_SIZE,
+        undefined,
+        'Draft,In Review,Rejected',
+        undefined,
+        undefined,
+        'data-dictionary-id'
+      );
     });
 
     it('sorts terms from a Glossary snapshot alphabetically by name', async () => {

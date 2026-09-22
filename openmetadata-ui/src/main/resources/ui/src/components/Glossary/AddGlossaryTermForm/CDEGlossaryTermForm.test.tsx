@@ -261,11 +261,17 @@ describe('CDEGlossaryTermForm', () => {
             tagFQN: `${CDE_TAG_CLASSIFICATIONS.dataSource}.Tag1`,
           }),
         ],
-        extension: expect.objectContaining({
-          version: '1.0',
-        }),
+        extension: undefined,
       })
     );
+
+    const createPayload = handleSave.mock.calls[0][0];
+
+    expect(createPayload).not.toHaveProperty('synonyms');
+    expect(createPayload).not.toHaveProperty('references');
+    expect(createPayload).not.toHaveProperty('relatedTerms');
+    expect(createPayload).not.toHaveProperty('mutuallyExclusive');
+    expect(createPayload).not.toHaveProperty('style');
   });
 
   it('prefills fields correctly in Edit mode', () => {
@@ -339,7 +345,6 @@ describe('CDEGlossaryTermForm', () => {
 
     // Extension fields
     expect(savedData.extension).toEqual({
-      version: '1.0',
       entityRelationship: '1 KH - N TK',
       dataQualityRules: ['Y'],
       relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',

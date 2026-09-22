@@ -100,14 +100,25 @@ public final class DataDictionaryResolver {
     if (create.getParent() != null) {
       throw new BadRequestException("A CDE must be a direct child of the Data Dictionary");
     }
-    if (create.getProvider() != null
-        || create.getStyle() != null
-        || create.getSynonyms() != null
-        || create.getRelatedTerms() != null
-        || create.getReferences() != null
-        || create.getConceptMappings() != null
-        || Boolean.TRUE.equals(create.getMutuallyExclusive())) {
-      throw new BadRequestException("Create CDE contains fields outside the F03 allowlist");
+    rejectUnsupportedCreateField("provider", create.getProvider() != null);
+    rejectUnsupportedCreateField("style", create.getStyle() != null);
+    rejectUnsupportedCreateField(
+        "synonyms", create.getSynonyms() != null && !create.getSynonyms().isEmpty());
+    rejectUnsupportedCreateField(
+        "relatedTerms", create.getRelatedTerms() != null && !create.getRelatedTerms().isEmpty());
+    rejectUnsupportedCreateField(
+        "references", create.getReferences() != null && !create.getReferences().isEmpty());
+    rejectUnsupportedCreateField(
+        "conceptMappings",
+        create.getConceptMappings() != null && !create.getConceptMappings().isEmpty());
+    rejectUnsupportedCreateField(
+        "mutuallyExclusive", Boolean.TRUE.equals(create.getMutuallyExclusive()));
+  }
+
+  private static void rejectUnsupportedCreateField(String field, boolean present) {
+    if (present) {
+      throw new BadRequestException(
+          "Create CDE contains field outside the F03 allowlist: " + field);
     }
   }
 

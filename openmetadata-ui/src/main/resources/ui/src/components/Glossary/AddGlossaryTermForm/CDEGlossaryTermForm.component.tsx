@@ -219,11 +219,6 @@ const CDEGlossaryTermForm = ({
         : [{ id: currentUser?.id ?? '', type: 'user' }],
       reviewers: currentReviewers,
       tags: allTags,
-      synonyms: [],
-      references: undefined,
-      relatedTerms: undefined,
-      mutuallyExclusive: false,
-      style: undefined,
       extension: isEmpty(extension) ? undefined : extension,
     } as GlossaryTermForm);
   };

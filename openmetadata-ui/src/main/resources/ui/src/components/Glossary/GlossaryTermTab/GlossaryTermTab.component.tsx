@@ -1120,12 +1120,35 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           EntityStatus.Rejected,
         ].includes(displayedGlossary.entityStatus as EntityStatus);
       if (isPublishedGlossarySnapshot || isWorkingGlossarySnapshot) {
-        const snapshotTerms = isPublishedGlossarySnapshot
+        let snapshotTerms = isPublishedGlossarySnapshot
           ? await getPublishedGlossaryTerms(
               displayedGlossary.id,
               displayedGlossary.businessVersion as string
             )
           : await getWorkingGlossaryTerms(displayedGlossary.id);
+        if (isWorkingGlossarySnapshot && isCDEGlossary) {
+          const authoringTerms = await getFirstLevelGlossaryTermsPaginated(
+            activeGlossary.fullyQualifiedName,
+            API_RES_MAX_SIZE,
+            undefined,
+            [
+              EntityStatus.Draft,
+              EntityStatus.InReview,
+              EntityStatus.Rejected,
+            ].join(','),
+            undefined,
+            undefined,
+            activeGlossary.id
+          );
+          const termsById = new Map(
+            authoringTerms.data.map((term) => [term.id, term])
+          );
+
+          // Exact revisions selected for the release package take precedence,
+          // while unpinned authoring CDEs remain visible after reload.
+          snapshotTerms.forEach((term) => termsById.set(term.id, term));
+          snapshotTerms = Array.from(termsById.values());
+        }
         const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
         const matchingTerms = snapshotTerms
           .filter((term) => {

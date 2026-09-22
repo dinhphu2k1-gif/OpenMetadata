@@ -77,11 +77,19 @@ describe('F03 CDE draft API', () => {
   it('loads authoring rows by glossary so unpinned Drafts survive reload', async () => {
     client.get.mockResolvedValue({ data: { data: [], paging: { total: 0 } } });
 
-    await getFirstLevelGlossaryTermsPaginated('Data Dictionary');
+    await getFirstLevelGlossaryTermsPaginated(
+      'Data Dictionary',
+      50,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'data-dictionary-id'
+    );
 
     expect(client.get).toHaveBeenCalledWith('/glossaryTerms', {
       params: expect.objectContaining({
-        glossary: 'Data Dictionary',
+        glossary: 'data-dictionary-id',
       }),
     });
     expect(client.get).not.toHaveBeenCalledWith(
