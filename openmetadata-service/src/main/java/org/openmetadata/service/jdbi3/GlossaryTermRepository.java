@@ -114,6 +114,7 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.jdbi3.FeedRepository.TaskWorkflow;
 import org.openmetadata.service.jdbi3.FeedRepository.ThreadContext;
@@ -501,6 +502,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     }
     // Validate glossary
     Glossary glossary = Entity.getEntity(entity.getGlossary(), "reviewers", Include.NON_DELETED);
+    DataDictionaryResolver.requireDataDictionary(glossary);
     entity.setGlossary(glossary.getEntityReference());
     validateHierarchy(entity);
     // Validate related terms
@@ -2065,26 +2067,10 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         return false;
       }
 
-      // Check if this term belongs to Data Dictionary or Data Quality (CDE terms)
-      String fqn =
-          original.getFullyQualifiedName() != null
-              ? original.getFullyQualifiedName()
-              : updated.getFullyQualifiedName();
-      if (fqn != null
-          && (fqn.startsWith("Data Dictionary.")
-              || fqn.startsWith("Data Quality.")
-              || fqn.contains("Data Dictionary")
-              || fqn.contains("Data Quality"))) {
-        return false;
-      }
-
-      if (original.getGlossary() != null
-          && ("Data Dictionary".equalsIgnoreCase(original.getGlossary().getName())
-              || "Data Quality".equalsIgnoreCase(original.getGlossary().getName()))) {
-        return false;
-      }
-
-      return super.consolidateChanges(original, updated, operation);
+      // Every accepted glossary term is a CDE. Keep each CDE change separate in native audit
+      // history; DataDictionaryResolver is the single authority that enforces that scope.
+      DataDictionaryResolver.requireCde(original);
+      return false;
     }
 
     private String getBusinessVersion(GlossaryTerm term) {

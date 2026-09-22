@@ -75,6 +75,7 @@ public class ListFilter extends Filter<ListFilter> {
     conditions.add(getPublishedSnapshotCondition(tableName));
     conditions.add(getExtensionCondition());
     conditions.add(getServerIdCondition(tableName));
+    conditions.add(getExactNameCondition(tableName));
     conditions.add(getNameFilterCondition());
     String condition = addCondition(conditions);
     return condition.isEmpty() ? "WHERE TRUE" : "WHERE " + condition;
@@ -83,6 +84,15 @@ public class ListFilter extends Filter<ListFilter> {
   private String getExtensionCondition() {
     String extension = queryParams.get("extension");
     return extension == null ? "" : "extension = :extension";
+  }
+
+  private String getExactNameCondition(String tableName) {
+    String exactName = queryParams.get("exactName");
+    if (nullOrEmpty(exactName)) {
+      return "";
+    }
+    String nameColumn = tableName == null || tableName.isBlank() ? "name" : tableName + ".name";
+    return nameColumn + " = :exactName";
   }
 
   private String getPublishedSnapshotCondition(String tableName) {

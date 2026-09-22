@@ -80,6 +80,7 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.resources.feeds.MessageParser;
 import org.openmetadata.service.resources.glossary.GlossaryResource;
@@ -171,7 +172,9 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
   }
 
   @Override
-  public void prepare(Glossary glossary, boolean update) {}
+  public void prepare(Glossary glossary, boolean update) {
+    DataDictionaryResolver.requireDataDictionary(glossary);
+  }
 
   @Override
   protected List<String> getFieldsStrippedFromStorageJson() {

@@ -10,20 +10,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../../../constants/constants';
-import GlossaryVersion from '../../Glossary/GlossaryVersion/GlossaryVersion.component';
 
 const GlossaryTermRouter = () => {
   return (
     <Routes>
       <Route
-        element={<GlossaryVersion />}
-        path={ROUTES.GLOSSARY_TERMS_VERSION_TAB.replace('/glossary-term', '')}
-      />
-      <Route
-        element={<GlossaryVersion />}
-        path={ROUTES.GLOSSARY_TERMS_VERSION.replace('/glossary-term', '')}
+        element={<Navigate replace to={ROUTES.DATA_DICTIONARY} />}
+        path="*"
       />
     </Routes>
   );

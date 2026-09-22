@@ -34,7 +34,9 @@ import { VERSION_VIEW_GLOSSARY_PERMISSION } from '../../mocks/Glossary.mock';
 import {
   addGlossaryTerm,
   getFirstLevelGlossaryTermsPaginated,
+  getGlossaryTermVersionPermissions,
   getGlossaryTermWorkingVersion,
+  getGlossaryVersionPermissions,
   ListGlossaryTermsParams,
   transitionGlossaryTermWorkflow,
   updateGlossaryTermWorkingVersion,
@@ -376,6 +378,9 @@ const GlossaryV1 = ({
     const permissionFetch = isGlossaryActive
       ? fetchGlossaryPermission
       : fetchGlossaryTermPermission;
+    const workflowPermissionFetch = isGlossaryActive
+      ? getGlossaryVersionPermissions
+      : getGlossaryTermVersionPermissions;
 
     try {
       if (isVersionsView) {
@@ -385,7 +390,34 @@ const GlossaryV1 = ({
 
         return permission;
       } else {
-        return await permissionFetch();
+        const permission = await permissionFetch();
+        let isConsumer = true;
+        try {
+          const workflowPermission = await workflowPermissionFetch(
+            selectedData.id
+          );
+          isConsumer =
+            workflowPermission.isConsumer ?? !workflowPermission.canViewWorking;
+        } catch {
+          // Fail closed: mutation controls stay hidden when workflow authorization is unknown.
+        }
+
+        if (isConsumer) {
+          const readOnlyPermission = {
+            ...VERSION_VIEW_GLOSSARY_PERMISSION,
+            ViewAll: permission.ViewAll,
+            ViewBasic: permission.ViewBasic,
+          };
+          if (isGlossaryActive) {
+            setGlossaryPermission(readOnlyPermission);
+          } else {
+            setGlossaryTermPermission(readOnlyPermission);
+          }
+
+          return readOnlyPermission;
+        }
+
+        return permission;
       }
     } finally {
       setIsPermissionLoading(false);

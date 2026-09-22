@@ -9,34 +9,31 @@ Kế hoạch này là kế hoạch triển khai của tài liệu [Thiết kế 
 - Duy nhất Glossary có định danh nghiệp vụ **Data Dictionary**, hiển thị là **Từ điển dữ liệu dùng chung**.
 - Các GlossaryTerm trực thuộc Data Dictionary, được gọi là **Thành tố dữ liệu dùng chung (CDE)**.
 - Business version, working/published snapshot, maker-checker workflow, phân quyền, danh sách CDE, tìm kiếm/lọc, import/export và Assets được mô tả trong tài liệu thiết kế.
-- Các thay đổi hạ tầng dùng chung chỉ được thực hiện khi cần để hỗ trợ Data Dictionary và phải được khóa bằng scope guard.
+- Data Dictionary là Glossary nghiệp vụ duy nhất được hỗ trợ; toàn bộ GlossaryTerm của nó được xử lý như CDE theo BusinessWorkflow.
 
 ### Ngoài phạm vi
 
-- Không triển khai business-version workflow mới cho Glossary thông thường.
-- Không triển khai tính năng mới cho Data Quality Glossary hoặc Technical Dictionary.
-- Không thay đổi native metadata version của OpenMetadata.
-- Không tái thiết kế các trang GlossaryTerm không thuộc Data Dictionary.
-
-Các đối tượng ngoài phạm vi chỉ xuất hiện trong characterization/smoke test để chứng minh việc triển khai Data Dictionary không gây regression. Chúng không phải sản phẩm bàn giao của kế hoạch này.
+- Không cung cấp UI hoặc luồng nghiệp vụ Glossary gốc (`Native Glossary`) của OpenMetadata.
+- Không hỗ trợ tạo thêm Glossary nghiệp vụ khác ngoài Data Dictionary.
+- Không xóa entity kỹ thuật `Glossary`/`GlossaryTerm` và native metadata version ở tầng OpenMetadata vì đây vẫn là nền lưu trữ, quan hệ và REST contract của Data Dictionary/CDE.
 
 Trong tài liệu này:
 
 - “Data Dictionary” hoặc “Từ điển dữ liệu dùng chung” chỉ Glossary chuyên biệt nêu trên.
 - “CDE” chỉ GlossaryTerm trực thuộc Data Dictionary.
-- Từ “Glossary” trong tên class/API chỉ mô tả implementation OpenMetadata, không mở rộng phạm vi nghiệp vụ sang các Glossary khác.
+- Từ “Glossary” trong tên class/API chỉ mô tả implementation OpenMetadata; ở tầng sản phẩm, nó luôn được biểu diễn là Data Dictionary hoặc CDE.
 
 ## 2. Cách chia
 
 Mỗi mục bên dưới là một lát dọc có thể nghiệm thu độc lập, gồm backend contract, authorization, persistence/query, frontend API, UI và test. Một chức năng chưa hoàn thành nếu mới có API hoặc mới có giao diện.
 
-Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR backend và frontend nhưng chỉ bật flag khi cả hai đã hoàn tất. Không trộn refactor ngoài phạm vi.
+Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR backend và frontend nhưng chỉ tích hợp vào nhánh phát hành khi cả hai đã hoàn tất. Không trộn refactor ngoài phạm vi.
 
 ## 3. Thứ tự triển khai
 
 | ID | Chức năng | Phụ thuộc | Mốc bàn giao |
 | --- | --- | --- | --- |
-| F00 | Scope guard cho Data Dictionary và safety baseline | Không | Nền tảng |
+| F00 | BusinessWorkflow foundation và safety baseline | Không | Nền tảng |
 | F01 | Consumer xem Approved mới nhất | F00 | Read-only pilot |
 | F02 | Lịch sử Approved và deep link | F01 | Read-only pilot |
 | F03 | Tạo và lưu Draft CDE | F00 | CDE maker |
@@ -80,22 +77,21 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 ## 4. Chi tiết từng chức năng
 
-### F00 — Scope guard cho Data Dictionary và safety baseline
+### F00 — BusinessWorkflow foundation và safety baseline
 
 **Phạm vi**
 
-- Chốt versioning mode gồm Native và BusinessWorkflow, mặc định Native.
-- Data Dictionary dùng BusinessWorkflow; CDE kế thừa từ Glossary cha.
-- Tạo resolver backend dùng chung, không hard-code display name rải rác.
-- Thêm global feature flag mặc định tắt.
-- Frontend giữ nguyên luồng hiện tại khi flag tắt hoặc mode là Native.
+- Data Dictionary là Glossary nghiệp vụ duy nhất, có vòng đời Draft → InReview → Approved/Rejected và business version.
+- CDE kế thừa workflow và vòng đời từ Data Dictionary, không có cấu hình workflow riêng.
+- Tạo resolver backend dùng chung để nhận diện Data Dictionary bằng định danh ổn định, không hard-code display name rải rác.
+- Loại bỏ entry point và route của Native Glossary khỏi frontend.
 
 **Test/DoD**
 
-- Characterization test CRUD, native history, search, import/export cho Glossary thường; đây chỉ là test chống regression, không phải triển khai tính năng cho Glossary thường.
-- Smoke test Data Quality và Technical Dictionary.
-- Term không thể tự bật workflow khác Glossary cha.
-- Khi flag tắt, UI và API cũ không đổi hành vi.
+- Backend từ chối tạo hoặc sử dụng Glossary nghiệp vụ ngoài Data Dictionary qua các API thuộc phạm vi tính năng này.
+- UI không hiển thị trang, action hoặc điều hướng sang Native Glossary.
+- Term không thể cấu hình workflow khác Data Dictionary cha.
+- UI và API chỉ triển khai trực tiếp luồng Data Dictionary/CDE, không có nhánh cấu hình lựa chọn hành vi.
 
 ### F01 — Consumer xem Approved mới nhất
 
@@ -110,15 +106,15 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Consumer vẫn thấy v1.0 khi v1.1 đang Draft, InReview hoặc Rejected.
 - Working endpoint hay FQN chưa publish trả 403/404 và không lộ payload.
-- Có E2E Consumer xem Glossary và CDE Approved.
+- Có E2E Consumer xem Data Dictionary và CDE Approved.
 
 ### F02 — Lịch sử Approved và deep link
 
 **Phạm vi**
 
-- Giữ endpoint /versions cho native history; dùng /published cho business history.
-- Glossary hỗ trợ query version; CDE hỗ trợ glossaryVersion và version.
-- Nếu chỉ có glossaryVersion, resolve CDE revision từ Glossary snapshot.
+- Không expose native history ở tầng sản phẩm; dùng `/published` cho business history.
+- Data Dictionary hỗ trợ query version; CDE hỗ trợ `glossaryVersion` và `version` để giữ tương thích với REST contract kỹ thuật.
+- Nếu chỉ có `glossaryVersion`, resolve CDE revision từ Data Dictionary snapshot.
 - Selector, badge và breadcrumb đồng bộ URL; historical snapshot luôn read-only.
 
 **Test/DoD**
@@ -126,7 +122,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 - F5, bookmark và back/forward giữ đúng version.
 - Version không tồn tại trả 404; Consumer trỏ vào non-Approved bị chặn.
 - Version 1.10 sắp sau 1.2 bằng comparator số.
-- Native version không xuất hiện như business version trên UI.
+- Native version không xuất hiện trong UI hoặc business response.
 
 ### F03 — Tạo và lưu Draft CDE
 
@@ -208,7 +204,7 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 
 - Concurrent save trả 409.
 - Save Draft không làm đổi term snapshot.
-- Glossary ngoài Data Dictionary vẫn dùng native flow; đây là điều kiện chống regression, không thuộc phạm vi bàn giao.
+- Request tạo hoặc vận hành Glossary nghiệp vụ ngoài Data Dictionary bị từ chối rõ ràng.
 
 ### F08 — Thêm/bớt CDE revision trong working Data Dictionary
 
@@ -341,13 +337,13 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 - Archive chỉ cho Admin/Steward phù hợp; snapshot vẫn còn để audit.
 - Audit transition, actor, revision và business version.
 - Theo dõi 403/409/5xx, publish failure, latency và outbox lag.
-- Có runbook feature-flag rollback, backup/restore và xử lý outbox lỗi.
+- Có runbook rollback bản triển khai, backup/restore và xử lý outbox lỗi.
 
 **Test/DoD**
 
 - Test quyền và confirm modal delete/archive.
 - Archived snapshot không là latest nhưng vẫn truy vết theo chính sách.
-- Diễn tập tắt flag và restore; không làm mất snapshot.
+- Diễn tập rollback bản triển khai và restore; không làm mất snapshot.
 - Có UAT sign-off, dashboard, alert và rollback runbook.
 
 ## 5. Quy trình cho mỗi chức năng
@@ -359,19 +355,18 @@ F01–F02 nên làm trước các mutation vì read-only ít rủi ro. Hai nhán
 5. Viết frontend API/hook test.
 6. Triển khai UI và component tests.
 7. Thêm một E2E hành trình chính.
-8. Bật flag ở dev/UAT.
-9. Review bằng chứng rồi mới làm chức năng tiếp theo.
+8. Triển khai ở dev/UAT và review bằng chứng rồi mới làm chức năng tiếp theo.
 
 Checklist bắt buộc cho mỗi PR:
 
-- [ ] Chỉ tác động entity ở BusinessWorkflow mode.
+- [ ] Chỉ Data Dictionary và CDE được đi qua business workflow.
 - [ ] Backend không dựa vào UI để bảo vệ dữ liệu.
 - [ ] Có positive và negative authorization tests.
 - [ ] Có test 409 nếu là mutation.
-- [ ] Có regression test chứng minh Glossary ngoài Data Dictionary vẫn dùng native behavior.
+- [ ] Có negative test chứng minh Native Glossary không được expose qua UI hoặc business API.
 - [ ] Không trộn native version, business version và working revision.
 - [ ] UI có loading, empty, error và stale-request handling.
-- [ ] Có thể tắt/rollback mà không xóa dữ liệu.
+- [ ] Có thể rollback bản triển khai mà không xóa dữ liệu.
 
 ## 6. Các mốc phát hành
 

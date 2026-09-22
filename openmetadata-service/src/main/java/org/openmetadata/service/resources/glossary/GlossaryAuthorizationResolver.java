@@ -46,6 +46,11 @@ public final class GlossaryAuthorizationResolver {
         && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
   }
 
+  /** Consumer access is always limited to immutable published representations. */
+  public static Capabilities publishedReadOnly() {
+    return new Capabilities(false, true, false, false, false, false, false);
+  }
+
   public static void requireViewWorking(Capabilities capabilities) {
     require(capabilities.canViewWorking(), "Not authorized to view the working version");
   }

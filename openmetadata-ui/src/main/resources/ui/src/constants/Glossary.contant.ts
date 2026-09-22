@@ -51,8 +51,6 @@ export const CDE_GLOSSARY_TERM_FIELDS = [
 ];
 
 export const DATA_DICTIONARY_GLOSSARY_NAME = 'Data Dictionary';
-export const DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME =
-  'Từ điển dữ liệu dùng chung';
 
 export const isDataDictionaryGlossary = (
   ...identifiers: Array<string | undefined>
@@ -70,13 +68,9 @@ export const isDataDictionaryGlossary = (
 
     return (
       identifier === DATA_DICTIONARY_GLOSSARY_NAME ||
-      identifier === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
       decoded === DATA_DICTIONARY_GLOSSARY_NAME ||
-      decoded === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
       identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
-      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`) ||
-      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
-      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
+      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`)
     );
   });
 

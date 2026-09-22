@@ -328,10 +328,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   const [workflowPermissions, setWorkflowPermissions] =
     useState<GlossaryVersionPermissions>();
+  const [isWorkflowPermissionLoading, setIsWorkflowPermissionLoading] =
+    useState(true);
 
   useEffect(() => {
     let cancelled = false;
     if (displayedGlossary.id) {
+      setIsWorkflowPermissionLoading(true);
+      setWorkflowPermissions(undefined);
       getGlossaryVersionPermissions(displayedGlossary.id)
         .then((response) => {
           if (!cancelled) {
@@ -342,7 +346,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           if (!cancelled) {
             setWorkflowPermissions(undefined);
           }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsWorkflowPermissionLoading(false);
+          }
         });
+    } else {
+      setIsWorkflowPermissionLoading(false);
     }
 
     return () => {
@@ -351,14 +362,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [displayedGlossary.id]);
 
   const isConsumer = workflowPermissions
-    ? !workflowPermissions.canViewWorking
-    : !(permissions.EditAll || permissions.EditStatus);
+    ? workflowPermissions.isConsumer ?? !workflowPermissions.canViewWorking
+    : true;
+  const canMutate =
+    !isWorkflowPermissionLoading && !isConsumer && Boolean(workflowPermissions);
   const canSubmitForReview =
-    workflowPermissions?.canSubmit ?? Boolean(permissions.EditAll);
+    canMutate && Boolean(workflowPermissions?.canSubmit);
   const canApproveOrReject =
-    Boolean(workflowPermissions?.canApprove) ||
-    Boolean(workflowPermissions?.canReject) ||
-    (!workflowPermissions && Boolean(permissions.EditStatus));
+    canMutate &&
+    (Boolean(workflowPermissions?.canApprove) ||
+      Boolean(workflowPermissions?.canReject));
 
   const canSelectRows = useMemo(() => {
     if (isConsumer) {
@@ -1609,8 +1622,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [isGlossary, activeGlossary]);
 
   const tableColumnsWidth = useMemo(
-    () => glossaryTermTableColumnsWidth(containerWidth, permissions.Create),
-    [permissions.Create, containerWidth]
+    () =>
+      glossaryTermTableColumnsWidth(
+        containerWidth,
+        canMutate && permissions.Create
+      ),
+    [canMutate, permissions.Create, containerWidth]
   );
 
   const updateGlossaryTermStatus = (
@@ -1898,9 +1915,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         key: GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
         // this check is added to the width, since the last column is optional and to maintain
         // the re-sizing of the column should not be affected the others columns width sizes.
-        ...(permissions.Create && {
-          width: tableColumnsWidth.status,
-        }),
+        ...(canMutate &&
+          permissions.Create && {
+            width: tableColumnsWidth.status,
+          }),
         render: (_, record) => {
           const isLoadMoreRow = record.isLoadMoreButton;
 
@@ -2006,7 +2024,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         },
       })),
     ];
-    if (permissions.Create) {
+    if (canMutate && permissions.Create) {
       data.push({
         title: t('label.action-plural'),
         dataIndex: GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
@@ -2151,6 +2169,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     return data;
   }, [
     permissions,
+    canMutate,
     tableColumnsWidth,
     termTaskThreads,
     handleApproveGlossaryTerm,
@@ -2712,7 +2731,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           </>
         )}
 
-        {getBulkEditButton(permissions.EditAll, handleEditGlossary)}
+        {getBulkEditButton(
+          canMutate && permissions.EditAll,
+          handleEditGlossary
+        )}
 
         <Button
           className={classNames('text-primary remove-button-background-hover', {
@@ -2779,6 +2801,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     filteredGlossaryTerms,
     t,
     permissions.EditAll,
+    canMutate,
   ]);
 
   const fetchKey = useMemo(
@@ -2917,13 +2940,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           className="p-md p-b-lg border-none"
           doc={GLOSSARIES_DOCS}
           heading={t('label.glossary-term')}
-          permission={permissions.Create}
+          permission={canMutate && permissions.Create}
           permissionValue={t('label.create-entity', {
             entity: t('label.glossary-term'),
           })}
           placeholderText={t('message.no-glossary-term')}
           type={
-            permissions.Create && glossaryTermStatus === EntityStatus.Approved
+            canMutate &&
+            permissions.Create &&
+            glossaryTermStatus === EntityStatus.Approved
               ? ERROR_PLACEHOLDER_TYPE.CREATE
               : ERROR_PLACEHOLDER_TYPE.NO_DATA
           }

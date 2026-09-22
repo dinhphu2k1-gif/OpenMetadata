@@ -188,23 +188,47 @@ const GlossaryHeader = ({
   const isGlossary = entityType === EntityType.GLOSSARY;
   const [workflowPermissions, setWorkflowPermissions] =
     useState<GlossaryVersionPermissions>();
+  const [isWorkflowPermissionLoading, setIsWorkflowPermissionLoading] =
+    useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const loadWorkflowPermissions = async () => {
+      setIsWorkflowPermissionLoading(true);
+      setWorkflowPermissions(undefined);
       try {
         const value = isGlossary
           ? await getGlossaryVersionPermissions(selectedData.id)
           : await getGlossaryTermVersionPermissions(selectedData.id);
-        setWorkflowPermissions(value);
+        if (!cancelled) {
+          setWorkflowPermissions(value);
+        }
       } catch {
-        setWorkflowPermissions(undefined);
+        if (!cancelled) {
+          setWorkflowPermissions(undefined);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsWorkflowPermissionLoading(false);
+        }
       }
     };
 
     if (selectedData?.id) {
       loadWorkflowPermissions();
+    } else {
+      setIsWorkflowPermissionLoading(false);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [isGlossary, selectedData?.id]);
+  const isConsumer = workflowPermissions
+    ? workflowPermissions.isConsumer ?? !workflowPermissions.canViewWorking
+    : false;
+  const canRenderMutationActions =
+    !isWorkflowPermissionLoading && !isConsumer && Boolean(workflowPermissions);
   const { permissions: globalPermissions } = usePermissionProvider();
 
   const createGlossaryTermPermission = useMemo(
@@ -962,6 +986,20 @@ const GlossaryHeader = ({
       const versionList =
         availableVersions.length > 0 ? availableVersions : [currentVersionItem];
 
+      if (isConsumer || isWorkflowPermissionLoading) {
+        return (
+          <Space align="center" size={8}>
+            <StatusBadge label={entityStatus} status={statusClass} />
+            <span
+              className={`status-badge cde-header-version-badge ${statusClass}`}>
+              <span className={`status-badge-label ${statusClass}`}>
+                {versionLabel}
+              </span>
+            </span>
+          </Space>
+        );
+      }
+
       return (
         <Space align="center" size={8}>
           <StatusBadge label={entityStatus} status={statusClass} />
@@ -1010,13 +1048,18 @@ const GlossaryHeader = ({
     isVersionView,
     availableVersions,
     isLoadingVersions,
+    isConsumer,
+    isWorkflowPermissionLoading,
     glossaryTermStatus,
     navigate,
     t,
   ]);
 
   const createButtons = useMemo(() => {
-    if (permissions.Create || createGlossaryTermPermission) {
+    if (
+      canRenderMutationActions &&
+      (permissions.Create || createGlossaryTermPermission)
+    ) {
       return isGlossary ? (
         <Button
           className="m-l-xs"
@@ -1058,10 +1101,11 @@ const GlossaryHeader = ({
     createGlossaryTermPermission,
     addButtonContent,
     glossaryTermStatus,
+    canRenderMutationActions,
   ]);
 
   const approvalActionButtons = useMemo(() => {
-    if (isVersionView) {
+    if (isVersionView || !canRenderMutationActions) {
       return null;
     }
 
@@ -1145,6 +1189,7 @@ const GlossaryHeader = ({
     selectedData,
     businessVersion,
     t,
+    canRenderMutationActions,
   ]);
 
   /**
@@ -1254,41 +1299,43 @@ const GlossaryHeader = ({
                 </Tooltip>
               )}
 
-              {!isVersionView && manageButtonContent.length > 0 && (
-                <Dropdown
-                  align={{ targetOffset: [-12, 0] }}
-                  className="m-l-xs"
-                  menu={{
-                    items: manageButtonContent,
-                  }}
-                  open={showActions}
-                  overlayClassName="glossary-manage-dropdown-list-container"
-                  overlayStyle={{ width: '350px' }}
-                  placement="bottomRight"
-                  trigger={['click']}
-                  onOpenChange={setShowActions}>
-                  <Tooltip
-                    placement="topRight"
-                    title={t('label.manage-entity', {
-                      entity: isGlossary
-                        ? t('label.glossary')
-                        : t('label.glossary-term'),
-                    })}>
-                    <Button
-                      className="glossary-manage-dropdown-button"
-                      data-testid="manage-button"
-                      icon={
-                        <IconDropdown
-                          className="vertical-align-inherit manage-dropdown-icon"
-                          height={16}
-                          width={16}
-                        />
-                      }
-                      onClick={() => setShowActions(true)}
-                    />
-                  </Tooltip>
-                </Dropdown>
-              )}
+              {!isVersionView &&
+                canRenderMutationActions &&
+                manageButtonContent.length > 0 && (
+                  <Dropdown
+                    align={{ targetOffset: [-12, 0] }}
+                    className="m-l-xs"
+                    menu={{
+                      items: manageButtonContent,
+                    }}
+                    open={showActions}
+                    overlayClassName="glossary-manage-dropdown-list-container"
+                    overlayStyle={{ width: '350px' }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                    onOpenChange={setShowActions}>
+                    <Tooltip
+                      placement="topRight"
+                      title={t('label.manage-entity', {
+                        entity: isGlossary
+                          ? t('label.glossary')
+                          : t('label.glossary-term'),
+                      })}>
+                      <Button
+                        className="glossary-manage-dropdown-button"
+                        data-testid="manage-button"
+                        icon={
+                          <IconDropdown
+                            className="vertical-align-inherit manage-dropdown-icon"
+                            height={16}
+                            width={16}
+                          />
+                        }
+                        onClick={() => setShowActions(true)}
+                      />
+                    </Tooltip>
+                  </Dropdown>
+                )}
             </ButtonGroup>
           </div>
         </div>

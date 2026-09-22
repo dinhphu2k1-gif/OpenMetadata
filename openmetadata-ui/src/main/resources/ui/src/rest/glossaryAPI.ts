@@ -66,6 +66,7 @@ export interface GlossaryWorkflowRequest {
 }
 
 export interface GlossaryVersionPermissions {
+  isConsumer?: boolean;
   canViewWorking: boolean;
   canViewPublished: boolean;
   canEditWorking: boolean;
