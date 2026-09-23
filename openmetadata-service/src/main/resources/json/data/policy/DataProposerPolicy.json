@@ -40,8 +40,10 @@
         "glossaryTerm"
       ],
       "operations": [
-        "EditCustomFields",
-        "EditStatus"
+        "ViewWorking",
+        "EditWorking",
+        "SubmitWorking",
+        "CreateVersion"
       ],
       "effect": "allow"
     },

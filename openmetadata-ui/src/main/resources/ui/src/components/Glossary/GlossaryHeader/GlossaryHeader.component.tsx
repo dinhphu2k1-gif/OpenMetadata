@@ -68,14 +68,14 @@ import {
 } from '../../../constants/Glossary.contant';
 import {
   exportGlossaryInCSVFormat,
+  createGlossaryTermWorkingVersion,
   getGlossariesById,
   getGlossaryTermVersionPermissions,
-  getGlossaryTermWorkingVersion,
   getGlossaryTerms,
   getGlossaryTermsById,
+  getGlossaryTermWorkingVersion,
   getGlossaryTermsVersionsList,
   getGlossaryTermsVersion,
-  getPublishedGlossaryTerms,
   getGlossaryVersionsList,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
@@ -183,6 +183,7 @@ const GlossaryHeader = ({
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] =
     useState<boolean>(false);
   const [draftVersion, setDraftVersion] = useState<string>('');
+  const [draftVersionError, setDraftVersionError] = useState<string>('');
   const [isCreatingDraft, setIsCreatingDraft] = useState<boolean>(false);
   const [availableVersions, setAvailableVersions] = useState<
     {
@@ -233,7 +234,7 @@ const GlossaryHeader = ({
     };
   }, [isGlossary, selectedData?.id]);
   const isConsumer = workflowPermissions
-    ? workflowPermissions.isConsumer ?? !workflowPermissions.canViewWorking
+    ? (workflowPermissions.isConsumer ?? !workflowPermissions.canViewWorking)
     : false;
   const canRenderMutationActions =
     !isWorkflowPermissionLoading && !isConsumer && Boolean(workflowPermissions);
@@ -244,9 +245,9 @@ const GlossaryHeader = ({
       checkPermission(
         Operation.Create,
         ResourceEntity.GLOSSARY_TERM,
-        globalPermissions
+        globalPermissions,
       ),
-    [globalPermissions]
+    [globalPermissions],
   );
 
   const importExportPermissions = useMemo(
@@ -254,14 +255,14 @@ const GlossaryHeader = ({
       checkPermission(
         Operation.All,
         ResourceEntity.GLOSSARY_TERM,
-        globalPermissions
+        globalPermissions,
       ) ||
       checkPermission(
         Operation.EditAll,
         ResourceEntity.GLOSSARY_TERM,
-        globalPermissions
+        globalPermissions,
       ),
-    [globalPermissions]
+    [globalPermissions],
   );
 
   // To fetch the latest glossary data
@@ -299,7 +300,7 @@ const GlossaryHeader = ({
     return EntityStatus.Draft;
   }, [selectedData?.entityStatus]);
 
-  const editDisplayNamePermission =
+  const hasEditDisplayNamePermission =
     permissions.EditAll || permissions.EditDisplayName;
 
   const isCDEGlossary = useMemo(() => {
@@ -310,7 +311,7 @@ const GlossaryHeader = ({
     return isDataDictionaryGlossary(
       selectedData?.name,
       selectedData?.displayName,
-      selectedData?.fullyQualifiedName
+      selectedData?.fullyQualifiedName,
     );
   }, [isGlossary, selectedData]);
 
@@ -322,12 +323,9 @@ const GlossaryHeader = ({
     return isDataQualityGlossary(
       selectedData?.name,
       selectedData?.displayName,
-      selectedData?.fullyQualifiedName
+      selectedData?.fullyQualifiedName,
     );
   }, [isGlossary, selectedData]);
-
-  const canImportCDE = importExportPermissions;
-  const canImportDQ = importExportPermissions;
 
   const handleCDEExportClick = useCallback(async () => {
     try {
@@ -364,7 +362,7 @@ const GlossaryHeader = ({
     return isDataDictionaryGlossary(
       term?.fullyQualifiedName,
       term?.glossary?.name,
-      term?.glossary?.displayName
+      term?.glossary?.displayName,
     );
   }, [isGlossary, selectedData]);
 
@@ -377,13 +375,21 @@ const GlossaryHeader = ({
     return isDataQualityGlossary(
       term?.fullyQualifiedName,
       term?.glossary?.name,
-      term?.glossary?.displayName
+      term?.glossary?.displayName,
     );
   }, [isGlossary, selectedData]);
 
   const isCustomManagedGlossary = isGlossary && (isCDEGlossary || isDQGlossary);
   const isCustomManagedTerm = isCDEGlossaryTerm || isDQGlossaryTerm;
   const isCustomManaged = isCustomManagedTerm || isCustomManagedGlossary;
+  const canManageBusinessContent =
+    !isCustomManaged || Boolean(workflowPermissions?.canEditWorking);
+  const editDisplayNamePermission =
+    hasEditDisplayNamePermission &&
+    canManageBusinessContent &&
+    (!isCDEGlossaryTerm || selectedData.workingRevision != null);
+  const canImportCDE = importExportPermissions && canManageBusinessContent;
+  const canImportDQ = importExportPermissions && canManageBusinessContent;
 
   const businessVersion = useMemo(() => {
     if (!isCustomManagedTerm && !isCustomManagedGlossary) {
@@ -438,8 +444,8 @@ const GlossaryHeader = ({
     navigate(
       getEntityImportPath(
         EntityType.GLOSSARY,
-        selectedData?.fullyQualifiedName || fqn
-      )
+        selectedData?.fullyQualifiedName || fqn,
+      ),
     );
 
   const handleVersionClick = async () => {
@@ -477,17 +483,17 @@ const GlossaryHeader = ({
         snapshot?: Glossary | GlossaryTerm;
       }[] = (history?.versions ?? [])
         .map((snapshot) =>
-          typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
+          typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot,
         )
         .filter(
           (snapshot) =>
             String(
-              snapshot.entityStatus ?? snapshot.status ?? 'Approved'
-            ).toLowerCase() === 'approved'
+              snapshot.entityStatus ?? snapshot.status ?? 'Approved',
+            ).toLowerCase() === 'approved',
         )
         .sort(
           (first, second) =>
-            Number(second.version ?? 0) - Number(first.version ?? 0)
+            Number(second.version ?? 0) - Number(first.version ?? 0),
         )
         .map((snapshot) => {
           const label = getBusinessVersion(snapshot.businessVersion)
@@ -501,9 +507,34 @@ const GlossaryHeader = ({
         .trim()
         .replace(/^(version:?\s*|v)/i, '');
 
+      if (!isGlossary && workflowPermissions?.canViewWorking) {
+        try {
+          const working = await getGlossaryTermWorkingVersion(selectedData.id);
+          const workingBusinessVersion = getBusinessVersion(
+            working.businessVersion,
+          )
+            .trim()
+            .replace(/^(version:?\s*|v)/i, '');
+          if (
+            workingBusinessVersion &&
+            !versions.some((item) => item.label === workingBusinessVersion)
+          ) {
+            versions.unshift({
+              label: workingBusinessVersion,
+              snapshotVersion: workingBusinessVersion,
+              snapshot: working,
+            });
+          }
+        } catch (error) {
+          if ((error as AxiosError)?.response?.status !== 404) {
+            throw error;
+          }
+        }
+      }
+
       if (isGlossary && activeGlossary?.id === selectedData.id) {
         const latestBusinessVersion = getBusinessVersion(
-          activeGlossary.businessVersion
+          activeGlossary.businessVersion,
         )
           .trim()
           .replace(/^(version:?\s*|v)/i, '');
@@ -518,7 +549,7 @@ const GlossaryHeader = ({
 
       if (!isGlossary && latestData?.id === selectedData.id) {
         const latestBusinessVersion = getBusinessVersion(
-          latestData.businessVersion
+          latestData.businessVersion,
         )
           .trim()
           .replace(/^(version:?\s*|v)/i, '');
@@ -539,45 +570,16 @@ const GlossaryHeader = ({
         });
       }
 
-      const parentBusinessVersion = new URLSearchParams(location.search).get(
-        'parentBusinessVersion'
-      );
-      if (!isGlossary && parentBusinessVersion) {
-        const glossaryId = (selectedData as GlossaryTerm).glossary?.id;
-        let contextualTerm: GlossaryTerm | undefined;
-        if (glossaryId) {
-          try {
-            const publishedTerms = await getPublishedGlossaryTerms(
-              glossaryId,
-              parentBusinessVersion
-            );
-            contextualTerm = publishedTerms.find(
-              (term) => term.id === selectedData.id
-            );
-          } catch {
-            contextualTerm = selectedData as GlossaryTerm;
-          }
-        }
-        const contextualBusinessVersion = contextualTerm
-          ? getBusinessVersion(contextualTerm.businessVersion, '')
-          : '';
-        if (contextualBusinessVersion) {
-          versions = versions.filter(
-            (item) => item.label === contextualBusinessVersion
-          );
-        }
-      }
-
       setAvailableVersions(
         versions
           .filter(
             (item, index) =>
               versions.findIndex((version) => version.label === item.label) ===
-              index
+              index,
           )
           .sort((first, second) =>
-            compareBusinessVersions(second.label, first.label)
-          )
+            compareBusinessVersions(second.label, first.label),
+          ),
       );
     } catch (error) {
       showErrorToast(error as AxiosError);
@@ -589,7 +591,7 @@ const GlossaryHeader = ({
   const selectVersion = async (snapshotVersion: string) => {
     try {
       const availableVersion = availableVersions.find(
-        (item) => item.snapshotVersion === snapshotVersion
+        (item) => item.snapshotVersion === snapshotVersion,
       );
       if (availableVersion?.snapshot) {
         onVersionSelect?.(availableVersion.snapshot);
@@ -623,7 +625,7 @@ const GlossaryHeader = ({
       onVersionSelect?.(
         isGlossary && !snapshot.entityStatus
           ? { ...snapshot, entityStatus: EntityStatus.Approved }
-          : snapshot
+          : snapshot,
       );
     } catch (error) {
       showErrorToast(error as AxiosError);
@@ -642,7 +644,9 @@ const GlossaryHeader = ({
 
     updatedDetails = {
       ...selectedData,
-      name: name?.trim() || selectedData.name,
+      name: isCDEGlossaryTerm
+        ? selectedData.name
+        : name?.trim() || selectedData.name,
       displayName: displayName?.trim(),
     };
 
@@ -678,12 +682,21 @@ const GlossaryHeader = ({
       return false;
     }
 
-    return Boolean(workflowPermissions?.canEditWorking);
-  }, [isVersionView, glossaryTermStatus, workflowPermissions]);
+    return (
+      (isGlossary || isCDEGlossaryTerm) &&
+      Boolean(workflowPermissions?.canCreateVersion)
+    );
+  }, [
+    isVersionView,
+    isGlossary,
+    isCDEGlossaryTerm,
+    glossaryTermStatus,
+    workflowPermissions,
+  ]);
 
   const runWorkflowAction = async (
     action: GlossaryWorkflowAction,
-    options?: { businessVersion?: string }
+    options?: { businessVersion?: string },
   ) => {
     const expectedRevision = Number(selectedData.workingRevision);
     if (
@@ -692,7 +705,7 @@ const GlossaryHeader = ({
       !Number.isFinite(expectedRevision)
     ) {
       throw new Error(
-        'Working version revision is required for workflow actions'
+        'Working version revision is required for workflow actions',
       );
     }
     const request = {
@@ -703,12 +716,24 @@ const GlossaryHeader = ({
     };
     const updated = isGlossary
       ? await transitionGlossaryWorkflow(selectedData.id, action, request)
-      : action === 'submit' || action === 'reject' || action === 'reopen'
-      ? await transitionGlossaryTermWorkflow(selectedData.id, action, {
-          expectedRevision,
-        })
-      : await transitionGlossaryTermWorkflow(selectedData.id, action, request);
-    await onWorkflowTransition?.(updated);
+      : action === 'createDraft'
+        ? await createGlossaryTermWorkingVersion(
+            selectedData.id,
+            options?.businessVersion ?? '',
+          )
+        : action === 'submit' || action === 'reject' || action === 'reopen'
+          ? await transitionGlossaryTermWorkflow(selectedData.id, action, {
+              expectedRevision,
+            })
+          : await transitionGlossaryTermWorkflow(
+              selectedData.id,
+              action,
+              request,
+            );
+    if (!isGlossary && action === 'createDraft') {
+      navigate({ pathname: location.pathname, search: '' }, { replace: true });
+    }
+    await onWorkflowTransition?.(updated, action);
     setHasWorkflowConflict(false);
 
     return updated;
@@ -724,9 +749,10 @@ const GlossaryHeader = ({
   const handleReloadWorking = async () => {
     try {
       setIsReloadingWorking(true);
-      const working = await getGlossaryTermWorkingVersion(selectedData.id);
-      await onWorkflowTransition?.(working);
+      const latest = await getGlossaryTermsById(selectedData.id);
+      await onWorkflowTransition?.(latest);
       setHasWorkflowConflict(false);
+      setIsCreateDraftModalOpen(false);
     } catch (error) {
       showErrorToast(error as AxiosError);
     } finally {
@@ -735,17 +761,42 @@ const GlossaryHeader = ({
   };
 
   const handleCreateDraft = async () => {
+    if (isCreatingDraft) {
+      return;
+    }
+    const cleanVer = draftVersion.trim();
+    if (
+      cleanVer.length > 64 ||
+      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(cleanVer)
+    ) {
+      setDraftVersionError(
+        'Phiên bản phải có định dạng MAJOR.MINOR, không có số 0 ở đầu và tối đa 64 ký tự.',
+      );
+
+      return;
+    }
+    if (
+      compareBusinessVersions(cleanVer, String(businessVersion ?? '0.0')) <= 0
+    ) {
+      setDraftVersionError(
+        'Phiên bản mới phải lớn hơn phiên bản Approved mới nhất.',
+      );
+
+      return;
+    }
     try {
       setIsCreatingDraft(true);
-      const cleanVer = draftVersion?.trim().replace(/^(version:?\s*|v)/i, '');
       await runWorkflowAction('createDraft', {
-        businessVersion:
-          cleanVer || suggestNextVersion(selectedData.businessVersion ?? '0.0'),
+        businessVersion: cleanVer,
       });
       showSuccessToast(t('message.create-draft-success'));
       setIsCreateDraftModalOpen(false);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      if ((error as AxiosError)?.response?.status === 409) {
+        setHasWorkflowConflict(true);
+      } else {
+        showErrorToast(error as AxiosError);
+      }
     } finally {
       setIsCreatingDraft(false);
     }
@@ -809,7 +860,7 @@ const GlossaryHeader = ({
       showSuccessToast(
         t('message.entity-approved-success', {
           entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
-        })
+        }),
       );
       setIsApproveModalOpen(false);
     } catch (error) {
@@ -826,7 +877,7 @@ const GlossaryHeader = ({
       showSuccessToast(
         t('message.entity-rejected-success', {
           entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
-        })
+        }),
       );
       setIsRejectModalOpen(false);
     } catch (error) {
@@ -842,10 +893,10 @@ const GlossaryHeader = ({
     }
     const term = selectedData as GlossaryTerm;
     const inReviewers = term.reviewers?.some(
-      (r) => r.id === currentUser.id || r.name === currentUser.name
+      (r) => r.id === currentUser.id || r.name === currentUser.name,
     );
     const inOwners = term.owners?.some(
-      (o) => o.id === currentUser.id || o.name === currentUser.name
+      (o) => o.id === currentUser.id || o.name === currentUser.name,
     );
 
     return Boolean(inReviewers && !inOwners && !currentUser.isAdmin);
@@ -907,8 +958,8 @@ const GlossaryHeader = ({
                   isDQGlossary
                     ? t('dq.export-excel', 'Xuất Excel')
                     : isCDEGlossary
-                    ? t('cde.export-excel', 'Xuất Excel')
-                    : t('label.export')
+                      ? t('cde.export-excel', 'Xuất Excel')
+                      : t('label.export')
                 }
               />
             ),
@@ -929,8 +980,8 @@ const GlossaryHeader = ({
             isDQGlossary
               ? canImportDQ
               : isCDEGlossary
-              ? canImportCDE
-              : importExportPermissions
+                ? canImportCDE
+                : importExportPermissions
           )
             ? [
                 {
@@ -945,8 +996,8 @@ const GlossaryHeader = ({
                         isDQGlossary
                           ? t('dq.import-excel', 'Nhập Excel')
                           : isCDEGlossary
-                          ? t('cde.import-excel', 'Nhập Excel')
-                          : t('label.import')
+                            ? t('cde.import-excel', 'Nhập Excel')
+                            : t('label.import')
                       }
                     />
                   ),
@@ -966,14 +1017,24 @@ const GlossaryHeader = ({
           {
             label: (
               <ManageButtonItemLabel
-                description={t('message.rename-entity', {
-                  entity: isGlossary
-                    ? t('label.glossary')
-                    : t('label.glossary-term'),
-                })}
+                description={
+                  isCDEGlossaryTerm
+                    ? t('message.update-displayName-entity', {
+                        entity: t('label.glossary-term'),
+                      })
+                    : t('message.rename-entity', {
+                        entity: isGlossary
+                          ? t('label.glossary')
+                          : t('label.glossary-term'),
+                      })
+                }
                 icon={EditIcon}
                 id="rename-button"
-                name={t('label.rename')}
+                name={
+                  isCDEGlossaryTerm
+                    ? t('label.edit-glossary-display-name')
+                    : t('label.rename')
+                }
               />
             ),
             key: 'rename-button',
@@ -985,7 +1046,7 @@ const GlossaryHeader = ({
           },
         ] as ItemType[])
       : []),
-    ...(permissions?.EditAll && !isGlossary
+    ...(permissions?.EditAll && !isGlossary && canManageBusinessContent
       ? ([
           {
             label: (
@@ -1028,7 +1089,7 @@ const GlossaryHeader = ({
         ] as ItemType[])
       : []),
 
-    ...(permissions.Delete
+    ...(permissions.Delete && canManageBusinessContent
       ? ([
           {
             label: (
@@ -1039,7 +1100,7 @@ const GlossaryHeader = ({
                     entityType: isGlossary
                       ? t('label.glossary')
                       : t('label.glossary-term'),
-                  }
+                  },
                 )}
                 icon={IconDelete}
                 id="delete-button"
@@ -1112,7 +1173,7 @@ const GlossaryHeader = ({
             <button
               className={classNames(
                 'status-badge cde-header-version-badge',
-                statusClass
+                statusClass,
               )}
               data-testid="version-button"
               type="button">
@@ -1143,8 +1204,15 @@ const GlossaryHeader = ({
   ]);
 
   const createButtons = useMemo(() => {
+    // CDEs are always direct children of the Data Dictionary. The native term actions create a
+    // sub-term or attach an asset, neither of which is a valid CDE authoring action.
+    if (isCDEGlossaryTerm) {
+      return null;
+    }
+
     if (
       canRenderMutationActions &&
+      canManageBusinessContent &&
       (permissions.Create || createGlossaryTermPermission)
     ) {
       return isGlossary ? (
@@ -1184,11 +1252,13 @@ const GlossaryHeader = ({
     return null;
   }, [
     isGlossary,
+    isCDEGlossaryTerm,
     permissions,
     createGlossaryTermPermission,
     addButtonContent,
     glossaryTermStatus,
     canRenderMutationActions,
+    canManageBusinessContent,
   ]);
 
   const approvalActionButtons = useMemo(() => {
@@ -1255,6 +1325,7 @@ const GlossaryHeader = ({
             className="m-l-xs"
             onClick={() => {
               setDraftVersion(suggestNextVersion(cleanVer));
+              setDraftVersionError('');
               setIsCreateDraftModalOpen(true);
             }}>
             {t('label.create-draft')}
@@ -1304,7 +1375,7 @@ const GlossaryHeader = ({
       ?.displayName;
     const glossaryName = (selectedData as GlossaryTerm)?.glossary?.name;
     const parentBusinessVersion = new URLSearchParams(location.search).get(
-      'parentBusinessVersion'
+      'parentBusinessVersion',
     );
 
     const newData = [
@@ -1315,9 +1386,7 @@ const GlossaryHeader = ({
       },
       ...arr.slice(0, -1).map((d, index) => {
         dataFQN.push(d);
-        const glossaryPath = getGlossaryPath(
-          dataFQN.join(FQN_SEPARATOR_CHAR)
-        );
+        const glossaryPath = getGlossaryPath(dataFQN.join(FQN_SEPARATOR_CHAR));
         const nameToDisplay =
           index === 0 &&
           glossaryDisplayName &&
@@ -1332,7 +1401,7 @@ const GlossaryHeader = ({
           url:
             index === 0 && parentBusinessVersion
               ? `${glossaryPath}?businessVersion=${encodeURIComponent(
-                  parentBusinessVersion
+                  parentBusinessVersion,
                 )}`
               : glossaryPath,
           activeTitle: false,
@@ -1391,7 +1460,7 @@ const GlossaryHeader = ({
                       isVersionView
                         ? 'exit-version-history'
                         : 'version-plural-history'
-                    }`
+                    }`,
                   )}>
                   <Button
                     className={classNames('', {
@@ -1473,7 +1542,7 @@ const GlossaryHeader = ({
       )}
 
       <EntityNameModal<GlossaryTerm>
-        allowRename
+        allowRename={!isCDEGlossaryTerm}
         entity={selectedData}
         nameValidationRules={[
           {
@@ -1486,9 +1555,13 @@ const GlossaryHeader = ({
             }),
           },
         ]}
-        title={t('label.edit-entity', {
-          entity: t('label.name'),
-        })}
+        title={
+          isCDEGlossaryTerm
+            ? t('label.edit-glossary-display-name')
+            : t('label.edit-entity', {
+                entity: t('label.name'),
+              })
+        }
         visible={isNameEditing}
         onCancel={() => setIsNameEditing(false)}
         onSave={onNameSave}
@@ -1527,7 +1600,7 @@ const GlossaryHeader = ({
               loading={isReloadingWorking}
               size="small"
               onClick={handleReloadWorking}>
-              Tải bản làm việc mới nhất
+              Tải representation mới nhất
             </Button>
           }
           className="m-b-sm"
@@ -1544,7 +1617,10 @@ const GlossaryHeader = ({
         data-testid="cde-create-draft-modal"
         maskClosable={false}
         okButtonProps={{
-          disabled: isCustomManaged && !draftVersion?.trim(),
+          disabled:
+            isCreatingDraft ||
+            (isCustomManaged &&
+              (!draftVersion.trim() || Boolean(draftVersionError))),
         }}
         okText={t('label.create-draft')}
         open={isCreateDraftModalOpen}
@@ -1570,14 +1646,51 @@ const GlossaryHeader = ({
                 data-testid="cde-draft-version-input"
                 placeholder="Ví dụ: 1.1, 2.0..."
                 value={draftVersion}
-                onChange={(e) => setDraftVersion(e.target.value)}
+                status={draftVersionError ? 'error' : undefined}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDraftVersion(value);
+                  const canonical = /^(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(
+                    value.trim(),
+                  );
+                  setDraftVersionError(
+                    value.trim().length > 64 || !canonical
+                      ? 'Phiên bản phải có định dạng MAJOR.MINOR, không có số 0 ở đầu và tối đa 64 ký tự.'
+                      : compareBusinessVersions(
+                            value.trim(),
+                            String(businessVersion ?? '0.0'),
+                          ) <= 0
+                        ? 'Phiên bản mới phải lớn hơn phiên bản Approved mới nhất.'
+                        : '',
+                  );
+                }}
                 onPressEnter={() => {
                   if (draftVersion?.trim() && !isCreatingDraft) {
                     handleCreateDraft();
                   }
                 }}
               />
+              {draftVersionError && (
+                <Typography.Text type="danger">
+                  {draftVersionError}
+                </Typography.Text>
+              )}
             </div>
+          )}
+          {hasWorkflowConflict && !isGlossary && (
+            <Alert
+              showIcon
+              action={
+                <Button
+                  loading={isReloadingWorking}
+                  size="small"
+                  onClick={handleReloadWorking}>
+                  Tải representation mới nhất
+                </Button>
+              }
+              message="Đã có thay đổi đồng thời. Bản hiện tại vẫn được giữ nguyên."
+              type="warning"
+            />
           )}
         </div>
       </Modal>

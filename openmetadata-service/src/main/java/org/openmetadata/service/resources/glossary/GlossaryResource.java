@@ -13,7 +13,6 @@
 
 package org.openmetadata.service.resources.glossary;
 
-import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
 
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,7 +48,6 @@ import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -85,6 +83,7 @@ import org.openmetadata.service.resources.EntityResource;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.Authorizer;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
+import org.openmetadata.service.security.policyevaluator.ResourceContext;
 import org.openmetadata.service.util.CSVExportResponse;
 
 @Path("/v1/glossaries")
@@ -159,7 +158,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Valid GlossaryWorkingVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, FIELDS, Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, glossary));
+    GlossaryAuthorizationResolver.requireCreateVersion(capabilities(securityContext, glossary));
     DataDictionaryResolver.requireDataDictionaryPayload(
         request.getPayload() == null ? glossary : request.getPayload());
     WorkingVersionRecord working =
@@ -226,7 +225,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Valid GlossaryWorkingVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireSubmit(capabilities(securityContext, glossary));
     requireExpectedRevision(request);
     return GlossaryVersionResponses.working(
         versioningService.transition(
@@ -235,7 +233,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             request.getExpectedRevision(),
             EntityStatus.DRAFT,
             EntityStatus.IN_REVIEW,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireSubmit(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @POST
@@ -250,7 +251,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Valid GlossaryWorkingVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireReview(capabilities(securityContext, glossary));
     requireExpectedRevision(request);
     return GlossaryVersionResponses.working(
         versioningService.transition(
@@ -259,7 +259,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             request.getExpectedRevision(),
             EntityStatus.IN_REVIEW,
             EntityStatus.REJECTED,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireReject(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @POST
@@ -274,7 +277,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Valid GlossaryWorkingVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, glossary));
     requireExpectedRevision(request);
     return GlossaryVersionResponses.working(
         versioningService.transition(
@@ -283,7 +285,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             request.getExpectedRevision(),
             EntityStatus.REJECTED,
             EntityStatus.DRAFT,
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireEdit(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @POST
@@ -298,14 +303,16 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Valid GlossaryWorkingVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireReview(capabilities(securityContext, glossary));
     requireExpectedRevision(request);
     return GlossaryVersionResponses.published(
         versioningService.publish(
             GlossaryVersioningService.GLOSSARY,
             id,
             request.getExpectedRevision(),
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working ->
+                GlossaryAuthorizationResolver.requireReview(
+                    capabilitiesForWorking(securityContext, working))));
   }
 
   @GET
@@ -383,7 +390,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     GlossaryAuthorizationResolver.Capabilities capabilities =
         capabilities(securityContext, glossary);
     if (!capabilities.canArchive()) {
-      throw new ForbiddenException("Only an administrator or Data Steward can archive a snapshot");
+      throw new ForbiddenException("Not authorized to archive the published version");
     }
     return GlossaryVersionResponses.published(
         versioningService.archiveLatest(
@@ -409,18 +416,55 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, Glossary glossary) {
     DataDictionaryResolver.requireDataDictionary(glossary);
-    return GlossaryAuthorizationResolver.resolve(
-            getSubjectContext(securityContext), glossary.getOwners(), glossary.getReviewers())
-        .restrictToPolicy(
-            policyAllows(securityContext, glossary.getId(), MetadataOperation.EDIT_ALL),
-            policyAllows(securityContext, glossary.getId(), MetadataOperation.EDIT_STATUS));
+    try {
+      return withoutCreateVersion(
+          capabilitiesForWorking(
+              securityContext,
+              versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossary.getId())));
+    } catch (NotFoundException ignored) {
+      // Published-only identity: evaluate the current representation.
+    }
+    return capabilitiesForAuthorizationGlossary(securityContext, glossary);
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForWorking(
+      SecurityContext securityContext, WorkingVersionRecord working) {
+    Glossary payload = JsonUtils.readValue(working.payload(), Glossary.class);
+    return capabilitiesForAuthorizationGlossary(securityContext, payload);
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationGlossary(
+      SecurityContext securityContext, Glossary glossary) {
+    return GlossaryAuthorizationResolver.fromPolicy(
+        policyAllows(securityContext, glossary, MetadataOperation.VIEW_WORKING),
+        policyAllows(securityContext, glossary, MetadataOperation.EDIT_WORKING),
+        policyAllows(securityContext, glossary, MetadataOperation.SUBMIT_WORKING),
+        policyAllows(securityContext, glossary, MetadataOperation.CREATE_VERSION),
+        policyAllows(securityContext, glossary, MetadataOperation.APPROVE_WORKING),
+        policyAllows(securityContext, glossary, MetadataOperation.REJECT_WORKING),
+        policyAllows(securityContext, glossary, MetadataOperation.ARCHIVE_PUBLISHED));
+  }
+
+  private static GlossaryAuthorizationResolver.Capabilities withoutCreateVersion(
+      GlossaryAuthorizationResolver.Capabilities capabilities) {
+    return new GlossaryAuthorizationResolver.Capabilities(
+        capabilities.canViewWorking(),
+        capabilities.canViewPublished(),
+        capabilities.canEditWorking(),
+        capabilities.canSubmit(),
+        false,
+        capabilities.canApprove(),
+        capabilities.canReject(),
+        capabilities.canArchive());
   }
 
   private boolean policyAllows(
-      SecurityContext securityContext, UUID id, MetadataOperation operation) {
+      SecurityContext securityContext, Glossary glossary, MetadataOperation operation) {
     try {
       authorizer.authorize(
-          securityContext, new OperationContext(entityType, operation), getResourceContextById(id));
+          securityContext,
+          new OperationContext(entityType, operation),
+          new ResourceContext<>(entityType, glossary, repository));
       return true;
     } catch (AuthorizationException exception) {
       return false;
@@ -436,7 +480,14 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   @Override
   protected List<MetadataOperation> getEntitySpecificOperations() {
     addViewOperation("reviewers,usageCount,termCount", MetadataOperation.VIEW_BASIC);
-    return Collections.emptyList();
+    return List.of(
+        MetadataOperation.VIEW_WORKING,
+        MetadataOperation.EDIT_WORKING,
+        MetadataOperation.SUBMIT_WORKING,
+        MetadataOperation.CREATE_VERSION,
+        MetadataOperation.APPROVE_WORKING,
+        MetadataOperation.REJECT_WORKING,
+        MetadataOperation.ARCHIVE_PUBLISHED);
   }
 
   public static class GlossaryList extends ResultList<Glossary> {

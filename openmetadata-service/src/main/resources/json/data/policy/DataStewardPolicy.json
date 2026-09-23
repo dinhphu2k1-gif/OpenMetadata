@@ -45,6 +45,10 @@
         "topic"
       ],
       "operations": [
+        "ViewWorking",
+        "ApproveWorking",
+        "RejectWorking",
+        "ArchivePublished",
         "EditStatus"
       ],
       "effect": "allow"
@@ -57,6 +61,7 @@
       ],
       "operations": [
         "Create",
+        "EditAll",
         "EditCertification",
         "EditCustomFields",
         "EditDescription",

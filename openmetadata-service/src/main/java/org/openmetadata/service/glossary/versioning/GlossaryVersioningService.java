@@ -51,20 +51,90 @@ public class GlossaryVersioningService {
       Double nativeVersion,
       Object explicitPayload,
       String actor) {
+    return createWorking(
+        entityType,
+        entityId,
+        glossaryId,
+        businessVersion,
+        nativeVersion,
+        explicitPayload,
+        actor,
+        false);
+  }
+
+  public WorkingVersionRecord createNextTermWorking(
+      UUID entityId,
+      UUID glossaryId,
+      String businessVersion,
+      Double nativeVersion,
+      Object identityPayload,
+      String actor,
+      Consumer<PublishedSnapshotRecord> authorization) {
+    return createWorking(
+        GLOSSARY_TERM,
+        entityId,
+        glossaryId,
+        businessVersion,
+        nativeVersion,
+        identityPayload,
+        actor,
+        true,
+        authorization);
+  }
+
+  private WorkingVersionRecord createWorking(
+      String entityType,
+      UUID entityId,
+      UUID glossaryId,
+      String businessVersion,
+      Double nativeVersion,
+      Object explicitPayload,
+      String actor,
+      boolean requirePublished) {
+    return createWorking(
+        entityType,
+        entityId,
+        glossaryId,
+        businessVersion,
+        nativeVersion,
+        explicitPayload,
+        actor,
+        requirePublished,
+        null);
+  }
+
+  private WorkingVersionRecord createWorking(
+      String entityType,
+      UUID entityId,
+      UUID glossaryId,
+      String businessVersion,
+      Double nativeVersion,
+      Object explicitPayload,
+      String actor,
+      boolean requirePublished,
+      Consumer<PublishedSnapshotRecord> authorization) {
     requireEntityType(entityType);
     String canonicalVersion = requireBusinessVersion(businessVersion);
-    WorkingVersionRecord result =
-        Entity.getJdbi()
-            .inTransaction(
+    WorkingVersionRecord result;
+    try {
+      result =
+          Entity.getJdbi()
+              .inTransaction(
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                  PublishedSnapshotRecord latest = dao.lockLatestPublished(entityType, entityId);
+                  if (requirePublished && latest == null) {
+                    throw conflict("An Approved version is required before creating a new version");
+                  }
+                  if (authorization != null) {
+                    authorization.accept(latest);
+                  }
                   if (dao.lockWorking(entityType, entityId) != null) {
                     throw conflict("A working version already exists");
                   }
                   if (dao.findPublishedVersion(entityType, entityId, canonicalVersion) != null) {
                     throw conflict("businessVersion has already been published");
                   }
-                  PublishedSnapshotRecord latest = dao.findLatestPublished(entityType, entityId);
                   if (latest != null
                       && GlossaryBusinessVersion.compare(canonicalVersion, latest.businessVersion())
                           <= 0) {
@@ -102,6 +172,12 @@ public class GlossaryVersioningService {
                       actor);
                   return dao.findWorking(entityType, entityId);
                 });
+    } catch (UnableToExecuteStatementException exception) {
+      if (isConstraintConflict(exception)) {
+        throw conflict("A working version was created concurrently");
+      }
+      throw exception;
+    }
     refreshManagerIndexSafely(entityType, entityId);
     return result;
   }
@@ -592,40 +668,41 @@ public class GlossaryVersioningService {
 
   private static Object emptyWorkingPayload(
       String entityType, Object explicitPayload, PublishedSnapshotRecord latest) {
-    Object sourcePayload = explicitPayload != null ? explicitPayload : latest.payload();
-    Object parsed =
-        sourcePayload instanceof String
-            ? JsonUtils.readValue((String) sourcePayload, Object.class)
-            : JsonUtils.readValue(JsonUtils.pojoToJson(sourcePayload), Object.class);
-    if (!(parsed instanceof java.util.Map<?, ?> raw)) {
+    Object parsedIdentity =
+        explicitPayload instanceof String
+            ? JsonUtils.readValue((String) explicitPayload, Object.class)
+            : JsonUtils.readValue(JsonUtils.pojoToJson(explicitPayload), Object.class);
+    Object parsedSnapshot = JsonUtils.readValue(latest.payload(), Object.class);
+    if (!(parsedIdentity instanceof java.util.Map<?, ?> identityRaw)
+        || !(parsedSnapshot instanceof java.util.Map<?, ?> snapshotRaw)) {
       throw new BadRequestException("Working payload must be a JSON object");
     }
 
-    java.util.Map<String, Object> source = new java.util.LinkedHashMap<>();
-    raw.forEach((key, value) -> source.put(String.valueOf(key), value));
+    java.util.Map<String, Object> identity = new java.util.LinkedHashMap<>();
+    identityRaw.forEach((key, value) -> identity.put(String.valueOf(key), value));
+    java.util.Map<String, Object> snapshot = new java.util.LinkedHashMap<>();
+    snapshotRaw.forEach((key, value) -> snapshot.put(String.valueOf(key), value));
     java.util.Map<String, Object> blank = new java.util.LinkedHashMap<>();
     List<String> identityFields =
         GLOSSARY.equals(entityType)
             ? List.of(
                 "id", "name", "fullyQualifiedName", "href", "version", "versioningMode", "provider")
-            : List.of(
-                "id",
-                "name",
-                "fullyQualifiedName",
-                "glossary",
-                "parent",
-                "href",
-                "version",
-                "provider");
+            : List.of("id", "name", "fullyQualifiedName", "glossary", "displayName");
     for (String field : identityFields) {
-      if (source.get(field) != null) {
-        blank.put(field, source.get(field));
+      Object value = "displayName".equals(field) ? snapshot.get(field) : identity.get(field);
+      if (value != null) {
+        blank.put(field, value);
       }
     }
     // Description is required by both entity schemas, but a blank draft must not inherit it.
     blank.put("description", "");
     if (GLOSSARY.equals(entityType)) {
       blank.put("termRevisions", List.of());
+    } else {
+      blank.put("tags", List.of());
+      blank.put("owners", List.of());
+      blank.put("reviewers", List.of());
+      blank.put("domains", List.of());
     }
     return blank;
   }

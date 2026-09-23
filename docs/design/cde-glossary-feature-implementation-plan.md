@@ -169,12 +169,12 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Authorization và UI**
 
 - Backend quyết định quyền theo capability hiệu lực: đọc Draft yêu cầu `canViewWorking`, Save yêu cầu `canEditWorking`. Frontend không suy quyền chỉ từ tên role.
-- Consumer-only và Reviewer mặc định không được xem hoặc sửa Draft. Reviewer/owner chỉ được thao tác nếu policy hiệu lực cấp capability tương ứng.
+- Theo policy mặc định, chỉ Admin và Data Proposer được sửa Draft. Data Steward, Reviewer, owner và Consumer-only không được sửa; Data Steward/Reviewer được gán chỉ xem working để kiểm duyệt. Backend luôn tính capability từ policy hiệu lực, không hard-code tên role để vô hiệu hóa policy tùy chỉnh.
 - Người có quyền truy cập Data Dictionary được đưa thẳng tới Draft v1.0 đã bootstrap; Header hiển thị badge `Draft`, business version `1.0` chỉ đọc và nút `Lưu nháp` theo quyền.
 - Save disable action và hiển thị loading trong khi request đang chạy; chặn double-submit. Sau thành công, UI thay state bằng response backend và dùng `workingRevision` mới cho lần Save tiếp theo.
 - Khi nhận `409`, UI giữ dữ liệu chưa lưu, không đóng form và không tự retry. UI hiển thị conflict cùng hành động tải bản mới nhất; trước khi reload phải cảnh báo dữ liệu chưa lưu sẽ bị thay thế.
 - Luồng tổng thể tiếp theo là `Draft → Gửi duyệt → Phê duyệt` hoặc `Từ chối → Chỉnh sửa lại`. Các action Gửi duyệt/Phê duyệt/Từ chối/Chỉnh sửa lại thuộc F09; thêm/bớt CDE thuộc F08.
-- Sau khi một version đã Approved và không còn working version, F10 mới hiển thị `Tạo bản nháp` để người dùng nhập business version kế tiếp trên cùng identity.
+- Sau khi một version đã Approved và không còn working version, F10 mới hiển thị `Tạo phiên bản mới` cho Admin/Data Proposer để nhập business version kế tiếp trên cùng identity.
 
 **Test/DoD**
 
@@ -189,7 +189,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - PATCH thiếu/sai `expectedRevision` trả `400`; working không tồn tại trả `404`; PATCH `InReview` hoặc `Rejected` bị từ chối và không đổi dữ liệu.
 - Test chứng minh client không thể thay đổi field server-owned hoặc `termRevisions` qua Save Draft.
 - Save Draft không tạo hoặc thay đổi snapshot, published head, publication outbox hay CDE snapshot.
-- Authorization integration test bao phủ Admin/policy holder, Proposer được cấp quyền, Consumer-only, Reviewer mặc định và user đồng thời có nhiều role.
+- Authorization integration test bao phủ Admin, Data Proposer, Data Steward, Consumer-only, Reviewer mặc định và user đồng thời có nhiều role; chỉ Admin/Data Proposer có capability tạo hoặc chỉnh sửa.
 - Frontend test bao phủ tải Draft bootstrap, không hiển thị nút tạo Data Dictionary, loading, double-submit, cập nhật revision từ response và conflict `409` giữ dữ liệu chưa lưu.
 - E2E: khởi động môi trường sạch → mở Data Dictionary Draft v1.0 → Save nhiều lần → restart/reload, vẫn resolve đúng một identity và một Draft với revision/nội dung mới nhất.
 
@@ -231,7 +231,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Authorization và UI**
 
 - Vì CDE chưa tồn tại tại thời điểm Create, backend kiểm tra quyền tạo trên Data Dictionary cha bằng capability/policy hiệu lực. Save kiểm tra `canEditWorking` trên CDE; xem Draft kiểm tra `canViewWorking`. Frontend chỉ render action theo capability backend trả về, không suy quyền từ tên role.
-- Admin/policy holder và Proposer/owner được cấp capability phù hợp có thể tạo/sửa. Consumer-only không được xem, tạo hoặc sửa. Reviewer được gán có thể được cấp quyền xem working để duyệt ở F04 nhưng mặc định không được tạo hoặc sửa Draft.
+- Theo policy mặc định, chỉ Admin và Data Proposer có thể tạo/sửa. Data Steward, owner và Reviewer không được tạo hoặc sửa Draft; Data Steward/Reviewer được gán có thể xem working để duyệt ở F04. Consumer-only không được xem working, tạo hoặc sửa. Capability vẫn phải phản ánh policy hiệu lực thay vì hard-code tên role.
 - Form Create và Save disable action, hiển thị loading và chặn double-submit trong khi request đang chạy. Sau Create/Save thành công, UI thay state bằng response backend và dùng `workingRevision` trả về cho mutation tiếp theo.
 - Khu vực authoring của Data Dictionary hiển thị các CDE working mà người dùng được phép xem, kể cả khi chưa thuộc `termRevisions`, với nhãn rõ ràng `Chưa thêm vào gói phát hành`. Chọn row mở editor trong context Data Dictionary; reload vẫn tìm lại được Draft qua truy vấn authoring tối thiểu.
 - Khi Save nhận `409`, UI giữ dữ liệu chưa lưu, không đóng editor và không tự retry. UI hiển thị conflict cùng hành động tải bản mới nhất; trước khi thay state phải cảnh báo dữ liệu chưa lưu sẽ bị mất.
@@ -247,7 +247,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Hai writer dùng cùng revision: đúng một writer thành công; writer còn lại nhận `409`, payload/audit của writer thành công không bị ghi đè.
 - PATCH thiếu/sai `expectedRevision`, thiếu field bắt buộc hoặc có field ngoài allowlist trả `400`; working không tồn tại trả `404`; PATCH `InReview` hoặc `Rejected` bị từ chối và không đổi dữ liệu.
 - Test chứng minh client không thể đổi `name`, FQN, Glossary, parent, business version, status, revision hoặc actor/timestamp qua Save Draft; không dùng `workingRevision` hay native `version` làm fallback cho `businessVersion`.
-- Authorization integration test bao phủ Admin/policy holder, Proposer/owner được cấp quyền, Viewer có `canViewWorking` nhưng không có `canEditWorking`, Reviewer mặc định, Consumer-only và user đồng thời có nhiều role.
+- Authorization integration test bao phủ Admin, Data Proposer, Data Steward, owner, Viewer có `canViewWorking` nhưng không có `canEditWorking`, Reviewer và Consumer-only. Chỉ Admin/Data Proposer có capability create/edit/submit.
 - Test truy vấn authoring chứng minh maker tìm lại được Draft chưa thuộc `termRevisions` sau reload, kết quả đã lọc theo quyền và Consumer không nhận identity/working row.
 - Frontend test bao phủ single-request Create, loading/double-submit, không gửi `parent`, thay state/revision từ response, validation failure, Create failure không để cache row giả và conflict `409` giữ dữ liệu chưa lưu.
 - E2E: mở Data Dictionary Draft → tạo CDE → sửa và Save nhiều lần → reload/restart → Draft vẫn có version `1.0`, revision/nội dung đúng; Consumer không nhìn thấy và Data Dictionary `termRevisions` vẫn không đổi cho tới F08.
@@ -274,8 +274,8 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Authorization, validation và audit metadata**
 
 - Backend kiểm tra capability hiệu lực trên working payload hiện tại, bao gồm owners/reviewers đã được Save ở F03; không dựa vào quan hệ native có thể đã cũ và không suy quyền chỉ từ tên role.
-- `submit` yêu cầu `canSubmit`; `reject` yêu cầu `canReject`; `reopen` yêu cầu `canEditWorking`. Assigned Reviewer chỉ được reject khi được gán hoặc policy hiệu lực cho phép; Reviewer không mặc nhiên được submit/reopen. Proposer không được reject nếu không có capability review. Admin/Steward/policy holder tuân theo capability backend trả về.
-- Trước `submit`, backend validate lại working payload và các entity reference theo cùng invariant F03. F04 không bổ sung field nghiệp vụ bắt buộc mới và không bắt buộc danh sách reviewer phải khác rỗng vì Admin/Steward hoặc policy holder vẫn có thể review.
+- `submit` yêu cầu `canSubmit`; `reject` yêu cầu `canReject`; `reopen` yêu cầu `canEditWorking`. Chỉ Admin/Data Proposer được submit/reopen. Data Steward và assigned Reviewer chỉ được reject; Proposer không được reject.
+- Trước `submit`, backend validate lại working payload và các entity reference theo cùng invariant F03. F04 không bổ sung field nghiệp vụ bắt buộc mới và không bắt buộc danh sách reviewer phải khác rỗng vì Admin/Data Steward vẫn có thể review.
 - Mọi transition ghi `updatedBy/updatedAt` từ principal/backend clock. `submit` đồng thời ghi `submittedBy/submittedAt`; `reject` ghi `rejectedBy/rejectedAt`. `reopen` giữ lại metadata lần reject gần nhất để UI còn truy vết người từ chối; `updatedBy/updatedAt` của response thể hiện actor/time reopen. Client không được gửi hoặc sửa các field này.
 - Working response phải expose `updatedBy`, `updatedAt`, `submittedBy`, `submittedAt`, `rejectedBy` và `rejectedAt` khi có giá trị. Lịch sử transition append-only và màn hình audit đầy đủ thuộc F16.
 - Consumer-only không được xem working payload và không được gọi bất kỳ transition nào. Transition không làm CDE xuất hiện trong published read model.
@@ -321,7 +321,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Authorization và validation tại thời điểm publish**
 
 - Approve yêu cầu capability hiệu lực `canApprove`. Backend tính capability từ working payload mới nhất và policy hiện hành, bao gồm owners/reviewers đã được Save trước Submit; không dựa vào native relationship có thể đã cũ và không suy quyền chỉ từ tên role.
-- Assigned Reviewer chỉ được approve khi vẫn được gán trong working payload hoặc policy hiệu lực cho phép. Proposer/owner không mặc nhiên được approve; Consumer-only không được xem working payload hoặc gọi approve. Admin/Steward/policy holder vẫn phải đi qua cùng capability resolver.
+- Assigned Reviewer chỉ được approve khi vẫn được gán trong working payload hoặc policy hiệu lực cho phép. Proposer/owner không mặc nhiên được approve; Consumer-only không được xem working payload hoặc gọi approve. Admin/Data Steward vẫn phải đi qua cùng capability resolver và không nhận capability chỉnh sửa từ quyền kiểm duyệt.
 - Sau khi khóa working record và trước khi ghi snapshot, backend validate lại toàn bộ invariant CDE của F03/F04: CDE thuộc đúng Data Dictionary identity, không có `parent`, business payload đúng schema, owners/reviewers/domains/tags còn resolve hợp lệ và `extension` còn đúng Custom Property schema. Không giả định payload vẫn hợp lệ chỉ vì đã validate lúc Submit.
 - `publishedBy` lấy từ authenticated principal và `publishedAt` lấy từ backend clock. Client không được điều khiển hoặc ghi đè audit metadata.
 
@@ -366,20 +366,63 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - E2E phạm vi F05: Draft → Submit → Approve → published detail/history API đọc được snapshot; manager thấy Approved read-only và nhãn chưa thuộc gói phát hành khi chưa có membership.
 - E2E Consumer đầy đủ được nghiệm thu ở F08/F09: sau khi CDE snapshot được thêm vào một Data Dictionary version mà Consumer truy cập được, Consumer mới tìm/mở CDE qua URL có đủ `businessVersion` và `parentBusinessVersion`.
 
-### F06 — Tạo business version CDE kế tiếp
+### F06 — Tạo business version CDE mới cao hơn
 
-**Phạm vi**
+**API contract**
 
-- Version canonical, chưa tồn tại và lớn hơn latest published.
-- Draft mới chỉ giữ id, name, FQN và liên kết Glossary.
-- Business fields, tags, owners, domains và extension bắt đầu rỗng.
-- Chỉ một working version tại một thời điểm.
+- Dùng `POST /v1/glossaryTerms/{id}/working`. Request chỉ gồm `{ "businessVersion": "MAJOR.MINOR" }`; từ chối field ngoài allowlist, bao gồm `payload`, `expectedRevision`, `entityStatus` và các field identity.
+- Response là working representation vừa tạo, có `entityStatus = Draft`, `workingRevision = 1`, audit metadata và capability do backend tính.
+- Request sai cấu trúc hoặc version sai định dạng trả `400 Bad Request`; conflict về state, version hoặc concurrency trả `409 Conflict`; không đủ quyền trả `403 Forbidden`; CDE không tồn tại hoặc không thuộc Data Dictionary trả `404 Not Found`.
+
+**Tiền điều kiện và phân quyền**
+
+- CDE phải thuộc đúng Data Dictionary và đã có ít nhất một snapshot `Approved`. F06 không được dùng để tạo business version đầu tiên; version `1.0` thuộc luồng tạo mới F03.
+- Không tồn tại working version của CDE ở bất kỳ trạng thái `Draft`, `InReview` hoặc `Rejected` nào.
+- Backend kiểm tra capability riêng `canCreateVersion`; UI không suy quyền từ role hoặc chỉ tái sử dụng `canEditWorking` làm điều kiện duy nhất. Các capability workflow ánh xạ trực tiếp tới operation explicit-grant-only (`ViewWorking`, `EditWorking`, `SubmitWorking`, `CreateVersion`, `ApproveWorking`, `RejectWorking`, `ArchivePublished`), nên `All`/`EditAll` từ policy khác không tự động cấp quyền workflow.
+- Policy mặc định chỉ cấp quyền tạo version cho Admin và Data Proposer. Data Steward, owner, Consumer-only và Reviewer mặc định không được tạo; backend suy `canCreateVersion` từ policy hiệu lực thay vì hard-code tên role.
+- Business field `owners` của Draft mới vẫn bắt đầu rỗng, nhưng Admin/Data Proposer tạo Draft được giữ quyền xem, sửa và submit working version qua workflow authorization metadata/`createdBy`.
+
+**Quy tắc business version**
+
+- `businessVersion` dùng duy nhất dạng canonical `MAJOR.MINOR`, khớp `^(0|[1-9]\d*)\.(0|[1-9]\d*)$`, không có leading zero và phải nằm trong giới hạn độ dài mà API/database quy định.
+- Version mới phải lớn hơn version của latest published head theo so sánh từng đoạn số, không so sánh chuỗi và không dựa vào version mà UI đang hiển thị.
+- UI prefill bằng cách tăng minor của latest published version, ví dụ `1.9 → 1.10`, nhưng cho phép người dùng nhập một major/minor cao hơn như `2.0`.
+- Version trùng, tương đương, thấp hơn hoặc đã tồn tại trong working/published store trả `409 Conflict`.
+
+**Khởi tạo Draft**
+
+- Backend tự dựng payload từ server-owned identity và snapshot `Approved` mới nhất; không dùng payload do client gửi và không copy toàn bộ native entity hoặc snapshot cũ.
+- Giữ `id`, `name`, `fullyQualifiedName`, liên kết `glossary` và **`displayName` của snapshot Approved mới nhất**. `displayName` chỉ là giá trị khởi tạo thuận tiện và người dùng được phép sửa sau khi Draft được tạo.
+- `description`, tags, owners, reviewers, domains, extension và toàn bộ Custom Properties bắt đầu rỗng theo một quy ước `null`/empty thống nhất với schema.
+- Không giữ hoặc tạo `parent`; không copy Assets, quan hệ CDE, publication audit, `snapshotId`, `publicationSequence` hoặc native metadata history.
+- Các field kỹ thuật như `href` hoặc native version, nếu cần trong response, phải được server tính lại thay vì copy từ snapshot cũ.
+- Việc dựng Draft dùng allowlist để field nghiệp vụ bổ sung trong tương lai không vô tình được kế thừa. Snapshot Approved cũ, published head, `contentHash` và native entity không bị thay đổi.
+
+**Transaction và concurrency**
+
+- Trong một transaction, thực hiện theo thứ tự logic: khóa identity/published head ổn định của CDE → kiểm tra quyền, latest published version và working absence → dựng payload Draft → insert working row revision 1 → commit.
+- Không chỉ dựa vào `SELECT ... FOR UPDATE` trên working row chưa tồn tại vì thao tác đó không serialize được hai request tạo đồng thời. Unique constraint trên working entity/version là lớp bảo vệ cuối cùng.
+- Hai request đồng thời tạo cùng hoặc khác version cho một CDE chỉ có đúng một request thành công; constraint race phải được ánh xạ thành `409 Conflict`, không trả `500` chung chung.
+- Bất kỳ lỗi nào trước commit phải rollback toàn bộ. Refresh manager index chỉ chạy sau commit; lỗi index sau commit không được xóa working version đã tạo hoặc biến kết quả đã commit thành thất bại.
+
+**Quan hệ Data Dictionary và UI**
+
+- Tạo CDE version mới không thay đổi membership hoặc revision của bất kỳ Data Dictionary version nào, không tự thêm version mới và không tự thay thế CDE version đang được Data Dictionary chọn. Việc chọn version vào gói phát hành thuộc F08.
+- Consumer detail/list/search tiếp tục trả latest Approved cũ; không lộ working payload mới.
+- Chỉ hiển thị action khi backend trả `canCreateVersion = true`, CDE đang ở latest Approved và không có working version. Historical view không có action này.
+- Modal prefill version gợi ý, validation inline, loading, disable và chống double-submit. Sau thành công, UI dùng response backend làm state, mở authoring/manager context và hiển thị `Draft — Chưa được thêm vào gói phát hành Data Dictionary`.
+- Không tạo published deep link hoặc gọi published endpoint cho Draft. Lỗi `400/403/404/409/5xx` không được tạo optimistic Draft giả; với `409`, UI giữ state hiện tại và cung cấp hành động tải representation mới nhất.
 
 **Test/DoD**
 
-- Version trùng, thấp hơn hoặc sai định dạng bị từ chối.
-- Không copy nhầm business fields.
-- E2E publish v1.0 → tạo v1.1 Draft → Consumer vẫn xem v1.0.
+- Happy path `v1.0 Approved → tạo v1.1 Draft` tạo đúng một working row `Draft`, revision 1; giữ đúng identity, liên kết Glossary và `displayName` của v1.0. Sau đó sửa và lưu `displayName` trên v1.1 thành công theo optimistic locking.
+- Test chứng minh `description`, tags, owners, reviewers, domains, extension và mọi Custom Property không bị copy; các field publication/native/membership cũng không bị copy. Field nghiệp vụ mới thêm vào schema không tự động được kế thừa ngoài allowlist.
+- Test trường hợp chưa có published snapshot, đã có working ở từng trạng thái, version malformed/trùng/tương đương/thấp hơn, version vượt giới hạn và CDE không thuộc Data Dictionary.
+- Authorization integration test bao phủ Admin, Data Proposer, Data Steward, owner, assigned Reviewer, Reviewer thuần túy, Consumer-only và user đồng thời có nhiều role. Chỉ Admin/Data Proposer nhận `canCreateVersion = true`; Data Steward chỉ có capability phê duyệt, từ chối và hủy phê duyệt. Test riêng chứng minh creator hợp lệ không mất quyền xem/sửa/submit Draft vừa tạo dù `owners` bắt đầu rỗng.
+- Hai request đồng thời tạo cùng hoặc khác version: đúng một request thành công, request còn lại nhận `409` và chỉ tồn tại một working row.
+- Failure injection tại các boundary trong transaction chứng minh rollback toàn bộ; snapshot/head/hash, Data Dictionary membership/revision, native entity và outbox không thay đổi.
+- Frontend test bao phủ capability, latest-vs-historical, version prefill/validation, modal, loading, double-submit, state từ response, authoring context và xử lý conflict/reload.
+- E2E: publish v1.0 → tạo v1.1 Draft → xác nhận `displayName` được giữ lại → sửa/lưu Draft v1.1 → Consumer vẫn chỉ thấy v1.0 và Data Dictionary vẫn tham chiếu version cũ cho tới khi F08 thay đổi.
 
 ### F08 — Thêm/bớt CDE revision trong working hoặc latest Data Dictionary
 

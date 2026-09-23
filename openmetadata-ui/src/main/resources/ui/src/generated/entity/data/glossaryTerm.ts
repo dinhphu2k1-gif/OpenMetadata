@@ -149,6 +149,14 @@ export interface GlossaryTerm {
    * User who made the update.
    */
   updatedBy?: string;
+  /**
+   * Time at which this working business version was created.
+   */
+  createdAt?: number;
+  /**
+   * User who created this working business version.
+   */
+  createdBy?: string;
   /** Time at which the working version was most recently submitted. */
   submittedAt?: number;
   /** User who most recently submitted the working version. */

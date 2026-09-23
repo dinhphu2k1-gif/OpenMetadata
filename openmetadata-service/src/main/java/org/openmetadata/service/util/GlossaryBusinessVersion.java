@@ -13,17 +13,20 @@ import java.util.regex.Pattern;
 /** Canonical validator and comparator for glossary business versions. */
 public final class GlossaryBusinessVersion {
   private static final Pattern CANONICAL_VERSION =
-      Pattern.compile("^(0|[1-9]\\d*)(\\.(0|[1-9]\\d*))*$");
+      Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
+  private static final int MAX_LENGTH = 64;
 
   private GlossaryBusinessVersion() {}
 
   /** Validate and return the canonical business version used by the snapshot store. */
   public static String requireCanonical(String version) {
-    if (version == null || !CANONICAL_VERSION.matcher(version.trim()).matches()) {
+    if (version == null
+        || version.length() > MAX_LENGTH
+        || !CANONICAL_VERSION.matcher(version).matches()) {
       throw new IllegalArgumentException(
-          "businessVersion must contain dot-separated non-negative integers");
+          "businessVersion must be canonical MAJOR.MINOR without leading zeroes");
     }
-    return version.trim();
+    return version;
   }
 
   public static int compare(String left, String right) {

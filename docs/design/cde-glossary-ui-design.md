@@ -73,7 +73,7 @@ Quy tắc:
 | --- | --- |
 | Admin | Quản trị toàn bộ, xử lý ngoại lệ và cấu hình hệ thống. |
 | Organization | Role hệ thống có quyền theo policy; không mặc định là Consumer. |
-| Data Steward | Kiểm soát chất lượng, duyệt/từ chối và quản trị nội dung được giao. |
+| Data Steward | Theo policy mặc định: kiểm soát chất lượng; phê duyệt, từ chối và hủy phê duyệt, không tạo hoặc chỉnh sửa nội dung. Capability thực tế luôn lấy từ policy hiệu lực. |
 | Reviewer | Người được gán trực tiếp vào Glossary/CDE để duyệt. Đây có thể là assignment, không nhất thiết là một Role hệ thống riêng. |
 | Data Proposer | Tạo Draft, chỉnh sửa và gửi duyệt. |
 | Data Consumer | Khai thác nội dung đã được phê duyệt. |
@@ -94,20 +94,20 @@ Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ vi�
 | CDE Draft/Rejected | Có | Có trong phạm vi quản lý | Có khi liên quan phiên duyệt | Có khi được phép chỉnh sửa | Không | Không |
 | CDE In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
 | CDE Approved | Có | Có | Có | Có | Có | Có |
-| Import | Có | Theo policy | Không mặc định | Theo policy | Không | Không |
+| Import | Có | Không | Không | Theo policy | Không | Không |
 | Export | Có | Có | Có | Có | Có | Có |
 
 ### 4.3. Ma trận thao tác
 
 | Thao tác | Admin | Data Steward | Reviewer | Data Proposer | Data Consumer | Basic Consumer |
 | --- | --- | --- | --- | --- | --- | --- |
-| Tạo Glossary/CDE | Có | Theo policy | Không | Có | Không | Không |
-| Tạo business version mới | Có | Theo policy | Không | Có | Không | Không |
-| Chỉnh sửa Draft | Có | Theo policy | Không mặc định | Có | Không | Không |
-| Gửi duyệt | Có | Theo policy | Không | Có | Không | Không |
+| Tạo Glossary/CDE | Có | Không mặc định | Không | Có | Không | Không |
+| Tạo business version mới | Có | Không mặc định | Không | Có | Không | Không |
+| Chỉnh sửa Draft | Có | Không mặc định | Không | Có | Không | Không |
+| Gửi duyệt | Có | Không mặc định | Không | Có | Không | Không |
 | Approve/Reject | Có | Có | Có khi được gán | Không | Không | Không |
 | Thu hồi Approved | Có | Có theo policy | Không mặc định | Không | Không | Không |
-| Xóa | Có | Theo policy | Không | Theo policy với Draft | Không | Không |
+| Xóa | Có | Không | Không | Theo policy với Draft | Không | Không |
 | Xem/chọn version | Có | Có | Có | Có | Chỉ Approved | Chỉ Approved |
 
 ## 5. Thiết kế version của Từ điển dữ liệu dùng chung và CDE
@@ -245,7 +245,7 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
    - Các dòng có cùng mã CDE được xếp cạnh nhau, sắp xếp theo thứ tự phiên bản mới nhất ở trên để người dùng dễ theo dõi.
 2. **Quyền xem theo Role (Người dùng tự do tra cứu theo quyền):**
    - **Data Consumer:** Nhìn thấy tất cả các dòng phiên bản có trạng thái `Approved`. Người dùng tùy ý lựa chọn, tìm kiếm và xem chi tiết bất kỳ phiên bản CDE đã duyệt nào mà mình cần. Tuyệt đối không hiển thị các bản đang là `Draft`, `In Review` hoặc `Rejected`.
-   - **Nhóm Quản trị (Admin, Steward, Proposer):** Nhìn thấy đầy đủ tất cả các dòng phiên bản (bao gồm cả `Draft`, `In Review`, `Rejected`, `Approved`) để phục vụ quản lý và chỉnh sửa.
+   - **Nhóm nội bộ (Admin, Steward, Proposer):** Nhìn thấy đầy đủ tất cả các dòng phiên bản (bao gồm cả `Draft`, `In Review`, `Rejected`, `Approved`). Chỉ Admin/Proposer được chỉnh sửa; Steward chỉ thực hiện thao tác kiểm duyệt.
    - Trên Data Dictionary version mới nhất, các CDE working được phép tham gia danh sách nhưng chỉ xuất hiện với người có quyền working. Trên version lịch sử chỉ còn dữ liệu đã được chốt và không cho phép thêm/bớt.
 3. **Công cụ Tìm kiếm, Lọc và Phân trang (Search, Filters & Pagination):**
    - **Thanh tìm kiếm văn bản (Text Search Bar):**
@@ -281,7 +281,7 @@ Giả sử mục từ `CDE1` (Mã khách hàng) có lịch sử 4 phiên bản v
 | Nhóm người dùng | Các dòng hiển thị trên bảng (Ngang hàng) | Quy tắc |
 | :--- | :--- | :--- |
 | **Data Consumer** | • **`CDE1`** - Version `1.1` `[Approved]`<br>• **`CDE1`** - Version `1.0` `[Approved]` | • Các bản đã `Approved` hiển thị ngang hàng nhau.<br>• Người xem muốn tra cứu bản nào thì tùy chọn.<br>• Ẩn các bản `Draft` và `Rejected`. |
-| **Data Steward / Admin / Proposer** | • **`CDE1`** - Version `2.0` `[Draft]`<br>• **`CDE1`** - Version `1.2` `[Rejected]`<br>• **`CDE1`** - Version `1.1` `[Approved]`<br>• **`CDE1`** - Version `1.0` `[Approved]` | • Hiển thị đầy đủ mọi phiên bản ngang hàng nhau.<br>• Cho phép thao tác chỉnh sửa hoặc kiểm duyệt theo từng dòng. |
+| **Data Steward / Admin / Proposer** | • **`CDE1`** - Version `2.0` `[Draft]`<br>• **`CDE1`** - Version `1.2` `[Rejected]`<br>• **`CDE1`** - Version `1.1` `[Approved]`<br>• **`CDE1`** - Version `1.0` `[Approved]` | • Hiển thị đầy đủ mọi phiên bản ngang hàng nhau.<br>• Admin/Proposer được chỉnh sửa; Steward chỉ được phê duyệt, từ chối hoặc hủy phê duyệt theo trạng thái. |
 
 ## 7. Luồng màn hình Thành tố dữ liệu dùng chung (CDE)
 
@@ -456,7 +456,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Endpoint backend: `POST /v1/glossaries/{id}/working/approve`
   * *Hành vi:* Chuyển trạng thái $\rightarrow$ `Approved` và đặt làm published head. Version này là latest-mutable cho tới khi một Data Dictionary version mới được Approved; khi đó version cũ được chốt thành historical snapshot bất biến.
 * **Thêm/bớt CDE trên Data Dictionary Approved mới nhất:**
-  * Chỉ Admin/Steward/Proposer có policy phù hợp được thao tác; dùng optimistic locking và ghi audit actor/revision.
+  * Chỉ Admin và Data Proposer được tạo/chỉnh sửa/gửi duyệt; Data Steward chỉ phê duyệt, từ chối và hủy phê duyệt. Mọi mutation dùng optimistic locking và ghi audit actor/revision.
   * Cho phép tham chiếu CDE `Draft`, `InReview`, `Rejected` hoặc `Approved` thuộc đúng Data Dictionary. Consumer read model luôn lọc cứng chỉ trả CDE `Approved`.
   * Không cho phép thay đổi Data Dictionary historical.
 * **Từ chối Glossary:**
@@ -488,7 +488,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * `limit={limit}&offset={offset}`: Phân trang.
 * **Quy tắc phân quyền trả về từ Backend:**
   * *Consumer:* Backend tự động lọc cứng chỉ trả về các dòng có `entityStatus = Approved`.
-  * *Admin / Steward / Proposer:* Trả về đầy đủ tất cả các dòng phiên bản (`Draft`, `InReview`, `Rejected`, `Approved`) ngang hàng nhau để quản trị và kiểm duyệt.
+  * *Admin / Steward / Proposer:* Trả về đầy đủ tất cả các dòng phiên bản (`Draft`, `InReview`, `Rejected`, `Approved`) ngang hàng nhau; chỉ Admin/Proposer được chỉnh sửa, Steward chỉ được kiểm duyệt.
 
 ---
 

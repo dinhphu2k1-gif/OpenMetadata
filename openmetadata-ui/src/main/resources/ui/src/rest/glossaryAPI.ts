@@ -82,6 +82,7 @@ export interface GlossaryVersionPermissions {
   canViewPublished: boolean;
   canEditWorking: boolean;
   canSubmit: boolean;
+  canCreateVersion: boolean;
   canApprove: boolean;
   canReject: boolean;
   canArchive: boolean;
@@ -155,7 +156,13 @@ export const updateGlossaryWorkingVersion = async (
   const response = await APIClient.patch<
     { expectedRevision: number; payload: GlossaryDraftPayload },
     AxiosResponse<Glossary>
-  >(`/glossaries/${id}/working`, { expectedRevision, payload: mutablePayload });
+  >(
+    `/glossaries/${id}/working`,
+    { expectedRevision, payload: mutablePayload },
+    {
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
 
   return response.data;
 };
@@ -282,10 +289,33 @@ export const getLatestPublishedGlossaryTerm = async (id: string) => {
   return response.data;
 };
 
+export const getPublishedGlossaryTerm = async (
+  id: string,
+  businessVersion: string
+) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/published/${encodeURIComponent(businessVersion)}`
+  );
+
+  return response.data;
+};
+
 export const getGlossaryTermWorkingVersion = async (id: string) => {
   const response = await APIClient.get<GlossaryTerm>(
     `/glossaryTerms/${id}/working`
   );
+
+  return response.data;
+};
+
+export const createGlossaryTermWorkingVersion = async (
+  id: string,
+  businessVersion: string
+) => {
+  const response = await APIClient.post<
+    { businessVersion: string },
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/working`, { businessVersion });
 
   return response.data;
 };
@@ -303,12 +333,14 @@ export const updateGlossaryTermWorkingVersion = async (
     reviewers: payload.reviewers ?? [],
     domains: payload.domains ?? [],
     tags: payload.tags ?? [],
-    extension: (payload.extension as Record<string, unknown>) ?? null,
+    extension: (payload.extension as Record<string, unknown>) ?? {},
   };
   const response = await APIClient.patch<
     CdeDraftUpdateRequest,
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/working`, request);
+  >(`/glossaryTerms/${id}/working`, request, {
+    headers: { 'Content-Type': 'application/json' },
+  });
 
   return response.data;
 };

@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 import { Alert, Col, Row, Tabs } from 'antd';
+import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -58,6 +59,7 @@ import {
   getGlossaryTermsVersionsPath,
 } from '../../../utils/RouterUtils';
 import { getTermQuery } from '../../../utils/SearchUtils';
+import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
 import Loader from '../../common/Loader/Loader';
@@ -102,17 +104,17 @@ const GlossaryTermsV1 = ({
   const navigate = useNavigate();
   const location = useLocation();
   const businessVersion = new URLSearchParams(location.search).get(
-    'businessVersion'
+    'businessVersion',
   );
   const parentBusinessVersion = new URLSearchParams(location.search).get(
-    'parentBusinessVersion'
+    'parentBusinessVersion',
   );
   const { currentUser } = useApplicationStore();
   const isAdmin = Boolean(currentUser?.isAdmin);
   const assetTabRef = useRef<AssetsTabRef>(null);
   const [assetModalVisible, setAssetModalVisible] = useState(false);
   const [feedCount, setFeedCount] = useState<FeedCounts>(
-    FEED_COUNT_INITIAL_DATA
+    FEED_COUNT_INITIAL_DATA,
   );
   const [assetCount, setAssetCount] = useState<number>(0);
   const [previewAsset, setPreviewAsset] =
@@ -122,7 +124,7 @@ const GlossaryTermsV1 = ({
   const { customizedPage, isLoading } = useCustomPages(PageType.GlossaryTerm);
   const customizedTabs = useMemo(() => {
     const tabs = customizedPage?.tabs?.filter(
-      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH
+      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH,
     );
 
     return tabs?.length ? tabs : undefined;
@@ -134,8 +136,8 @@ const GlossaryTermsV1 = ({
     () =>
       viewedVersion
         ? { ...viewedVersion, changeDescription: undefined }
-        : transitionedWorking ?? currentGlossaryTerm,
-    [viewedVersion, transitionedWorking, currentGlossaryTerm]
+        : (transitionedWorking ?? currentGlossaryTerm),
+    [viewedVersion, transitionedWorking, currentGlossaryTerm],
   );
   useEffect(() => {
     if (
@@ -152,17 +154,17 @@ const GlossaryTermsV1 = ({
   const handleVersionSelect = useCallback(
     (snapshot: GlossaryTerm) => {
       const snapshotBusinessVersion = getBusinessVersion(
-        snapshot.businessVersion
+        snapshot.businessVersion,
       );
       const currentBusinessVersion = getBusinessVersion(
-        currentGlossaryTerm.businessVersion
+        currentGlossaryTerm.businessVersion,
       );
       const isLatestVersion =
         snapshot.id === currentGlossaryTerm.id &&
         snapshot.version === currentGlossaryTerm.version &&
         compareBusinessVersions(
           snapshotBusinessVersion,
-          currentBusinessVersion
+          currentBusinessVersion,
         ) === 0;
       const searchParams = new URLSearchParams(location.search);
 
@@ -173,14 +175,12 @@ const GlossaryTermsV1 = ({
       }
       searchParams.set('businessVersion', snapshotBusinessVersion);
 
-      navigate(
-        {
-          pathname: location.pathname,
-          search: searchParams.toString(),
-        }
-      );
+      navigate({
+        pathname: location.pathname,
+        search: searchParams.toString(),
+      });
     },
-    [currentGlossaryTerm, location.pathname, location.search, navigate]
+    [currentGlossaryTerm, location.pathname, location.search, navigate],
   );
 
   useEffect(() => {
@@ -188,7 +188,7 @@ const GlossaryTermsV1 = ({
     setViewedVersion(null);
     if (businessVersion) {
       const currentVer = getBusinessVersion(
-        currentGlossaryTerm.businessVersion
+        currentGlossaryTerm.businessVersion,
       );
 
       if (compareBusinessVersions(currentVer, businessVersion) === 0) {
@@ -239,7 +239,7 @@ const GlossaryTermsV1 = ({
           const approvedVersions = versions.filter(
             (item) =>
               String(item.entityStatus ?? 'Approved').toLowerCase() ===
-              'approved'
+              'approved',
           );
           if (approvedVersions.length > 0) {
             candidate1_0 = approvedVersions[approvedVersions.length - 1];
@@ -291,10 +291,10 @@ const GlossaryTermsV1 = ({
             : getGlossaryTermDetailsPath(glossaryFqn, tab),
           ...(location.search ? { search: location.search } : {}),
         },
-        { replace: true }
+        { replace: true },
       );
     },
-    [glossaryFqn, location.search, navigate, version]
+    [glossaryFqn, location.search, navigate, version],
   );
 
   const isCDEGlossaryTerm = useMemo(
@@ -302,9 +302,9 @@ const GlossaryTermsV1 = ({
       isDataDictionaryGlossary(
         glossaryTerm.fullyQualifiedName,
         glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName
+        glossaryTerm.glossary?.displayName,
       ),
-    [glossaryTerm]
+    [glossaryTerm],
   );
 
   const isDQGlossaryTerm = useMemo(
@@ -312,9 +312,9 @@ const GlossaryTermsV1 = ({
       isDataQualityGlossary(
         glossaryTerm.fullyQualifiedName,
         glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName
+        glossaryTerm.glossary?.displayName,
       ),
-    [glossaryTerm]
+    [glossaryTerm],
   );
 
   useEffect(() => {
@@ -348,7 +348,7 @@ const GlossaryTermsV1 = ({
     getFeedCounts(
       EntityType.GLOSSARY_TERM,
       glossaryTerm.fullyQualifiedName ?? '',
-      handleFeedCount
+      handleFeedCount,
     );
   };
 
@@ -382,19 +382,28 @@ const GlossaryTermsV1 = ({
     await handleGlossaryTermUpdate(data as GlossaryTerm);
     setViewedVersion(null);
 
-    if (approvedVersion) {
-      const searchParams = new URLSearchParams(location.search);
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.has('approvedVersion')) {
       searchParams.delete('approvedVersion');
       navigate(
         {
           pathname: location.pathname,
           search: searchParams.toString(),
         },
-        { replace: true }
+        { replace: true },
       );
     }
 
-    await refreshActiveGlossaryTerm?.();
+    try {
+      const refresh = refreshActiveGlossaryTerm?.();
+      if (refresh) {
+        void Promise.resolve(refresh).catch((error) =>
+          showErrorToast(error as AxiosError),
+        );
+      }
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    }
     // For name change, do not update the feed. It will be updated when the page is redirected to
     // have the new value.
     if (glossaryTerm.name === data.name) {
@@ -407,12 +416,12 @@ const GlossaryTermsV1 = ({
       setPreviewAsset(asset);
       onAssetClick?.(asset);
     },
-    [onAssetClick]
+    [onAssetClick],
   );
 
   const viewCustomPropertiesPermission = useMemo(
     () => getPrioritizedViewPermission(permissions, Operation.ViewCustomFields),
-    [permissions]
+    [permissions],
   );
 
   const tabItems = useMemo(() => {
@@ -442,7 +451,7 @@ const GlossaryTermsV1 = ({
       items,
       customizedTabs,
       EntityTabs.OVERVIEW,
-      isViewingVersion
+      isViewingVersion,
     );
 
     if (isDQGlossaryTerm) {
@@ -452,12 +461,12 @@ const GlossaryTermsV1 = ({
               ...tab,
               children: <DQGlossaryTermOverview glossaryTerm={glossaryTerm} />,
             }
-          : tab
+          : tab,
       );
 
       if (!isAdmin) {
         return dqTabs.filter(
-          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
         );
       }
 
@@ -471,11 +480,11 @@ const GlossaryTermsV1 = ({
               ...tab,
               children: <CDEGlossaryTermOverview glossaryTerm={glossaryTerm} />,
             }
-          : tab
+          : tab,
       );
 
       return cdeTabs.filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
       );
     }
 
@@ -514,7 +523,7 @@ const GlossaryTermsV1 = ({
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.NAME,
-          glossaryTerm.name
+          glossaryTerm.name,
         )
       : glossaryTerm.name;
 
@@ -522,7 +531,7 @@ const GlossaryTermsV1 = ({
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.DISPLAYNAME,
-          glossaryTerm.displayName
+          glossaryTerm.displayName,
         )
       : glossaryTerm.displayName;
 
@@ -553,7 +562,7 @@ const GlossaryTermsV1 = ({
   const isExpandViewSupported = useMemo(
     () =>
       checkIfExpandViewSupported(tabItems[0], activeTab, PageType.GlossaryTerm),
-    [tabItems[0], activeTab]
+    [tabItems[0], activeTab],
   );
 
   if (isLoading) {
@@ -570,6 +579,16 @@ const GlossaryTermsV1 = ({
       type={EntityType.GLOSSARY_TERM}
       onUpdate={onTermUpdate}>
       <Row data-testid="glossary-term" gutter={[0, 12]}>
+        {isCDEGlossaryTerm &&
+          glossaryTerm.entityStatus === EntityStatus.Draft &&
+          !parentBusinessVersion && (
+            <Col span={24}>
+              <Alert
+                message="Draft — Chưa được thêm vào gói phát hành Data Dictionary"
+                type="info"
+              />
+            </Col>
+          )}
         {isCDEGlossaryTerm &&
           glossaryTerm.entityStatus === EntityStatus.Approved &&
           !parentBusinessVersion && (
@@ -590,10 +609,12 @@ const GlossaryTermsV1 = ({
             onVersionSelect={(snapshot) =>
               handleVersionSelect(snapshot as GlossaryTerm)
             }
-            onWorkflowTransition={async (updated) => {
+            onWorkflowTransition={async (updated, action) => {
               setViewedVersion(null);
               setTransitionedWorking(updated as GlossaryTerm);
-              await refreshActiveGlossaryTerm?.();
+              if (action !== 'createDraft') {
+                await refreshActiveGlossaryTerm?.();
+              }
             }}
           />
         </Col>
@@ -627,7 +648,7 @@ const GlossaryTermsV1 = ({
           entityFqn={glossaryTerm.fullyQualifiedName}
           open={assetModalVisible}
           queryFilter={getQueryFilterToExcludeTerm(
-            glossaryTerm.fullyQualifiedName
+            glossaryTerm.fullyQualifiedName,
           )}
           type={AssetsOfEntity.GLOSSARY}
           onCancel={() => setAssetModalVisible(false)}

@@ -59,7 +59,7 @@ import {
   getGlossaryVersion,
   getGlossaryVersionPermissions,
   getGlossaryWorkingVersion,
-  getPublishedGlossaryTerms,
+  getPublishedGlossaryTerm,
   getGlossaryTermByFQN,
   getGlossaryTermWorkingVersion,
   updateGlossaryTermWorkingVersion,
@@ -307,26 +307,24 @@ const GlossaryPage = () => {
       const reqCdeVer = getBusinessVersion(businessVersion, '');
       const liveCdeVer = getBusinessVersion(current.businessVersion, '');
 
-      if (liveParentVer && compareBusinessVersions(liveParentVer, reqParentVer) === 0) {
-        if (compareBusinessVersions(liveCdeVer, reqCdeVer) !== 0) {
-          navigate(ROUTES.NOT_FOUND, { replace: true });
+      if (
+        liveParentVer &&
+        compareBusinessVersions(liveParentVer, reqParentVer) === 0
+      ) {
+        if (compareBusinessVersions(liveCdeVer, reqCdeVer) === 0) {
+          setIsTermHistorical(false);
+          setActiveGlossary(current as ModifiedGlossary);
 
           return;
         }
-        setIsTermHistorical(false);
-        setActiveGlossary(current as ModifiedGlossary);
-
-        return;
       }
 
       try {
-        const parentTerms = await getPublishedGlossaryTerms(
-          parentGlossaryId,
-          parentBusinessVersion
+        const response = await getPublishedGlossaryTerm(
+          current.id,
+          reqCdeVer
         );
-        const response = parentTerms.find((term) => term.id === current.id);
         if (
-          !response ||
           compareBusinessVersions(
             getBusinessVersion(response.businessVersion, ''),
             reqCdeVer

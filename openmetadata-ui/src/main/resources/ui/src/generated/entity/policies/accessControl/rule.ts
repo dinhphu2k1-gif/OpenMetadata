@@ -55,10 +55,13 @@ export enum Effect {
  */
 export enum Operation {
     All = "All",
+    ApproveWorking = "ApproveWorking",
+    ArchivePublished = "ArchivePublished",
     AuditLogs = "AuditLogs",
     BulkCreate = "BulkCreate",
     BulkUpdate = "BulkUpdate",
     Create = "Create",
+    CreateVersion = "CreateVersion",
     CreateIngestionPipelineAutomator = "CreateIngestionPipelineAutomator",
     CreateScim = "CreateScim",
     CreateTests = "CreateTests",
@@ -67,6 +70,7 @@ export enum Operation {
     DeleteTestCaseFailedRowsSample = "DeleteTestCaseFailedRowsSample",
     Deploy = "Deploy",
     EditAll = "EditAll",
+    EditWorking = "EditWorking",
     EditCertification = "EditCertification",
     EditCustomFields = "EditCustomFields",
     EditDataProfile = "EditDataProfile",
@@ -98,6 +102,8 @@ export enum Operation {
     GenerateToken = "GenerateToken",
     Impersonate = "Impersonate",
     Kill = "Kill",
+    RejectWorking = "RejectWorking",
+    SubmitWorking = "SubmitWorking",
     Trigger = "Trigger",
     ViewAll = "ViewAll",
     ViewBasic = "ViewBasic",
@@ -111,4 +117,5 @@ export enum Operation {
     ViewTestDefinitionLibrary = "ViewTestDefinitionLibrary",
     ViewTests = "ViewTests",
     ViewUsage = "ViewUsage",
+    ViewWorking = "ViewWorking",
 }

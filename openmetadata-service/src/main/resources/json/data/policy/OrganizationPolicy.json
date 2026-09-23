@@ -30,6 +30,34 @@
       ],
       "effect": "allow",
       "condition": "noOwner()"
+    },
+    {
+      "name": "OrganizationPolicy-CDEOwnerViewWorkingRule",
+      "description": "Allow an assigned owner to view, but not edit, a Glossary or CDE working representation.",
+      "resources": [
+        "glossary",
+        "glossaryTerm"
+      ],
+      "operations": [
+        "ViewWorking"
+      ],
+      "effect": "allow",
+      "condition": "isOwner()"
+    },
+    {
+      "name": "OrganizationPolicy-CDEAssignedReviewerRule",
+      "description": "Allow an assigned reviewer to view and review a Glossary or CDE working representation.",
+      "resources": [
+        "glossary",
+        "glossaryTerm"
+      ],
+      "operations": [
+        "ViewWorking",
+        "ApproveWorking",
+        "RejectWorking"
+      ],
+      "effect": "allow",
+      "condition": "isReviewer()"
     }
   ]
 }

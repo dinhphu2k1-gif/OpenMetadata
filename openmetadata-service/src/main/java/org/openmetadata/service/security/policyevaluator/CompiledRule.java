@@ -26,11 +26,19 @@ import org.springframework.expression.spel.support.SimpleEvaluationContext;
 public class CompiledRule extends Rule {
   private static final SpelExpressionParser EXPRESSION_PARSER = new SpelExpressionParser();
 
-  // Sensitive operations that must be granted by name - never matched by the ALL/EditAll/ViewAll
-  // subsumption. Impersonation lets a bot act as any user, so a broad god-mode policy must not
-  // grant it implicitly; enablement stays the admin-only allowImpersonation flag.
+  // Sensitive operations that must be granted by name and are never matched by
+  // ALL/EditAll/ViewAll subsumption. This prevents broad metadata policies from implicitly
+  // granting impersonation or business-workflow mutations.
   private static final Set<MetadataOperation> EXPLICIT_GRANT_ONLY_OPERATIONS =
-      Set.of(MetadataOperation.IMPERSONATE);
+      Set.of(
+          MetadataOperation.IMPERSONATE,
+          MetadataOperation.VIEW_WORKING,
+          MetadataOperation.EDIT_WORKING,
+          MetadataOperation.SUBMIT_WORKING,
+          MetadataOperation.CREATE_VERSION,
+          MetadataOperation.APPROVE_WORKING,
+          MetadataOperation.REJECT_WORKING,
+          MetadataOperation.ARCHIVE_PUBLISHED);
 
   @JsonIgnore private Expression expression;
 

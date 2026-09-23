@@ -21,6 +21,7 @@ import static org.openmetadata.service.exception.CatalogExceptionMessage.notAdmi
 import io.micrometer.core.instrument.Timer;
 import jakarta.ws.rs.core.SecurityContext;
 import java.util.List;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.entity.teams.User;
 import org.openmetadata.schema.type.EntityReference;
@@ -40,6 +41,15 @@ import org.openmetadata.service.security.policyevaluator.SubjectContext;
 
 @Slf4j
 public class DefaultAuthorizer implements Authorizer {
+  private static final Set<MetadataOperation> POLICY_ONLY_WORKFLOW_OPERATIONS =
+      Set.of(
+          MetadataOperation.VIEW_WORKING,
+          MetadataOperation.EDIT_WORKING,
+          MetadataOperation.SUBMIT_WORKING,
+          MetadataOperation.CREATE_VERSION,
+          MetadataOperation.APPROVE_WORKING,
+          MetadataOperation.REJECT_WORKING,
+          MetadataOperation.ARCHIVE_PUBLISHED);
 
   @Override
   public void init(OpenMetadataApplicationConfig config) {
@@ -94,7 +104,9 @@ public class DefaultAuthorizer implements Authorizer {
       if (subjectContext.isAdmin()) {
         return;
       }
-      if (isReviewer(resourceContext, subjectContext)) {
+      if (isReviewer(resourceContext, subjectContext)
+          && operationContext.getOperations(resourceContext).stream()
+              .noneMatch(POLICY_ONLY_WORKFLOW_OPERATIONS::contains)) {
         return;
       }
 

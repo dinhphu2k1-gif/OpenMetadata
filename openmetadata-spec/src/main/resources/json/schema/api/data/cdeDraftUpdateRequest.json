@@ -25,13 +25,11 @@
   },
   "required": [
     "expectedRevision",
-    "displayName",
     "description",
     "owners",
     "reviewers",
     "domains",
-    "tags",
-    "extension"
+    "tags"
   ],
   "additionalProperties": false
 }

@@ -8,11 +8,11 @@ import { TagLabel } from '../../entity/data/glossaryTerm';
 /** Complete mutable payload used to save a CDE working Draft. */
 export interface CdeDraftUpdateRequest {
   expectedRevision: number;
-  displayName: string | null;
+  displayName?: string | null;
   description: string;
   owners: EntityReference[];
   reviewers: EntityReference[];
   domains: EntityReference[];
   tags: TagLabel[];
-  extension: Record<string, unknown> | null;
+  extension?: Record<string, unknown> | null;
 }

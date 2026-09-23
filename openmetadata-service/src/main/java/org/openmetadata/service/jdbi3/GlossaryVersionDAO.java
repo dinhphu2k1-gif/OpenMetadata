@@ -187,6 +187,14 @@ public interface GlossaryVersionDAO {
 
   @SqlQuery(
       "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+          + "FROM glossary_published_head h JOIN glossary_business_snapshot s ON s.snapshotId = h.snapshotId "
+          + "WHERE h.entityType = :entityType AND h.entityId = :entityId FOR UPDATE")
+  @RegisterRowMapper(PublishedSnapshotMapper.class)
+  PublishedSnapshotRecord lockLatestPublished(
+      @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
+
+  @SqlQuery(
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId IN (<entityIds>)")
   @RegisterRowMapper(PublishedSnapshotMapper.class)

@@ -21,6 +21,8 @@ final class GlossaryVersionResponses {
     payload.put("entityStatus", record.entityStatus());
     payload.put("updatedAt", record.updatedAt());
     payload.put("updatedBy", record.updatedBy());
+    payload.put("createdAt", record.createdAt());
+    payload.put("createdBy", record.createdBy());
     putIfPresent(payload, "submittedAt", record.submittedAt());
     putIfPresent(payload, "submittedBy", record.submittedBy());
     putIfPresent(payload, "rejectedAt", record.rejectedAt());

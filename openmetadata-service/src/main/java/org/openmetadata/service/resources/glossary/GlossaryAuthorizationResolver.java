@@ -7,31 +7,30 @@ package org.openmetadata.service.resources.glossary;
 
 import jakarta.ws.rs.ForbiddenException;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.service.security.policyevaluator.SubjectContext;
 
 /** Central workflow capability resolver. Organization is not elevated without a matching policy. */
 public final class GlossaryAuthorizationResolver {
   private GlossaryAuthorizationResolver() {}
 
-  public static Capabilities resolve(
-      SubjectContext subject, List<EntityReference> owners, List<EntityReference> reviewers) {
-    boolean administrator = subject != null && (subject.isAdmin() || subject.hasAnyRole("Admin"));
-    boolean steward = subject != null && subject.hasAnyRole("DataSteward");
-    boolean owner = subject != null && subject.isOwner(owners);
-    boolean proposer = subject != null && subject.hasAnyRole("DataProposer");
-    boolean reviewer = subject != null && subject.isReviewer(reviewers);
-    boolean elevated = administrator || steward;
+  public static Capabilities fromPolicy(
+      boolean canViewWorking,
+      boolean canEditWorking,
+      boolean canSubmit,
+      boolean canCreateVersion,
+      boolean canApprove,
+      boolean canReject,
+      boolean canArchive) {
     return new Capabilities(
-        elevated || proposer || owner || reviewer,
+        canViewWorking,
         true,
-        elevated || proposer || owner,
-        elevated || proposer || owner,
-        elevated || reviewer,
-        elevated || reviewer,
-        elevated);
+        canEditWorking,
+        canSubmit,
+        canCreateVersion,
+        canApprove,
+        canReject,
+        canArchive);
   }
 
   public static boolean isConsumerOnly(SubjectContext subject) {
@@ -48,7 +47,7 @@ public final class GlossaryAuthorizationResolver {
 
   /** Consumer access is always limited to immutable published representations. */
   public static Capabilities publishedReadOnly() {
-    return new Capabilities(false, true, false, false, false, false, false);
+    return new Capabilities(false, true, false, false, false, false, false, false);
   }
 
   public static void requireViewWorking(Capabilities capabilities) {
@@ -63,8 +62,12 @@ public final class GlossaryAuthorizationResolver {
     require(capabilities.canSubmit(), "Not authorized to submit the working version");
   }
 
+  public static void requireCreateVersion(Capabilities capabilities) {
+    require(capabilities.canCreateVersion(), "Not authorized to create a CDE version");
+  }
+
   public static void requireReview(Capabilities capabilities) {
-    require(capabilities.canApprove(), "Only an assigned reviewer or Data Steward can review");
+    require(capabilities.canApprove(), "Not authorized to approve the working version");
   }
 
   public static void requireReject(Capabilities capabilities) {
@@ -82,26 +85,17 @@ public final class GlossaryAuthorizationResolver {
       boolean canViewPublished,
       boolean canEditWorking,
       boolean canSubmit,
+      boolean canCreateVersion,
       boolean canApprove,
       boolean canReject,
       boolean canArchive) {
-    public Capabilities restrictToPolicy(boolean canEdit, boolean canChangeStatus) {
-      return new Capabilities(
-          canViewWorking || canEdit || canChangeStatus,
-          canViewPublished,
-          canEdit,
-          canEdit || canChangeStatus,
-          canApprove && canChangeStatus,
-          canReject && canChangeStatus,
-          canArchive && canChangeStatus);
-    }
-
     public Map<String, Boolean> asMap() {
       Map<String, Boolean> result = new LinkedHashMap<>();
       result.put("canViewWorking", canViewWorking);
       result.put("canViewPublished", canViewPublished);
       result.put("canEditWorking", canEditWorking);
       result.put("canSubmit", canSubmit);
+      result.put("canCreateVersion", canCreateVersion);
       result.put("canApprove", canApprove);
       result.put("canReject", canReject);
       result.put("canArchive", canArchive);

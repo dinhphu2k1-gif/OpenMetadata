@@ -16,7 +16,6 @@ package org.openmetadata.service.resources.glossary;
 import static org.openmetadata.service.Entity.ADMIN_USER_NAME;
 import static org.openmetadata.service.Entity.GLOSSARY;
 import static org.openmetadata.service.Entity.GLOSSARY_TERM;
-import static org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext;
 
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,6 +62,7 @@ import org.openmetadata.schema.api.AddGlossaryToAssetsRequest;
 import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossaryTerm;
+import org.openmetadata.schema.api.data.CdeCreateVersionRequest;
 import org.openmetadata.schema.api.data.CdeDraftUpdateRequest;
 import org.openmetadata.schema.api.data.CdeWorkflowTransitionRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
@@ -175,21 +175,27 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
-    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
-    GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, term));
-    DataDictionaryResolver.requireCdePayload(
-        request.getPayload() == null ? term : request.getPayload(), term.getGlossary().getId());
+      @NotNull @Valid CdeCreateVersionRequest request) {
+    GlossaryTerm term = createVersionEntity(uriInfo, securityContext, id);
+    GlossaryAuthorizationResolver.requireCreateVersion(capabilities(securityContext, term));
     WorkingVersionRecord working =
-        versioningService.createWorking(
-            GlossaryVersioningService.GLOSSARY_TERM,
+        versioningService.createNextTermWorking(
             id,
             term.getGlossary() == null ? null : term.getGlossary().getId(),
             request.getBusinessVersion(),
             term.getVersion(),
-            request.getPayload() == null ? term : request.getPayload(),
-            securityContext.getUserPrincipal().getName());
-    return GlossaryVersionResponses.working(working);
+            term,
+            securityContext.getUserPrincipal().getName(),
+            latest -> {
+              GlossaryTerm published = JsonUtils.readValue(latest.payload(), GlossaryTerm.class);
+              GlossaryAuthorizationResolver.requireCreateVersion(
+                  capabilitiesForAuthorizationTerm(securityContext, published));
+            });
+    Map<String, Object> response = GlossaryVersionResponses.working(working);
+    response.put(
+        "capabilities",
+        withoutCreateVersion(capabilitiesForWorking(securityContext, working)).asMap());
+    return response;
   }
 
   @PATCH
@@ -349,8 +355,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     GlossaryAuthorizationResolver.Capabilities capabilities = capabilities(securityContext, term);
     if (!capabilities.canArchive()) {
-      throw new AuthorizationException(
-          "Only an administrator or Data Steward can archive a snapshot");
+      throw new AuthorizationException("Not authorized to archive the published version");
     }
     return GlossaryVersionResponses.published(
         versioningService.archiveLatest(
@@ -379,67 +384,86 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         getInternal(uriInfo, securityContext, id, FIELDS + ",glossary", Include.NON_DELETED, null));
   }
 
+  private GlossaryTerm createVersionEntity(
+      UriInfo uriInfo, SecurityContext securityContext, UUID id) {
+    try {
+      return versionEntity(uriInfo, securityContext, id);
+    } catch (BadRequestException exception) {
+      throw new NotFoundException("CDE was not found in the Data Dictionary");
+    }
+  }
+
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, GlossaryTerm term) {
     GlossaryTerm authorizationTerm = term;
-    boolean workingPayload = false;
     try {
       WorkingVersionRecord working =
           versioningService.getWorking(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
-      authorizationTerm = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
-      workingPayload = true;
+      return withoutCreateVersion(capabilitiesForWorking(securityContext, working));
     } catch (NotFoundException ignored) {
       // Published-only identities retain their persisted authorization relationships.
     }
-    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm, workingPayload);
+    try {
+      PublishedSnapshotRecord latest =
+          versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
+      GlossaryTerm publishedAuthorizationTerm =
+          JsonUtils.readValue(latest.payload(), GlossaryTerm.class);
+      return capabilitiesForAuthorizationTerm(securityContext, publishedAuthorizationTerm);
+    } catch (NotFoundException ignored) {
+      return withoutCreateVersion(
+          capabilitiesForAuthorizationTerm(securityContext, authorizationTerm));
+    }
   }
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
       SecurityContext securityContext, GlossaryTerm authorizationTerm) {
-    return capabilitiesForAuthorizationTerm(securityContext, authorizationTerm, true);
-  }
-
-  private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
-      SecurityContext securityContext,
-      GlossaryTerm authorizationTerm,
-      boolean workingPayload) {
-    GlossaryAuthorizationResolver.Capabilities resolved =
-        GlossaryAuthorizationResolver.resolve(
-            getSubjectContext(securityContext),
-            authorizationTerm.getOwners(),
-            authorizationTerm.getReviewers());
-    boolean canEdit =
-        policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_ALL);
-    boolean canChangeStatus =
-        policyAllows(securityContext, authorizationTerm.getId(), MetadataOperation.EDIT_STATUS);
-    GlossaryAuthorizationResolver.Capabilities policyRestricted =
-        resolved.restrictToPolicy(canEdit, canChangeStatus);
-    if (!workingPayload) {
-      return policyRestricted;
-    }
-
-    // Working owners/reviewers are authoritative for F04 even when native relationships lag.
-    return new GlossaryAuthorizationResolver.Capabilities(
-        resolved.canViewWorking() || policyRestricted.canViewWorking(),
-        resolved.canViewPublished(),
-        resolved.canEditWorking() || policyRestricted.canEditWorking(),
-        resolved.canSubmit() || policyRestricted.canSubmit(),
-        policyRestricted.canApprove(),
-        resolved.canReject() || policyRestricted.canReject(),
-        policyRestricted.canArchive());
+    return GlossaryAuthorizationResolver.fromPolicy(
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.VIEW_WORKING),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.EDIT_WORKING),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.SUBMIT_WORKING),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.CREATE_VERSION),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.APPROVE_WORKING),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.REJECT_WORKING),
+        policyAllows(securityContext, authorizationTerm, MetadataOperation.ARCHIVE_PUBLISHED));
   }
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForWorking(
       SecurityContext securityContext, WorkingVersionRecord working) {
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
-    return capabilitiesForAuthorizationTerm(securityContext, payload);
+    GlossaryAuthorizationResolver.Capabilities capabilities =
+        capabilitiesForAuthorizationTerm(securityContext, payload);
+    if (!securityContext.getUserPrincipal().getName().equals(working.createdBy())
+        || (!capabilities.canEditWorking() && !capabilities.canSubmit())) {
+      return capabilities;
+    }
+    return new GlossaryAuthorizationResolver.Capabilities(
+        true,
+        capabilities.canViewPublished(),
+        capabilities.canEditWorking(),
+        capabilities.canSubmit(),
+        capabilities.canCreateVersion(),
+        capabilities.canApprove(),
+        capabilities.canReject(),
+        capabilities.canArchive());
+  }
+
+  private static GlossaryAuthorizationResolver.Capabilities withoutCreateVersion(
+      GlossaryAuthorizationResolver.Capabilities capabilities) {
+    return new GlossaryAuthorizationResolver.Capabilities(
+        capabilities.canViewWorking(),
+        capabilities.canViewPublished(),
+        capabilities.canEditWorking(),
+        capabilities.canSubmit(),
+        false,
+        capabilities.canApprove(),
+        capabilities.canReject(),
+        capabilities.canArchive());
   }
 
   private void authorizeAndValidateSubmit(
       SecurityContext securityContext, WorkingVersionRecord working) {
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
-    GlossaryAuthorizationResolver.requireSubmit(
-        capabilitiesForAuthorizationTerm(securityContext, payload));
+    GlossaryAuthorizationResolver.requireSubmit(capabilitiesForWorking(securityContext, working));
     DataDictionaryResolver.requireCdePayload(payload, working.glossaryId());
     repository.prepareInternal(payload, true);
   }
@@ -460,10 +484,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   }
 
   private boolean policyAllows(
-      SecurityContext securityContext, UUID id, MetadataOperation operation) {
+      SecurityContext securityContext, GlossaryTerm term, MetadataOperation operation) {
     try {
       authorizer.authorize(
-          securityContext, new OperationContext(entityType, operation), getResourceContextById(id));
+          securityContext,
+          new OperationContext(entityType, operation),
+          new ResourceContext<>(entityType, term, repository));
       return true;
     } catch (AuthorizationException exception) {
       return false;
@@ -479,7 +505,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Override
   protected List<MetadataOperation> getEntitySpecificOperations() {
     addViewOperation("children,relatedTerms,reviewers,usageCount", MetadataOperation.VIEW_BASIC);
-    return null;
+    return List.of(
+        MetadataOperation.VIEW_WORKING,
+        MetadataOperation.EDIT_WORKING,
+        MetadataOperation.SUBMIT_WORKING,
+        MetadataOperation.CREATE_VERSION,
+        MetadataOperation.APPROVE_WORKING,
+        MetadataOperation.REJECT_WORKING,
+        MetadataOperation.ARCHIVE_PUBLISHED);
   }
 
   public static class GlossaryTermList extends ResultList<GlossaryTerm> {
@@ -1342,11 +1375,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     WorkingVersionRecord glossaryWorking =
         versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossary.getId());
     Glossary authorizationGlossary = JsonUtils.readValue(glossaryWorking.payload(), Glossary.class);
-    GlossaryAuthorizationResolver.requireEdit(
-        GlossaryAuthorizationResolver.resolve(
-            getSubjectContext(securityContext),
-            authorizationGlossary.getOwners(),
-            authorizationGlossary.getReviewers()));
+    authorizer.authorize(
+        securityContext,
+        new OperationContext(GLOSSARY, MetadataOperation.EDIT_WORKING),
+        new ResourceContext<>(GLOSSARY, authorizationGlossary.getId(), null));
     CreateResourceContext<GlossaryTerm> createContext =
         new CreateResourceContext<>(entityType, term);
     OperationContext createOperation =

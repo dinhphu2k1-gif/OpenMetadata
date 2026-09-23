@@ -520,7 +520,11 @@ export const AuthProvider = ({
         }
       }
 
-      if (config.method === 'patch' && config.headers) {
+      if (
+        config.method === 'patch' &&
+        config.headers &&
+        !config.headers.get('Content-Type')
+      ) {
         config.headers['Content-type'] = 'application/json-patch+json';
       }
 
