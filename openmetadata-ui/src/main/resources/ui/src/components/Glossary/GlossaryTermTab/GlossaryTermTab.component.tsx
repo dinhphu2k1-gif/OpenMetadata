@@ -544,35 +544,31 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     useState<boolean>(false);
   const [statusDropdownSelection, setStatusDropdownSelection] = useState<
     string[]
-  >(() =>
-    isConsumer
-      ? [EntityStatus.Approved]
-      : [
-          'all',
-          EntityStatus.Draft,
-          EntityStatus.InReview,
-          EntityStatus.Rejected,
-          EntityStatus.Approved,
-        ]
-  );
-  const [selectedStatus, setSelectedStatus] = useState<string[]>(() =>
-    isConsumer
-      ? [EntityStatus.Approved]
-      : [
-          'all',
-          EntityStatus.Draft,
-          EntityStatus.InReview,
-          EntityStatus.Rejected,
-          EntityStatus.Approved,
-        ]
-  );
+  >(() => [
+    'all',
+    EntityStatus.Draft,
+    EntityStatus.InReview,
+    EntityStatus.Rejected,
+    EntityStatus.Approved,
+  ]);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(() => [
+    'all',
+    EntityStatus.Draft,
+    EntityStatus.InReview,
+    EntityStatus.Rejected,
+    EntityStatus.Approved,
+  ]);
 
   useEffect(() => {
+    if (isWorkflowPermissionLoading) {
+      return;
+    }
+
     if (isConsumer) {
       setStatusDropdownSelection([EntityStatus.Approved]);
       setSelectedStatus([EntityStatus.Approved]);
     }
-  }, [isConsumer]);
+  }, [isConsumer, isWorkflowPermissionLoading]);
   const [confirmCheckboxChecked, setConfirmCheckboxChecked] = useState(false);
   const [totalTermsCount, setTotalTermsCount] = useState<number>(0);
 
@@ -1138,7 +1134,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               displayedGlossary.businessVersion as string
             )
           : await getWorkingGlossaryTerms(displayedGlossary.id);
-        if (isWorkingGlossarySnapshot && isCDEGlossary) {
+        if (!isConsumer && !isVersionView && isCDEGlossary) {
           const authoringTerms = await getFirstLevelGlossaryTermsPaginated(
             activeGlossary.fullyQualifiedName,
             API_RES_MAX_SIZE,
@@ -1147,6 +1143,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               EntityStatus.Draft,
               EntityStatus.InReview,
               EntityStatus.Rejected,
+              EntityStatus.Approved,
             ].join(','),
             undefined,
             undefined,
@@ -2872,6 +2869,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           ?.map((revision) => revision.termSnapshotId)
           .join(',') ?? 'current-membership',
         isVersionView ? 'version-view' : 'current-view',
+        isConsumer ? 'consumer' : 'authoring',
         searchTerm,
         selectedStatus.join(','),
         pageSize,
@@ -2893,6 +2891,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       displayedGlossary.businessVersion,
       displayedGlossary.termRevisions,
       isVersionView,
+      isConsumer,
       searchTerm,
       selectedStatus,
       pageSize,
@@ -2915,7 +2914,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   // Fetch once per page/filter combination and ignore layout-only rerenders.
   useEffect(() => {
-    if (!activeGlossary?.fullyQualifiedName || toggleExpandBtn) {
+    if (
+      isWorkflowPermissionLoading ||
+      !activeGlossary?.fullyQualifiedName ||
+      toggleExpandBtn
+    ) {
       return;
     }
 
@@ -2925,7 +2928,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
     lastFetchKeyRef.current = fetchKey;
     fetchAllTerms();
-  }, [fetchKey, toggleExpandBtn]);
+  }, [fetchKey, isWorkflowPermissionLoading, toggleExpandBtn]);
 
   const paginationProps = useMemo(
     () => ({

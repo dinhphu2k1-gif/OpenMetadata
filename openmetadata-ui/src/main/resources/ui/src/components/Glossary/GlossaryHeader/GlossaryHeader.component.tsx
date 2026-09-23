@@ -768,6 +768,7 @@ const GlossaryHeader = ({
     if (isVersionView || glossaryTermStatus !== EntityStatus.Draft) {
       return false;
     }
+
     return Boolean(workflowPermissions?.canSubmit);
   }, [isVersionView, glossaryTermStatus, workflowPermissions]);
 
@@ -784,16 +785,22 @@ const GlossaryHeader = ({
     }
   };
 
-  const canApproveOrReject = useMemo(() => {
+  const canApprove = useMemo(() => {
     if (isVersionView || !workflowPermissions) {
       return false;
     }
 
     return (
       glossaryTermStatus === EntityStatus.InReview &&
-      (workflowPermissions.canApprove || workflowPermissions.canReject)
+      workflowPermissions.canApprove
     );
   }, [isVersionView, workflowPermissions, glossaryTermStatus]);
+
+  const canApproveOrReject =
+    canApprove ||
+    (!isVersionView &&
+      glossaryTermStatus === EntityStatus.InReview &&
+      Boolean(workflowPermissions?.canReject));
 
   const handleApproveTerm = async () => {
     try {
@@ -806,7 +813,7 @@ const GlossaryHeader = ({
       );
       setIsApproveModalOpen(false);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      handleWorkflowError(error);
     } finally {
       setIsApproving(false);
     }
@@ -1198,17 +1205,20 @@ const GlossaryHeader = ({
       <Space size={8}>
         {canApproveOrReject && (
           <>
-            <Button
-              className="m-l-xs"
-              style={{
-                backgroundColor: '#10b981',
-                borderColor: '#10b981',
-                color: '#fff',
-              }}
-              type="primary"
-              onClick={() => setIsApproveModalOpen(true)}>
-              {t('label.approve')}
-            </Button>
+            {canApprove && (
+              <Button
+                className="m-l-xs"
+                disabled={isApproving}
+                style={{
+                  backgroundColor: '#10b981',
+                  borderColor: '#10b981',
+                  color: '#fff',
+                }}
+                type="primary"
+                onClick={() => setIsApproveModalOpen(true)}>
+                {t('label.approve')}
+              </Button>
+            )}
             {workflowPermissions?.canReject && (
               <Button
                 danger
@@ -1264,6 +1274,7 @@ const GlossaryHeader = ({
   }, [
     isVersionView,
     canApproveOrReject,
+    canApprove,
     workflowPermissions,
     canSubmitForReview,
     isSubmittingForReview,

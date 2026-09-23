@@ -295,16 +295,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
-    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
-    GlossaryAuthorizationResolver.requireReview(capabilities(securityContext, term));
-    requireExpectedRevision(request);
+      @NotNull @Valid CdeWorkflowTransitionRequest request) {
+    versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.published(
         versioningService.publish(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
             request.getExpectedRevision(),
-            securityContext.getUserPrincipal().getName()));
+            securityContext.getUserPrincipal().getName(),
+            working -> authorizeAndValidateApprove(securityContext, working)));
   }
 
   @GET
@@ -442,6 +441,21 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryAuthorizationResolver.requireSubmit(
         capabilitiesForAuthorizationTerm(securityContext, payload));
     DataDictionaryResolver.requireCdePayload(payload, working.glossaryId());
+    repository.prepareInternal(payload, true);
+  }
+
+  private void authorizeAndValidateApprove(
+      SecurityContext securityContext, WorkingVersionRecord working) {
+    GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+    GlossaryAuthorizationResolver.requireReview(
+        capabilitiesForAuthorizationTerm(securityContext, payload));
+    DataDictionaryResolver.requireCdePayload(payload, working.glossaryId());
+    if (payload.getParent() != null) {
+      throw new BadRequestException("A CDE must be a direct child of the Data Dictionary");
+    }
+    EntityRepository.validateOwners(payload.getOwners());
+    EntityRepository.validateReviewers(payload.getReviewers());
+    repository.validateDomainsByRef(payload.getDomains());
     repository.prepareInternal(payload, true);
   }
 
@@ -864,18 +878,28 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private List<GlossaryTerm> resolveAuthoringRepresentations(
       SecurityContext securityContext, List<GlossaryTerm> terms) {
+    List<UUID> ids = terms.stream().map(GlossaryTerm::getId).toList();
     Map<UUID, WorkingVersionRecord> working =
         versioningService.getWorkingBatch(
-            GlossaryVersioningService.GLOSSARY_TERM,
-            terms.stream().map(GlossaryTerm::getId).toList());
+            GlossaryVersioningService.GLOSSARY_TERM, ids);
+    Map<UUID, PublishedSnapshotRecord> published =
+        versioningService.getLatestPublishedBatch(
+            GlossaryVersioningService.GLOSSARY_TERM, ids);
     return terms.stream()
-        .map(term -> working.get(term.getId()))
-        .filter(java.util.Objects::nonNull)
         .map(
-            record ->
-                JsonUtils.readValue(
-                    JsonUtils.pojoToJson(GlossaryVersionResponses.working(record)),
-                    GlossaryTerm.class))
+            term -> {
+              WorkingVersionRecord workingRecord = working.get(term.getId());
+              if (workingRecord != null) {
+                return JsonUtils.readValue(
+                    JsonUtils.pojoToJson(GlossaryVersionResponses.working(workingRecord)),
+                    GlossaryTerm.class);
+              }
+              PublishedSnapshotRecord publishedRecord = published.get(term.getId());
+              return publishedRecord == null
+                  ? null
+                  : JsonUtils.readValue(publishedRecord.payload(), GlossaryTerm.class);
+            })
+        .filter(java.util.Objects::nonNull)
         .filter(term -> capabilitiesForAuthorizationTerm(securityContext, term).canViewWorking())
         .toList();
   }

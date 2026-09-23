@@ -12,14 +12,18 @@ import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
@@ -224,56 +228,76 @@ public class GlossaryVersioningService {
 
   public PublishedSnapshotRecord publish(
       String entityType, UUID entityId, long expectedRevision, String actor) {
-    requireEntityType(entityType);
-    PublishedSnapshotRecord published =
-        Entity.getJdbi()
-            .inTransaction(
-                handle -> {
-                  GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
-                  WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
-                  if (working.revision() != expectedRevision) {
-                    throw conflict("Working version revision conflict");
-                  }
-                  if (!EntityStatus.IN_REVIEW.value().equals(working.entityStatus())) {
-                    throw new BadRequestException(
-                        "Only an InReview working version can be approved");
-                  }
-                  if (dao.findPublishedVersion(entityType, entityId, working.businessVersion())
-                      != null) {
-                    throw conflict("businessVersion has already been published");
-                  }
+    return publish(entityType, entityId, expectedRevision, actor, null);
+  }
 
-                  UUID snapshotId = UUID.randomUUID();
-                  long sequence = dao.nextPublicationSequence(entityType, entityId);
-                  long now = System.currentTimeMillis();
-                  String approvedPayload =
-                      withPublishedMetadata(working, snapshotId, sequence, now, actor);
-                  String contentHash = sha256(approvedPayload);
-                  dao.insertSnapshot(
-                      snapshotId,
-                      entityType,
-                      entityId,
-                      working.glossaryId(),
-                      working.businessVersion(),
-                      working.nativeVersion(),
-                      sequence,
-                      approvedPayload,
-                      contentHash,
-                      now,
-                      actor);
-                  if (GLOSSARY.equals(entityType)) {
-                    insertGlossaryTermRevisions(dao, entityId, snapshotId, approvedPayload);
-                  }
-                  dao.upsertPublishedHead(entityType, entityId, snapshotId, sequence);
-                  requireUpdated(dao.deleteWorking(entityType, entityId, expectedRevision));
-                  dao.insertOutbox(
-                      UUID.randomUUID(),
-                      snapshotId,
-                      "PUBLISHED_SNAPSHOT_UPSERT",
-                      approvedPayload,
-                      now);
-                  return dao.findPublishedVersion(entityType, entityId, working.businessVersion());
-                });
+  public PublishedSnapshotRecord publish(
+      String entityType,
+      UUID entityId,
+      long expectedRevision,
+      String actor,
+      Consumer<WorkingVersionRecord> authorizationAndValidation) {
+    requireEntityType(entityType);
+    PublishedSnapshotRecord published;
+    try {
+      published =
+          Entity.getJdbi()
+              .inTransaction(
+                  handle -> {
+                    GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                    WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
+                    if (working.revision() != expectedRevision) {
+                      throw conflict("Working version revision conflict");
+                    }
+                    if (!EntityStatus.IN_REVIEW.value().equals(working.entityStatus())) {
+                      throw conflict("Only an InReview working version can be approved");
+                    }
+                    if (authorizationAndValidation != null) {
+                      authorizationAndValidation.accept(working);
+                    }
+                    if (dao.findPublishedVersion(entityType, entityId, working.businessVersion())
+                        != null) {
+                      throw conflict("businessVersion has already been published");
+                    }
+
+                    UUID snapshotId = UUID.randomUUID();
+                    long sequence = dao.nextPublicationSequence(entityType, entityId);
+                    long now = System.currentTimeMillis();
+                    String approvedPayload =
+                        withPublishedMetadata(working, snapshotId, sequence, now, actor);
+                    String contentHash = sha256(approvedPayload);
+                    dao.insertSnapshot(
+                        snapshotId,
+                        entityType,
+                        entityId,
+                        working.glossaryId(),
+                        working.businessVersion(),
+                        working.nativeVersion(),
+                        sequence,
+                        approvedPayload,
+                        contentHash,
+                        now,
+                        actor);
+                    if (GLOSSARY.equals(entityType)) {
+                      insertGlossaryTermRevisions(dao, entityId, snapshotId, approvedPayload);
+                    }
+                    dao.upsertPublishedHead(entityType, entityId, snapshotId, sequence);
+                    dao.insertOutbox(
+                        UUID.randomUUID(),
+                        snapshotId,
+                        "PUBLISHED_SNAPSHOT_UPSERT",
+                        approvedPayload,
+                        now);
+                    requireUpdated(dao.deleteWorking(entityType, entityId, expectedRevision));
+                    return dao.findPublishedVersion(
+                        entityType, entityId, working.businessVersion());
+                  });
+    } catch (UnableToExecuteStatementException exception) {
+      if (isConstraintConflict(exception)) {
+        throw conflict("The working version was published concurrently");
+      }
+      throw exception;
+    }
     processPendingOutbox();
     refreshManagerIndexSafely(entityType, entityId);
     return published;
@@ -541,6 +565,17 @@ public class GlossaryVersioningService {
         Response.status(Response.Status.CONFLICT).entity(message).build());
   }
 
+  private static boolean isConstraintConflict(Throwable exception) {
+    for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+      if (cause instanceof SQLException sqlException
+          && sqlException.getSQLState() != null
+          && sqlException.getSQLState().startsWith("23")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static void requireEntityType(String entityType) {
     if (!GLOSSARY.equals(entityType) && !GLOSSARY_TERM.equals(entityType)) {
       throw new BadRequestException("Unsupported glossary version entity type: " + entityType);
@@ -755,7 +790,23 @@ public class GlossaryVersioningService {
     payload.put("publishedAt", publishedAt);
     payload.put("publishedBy", publishedBy);
     payload.remove("workingRevision");
-    return JsonUtils.pojoToJson(payload);
+    payload.remove("archivedAt");
+    payload.remove("archivedBy");
+    return JsonUtils.pojoToJson(canonicalize(payload));
+  }
+
+  private static Object canonicalize(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> sorted = new TreeMap<>();
+      map.forEach((key, child) -> sorted.put(String.valueOf(key), canonicalize(child)));
+      return sorted;
+    }
+    if (value instanceof List<?> list) {
+      List<Object> canonical = new ArrayList<>(list.size());
+      list.forEach(child -> canonical.add(canonicalize(child)));
+      return canonical;
+    }
+    return value;
   }
 
   private static Object normalizeWorkingPayload(

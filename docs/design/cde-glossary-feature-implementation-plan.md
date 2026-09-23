@@ -301,20 +301,70 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 ### F05 — Approve và publish CDE
 
-**Phạm vi**
+**Ranh giới chức năng và invariant**
 
-- InReview → Approved trong transaction.
-- Ghi snapshot, content hash, publication sequence, published head và outbox.
-- Chỉ xóa working record sau khi snapshot/head thành công.
-- Không endpoint nào được sửa snapshot.
-- UI chuyển sang published view sau approve.
+- F05 publish một CDE working version từ `InReview` thành một published snapshot có `entityStatus = Approved`. Không tạo hoặc giữ working record ở trạng thái `Approved`; working record chỉ bị xóa khi toàn bộ publication transaction thành công.
+- Approve không thay đổi native `GlossaryTerm` identity, native metadata version, `businessVersion` hoặc business payload đã được submit. Snapshot là representation có thẩm quyền của bản CDE đã ban hành.
+- Approve không tự thêm, tự thay thế hoặc tự loại CDE revision trong working/latest Data Dictionary và không tăng revision của Data Dictionary. Quản lý membership `(termId, termBusinessVersion)` thuộc F08; publish Data Dictionary thuộc F09.
+- Một CDE snapshot đã Approved là **đủ điều kiện công bố** nhưng chỉ xuất hiện với Consumer trong ngữ cảnh một Data Dictionary version khi snapshot đó được Data Dictionary version tương ứng tham chiếu. F05 không phá invariant URL/membership của F02 để cung cấp chế độ xem CDE độc lập.
+- Approved snapshot bất biến về business payload và publication metadata cốt lõi. F16 có thể bổ sung lifecycle metadata như `archivedAt/archivedBy`, nhưng không được sửa snapshot payload, `businessVersion`, `publicationSequence`, `publishedAt`, `publishedBy` hoặc `contentHash`.
+- F05 chỉ publish một CDE. Không triển khai tạo business version kế tiếp của F06, quản lý Data Dictionary membership của F08, publish Data Dictionary của F09 hoặc màn hình audit đầy đủ của F16.
+
+**API contract và optimistic locking**
+
+- Dùng endpoint `POST /v1/glossaryTerms/{id}/working/approve`; frontend gọi wrapper hiện có `transitionGlossaryTermWorkflow(id, 'approve', request)`, không tạo API client song song.
+- Request dùng cùng typed contract tối thiểu như các transition F04 và chỉ gồm `{ "expectedRevision": <integer> }`. `expectedRevision` bắt buộc là integer từ 1 trở lên; thiếu, sai kiểu, ngoài miền hoặc có field ngoài allowlist trả `400 Bad Request`.
+- Client không được gửi `businessVersion`, business payload, `workingRevision`, actor, timestamp, source status, target status, snapshot ID, publication sequence hoặc publication metadata.
+- Backend đọc `expectedRevision` từ working representation gần nhất. Revision cũ, source state không còn `InReview` hoặc business version đã được publish trả `409 Conflict` và không thay đổi working/snapshot/head/outbox. Working record không tồn tại trả `404 Not Found`; không đủ quyền trả `403 Forbidden`.
+- Thành công trả published representation gồm ít nhất `id`, `name`, `fullyQualifiedName`, `glossary`, toàn bộ business payload, `businessVersion`, `entityStatus = Approved`, `snapshotId`, `publicationSequence`, `publishedAt` và `publishedBy`. Published response không trả hoặc tái sử dụng `workingRevision`; frontend không tự tính status, sequence hoặc publication metadata.
+
+**Authorization và validation tại thời điểm publish**
+
+- Approve yêu cầu capability hiệu lực `canApprove`. Backend tính capability từ working payload mới nhất và policy hiện hành, bao gồm owners/reviewers đã được Save trước Submit; không dựa vào native relationship có thể đã cũ và không suy quyền chỉ từ tên role.
+- Assigned Reviewer chỉ được approve khi vẫn được gán trong working payload hoặc policy hiệu lực cho phép. Proposer/owner không mặc nhiên được approve; Consumer-only không được xem working payload hoặc gọi approve. Admin/Steward/policy holder vẫn phải đi qua cùng capability resolver.
+- Sau khi khóa working record và trước khi ghi snapshot, backend validate lại toàn bộ invariant CDE của F03/F04: CDE thuộc đúng Data Dictionary identity, không có `parent`, business payload đúng schema, owners/reviewers/domains/tags còn resolve hợp lệ và `extension` còn đúng Custom Property schema. Không giả định payload vẫn hợp lệ chỉ vì đã validate lúc Submit.
+- `publishedBy` lấy từ authenticated principal và `publishedAt` lấy từ backend clock. Client không được điều khiển hoặc ghi đè audit metadata.
+
+**Atomic publication transaction**
+
+- Backend khóa working row của CDE theo entity bằng cơ chế tương đương `SELECT ... FOR UPDATE` trước khi kiểm tra revision, state, quyền và validation. Mọi bước ghi publication dùng cùng database handle/transaction.
+- Trong đúng một transaction, thực hiện theo thứ tự logic: khóa và đọc working → kiểm tra `expectedRevision` và `InReview` → authorization/validation → tạo Approved snapshot payload → cấp `publicationSequence` kế tiếp → tính `contentHash` → insert snapshot → cập nhật published head → insert outbox idempotent → xóa working row bằng compare-and-set.
+- Bất kỳ lỗi nào trước commit, bao gồm lỗi insert snapshot, update head, insert outbox hoặc delete working, phải rollback toàn bộ. Không được tồn tại snapshot mồ côi, head trỏ sai, outbox thiếu, working bị xóa sớm hoặc manager/published index phản ánh dữ liệu chưa commit.
+- Published head chỉ được trỏ tới snapshot vừa commit có publication sequence mới nhất của cùng CDE. Unique constraint trên `(entityType, entityId, businessVersion)` và `(entityType, entityId, publicationSequence)` là lớp bảo vệ cuối cùng; lỗi constraint do race được ánh xạ thành `409 Conflict`, không trả `500` chung chung.
+- Không phát native metadata version hoặc external event trực tiếp bên trong transaction. Side effect ngoài database chỉ được kích hoạt từ outbox sau commit và phải idempotent.
+
+**Content hash, read model và outbox**
+
+- `contentHash` là SHA-256 dạng lowercase hex của canonical immutable snapshot JSON mã hóa UTF-8. Canonicalization phải ổn định giữa MySQL/PostgreSQL và không phụ thuộc thứ tự key do serializer hoặc kiểu lưu `json/jsonb` trả về.
+- Hash bao phủ toàn bộ immutable snapshot payload dùng để phục vụ published read, gồm business content và publication metadata cốt lõi. Lifecycle metadata có thể thay đổi ở F16 như `archivedAt/archivedBy` nằm ngoài payload/hash; archive không được làm thay đổi hash cũ.
+- Database published snapshot/head là nguồn sự thật ngay sau commit. Published detail/history API đọc được snapshot vừa publish mà không phụ thuộc search indexing.
+- Search/index/event sử dụng transactional outbox và có eventual consistency. Lỗi xử lý outbox sau commit không biến Approve đã commit thành thất bại, không xóa snapshot và không rollback head; event giữ trạng thái pending/error để retry idempotent theo cơ chế vận hành. Xử lý lặp cùng event không được tạo document hoặc event nghiệp vụ trùng.
+- Consumer search/list không được fallback sang mutable/native index khi published index đang chậm. UI sau Approve dùng response backend hoặc published detail API, không dùng search index để quyết định publication đã thành công hay chưa.
+
+**UI**
+
+- Chỉ hiển thị `Phê duyệt` khi CDE có `entityStatus = InReview`, không phải historical/version view và backend trả `canApprove = true`. UI không suy quyền từ role, owner hoặc reviewer phía client.
+- Approve có modal xác nhận. Trong khi request chạy, action có loading, bị disable và chặn double-submit; request hợp lệ gửi đúng một `expectedRevision` hiện tại.
+- Sau thành công, UI thay state bằng published response, hiển thị badge `Approved`, chuyển toàn bộ nội dung sang read-only, cập nhật version selector và không giữ state/cache working giả.
+- Nếu CDE snapshot đã thuộc Data Dictionary version của context hiện tại, UI điều hướng tới published deep link có đủ `businessVersion` và `parentBusinessVersion`. Không tự suy diễn một trong hai version và không tạo URL published thiếu context cha.
+- Nếu snapshot chưa thuộc Data Dictionary version nào có thể mở, UI giữ manager/authoring context ở chế độ read-only và hiển thị rõ `Approved — Chưa được thêm vào gói phát hành Data Dictionary`; không giả vờ Consumer đã có thể truy cập. Sau F08/F09, điều hướng published tuân theo invariant membership của F02.
+- Khi nhận `409`, UI giữ state hiện tại, không tự retry hoặc tự đổi badge/revision; hiển thị conflict và hành động tải representation mới nhất. Lỗi `403/404/5xx` dừng loading, hiển thị lỗi phù hợp và không để optimistic Approved state.
 
 **Test/DoD**
 
-- Failure giữa insert snapshot và update head rollback toàn bộ.
-- Snapshot payload/hash không đổi sau mutation tương lai.
-- Approve cùng revision hai lần chỉ một lần thành công.
-- E2E Draft → InReview → Approved → Consumer read.
+- Integration happy path `InReview revision N → Approve` tạo đúng một snapshot `Approved`, một published head và một outbox event, xóa working record, giữ nguyên identity/businessVersion/business payload và trả đầy đủ published representation không có `workingRevision`.
+- Failure injection sau từng boundary insert snapshot, update head, insert outbox và delete working chứng minh transaction rollback toàn bộ; published API, manager index và Consumer index không quan sát dữ liệu thất bại.
+- Hai request Approve cùng revision: đúng một request thành công và chỉ có một snapshot/head/outbox; request còn lại nhận `409` nếu quan sát conflict trong transaction hoặc `404` nếu chạy sau khi working đã bị xóa, không trả thành công idempotent giả.
+- Race Approve với Reject dùng cùng revision: chỉ đúng một mutation thành công; mutation còn lại nhận `409/404`. Không tồn tại đồng thời published snapshot và working `Rejected` của cùng business version.
+- Test source state sai, revision cũ, business version đã publish, working không tồn tại, request thiếu/sai `expectedRevision` và field ngoài allowlist; mọi trường hợp thất bại không thay đổi snapshot/head/outbox/working.
+- Authorization integration test bao phủ Admin/Steward/policy holder, Proposer, owner, assigned Reviewer, Reviewer đã bị gỡ assignment, Reviewer không được gán, Consumer-only và user đồng thời có nhiều role. Test chứng minh Approve dùng working owners/reviewers mới nhất thay vì native assignment cũ.
+- Test xóa hoặc làm mất hợp lệ owners/reviewers/domains/tags/Custom Property sau Submit nhưng trước Approve làm publication thất bại toàn bộ; sửa native identity hoặc trỏ sai Data Dictionary/parent cũng bị từ chối.
+- Recompute hash từ canonical snapshot payload đọc lại từ cả MySQL và PostgreSQL phải khớp `contentHash` đã lưu. Save/version/publish tương lai và archive metadata không được thay đổi payload/hash của snapshot cũ.
+- Outbox test bao phủ xử lý thành công, lỗi index để event pending/error, retry thành công và xử lý lặp idempotent. Published detail/history vẫn đọc được ngay khi index đang lỗi; Consumer search không lộ working/native payload.
+- Test chứng minh Approve không tạo native metadata version, không tự thay đổi Data Dictionary `termRevisions`/revision và không tự thay thế CDE version đã được Data Dictionary chọn.
+- Frontend test bao phủ action visibility theo capability/state, modal, loading, double-submit, request chỉ có `expectedRevision`, state từ response, conflict reload và hai nhánh điều hướng có/không có Data Dictionary membership.
+- E2E phạm vi F05: Draft → Submit → Approve → published detail/history API đọc được snapshot; manager thấy Approved read-only và nhãn chưa thuộc gói phát hành khi chưa có membership.
+- E2E Consumer đầy đủ được nghiệm thu ở F08/F09: sau khi CDE snapshot được thêm vào một Data Dictionary version mà Consumer truy cập được, Consumer mới tìm/mở CDE qua URL có đủ `businessVersion` và `parentBusinessVersion`.
 
 ### F06 — Tạo business version CDE kế tiếp
 

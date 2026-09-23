@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Col, Row, Tabs } from 'antd';
+import { Alert, Col, Row, Tabs } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -103,6 +103,9 @@ const GlossaryTermsV1 = ({
   const location = useLocation();
   const businessVersion = new URLSearchParams(location.search).get(
     'businessVersion'
+  );
+  const parentBusinessVersion = new URLSearchParams(location.search).get(
+    'parentBusinessVersion'
   );
   const { currentUser } = useApplicationStore();
   const isAdmin = Boolean(currentUser?.isAdmin);
@@ -567,6 +570,16 @@ const GlossaryTermsV1 = ({
       type={EntityType.GLOSSARY_TERM}
       onUpdate={onTermUpdate}>
       <Row data-testid="glossary-term" gutter={[0, 12]}>
+        {isCDEGlossaryTerm &&
+          glossaryTerm.entityStatus === EntityStatus.Approved &&
+          !parentBusinessVersion && (
+            <Col span={24}>
+              <Alert
+                message="Approved — Chưa được thêm vào gói phát hành Data Dictionary"
+                type="info"
+              />
+            </Col>
+          )}
         <Col span={24}>
           <GlossaryHeader
             latestData={currentGlossaryTerm}
