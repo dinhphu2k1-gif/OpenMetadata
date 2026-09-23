@@ -188,10 +188,7 @@ const GlossaryTermsV1 = ({
         currentGlossaryTerm.businessVersion
       );
 
-      if (
-        currentVer === businessVersion &&
-        String(currentGlossaryTerm.entityStatus).toLowerCase() === 'approved'
-      ) {
+      if (compareBusinessVersions(currentVer, businessVersion) === 0) {
         return;
       }
 

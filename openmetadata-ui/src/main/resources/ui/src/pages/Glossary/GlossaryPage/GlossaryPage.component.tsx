@@ -67,6 +67,10 @@ import {
   updateGlossaryTermVotes,
   updateGlossaryVotes,
 } from '../../../rest/glossaryAPI';
+import {
+  compareBusinessVersions,
+  getBusinessVersion,
+} from '../../../utils/BusinessVersionUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
@@ -90,7 +94,8 @@ const GlossaryPage = () => {
   );
   const businessVersion = searchParams.get('businessVersion');
   const parentBusinessVersion = searchParams.get('parentBusinessVersion');
-  const isHistoricalView = Boolean(businessVersion || parentBusinessVersion);
+  const [isGlossaryHistorical, setIsGlossaryHistorical] = useState(false);
+  const [isTermHistorical, setIsTermHistorical] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMoreGlossaryLoading, setIsMoreGlossaryLoading] =
@@ -127,6 +132,10 @@ const GlossaryPage = () => {
 
     return true;
   }, [glossaryFqn]);
+
+  const isHistoricalView = isGlossaryActive
+    ? isGlossaryHistorical
+    : isTermHistorical;
 
   const { viewBasicGlossaryPermission, viewAllGlossaryPermission } =
     useMemo(() => {
@@ -260,28 +269,89 @@ const GlossaryPage = () => {
           TabSpecificField.CHILDREN_COUNT,
         ],
       });
-      const parentTerms = await getPublishedGlossaryTerms(
-        current.glossary.id,
-        parentBusinessVersion
-      );
-      const response = parentTerms.find((term) => term.id === current.id);
-      if (!response || response.businessVersion !== businessVersion) {
+
+      const parentGlossaryId = current.glossary?.id;
+      if (!parentGlossaryId) {
         navigate(ROUTES.NOT_FOUND, { replace: true });
 
         return;
       }
-      setActiveGlossary(response as ModifiedGlossary);
+
+      let liveGlossary: Glossary | null = null;
+      try {
+        const capabilities = await getGlossaryVersionPermissions(parentGlossaryId);
+        if (capabilities.canViewWorking) {
+          try {
+            liveGlossary = await getGlossaryWorkingVersion(parentGlossaryId);
+          } catch (error) {
+            if ((error as AxiosError)?.response?.status === ClientErrors.NOT_FOUND) {
+              liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
+            } else {
+              throw error;
+            }
+          }
+        } else {
+          liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
+        }
+      } catch {
+        const found = glossaries.find((g) => g.id === parentGlossaryId);
+        if (found) {
+          liveGlossary = found;
+        }
+      }
+
+      const liveParentVer = liveGlossary?.businessVersion
+        ? getBusinessVersion(liveGlossary.businessVersion, '')
+        : '';
+      const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
+      const reqCdeVer = getBusinessVersion(businessVersion, '');
+      const liveCdeVer = getBusinessVersion(current.businessVersion, '');
+
+      if (liveParentVer && compareBusinessVersions(liveParentVer, reqParentVer) === 0) {
+        if (compareBusinessVersions(liveCdeVer, reqCdeVer) !== 0) {
+          navigate(ROUTES.NOT_FOUND, { replace: true });
+
+          return;
+        }
+        setIsTermHistorical(false);
+        setActiveGlossary(current as ModifiedGlossary);
+
+        return;
+      }
+
+      try {
+        const parentTerms = await getPublishedGlossaryTerms(
+          parentGlossaryId,
+          parentBusinessVersion
+        );
+        const response = parentTerms.find((term) => term.id === current.id);
+        if (
+          !response ||
+          compareBusinessVersions(
+            getBusinessVersion(response.businessVersion, ''),
+            reqCdeVer
+          ) !== 0
+        ) {
+          navigate(ROUTES.NOT_FOUND, { replace: true });
+
+          return;
+        }
+        setIsTermHistorical(true);
+        setActiveGlossary(response as ModifiedGlossary);
+      } catch {
+        navigate(ROUTES.NOT_FOUND, { replace: true });
+      }
     } catch (error) {
       const status = (error as AxiosError)?.response?.status;
       if (status === ClientErrors.FORBIDDEN) {
         navigate(ROUTES.FORBIDDEN, { replace: true });
-      } else if (status === ClientErrors.NOT_FOUND || isHistoricalView) {
+      } else {
         navigate(ROUTES.NOT_FOUND, { replace: true });
       }
     } finally {
       setIsRightPanelLoading(false);
     }
-  }, [businessVersion, glossaryFqn, isHistoricalView, parentBusinessVersion]);
+  }, [businessVersion, glossaryFqn, parentBusinessVersion, glossaries]);
 
   useEffect(() => {
     setIsRightPanelLoading(true);
@@ -302,14 +372,46 @@ const GlossaryPage = () => {
         const current = foundGlossary || glossaries[0];
         if (businessVersion && current) {
           setIsRightPanelLoading(true);
-          getGlossaryVersion(current.id, businessVersion)
-            .then((snapshot) => setActiveGlossary(snapshot))
+          getGlossaryVersionPermissions(current.id)
+            .then(async (capabilities) => {
+              if (capabilities.canViewWorking) {
+                try {
+                  const working = await getGlossaryWorkingVersion(current.id);
+                  if (
+                    compareBusinessVersions(
+                      getBusinessVersion(working.businessVersion, ''),
+                      getBusinessVersion(businessVersion, '')
+                    ) === 0
+                  ) {
+                    setIsGlossaryHistorical(false);
+                    setActiveGlossary(working);
+
+                    return;
+                  }
+                } catch (error) {
+                  if (
+                    (error as AxiosError)?.response?.status !==
+                    ClientErrors.NOT_FOUND
+                  ) {
+                    throw error;
+                  }
+                }
+              }
+
+              const snapshot = await getGlossaryVersion(
+                current.id,
+                businessVersion
+              );
+              setIsGlossaryHistorical(true);
+              setActiveGlossary(snapshot);
+            })
             .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
             .finally(() => setIsRightPanelLoading(false));
 
           return;
         }
 
+        setIsGlossaryHistorical(false);
         setIsRightPanelLoading(true);
         getGlossaryVersionPermissions(current.id)
           .then(async (capabilities) => {

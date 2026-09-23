@@ -61,6 +61,7 @@ import {
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
 import { useFqn } from '../../../hooks/useFqn';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import {
   isDataDictionaryGlossary,
   isDataQualityGlossary,
@@ -196,6 +197,7 @@ const GlossaryHeader = ({
     useState<GlossaryVersionPermissions>();
   const [isWorkflowPermissionLoading, setIsWorkflowPermissionLoading] =
     useState(true);
+  const { currentUser } = useApplicationStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -542,20 +544,28 @@ const GlossaryHeader = ({
       );
       if (!isGlossary && parentBusinessVersion) {
         const glossaryId = (selectedData as GlossaryTerm).glossary?.id;
-        const contextualTerm = glossaryId
-          ? (
-              await getPublishedGlossaryTerms(
-                glossaryId,
-                parentBusinessVersion
-              )
-            ).find((term) => term.id === selectedData.id)
-          : undefined;
+        let contextualTerm: GlossaryTerm | undefined;
+        if (glossaryId) {
+          try {
+            const publishedTerms = await getPublishedGlossaryTerms(
+              glossaryId,
+              parentBusinessVersion
+            );
+            contextualTerm = publishedTerms.find(
+              (term) => term.id === selectedData.id
+            );
+          } catch {
+            contextualTerm = selectedData as GlossaryTerm;
+          }
+        }
         const contextualBusinessVersion = contextualTerm
           ? getBusinessVersion(contextualTerm.businessVersion, '')
           : '';
-        versions = versions.filter(
-          (item) => item.label === contextualBusinessVersion
-        );
+        if (contextualBusinessVersion) {
+          versions = versions.filter(
+            (item) => item.label === contextualBusinessVersion
+          );
+        }
       }
 
       setAvailableVersions(
@@ -819,10 +829,26 @@ const GlossaryHeader = ({
     }
   };
 
+  const isAssignedReviewer = useMemo(() => {
+    if (isGlossary || !currentUser) {
+      return false;
+    }
+    const term = selectedData as GlossaryTerm;
+    const inReviewers = term.reviewers?.some(
+      (r) => r.id === currentUser.id || r.name === currentUser.name
+    );
+    const inOwners = term.owners?.some(
+      (o) => o.id === currentUser.id || o.name === currentUser.name
+    );
+
+    return Boolean(inReviewers && !inOwners && !currentUser.isAdmin);
+  }, [isGlossary, selectedData, currentUser]);
+
   const canReopen =
     !isVersionView &&
     glossaryTermStatus === EntityStatus.Rejected &&
-    Boolean(workflowPermissions?.canEditWorking);
+    Boolean(workflowPermissions?.canEditWorking) &&
+    !isAssignedReviewer;
 
   const handleReopen = async () => {
     try {

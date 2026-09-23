@@ -2193,7 +2193,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       const governanceColumnKeys = new Set([
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.REVIEWERS,
-        GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
       ]);
       const governanceColumns = data
         .filter((column) => governanceColumnKeys.has(String(column.key)))
@@ -2209,13 +2208,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             return {
               ...column,
               width: 180,
-            };
-          }
-          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS) {
-            return {
-              ...column,
-              width: 80,
-              align: 'center' as const,
             };
           }
 

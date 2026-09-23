@@ -27,7 +27,7 @@ import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { EntityType } from '../../../enums/entity.enum';
-import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { TagSource } from '../../../generated/type/tagLabel';
 import { createTagObject } from '../../../utils/TagsUtils';
@@ -92,8 +92,13 @@ const CDETagField = ({
   const selectedTags = (glossaryTerm.tags ?? []).filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
   );
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditTags || permissions?.EditAll);
+    isDraft &&
+    !isVersionView &&
+    Boolean(permissions?.EditTags || permissions?.EditAll);
 
   const handleTagUpdate = async (updatedTags: EntityTags[]) => {
     const tags = createTagObject(updatedTags) ?? [];
@@ -136,8 +141,13 @@ const CDEOwnersField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, entityRules, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditOwners || permissions?.EditAll);
+    isDraft &&
+    !isVersionView &&
+    Boolean(permissions?.EditOwners || permissions?.EditAll);
 
   const handleOwnerUpdate = async (owners?: EntityReference[]) => {
     await onUpdate?.({
@@ -177,7 +187,11 @@ const CDEDomainsField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, entityRules, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
-  const hasEditAccess = !isVersionView && Boolean(permissions?.EditAll);
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
+  const hasEditAccess =
+    isDraft && !isVersionView && Boolean(permissions?.EditAll);
 
   const handleDomainUpdate = async (
     selectedDomain: EntityReference | EntityReference[]
@@ -225,7 +239,11 @@ const CDEQualityRuleField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
@@ -315,7 +333,11 @@ const CDETextCustomField = ({
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
@@ -386,7 +408,11 @@ const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const extension = data?.extension ?? glossaryTerm.extension ?? {};
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const canEdit =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
   const openEditor = (key: CDEDateField) => {
