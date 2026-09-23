@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 1,
+  "numPassedTests": 12,
   "numPendingTestSuites": 0,
-  "numPendingTests": 8,
+  "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 9,
+  "numTotalTests": 12,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1790117386188,
+  "startTime": 1790156789586,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 1,
-      "numPendingTests": 8,
+      "numPassingTests": 12,
+      "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1790117391811,
-        "runtime": 5280,
+        "end": 1790156806769,
+        "runtime": 16004,
         "slow": true,
-        "start": 1790117386531
+        "start": 1790156790765
       },
       "skipped": false,
       "snapshot": {
@@ -58,7 +58,7 @@
           "ancestorTitles": [
             "Test GlossaryComponent page"
           ],
-          "duration": 25,
+          "duration": 74,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page GlossaryComponent Page Should render",
@@ -73,46 +73,91 @@
           "ancestorTitles": [
             "Test GlossaryComponent page"
           ],
-          "duration": null,
+          "duration": 23,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page All Function call should work properly - part 1",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "All Function call should work properly - part 1"
         },
         {
           "ancestorTitles": [
             "Test GlossaryComponent page"
           ],
-          "duration": null,
+          "duration": 18,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryComponent page updates an inline attribute without navigating or reloading the glossary list",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 4,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "updates an inline attribute without navigating or reloading the glossary list"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryComponent page"
+          ],
+          "duration": 20,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryComponent page does not refetch the working version when glossary metadata changes",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "does not refetch the working version when glossary metadata changes"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryComponent page"
+          ],
+          "duration": 56,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page All Function call should work properly - part 2",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "All Function call should work properly - part 2"
+        },
+        {
+          "ancestorTitles": [
+            "Test GlossaryComponent page"
+          ],
+          "duration": 13,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "Test GlossaryComponent page updates a glossary term without refetching page content",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 5,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "updates a glossary term without refetching page content"
         },
         {
           "ancestorTitles": [
             "Test GlossaryComponent page",
             "Render Sad Paths"
           ],
-          "duration": null,
+          "duration": 9,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page Render Sad Paths shows an error if updating the working term resolves without data",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "shows an error if updating the working term resolves without data"
         },
         {
@@ -120,15 +165,15 @@
             "Test GlossaryComponent page",
             "handleGlossaryDelete"
           ],
-          "duration": null,
+          "duration": 12,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page handleGlossaryDelete should update glossaries list and navigate to first remaining glossary after deletion",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 2,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "should update glossaries list and navigate to first remaining glossary after deletion"
         },
         {
@@ -136,15 +181,15 @@
             "Test GlossaryComponent page",
             "handleGlossaryDelete"
           ],
-          "duration": null,
+          "duration": 11,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page handleGlossaryDelete should navigate to empty glossary path when no glossaries remain after deletion",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 2,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "should navigate to empty glossary path when no glossaries remain after deletion"
         },
         {
@@ -152,45 +197,45 @@
             "Test GlossaryComponent page",
             "handleGlossaryDelete"
           ],
-          "duration": null,
+          "duration": 9,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page handleGlossaryDelete should filter out deleted glossary from list",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 2,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "should filter out deleted glossary from list"
         },
         {
           "ancestorTitles": [
             "Test GlossaryComponent page"
           ],
-          "duration": null,
+          "duration": 8,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page should pass entity name as pageTitle to withPageLayout",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "should pass entity name as pageTitle to withPageLayout"
         },
         {
           "ancestorTitles": [
             "Test GlossaryComponent page"
           ],
-          "duration": null,
+          "duration": 6,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Test GlossaryComponent page should enable the left-panel collapse control for all glossaries",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
+          "status": "passed",
           "title": "should enable the left-panel collapse control for all glossaries"
         }
       ],

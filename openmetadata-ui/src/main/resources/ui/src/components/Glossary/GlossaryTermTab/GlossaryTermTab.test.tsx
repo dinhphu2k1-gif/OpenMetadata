@@ -61,7 +61,6 @@ const mockSearchQuery = jest.fn();
 const mockGetGlossaryTermsVersionsList = jest.fn();
 const mockGetGlossaryVersionPermissions = jest.fn();
 const mockGetPublishedGlossaryTerms = jest.fn();
-const mockGetWorkingGlossaryTerms = jest.fn();
 const mockGetAllFeeds = jest.fn();
 const mockUpdateTask = jest.fn();
 
@@ -117,9 +116,6 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   getPublishedGlossaryTerms: jest
     .fn()
     .mockImplementation((...args) => mockGetPublishedGlossaryTerms(...args)),
-  getWorkingGlossaryTerms: jest
-    .fn()
-    .mockImplementation((...args) => mockGetWorkingGlossaryTerms(...args)),
   getGlossaryTermsVersionsList: jest
     .fn()
     .mockImplementation((...args) => mockGetGlossaryTermsVersionsList(...args)),
@@ -383,7 +379,6 @@ describe('Test GlossaryTermTab component', () => {
     });
     mockGetGlossaryTermsVersionsList.mockResolvedValue({ versions: [] });
     mockGetPublishedGlossaryTerms.mockResolvedValue([]);
-    mockGetWorkingGlossaryTerms.mockResolvedValue([]);
     mockGetGlossaryVersionPermissions.mockResolvedValue({
       canViewWorking: true,
       canViewPublished: true,
@@ -1062,7 +1057,6 @@ describe('Test GlossaryTermTab component', () => {
           permissions: MOCK_PERMISSIONS,
           type: 'glossary',
         }));
-        mockGetWorkingGlossaryTerms.mockResolvedValue([]);
         mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
           data: [unpinnedTerm],
           paging: { total: 1 },
@@ -1110,7 +1104,10 @@ describe('Test GlossaryTermTab component', () => {
         permissions: MOCK_PERMISSIONS,
         type: 'glossary',
       }));
-      mockGetWorkingGlossaryTerms.mockResolvedValue([cdeTerm]);
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [cdeTerm],
+        paging: { total: 1 },
+      });
       mockGetGlossaryTermsByIds.mockResolvedValue([cdeTerm]);
 
       const { rerender } = render(<GlossaryTermTab isGlossary />, {
@@ -1118,7 +1115,7 @@ describe('Test GlossaryTermTab component', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetWorkingGlossaryTerms).toHaveBeenCalledTimes(1);
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(1);
       });
 
       workingGlossary = {
@@ -1128,7 +1125,7 @@ describe('Test GlossaryTermTab component', () => {
       };
       rerender(<GlossaryTermTab isGlossary />);
 
-      expect(mockGetWorkingGlossaryTerms).toHaveBeenCalledTimes(1);
+      expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(1);
       expect(mockSetGlossaryChildTerms).not.toHaveBeenLastCalledWith([]);
     });
 

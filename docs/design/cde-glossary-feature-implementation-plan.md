@@ -41,8 +41,7 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F04 | Submit, Reject và Reopen CDE | F01, F03 | CDE checker |
 | F05 | Approve và publish CDE | F01, F04 | Vòng đời CDE |
 | F06 | Tạo business version CDE kế tiếp | F05 | Nhiều version CDE |
-| F08 | Thêm/bớt CDE revision trong working Data Dictionary | F05, F07 | Soạn gói phát hành |
-| F09 | Workflow và publish Data Dictionary | F01, F08 | Vòng đời Dictionary |
+| F09 | Workflow và tự động snapshot CDE khi publish Data Dictionary | F01, F05, F07 | Vòng đời Dictionary |
 | F10 | Tạo business version Data Dictionary kế tiếp | F09 | Nhiều version Dictionary |
 | F11 | Bảng flat mọi CDE business version | F02, F05 | Tra cứu đầy đủ |
 | F12 | Search, filter, sort và pagination | F11 | Khai thác dữ liệu |
@@ -51,7 +50,9 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F15 | CDE Overview và Assets | F02, F05 | Chi tiết CDE |
 | F16 | Archive/delete, audit và vận hành | F05, F09 | Production-ready |
 
-F00 bootstrap nguyên tử Data Dictionary identity và working Draft v1.0 trước khi các chức năng đọc/ghi được sử dụng. F01–F02 triển khai read-only trên nền đó; Consumer-only vẫn không thấy Data Dictionary cho tới khi có bản Approved. F07 phải hoàn thành trước F03 để khóa luồng xem/lưu Draft Data Dictionary trước khi tạo CDE. Sau F07, nhánh CDE F03–F06 và nhánh Data Dictionary F08–F10 có thể tiếp tục phát triển riêng, nhưng không publish Data Dictionary trước khi invariant tham chiếu CDE snapshot đã được kiểm chứng.
+**Quyết định thay đổi:** F08 (thêm/bớt CDE revision thủ công) đã bị loại khỏi phạm vi. Giữ nguyên mã các chức năng còn lại để không làm mất truy vết lịch sử; F09 tiếp nhận việc tự động tổng hợp latest Approved CDE khi publish Data Dictionary.
+
+F00 bootstrap nguyên tử Data Dictionary identity và working Draft v1.0 trước khi các chức năng đọc/ghi được sử dụng. F01–F02 triển khai read-only trên nền đó; Consumer-only vẫn không thấy Data Dictionary cho tới khi có bản Approved. F07 phải hoàn thành trước F03 để khóa luồng xem/lưu Draft Data Dictionary trước khi tạo CDE. Sau F07, nhánh CDE F03–F06 và nhánh Data Dictionary F09–F10 có thể tiếp tục phát triển riêng, nhưng F09 chỉ được publish Data Dictionary sau khi F05 đã cung cấp published head bất biến cho CDE và invariant snapshot tự động đã được kiểm chứng.
 
 F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Các role khác tiếp tục sử dụng route và representation mặc định của OpenMetadata theo quyền hiện có, bao gồm working Draft v1.0 đã bootstrap; F01 không thay đổi hành vi của nhóm này.
 
@@ -67,8 +68,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 | F05 | §5.4 Snapshot bất biến; §7.1 Approved; §8 Approve; §9.5.3; §9.7 |
 | F06 | §5.5 Tạo business version mới của CDE; §7.1; §8 |
 | F07 | §5.1–5.2 Snapshot/working Data Dictionary; §6.2; §8; §9.3.4 |
-| F08 | §5.1 term revisions; §6.2–6.3 quản lý CDE trong bản làm việc; §9.3.4 |
-| F09 | §3; §4; §5.1; §6.2; §8; §9.3.4 |
+| F09 | §3; §4; §5.1 term revisions tự động; §6.2; §8; §9.3.4 |
 | F10 | §5.2 Data Dictionary version mới là bản trắng; §6.2; §8 |
 | F11 | §6.3 Flat List và quyền xem |
 | F12 | §6.3 Search, filters, pagination |
@@ -147,7 +147,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Identity, technical name, display name, versioning mode và business version đầu tiên là dữ liệu hệ thống; F07 không cung cấp API hoặc UI để tạo thêm, đổi tên hay cấu hình lại Data Dictionary.
 - Không hiển thị nút `Tạo Từ điển dữ liệu dùng chung` và không dùng `POST /v1/glossaries` từ UI. Nếu bootstrap identity hoặc working record bị thiếu, UI hiển thị lỗi vận hành và backend fail-fast; không tự tạo hoặc tự sửa dữ liệu ngầm.
 - Draft v1.0 chưa phải published content: bootstrap/F07 không tạo snapshot, published head, publication outbox hoặc trạng thái `Approved`. Consumer-only không nhìn thấy Data Dictionary cho tới khi F09 publish thành công.
-- `termRevisions` ban đầu luôn là array rỗng. F07 không tự khám phá, sao chép hoặc gắn CDE; mutation thêm/bớt CDE revision thuộc F08.
+- `termRevisions` của working Data Dictionary luôn là array rỗng và do server quản lý. Không có API/UI thêm, bớt hoặc chọn CDE thủ công; F09 tự dựng `termRevisions` từ các published head CDE khi publish Data Dictionary.
 - `POST /v1/glossaries/{id}/working` không dùng trong F07; endpoint này chỉ tạo working business version kế tiếp ở F10 sau khi đã có bản Approved và không còn working version.
 
 **API Save Draft và validation**
@@ -159,7 +159,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Chỉ working record có `entityStatus = Draft` được sửa. `InReview` và `Rejected` đều không được PATCH; bản `Rejected` phải được reopen về `Draft` ở F09 trước khi sửa.
 - Các field được sửa trong F07 gồm description, owners, reviewers, domains, tags và extension. Payload là trạng thái đầy đủ của nhóm field này; array bị bỏ trống được chuẩn hóa thành array rỗng theo schema.
 - Các field `id`, `name`, `displayName`, `fullyQualifiedName`, `versioningMode`, `businessVersion`, `workingRevision`, `entityStatus`, native `version`, publication metadata và audit metadata do server quản lý. Payload cố thay đổi các field này trả `400`.
-- F07 không cho phép PATCH trực tiếp `termRevisions`; backend giữ nguyên giá trị hiện tại. Mutation thêm/bớt CDE revision chỉ được thực hiện qua contract của F08.
+- F07 không cho phép PATCH trực tiếp `termRevisions`; payload cố gửi field này trả `400`. Danh sách chỉ được tạo bởi transaction publish của F09.
 - Backend validate reference của owners, reviewers, domains, tags và schema của extension; không tin entity reference hoặc custom property chỉ vì frontend đã validate.
 - Save thành công cập nhật working record tại chỗ, giữ nguyên `businessVersion = "1.0"`, tăng `workingRevision` đúng một đơn vị và trả working representation mới.
 - Update dùng compare-and-set theo `expectedRevision`. Revision cũ trả `409 Conflict` và không thay đổi payload, revision hoặc audit metadata.
@@ -173,7 +173,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Người có quyền truy cập Data Dictionary được đưa thẳng tới Draft v1.0 đã bootstrap; Header hiển thị badge `Draft`, business version `1.0` chỉ đọc và nút `Lưu nháp` theo quyền.
 - Save disable action và hiển thị loading trong khi request đang chạy; chặn double-submit. Sau thành công, UI thay state bằng response backend và dùng `workingRevision` mới cho lần Save tiếp theo.
 - Khi nhận `409`, UI giữ dữ liệu chưa lưu, không đóng form và không tự retry. UI hiển thị conflict cùng hành động tải bản mới nhất; trước khi reload phải cảnh báo dữ liệu chưa lưu sẽ bị thay thế.
-- Luồng tổng thể tiếp theo là `Draft → Gửi duyệt → Phê duyệt` hoặc `Từ chối → Chỉnh sửa lại`. Các action Gửi duyệt/Phê duyệt/Từ chối/Chỉnh sửa lại thuộc F09; thêm/bớt CDE thuộc F08.
+- Luồng tổng thể tiếp theo là `Draft → Gửi duyệt → Phê duyệt` hoặc `Từ chối → Chỉnh sửa lại`. Các action Gửi duyệt/Phê duyệt/Từ chối/Chỉnh sửa lại và việc tự động chốt danh sách CDE thuộc F09; UI không có thao tác thêm/bớt CDE.
 - Sau khi một version đã Approved và không còn working version, F10 mới hiển thị `Tạo phiên bản mới` cho Admin/Data Proposer để nhập business version kế tiếp trên cùng identity.
 
 **Test/DoD**
@@ -202,8 +202,8 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Identity và working record phải được ghi trong cùng database transaction. Nếu bất kỳ bước nào thất bại thì rollback toàn bộ; không để lại identity mồ côi, working record mồ côi, relationship, index document hoặc event cho dữ liệu thất bại.
 - Native `GlossaryTerm` identity chỉ cung cấp định danh kỹ thuật và quan hệ nền của OpenMetadata. Working record là nguồn business content có thẩm quyền; Create/Save Draft không dùng direct native PATCH để lưu business content và không dùng native metadata version làm business version.
 - Mỗi CDE có đúng Data Dictionary làm cha nghiệp vụ trực tiếp. Payload phải trỏ tới Data Dictionary identity đã bootstrap và không được có `parent` là một CDE; backend từ chối sub-term, Glossary khác và mọi cấu hình workflow/versioning riêng trên CDE.
-- Tạo CDE thiết lập quan hệ sở hữu kỹ thuật với Data Dictionary nhưng không tự thêm revision vào `termRevisions`, không tăng `workingRevision` của Data Dictionary và không tạo snapshot. F08 chịu trách nhiệm đưa/bỏ một CDE revision vào gói phát hành Data Dictionary.
-- Trước khi được thêm vào gói phát hành ở F08, Draft CDE chỉ được mở trong editor có ngữ cảnh Data Dictionary bởi người có `canViewWorking`; UI không điều hướng nó vào published/historical deep-link và Consumer không thể phát hiện identity hoặc working payload này.
+- Tạo CDE thiết lập quan hệ sở hữu kỹ thuật với Data Dictionary nhưng không ghi `termRevisions`, không tăng `workingRevision` của Data Dictionary và không tạo snapshot. Sau khi CDE được Approved, published head của nó tự động đủ điều kiện cho lần publish Data Dictionary tiếp theo ở F09.
+- Draft CDE chỉ được mở trong editor có ngữ cảnh Data Dictionary bởi người có `canViewWorking`; UI không điều hướng nó vào published/historical deep-link và Consumer không thể phát hiện identity hoặc working payload này.
 - Một identity chỉ có tối đa một working version. Tên kỹ thuật/FQN phải duy nhất trong Data Dictionary; retry sau create đã commit trả conflict rõ ràng thay vì tạo bản ghi thứ hai.
 
 **API Create và validation**
@@ -219,7 +219,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **API Save Draft**
 
 - `GET /v1/glossaryTerms/{id}/working` yêu cầu `canViewWorking`, chỉ trả working representation và trả `404 Not Found` nếu working record không tồn tại; không fallback sang identity hoặc published snapshot.
-- F03 cung cấp truy vấn authoring tối thiểu qua `GET /v1/glossaryTerms?glossary={dataDictionaryFqn}` để người có `canViewWorking` tìm lại CDE có working record sau reload. Backend resolve mỗi row thành working representation và lọc quyền trước khi trả; đây không phải bảng lịch sử/flat list đầy đủ của F11 và không làm CDE trở thành thành viên của `termRevisions`.
+- F03 cung cấp truy vấn authoring tối thiểu qua `GET /v1/glossaryTerms?glossary={dataDictionaryFqn}` để người có `canViewWorking` tìm lại CDE có working record sau reload. Backend resolve mỗi row thành working representation và lọc quyền trước khi trả; đây không phải bảng lịch sử/flat list đầy đủ của F11 và không ghi CDE vào `termRevisions` của working Data Dictionary.
 - `PATCH /v1/glossaryTerms/{id}/working` dùng typed request gồm `expectedRevision` và full mutable business payload; không dùng `entityExtension`/`GlossaryTerm` tổng quát làm public mutation contract.
 - `expectedRevision` bắt buộc là integer từ 1 trở lên. Thiếu, sai kiểu hoặc ngoài miền hợp lệ trả `400 Bad Request`.
 - Full mutable payload của Save gồm `displayName`, `description`, `owners`, `reviewers`, `domains`, `tags` và `extension`. Các array bắt buộc hiện diện và dùng `[]` để xóa toàn bộ; `extension` bắt buộc hiện diện nhưng được phép `null` để xóa toàn bộ Custom Properties. Field bị thiếu hoặc ngoài allowlist trả `400`, không được hiểu là “giữ nguyên”.
@@ -233,7 +233,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Vì CDE chưa tồn tại tại thời điểm Create, backend kiểm tra quyền tạo trên Data Dictionary cha bằng capability/policy hiệu lực. Save kiểm tra `canEditWorking` trên CDE; xem Draft kiểm tra `canViewWorking`. Frontend chỉ render action theo capability backend trả về, không suy quyền từ tên role.
 - Theo policy mặc định, chỉ Admin và Data Proposer có thể tạo/sửa. Data Steward, owner và Reviewer không được tạo hoặc sửa Draft; Data Steward/Reviewer được gán có thể xem working để duyệt ở F04. Consumer-only không được xem working, tạo hoặc sửa. Capability vẫn phải phản ánh policy hiệu lực thay vì hard-code tên role.
 - Form Create và Save disable action, hiển thị loading và chặn double-submit trong khi request đang chạy. Sau Create/Save thành công, UI thay state bằng response backend và dùng `workingRevision` trả về cho mutation tiếp theo.
-- Khu vực authoring của Data Dictionary hiển thị các CDE working mà người dùng được phép xem, kể cả khi chưa thuộc `termRevisions`, với nhãn rõ ràng `Chưa thêm vào gói phát hành`. Chọn row mở editor trong context Data Dictionary; reload vẫn tìm lại được Draft qua truy vấn authoring tối thiểu.
+- Khu vực authoring của Data Dictionary hiển thị các CDE working mà người dùng được phép xem với nhãn trạng thái rõ ràng. CDE chưa Approved hiển thị `Chưa đủ điều kiện phát hành`; CDE Approved hiển thị `Sẽ được lấy ở lần phát hành Data Dictionary tiếp theo`. Chọn row mở editor trong context Data Dictionary; reload vẫn tìm lại được Draft qua truy vấn authoring tối thiểu.
 - Khi Save nhận `409`, UI giữ dữ liệu chưa lưu, không đóng editor và không tự retry. UI hiển thị conflict cùng hành động tải bản mới nhất; trước khi thay state phải cảnh báo dữ liệu chưa lưu sẽ bị mất.
 - UI không hiển thị control tạo sub-term hoặc chọn Glossary cha; Data Dictionary được lấy từ context hiện tại. Hủy hoặc lỗi Create không chèn CDE giả vào bảng/cache phía client.
 
@@ -248,9 +248,9 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - PATCH thiếu/sai `expectedRevision`, thiếu field bắt buộc hoặc có field ngoài allowlist trả `400`; working không tồn tại trả `404`; PATCH `InReview` hoặc `Rejected` bị từ chối và không đổi dữ liệu.
 - Test chứng minh client không thể đổi `name`, FQN, Glossary, parent, business version, status, revision hoặc actor/timestamp qua Save Draft; không dùng `workingRevision` hay native `version` làm fallback cho `businessVersion`.
 - Authorization integration test bao phủ Admin, Data Proposer, Data Steward, owner, Viewer có `canViewWorking` nhưng không có `canEditWorking`, Reviewer và Consumer-only. Chỉ Admin/Data Proposer có capability create/edit/submit.
-- Test truy vấn authoring chứng minh maker tìm lại được Draft chưa thuộc `termRevisions` sau reload, kết quả đã lọc theo quyền và Consumer không nhận identity/working row.
+- Test truy vấn authoring chứng minh maker tìm lại được Draft sau reload, kết quả đã lọc theo quyền và Consumer không nhận identity/working row.
 - Frontend test bao phủ single-request Create, loading/double-submit, không gửi `parent`, thay state/revision từ response, validation failure, Create failure không để cache row giả và conflict `409` giữ dữ liệu chưa lưu.
-- E2E: mở Data Dictionary Draft → tạo CDE → sửa và Save nhiều lần → reload/restart → Draft vẫn có version `1.0`, revision/nội dung đúng; Consumer không nhìn thấy và Data Dictionary `termRevisions` vẫn không đổi cho tới F08.
+- E2E: mở Data Dictionary Draft → tạo CDE → sửa và Save nhiều lần → reload/restart → Draft vẫn có version `1.0`, revision/nội dung đúng; Consumer không nhìn thấy và working Data Dictionary không tự ghi `termRevisions`.
 
 ### F04 — Submit, Reject và Reopen CDE
 
@@ -305,10 +305,10 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 - F05 publish một CDE working version từ `InReview` thành một published snapshot có `entityStatus = Approved`. Không tạo hoặc giữ working record ở trạng thái `Approved`; working record chỉ bị xóa khi toàn bộ publication transaction thành công.
 - Approve không thay đổi native `GlossaryTerm` identity, native metadata version, `businessVersion` hoặc business payload đã được submit. Snapshot là representation có thẩm quyền của bản CDE đã ban hành.
-- Approve không tự thêm, tự thay thế hoặc tự loại CDE revision trong working/latest Data Dictionary và không tăng revision của Data Dictionary. Quản lý membership `(termId, termBusinessVersion)` thuộc F08; publish Data Dictionary thuộc F09.
+- Approve CDE không sửa working hoặc snapshot Data Dictionary và không tăng revision của Data Dictionary. Nó chỉ cập nhật published head của CDE; F09 sẽ tự đọc published head mới nhất tại thời điểm publish Data Dictionary.
 - Một CDE snapshot đã Approved là **đủ điều kiện công bố** nhưng chỉ xuất hiện với Consumer trong ngữ cảnh một Data Dictionary version khi snapshot đó được Data Dictionary version tương ứng tham chiếu. F05 không phá invariant URL/membership của F02 để cung cấp chế độ xem CDE độc lập.
 - Approved snapshot bất biến về business payload và publication metadata cốt lõi. F16 có thể bổ sung lifecycle metadata như `archivedAt/archivedBy`, nhưng không được sửa snapshot payload, `businessVersion`, `publicationSequence`, `publishedAt`, `publishedBy` hoặc `contentHash`.
-- F05 chỉ publish một CDE. Không triển khai tạo business version kế tiếp của F06, quản lý Data Dictionary membership của F08, publish Data Dictionary của F09 hoặc màn hình audit đầy đủ của F16.
+- F05 chỉ publish một CDE. Không triển khai tạo business version kế tiếp của F06, tự động snapshot CDE khi publish Data Dictionary của F09 hoặc màn hình audit đầy đủ của F16.
 
 **API contract và optimistic locking**
 
@@ -327,7 +327,8 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 **Atomic publication transaction**
 
-- Backend khóa working row của CDE theo entity bằng cơ chế tương đương `SELECT ... FOR UPDATE` trước khi kiểm tra revision, state, quyền và validation. Mọi bước ghi publication dùng cùng database handle/transaction.
+- Trước khi khóa working row CDE, backend khóa row identity ổn định của Data Dictionary cha bằng cơ chế tương đương `SELECT id FROM glossary_entity WHERE id = :glossaryId FOR UPDATE`. Mọi mutation làm thay đổi published head CDE của Data Dictionary đó, gồm approve và archive/restore khi được bổ sung, phải lấy cùng parent lock trước; thứ tự khóa thống nhất là Data Dictionary identity → CDE working/head để tránh deadlock với F09.
+- Sau parent lock, backend khóa working row của CDE theo entity bằng cơ chế tương đương `SELECT ... FOR UPDATE` trước khi kiểm tra revision, state, quyền và validation. Mọi bước ghi publication dùng cùng database handle/transaction.
 - Trong đúng một transaction, thực hiện theo thứ tự logic: khóa và đọc working → kiểm tra `expectedRevision` và `InReview` → authorization/validation → tạo Approved snapshot payload → cấp `publicationSequence` kế tiếp → tính `contentHash` → insert snapshot → cập nhật published head → insert outbox idempotent → xóa working row bằng compare-and-set.
 - Bất kỳ lỗi nào trước commit, bao gồm lỗi insert snapshot, update head, insert outbox hoặc delete working, phải rollback toàn bộ. Không được tồn tại snapshot mồ côi, head trỏ sai, outbox thiếu, working bị xóa sớm hoặc manager/published index phản ánh dữ liệu chưa commit.
 - Published head chỉ được trỏ tới snapshot vừa commit có publication sequence mới nhất của cùng CDE. Unique constraint trên `(entityType, entityId, businessVersion)` và `(entityType, entityId, publicationSequence)` là lớp bảo vệ cuối cùng; lỗi constraint do race được ánh xạ thành `409 Conflict`, không trả `500` chung chung.
@@ -347,7 +348,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Approve có modal xác nhận. Trong khi request chạy, action có loading, bị disable và chặn double-submit; request hợp lệ gửi đúng một `expectedRevision` hiện tại.
 - Sau thành công, UI thay state bằng published response, hiển thị badge `Approved`, chuyển toàn bộ nội dung sang read-only, cập nhật version selector và không giữ state/cache working giả.
 - Nếu CDE snapshot đã thuộc Data Dictionary version của context hiện tại, UI điều hướng tới published deep link có đủ `businessVersion` và `parentBusinessVersion`. Không tự suy diễn một trong hai version và không tạo URL published thiếu context cha.
-- Nếu snapshot chưa thuộc Data Dictionary version nào có thể mở, UI giữ manager/authoring context ở chế độ read-only và hiển thị rõ `Approved — Chưa được thêm vào gói phát hành Data Dictionary`; không giả vờ Consumer đã có thể truy cập. Sau F08/F09, điều hướng published tuân theo invariant membership của F02.
+- Nếu snapshot chưa thuộc Data Dictionary version nào có thể mở, UI giữ manager/authoring context ở chế độ read-only và hiển thị rõ `Approved — Sẽ được lấy ở lần phát hành Data Dictionary tiếp theo`; không giả vờ Consumer đã có thể truy cập. Sau F09, điều hướng published tuân theo invariant membership của F02.
 - Khi nhận `409`, UI giữ state hiện tại, không tự retry hoặc tự đổi badge/revision; hiển thị conflict và hành động tải representation mới nhất. Lỗi `403/404/5xx` dừng loading, hiển thị lỗi phù hợp và không để optimistic Approved state.
 
 **Test/DoD**
@@ -361,10 +362,10 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Test xóa hoặc làm mất hợp lệ owners/reviewers/domains/tags/Custom Property sau Submit nhưng trước Approve làm publication thất bại toàn bộ; sửa native identity hoặc trỏ sai Data Dictionary/parent cũng bị từ chối.
 - Recompute hash từ canonical snapshot payload đọc lại từ cả MySQL và PostgreSQL phải khớp `contentHash` đã lưu. Save/version/publish tương lai và archive metadata không được thay đổi payload/hash của snapshot cũ.
 - Outbox test bao phủ xử lý thành công, lỗi index để event pending/error, retry thành công và xử lý lặp idempotent. Published detail/history vẫn đọc được ngay khi index đang lỗi; Consumer search không lộ working/native payload.
-- Test chứng minh Approve không tạo native metadata version, không tự thay đổi Data Dictionary `termRevisions`/revision và không tự thay thế CDE version đã được Data Dictionary chọn.
-- Frontend test bao phủ action visibility theo capability/state, modal, loading, double-submit, request chỉ có `expectedRevision`, state từ response, conflict reload và hai nhánh điều hướng có/không có Data Dictionary membership.
-- E2E phạm vi F05: Draft → Submit → Approve → published detail/history API đọc được snapshot; manager thấy Approved read-only và nhãn chưa thuộc gói phát hành khi chưa có membership.
-- E2E Consumer đầy đủ được nghiệm thu ở F08/F09: sau khi CDE snapshot được thêm vào một Data Dictionary version mà Consumer truy cập được, Consumer mới tìm/mở CDE qua URL có đủ `businessVersion` và `parentBusinessVersion`.
+- Test chứng minh Approve không tạo native metadata version, không tự thay đổi Data Dictionary `termRevisions`/revision và không sửa bất kỳ Data Dictionary snapshot đã phát hành nào.
+- Frontend test bao phủ action visibility theo capability/state, modal, loading, double-submit, request chỉ có `expectedRevision`, state từ response, conflict reload và hai nhánh điều hướng có/chưa có Data Dictionary snapshot tham chiếu.
+- E2E phạm vi F05: Draft → Submit → Approve → published detail/history API đọc được snapshot; manager thấy Approved read-only và nhãn chờ lần phát hành Data Dictionary tiếp theo nếu chưa có snapshot cha tham chiếu.
+- E2E Consumer đầy đủ được nghiệm thu ở F09: sau khi Data Dictionary được publish và tự động snapshot CDE Approved, Consumer mới tìm/mở CDE qua URL có đủ `businessVersion` và `parentBusinessVersion`.
 
 ### F06 — Tạo business version CDE mới cao hơn
 
@@ -407,10 +408,10 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 **Quan hệ Data Dictionary và UI**
 
-- Tạo CDE version mới không thay đổi membership hoặc revision của bất kỳ Data Dictionary version nào, không tự thêm version mới và không tự thay thế CDE version đang được Data Dictionary chọn. Việc chọn version vào gói phát hành thuộc F08.
+- Tạo CDE version mới không thay đổi `termRevisions` hoặc revision của bất kỳ Data Dictionary snapshot nào. Nếu version mới chưa Approved, lần publish Data Dictionary tiếp theo vẫn lấy published head Approved cũ; sau khi version mới được Approved, F09 tự lấy version mới ở lần publish tiếp theo.
 - Consumer detail/list/search tiếp tục trả latest Approved cũ; không lộ working payload mới.
 - Chỉ hiển thị action khi backend trả `canCreateVersion = true`, CDE đang ở latest Approved và không có working version. Historical view không có action này.
-- Modal prefill version gợi ý, validation inline, loading, disable và chống double-submit. Sau thành công, UI dùng response backend làm state, mở authoring/manager context và hiển thị `Draft — Chưa được thêm vào gói phát hành Data Dictionary`.
+- Modal prefill version gợi ý, validation inline, loading, disable và chống double-submit. Sau thành công, UI dùng response backend làm state, mở authoring/manager context và hiển thị `Draft — Chưa đủ điều kiện phát hành`.
 - Không tạo published deep link hoặc gọi published endpoint cho Draft. Lỗi `400/403/404/409/5xx` không được tạo optimistic Draft giả; với `409`, UI giữ state hiện tại và cung cấp hành động tải representation mới nhất.
 
 **Test/DoD**
@@ -422,55 +423,70 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Hai request đồng thời tạo cùng hoặc khác version: đúng một request thành công, request còn lại nhận `409` và chỉ tồn tại một working row.
 - Failure injection tại các boundary trong transaction chứng minh rollback toàn bộ; snapshot/head/hash, Data Dictionary membership/revision, native entity và outbox không thay đổi.
 - Frontend test bao phủ capability, latest-vs-historical, version prefill/validation, modal, loading, double-submit, state từ response, authoring context và xử lý conflict/reload.
-- E2E: publish v1.0 → tạo v1.1 Draft → xác nhận `displayName` được giữ lại → sửa/lưu Draft v1.1 → Consumer vẫn chỉ thấy v1.0 và Data Dictionary vẫn tham chiếu version cũ cho tới khi F08 thay đổi.
+- E2E: Data Dictionary đã snapshot CDE v1.0 → tạo v1.1 Draft → xác nhận `displayName` được giữ lại → sửa/lưu Draft v1.1 → Consumer và Data Dictionary cũ vẫn thấy v1.0; publish Data Dictionary khi v1.1 còn Draft vẫn lấy v1.0, còn lần publish sau khi v1.1 Approved tự lấy v1.1.
 
-### F08 — Thêm/bớt CDE revision trong working hoặc latest Data Dictionary
+### F09 — Workflow và tự động snapshot CDE khi publish Data Dictionary
 
-**Phạm vi**
+**Invariant và thời điểm xác định nội dung**
 
-- Working Data Dictionary và Data Dictionary Approved mới nhất cho phép người có quyền thêm/bớt CDE thuộc đúng Data Dictionary; historical Data Dictionary luôn khóa.
-- Latest Data Dictionary được phép tham chiếu CDE `Draft`, `InReview`, `Rejected` hoặc `Approved`. Consumer read model chỉ trả CDE `Approved`; manager nhận các trạng thái theo quyền.
-- Lưu cặp termId và termBusinessVersion, không chỉ termId.
-- Add/remove dùng optimistic locking.
-- Mọi mutation latest ghi audit actor/revision và không đổi `businessVersion`.
+- Working Data Dictionary không lưu danh sách CDE do người dùng chọn. Không có API/UI add/remove CDE; client không được gửi `termRevisions` trong Save, Submit, Reject, Reopen hoặc Approve.
+- Submit chỉ chuyển `Draft → InReview`, không đóng băng và không ghi `termRevisions`. Tập CDE phát hành được xác định từ trạng thái hiện tại đúng lúc transaction Approve lấy publication lock của Data Dictionary.
+- Mọi mutation published head CDE thuộc cùng Data Dictionary phải lấy publication lock đó trước. Vì vậy, CDE Approved/archive commit trước điểm lấy lock được phản ánh vào lần publish hiện tại; mutation commit sau điểm đó chờ lock và chỉ ảnh hưởng lần publish Data Dictionary tiếp theo. Không dùng timestamp phía ứng dụng để suy commit order.
+- Sau khi commit, Data Dictionary Approved và `termRevisions` của nó bất biến, kể cả khi CDE mới được tạo/Approved, bị archive hoặc có business version mới. Không có ngoại lệ “latest-mutable”.
+
+**API contract và state machine**
+
+- Dùng các endpoint `POST /v1/glossaries/{id}/working/submit`, `/reject`, `/reopen` và `/approve`. Tạo schema `glossaryWorkflowTransitionRequest.json` dùng riêng cho bốn endpoint, chỉ gồm required `{ "expectedRevision": <integer> }` và `additionalProperties = false`; không tái sử dụng `GlossaryWorkingVersionRequest` vốn còn cho phép `businessVersion`/`payload`. Thiếu/sai kiểu/ngoài miền hoặc gửi thêm `businessVersion`, `payload`, `termRevisions`, actor, timestamp hay target status trả `400 Bad Request`.
+- State hợp lệ là `Draft → InReview` qua Submit, `InReview → Rejected` qua Reject, `Rejected → Draft` qua Reopen và `InReview → Approved` qua Approve. Sai source state hoặc revision cũ trả `409 Conflict`; working không tồn tại trả `404`; thiếu capability trả `403`.
+- Submit yêu cầu `canSubmit`, Reject yêu cầu `canReject`, Reopen yêu cầu `canEditWorking`, Approve yêu cầu `canApprove`. Capability được tính lại từ working payload và policy hiện hành sau khi row đã khóa; UI không suy quyền từ role.
+- Submit/Reject/Reopen thành công tăng `workingRevision` đúng một và trả working representation mới. Approve thành công xóa working row và trả published representation có `entityStatus = Approved`, `snapshotId`, `businessVersion`, publication metadata, `termCount` và server-owned `termRevisions`; không trả `workingRevision`.
+- `GET /v1/glossaries/{id}/working/publish-preview?limit={n}&after={cursor}` yêu cầu `canViewWorking` và trả DTO typed gồm page `data`, `paging`, tổng `termCount` và `evaluatedAt` của preview động latest Approved CDE hiện tại. Endpoint phải phân trang server-side và không trả toàn bộ tập lớn chỉ để modal lấy count. Preview không phải reservation, không có giá trị khóa; response và modal phải ghi rõ tập cuối cùng được tính lại trong transaction Approve.
+
+**Quy tắc tự động dựng termRevisions**
+
+- Sau khi lấy publication lock, backend dùng một batch query trong cùng transaction để lấy đúng một active published head cho mỗi CDE identity trực thuộc Data Dictionary, đồng thời kiểm tra identity chưa soft-delete và snapshot có `entityType = glossaryTerm`, `glossaryId` đúng Data Dictionary, `entityStatus = Approved` và `archivedAt = null`.
+- CDE chưa từng có active Approved head bị bỏ qua. Nếu CDE có working version `Draft`, `InReview` hoặc `Rejected`, backend vẫn lấy active Approved head cũ. Publish Data Dictionary rỗng được phép và tạo `termRevisions = []`, `termCount = 0`.
+- Cập nhật `glossaryTermRevisionReference.json` và regenerate Java/TypeScript types để mỗi reference public gồm đúng required `termId`, `termSnapshotId`, `termBusinessVersion` và `displayOrder`, với `additionalProperties = false`. `termSnapshotId` là khóa bất biến dùng để ghi quan hệ snapshot; loại `termNativeVersion` và `parentTermSnapshotId` vì native version không thuộc business contract và mô hình cấm CDE cha–con.
+- Không được có hai reference cho cùng `termId` hoặc `termSnapshotId`. Backend sắp xếp trong application bằng `name.toLowerCase(Locale.ROOT)` → raw `name` → UUID `termId`, rồi gán `displayOrder` liên tục từ 0; không phụ thuộc collation MySQL/PostgreSQL hoặc thứ tự row từ database.
+- Không cho người dùng loại trừ CDE Approved hoặc ghim thủ công version cũ. Mọi CDE thỏa điều kiện đều tham gia snapshot.
+
+**Atomic publication, hash và outbox**
+
+- Thứ tự transaction bắt buộc: khóa Data Dictionary identity → khóa/read working → kiểm tra revision/state/quyền và validate business payload → batch-read active CDE heads → dựng và gắn `termRevisions` cùng `termCount` vào payload → thêm publication metadata → canonicalize → tính `contentHash` → insert Data Dictionary snapshot → insert toàn bộ `glossary_snapshot_term` từ chính danh sách trong payload → update published head → insert outbox với chính canonical payload đó → xóa working bằng compare-and-set → commit.
+- Snapshot JSON, dữ liệu quan hệ `glossary_snapshot_term`, payload outbox, response Approve và dữ liệu dùng để tính hash phải xuất phát từ cùng một danh sách in-memory; không query lại hoặc resolve lại CDE giữa các bước. Hash phải bao phủ đầy đủ thứ tự và nội dung `termRevisions`.
+- Bất kỳ lỗi nào trước commit phải rollback toàn bộ. Constraint conflict được ánh xạ thành `409`, không để snapshot/head/relation/outbox mồ côi và không xóa working sớm. Side effect index/event chỉ chạy idempotent sau commit; lỗi sau commit không đảo kết quả publish.
+- Query tổng hợp phải tránh N+1 và không được truncate/paginate ngầm. Có test tải với 10.000 CDE Approved để kiểm tra tính đầy đủ, thứ tự xác định, kích thước payload/outbox và giới hạn vận hành trên cả MySQL lẫn PostgreSQL.
+
+**Frontend và loại bỏ contract F08 cũ**
+
+- Xóa endpoint `GET /v1/glossaries/{id}/working/terms`, wrapper `getWorkingGlossaryTerms` và mọi consumer của contract “exact revisions được chọn”; thay bằng publish-preview typed, paginated. Không giữ alias có semantics mơ hồ vì tính năng chưa phát hành rộng và không có backward-compatibility contract cho F08.
+- Bỏ logic enrich `termRevisions` khi bootstrap/tạo working Data Dictionary và bỏ UI label/control `selected`, `pinned`, add/remove hoặc “chưa thêm vào gói”. Khu vực authoring vẫn liệt kê CDE theo quyền và trạng thái, độc lập với published snapshot.
+- InReview hiển thị preview động và cảnh báo tập CDE được tính lại khi Approve. Modal Approve tải preview mới nhất, hiển thị `termCount`, loading và chống double-submit; không khẳng định preview là tập cuối cùng nếu có concurrency.
+- Sau Approve, UI dùng response backend làm state, hiển thị đúng `termCount`, chuyển read-only và tải danh sách qua endpoint published snapshot. Lỗi `409` giữ màn hình InReview và cung cấp reload; không tạo optimistic snapshot hoặc tự tính membership phía client.
 
 **Test/DoD**
 
-- Không thêm CDE của Glossary khác; Consumer không thấy CDE Draft/InReview/Rejected đã được thêm vào latest.
-- Add/remove conflict trả 409.
-- CDE version mới không tự thay thế version đã chọn.
-- Reload giữ đúng revisions và display order.
-- Add/remove trên historical Data Dictionary bị từ chối.
-
-### F09 — Workflow và publish Data Dictionary
-
-**Phạm vi**
-
-- Submit, Reject, Reopen, Approve và authorization tương tự CDE.
-- Trước approve, validate mọi term revision còn tồn tại và thuộc đúng Data Dictionary; trạng thái CDE được bảo vệ ở read model theo quyền.
-- Snapshot Data Dictionary và liên kết CDE snapshots ghi trong cùng transaction.
-- InReview và historical Approved khóa add/remove; Approved latest cho phép add/remove theo F08.
-
-**Test/DoD**
-
-- Data Dictionary v1.0 vẫn trả CDE v1.0 sau khi CDE v1.1 được publish.
-- Một term revision không tồn tại hoặc thuộc Data Dictionary khác làm approve thất bại toàn bộ.
-- Reviewer assignment và concurrency có integration test.
-- E2E publish Data Dictionary có nhiều CDE revisions.
+- Test đầy đủ bốn transition, request allowlist, capability, source state, `expectedRevision`, double-submit và race Approve/Reject.
+- Publish tự động lấy mọi active latest Approved CDE đúng Data Dictionary; bỏ qua CDE chỉ có working state, soft-deleted, archived hoặc thuộc Glossary khác. CDE có v1.1 working vẫn lấy v1.0 Approved; CDE không có Approved bị bỏ qua; snapshot rỗng publish thành công.
+- Race Approve Data Dictionary với approve/archive CDE được tuyến tính hóa bằng publication lock: mutation CDE commit trước lock được lấy, mutation chờ sau lock không được lấy; không có tập nửa cũ nửa mới trên MySQL hoặc PostgreSQL.
+- Test recompute `contentHash` từ payload đọc lại, đối chiếu một-một và đúng thứ tự giữa `termRevisions` với `glossary_snapshot_term`, đồng thời chứng minh snapshot/head/outbox/working rollback toàn bộ tại từng failure boundary.
+- Data Dictionary v1.0 vẫn trả đúng CDE revisions đã chốt sau khi CDE mới được Approved/archive hoặc có version mới; thay đổi chỉ xuất hiện khi một Data Dictionary version khác được publish.
+- Client cố gửi/sửa `termRevisions`, add/remove hoặc ghim version bị từ chối. Frontend test bao phủ preview không ràng buộc, modal/count, permission, loading, stale request, double-submit, response-authoritative và conflict reload.
+- E2E: publish với nhiều CDE tự động → Approved một CDE mới → snapshot cũ không đổi → tạo/publish Data Dictionary version tiếp theo → snapshot mới tự lấy CDE vừa Approved.
 
 ### F10 — Tạo business version Data Dictionary kế tiếp
 
 **Phạm vi**
 
 - Version lớn hơn latest published.
-- termRevisions luôn rỗng; không kế thừa ngầm CDE list.
+- `termRevisions` của working version luôn rỗng; không sao chép danh sách từ snapshot cũ vì F09 sẽ dựng lại từ published head CDE tại lần publish kế tiếp.
 - Giữ identity fields; khi version mới được Approved, Approved cũ được chốt thành historical snapshot bất biến và tiếp tục phục vụ Consumer.
 
 **Test/DoD**
 
-- Không copy term revisions từ bản trước.
+- Không copy term revisions từ bản trước; publish version mới tự tổng hợp lại toàn bộ latest Approved CDE.
 - Không đổi published head trước khi bản mới Approved.
-- E2E v1.0 Approved → tạo v2.0 Draft trống.
+- E2E v1.0 Approved → tạo v2.0 Draft không có `termRevisions` → publish v2.0 tự động snapshot tập latest Approved CDE tại thời điểm đó.
 
 ### F11 — Bảng flat mọi CDE business version
 
@@ -555,6 +571,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 - Delete chỉ cho Draft/Rejected theo policy.
 - Archive chỉ cho Admin/Steward phù hợp; snapshot vẫn còn để audit.
+- Archive/restore làm thay đổi published head CDE phải lấy publication lock của Data Dictionary cha trước, theo cùng thứ tự khóa của F05/F09, để không race với việc tổng hợp snapshot Data Dictionary.
 - Audit transition, actor, revision và business version.
 - Theo dõi 403/409/5xx, publish failure, latency và outbox lag.
 - Có runbook rollback bản triển khai, backup/restore và xử lý outbox lỗi.
@@ -562,6 +579,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Test/DoD**
 
 - Test quyền và confirm modal delete/archive.
+- Test race archive/restore CDE với Approve Data Dictionary chứng minh mutation được tuyến tính hóa theo publication lock và chỉ ảnh hưởng đúng một lần phát hành.
 - Archived snapshot không là latest nhưng vẫn truy vết theo chính sách.
 - Diễn tập rollback bản triển khai và restore; không làm mất snapshot.
 - Có UAT sign-off, dashboard, alert và rollback runbook.
@@ -592,7 +610,7 @@ Checklist bắt buộc cho mỗi PR:
 
 - **Milestone A — Tra cứu an toàn:** F00–F02.
 - **Milestone B — Vòng đời CDE:** F03–F06.
-- **Milestone C — Bản phát hành Từ điển dữ liệu dùng chung:** F07–F10.
+- **Milestone C — Bản phát hành Từ điển dữ liệu dùng chung:** F07, F09–F10.
 - **Milestone D — Khai thác dữ liệu:** F11–F15.
 - **Milestone E — Production-ready:** F16 và full regression/security/performance suite.
 

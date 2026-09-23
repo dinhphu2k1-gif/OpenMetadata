@@ -25,6 +25,9 @@ import org.openmetadata.service.util.jdbi.BindUUID;
 /** Persistence boundary for glossary working versions and immutable published snapshots. */
 public interface GlossaryVersionDAO {
 
+  @SqlQuery("SELECT id FROM glossary_entity WHERE id = :glossaryId FOR UPDATE")
+  String lockGlossaryIdentity(@BindUUID("glossaryId") UUID glossaryId);
+
   @ConnectionAwareSqlUpdate(
       value =
           "INSERT INTO glossary_business_working "
@@ -210,9 +213,12 @@ public interface GlossaryVersionDAO {
   @SqlQuery(
       "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
-          + "WHERE s.entityType = 'glossaryTerm' AND s.glossaryId = :glossaryId ORDER BY s.publishedAt, s.entityId")
+          + "JOIN glossary_term_entity t ON t.id = s.entityId "
+          + "WHERE s.entityType = 'glossaryTerm' AND s.glossaryId = :glossaryId "
+          + "AND s.archivedAt IS NULL AND (t.deleted IS NULL OR t.deleted = false)")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
-  List<PublishedSnapshotRecord> listLatestTermsForGlossary(@BindUUID("glossaryId") UUID glossaryId);
+  List<PublishedSnapshotRecord> listActiveLatestTermsForGlossary(
+      @BindUUID("glossaryId") UUID glossaryId);
 
   @SqlQuery(
       "SELECT snapshotId, entityType, entityId, glossaryId, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
@@ -259,12 +265,11 @@ public interface GlossaryVersionDAO {
       @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
 
   @SqlUpdate(
-      "INSERT INTO glossary_snapshot_term (glossarySnapshotId, termSnapshotId, parentTermSnapshotId, displayOrder) "
-          + "VALUES (:glossarySnapshotId, :termSnapshotId, :parentTermSnapshotId, :displayOrder)")
+      "INSERT INTO glossary_snapshot_term (glossarySnapshotId, termSnapshotId, displayOrder) "
+          + "VALUES (:glossarySnapshotId, :termSnapshotId, :displayOrder)")
   void insertSnapshotTerm(
       @BindUUID("glossarySnapshotId") UUID glossarySnapshotId,
       @BindUUID("termSnapshotId") UUID termSnapshotId,
-      @BindUUID(value = "parentTermSnapshotId", nullable = true) UUID parentTermSnapshotId,
       @Bind("displayOrder") int displayOrder);
 
   @SqlQuery(

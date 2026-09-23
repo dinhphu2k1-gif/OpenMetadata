@@ -141,7 +141,7 @@
       "minimum": 0
     },
     "termRevisions": {
-      "description": "Exact glossary term revisions included in this working version or published snapshot.",
+      "description": "Server-owned immutable CDE revisions. Always empty on a working Data Dictionary and populated automatically when published.",
       "type": "array",
       "items": {
         "$ref": "../../type/glossaryTermRevisionReference.json"

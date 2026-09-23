@@ -181,6 +181,12 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   moveGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
   getGlossaryTermsVersionsList: jest.fn(),
   getGlossaryVersionsList: jest.fn(),
+  getGlossaryPublishPreview: jest.fn().mockResolvedValue({
+    data: [],
+    paging: {},
+    termCount: 0,
+    evaluatedAt: 1,
+  }),
   transitionGlossaryTermWorkflow: jest
     .fn()
     .mockImplementation((_id, action, request) => {

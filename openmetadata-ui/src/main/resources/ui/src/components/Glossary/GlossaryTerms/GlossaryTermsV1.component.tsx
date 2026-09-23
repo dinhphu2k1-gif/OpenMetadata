@@ -11,7 +11,6 @@
  *  limitations under the License.
  */
 import { Alert, Col, Row, Tabs } from 'antd';
-import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -59,7 +58,6 @@ import {
   getGlossaryTermsVersionsPath,
 } from '../../../utils/RouterUtils';
 import { getTermQuery } from '../../../utils/SearchUtils';
-import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
 import Loader from '../../common/Loader/Loader';
@@ -381,34 +379,6 @@ const GlossaryTermsV1 = ({
   const onTermUpdate = async (data: GlossaryTerm | Glossary) => {
     await handleGlossaryTermUpdate(data as GlossaryTerm);
     setViewedVersion(null);
-
-    const searchParams = new URLSearchParams(location.search);
-    if (searchParams.has('approvedVersion')) {
-      searchParams.delete('approvedVersion');
-      navigate(
-        {
-          pathname: location.pathname,
-          search: searchParams.toString(),
-        },
-        { replace: true },
-      );
-    }
-
-    try {
-      const refresh = refreshActiveGlossaryTerm?.();
-      if (refresh) {
-        void Promise.resolve(refresh).catch((error) =>
-          showErrorToast(error as AxiosError),
-        );
-      }
-    } catch (error) {
-      showErrorToast(error as AxiosError);
-    }
-    // For name change, do not update the feed. It will be updated when the page is redirected to
-    // have the new value.
-    if (glossaryTerm.name === data.name) {
-      getEntityFeedCount();
-    }
   };
 
   const handleAssetClick = useCallback(

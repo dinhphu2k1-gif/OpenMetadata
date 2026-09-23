@@ -2016,7 +2016,7 @@ CREATE TABLE IF NOT EXISTS public.glossary_published_head (
 
 CREATE TABLE IF NOT EXISTS public.glossary_snapshot_term (
   glossarySnapshotId varchar(36) NOT NULL, termSnapshotId varchar(36) NOT NULL,
-  parentTermSnapshotId varchar(36), displayOrder integer NOT NULL DEFAULT 0,
+  displayOrder integer NOT NULL DEFAULT 0,
   PRIMARY KEY (glossarySnapshotId, termSnapshotId)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_term_order ON public.glossary_snapshot_term (glossarySnapshotId, displayOrder);

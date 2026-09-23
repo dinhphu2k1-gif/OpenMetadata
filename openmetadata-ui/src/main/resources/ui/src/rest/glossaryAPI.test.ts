@@ -6,6 +6,8 @@ import APIClient from './index';
 import {
   addGlossaryTerm,
   getFirstLevelGlossaryTermsPaginated,
+  getGlossaryPublishPreview,
+  transitionGlossaryWorkflow,
   updateGlossaryTermWorkingVersion,
 } from './glossaryAPI';
 
@@ -97,6 +99,52 @@ describe('F03 CDE draft API', () => {
       expect.objectContaining({
         params: expect.objectContaining({ directChildrenOf: 'Data Dictionary' }),
       })
+    );
+  });
+});
+
+describe('F09 Data Dictionary publication API', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('requests a server-paginated dynamic publish preview', async () => {
+    client.get.mockResolvedValue({
+      data: { data: [], paging: {}, termCount: 0, evaluatedAt: 1 },
+    });
+
+    await getGlossaryPublishPreview('dictionary-id', {
+      limit: 10,
+      after: '10',
+    });
+
+    expect(client.get).toHaveBeenCalledWith(
+      '/glossaries/dictionary-id/working/publish-preview',
+      { params: { limit: 10, after: '10' } }
+    );
+  });
+
+  it.each(['submit', 'reject', 'reopen', 'approve'] as const)(
+    'sends only expectedRevision for %s',
+    async (action) => {
+      client.post.mockResolvedValue({ data: {} });
+
+      await transitionGlossaryWorkflow('dictionary-id', action, {
+        expectedRevision: 3,
+        businessVersion: 'should-not-be-sent',
+      });
+
+      expect(client.post).toHaveBeenCalledWith(
+        `/glossaries/dictionary-id/working/${action}`,
+        { expectedRevision: 3 }
+      );
+    }
+  );
+
+  it('does not retain the removed F08 working terms route', async () => {
+    client.get.mockResolvedValue({ data: {} });
+    await getGlossaryPublishPreview('dictionary-id');
+    expect(client.get).not.toHaveBeenCalledWith(
+      expect.stringContaining('/working/terms'),
+      expect.anything()
     );
   });
 });

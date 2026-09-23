@@ -55,6 +55,7 @@ import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
 import org.openmetadata.schema.api.data.GlossaryDraftPayload;
 import org.openmetadata.schema.api.data.GlossaryDraftUpdateRequest;
+import org.openmetadata.schema.api.data.GlossaryWorkflowTransitionRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.RestoreEntity;
 import org.openmetadata.schema.entity.data.Glossary;
@@ -130,20 +131,28 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   }
 
   @GET
-  @Path("/{id}/working/terms")
+  @Path("/{id}/working/publish-preview")
   @Operation(
-      operationId = "listWorkingGlossaryTerms",
-      summary = "List exact term revisions in a working glossary")
-  public List<Map<String, Object>> listWorkingGlossaryTerms(
+      operationId = "getGlossaryPublishPreview",
+      summary = "Preview CDEs eligible for publish")
+  public GlossaryPublishPreviewResponse getGlossaryPublishPreview(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
-      @PathParam("id") UUID id) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.requireViewWorking(capabilities(securityContext, glossary));
-    return versioningService.listWorkingGlossaryTerms(id).stream()
-        .map(GlossaryVersionResponses::published)
-        .toList();
+      @PathParam("id") UUID id,
+      @DefaultValue("25") @Min(1) @Max(100) @QueryParam("limit") int limit,
+      @QueryParam("after") String after) {
+    getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    WorkingVersionRecord working =
+        versioningService.getWorking(GlossaryVersioningService.GLOSSARY, id);
+    GlossaryAuthorizationResolver.requireViewWorking(
+        capabilitiesForWorking(securityContext, working));
+    GlossaryVersioningService.PublishPreview preview =
+        versioningService.publishPreview(id, limit, after);
+    return new GlossaryPublishPreviewResponse(
+        preview.data(),
+        new PublishPreviewPaging(preview.after()),
+        preview.termCount(),
+        preview.evaluatedAt());
   }
 
   @POST
@@ -222,7 +231,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid GlossaryWorkflowTransitionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
@@ -248,7 +257,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid GlossaryWorkflowTransitionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
@@ -274,7 +283,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid GlossaryWorkflowTransitionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
@@ -300,7 +309,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid GlossaryWorkflowTransitionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
@@ -471,7 +480,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     }
   }
 
-  private static void requireExpectedRevision(GlossaryWorkingVersionRequest request) {
+  private static void requireExpectedRevision(GlossaryWorkflowTransitionRequest request) {
     if (request == null || request.getExpectedRevision() == null) {
       throw new BadRequestException("expectedRevision is required");
     }
@@ -493,6 +502,14 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   public static class GlossaryList extends ResultList<Glossary> {
     /* Required for serde */
   }
+
+  public record GlossaryPublishPreviewResponse(
+      List<GlossaryVersioningService.TermRevision> data,
+      PublishPreviewPaging paging,
+      int termCount,
+      long evaluatedAt) {}
+
+  public record PublishPreviewPaging(String after) {}
 
   @GET
   @Valid

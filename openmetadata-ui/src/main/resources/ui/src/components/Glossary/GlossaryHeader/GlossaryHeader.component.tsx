@@ -79,6 +79,7 @@ import {
   getGlossaryVersionsList,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
+  getGlossaryPublishPreview,
   GlossaryVersionPermissions,
   GlossaryWorkflowAction,
   transitionGlossaryTermWorkflow,
@@ -175,6 +176,9 @@ const GlossaryHeader = ({
     useState<boolean>(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [approvePreviewCount, setApprovePreviewCount] = useState<number>();
+  const [isApprovePreviewLoading, setIsApprovePreviewLoading] =
+    useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const [isReopening, setIsReopening] = useState(false);
@@ -740,7 +744,7 @@ const GlossaryHeader = ({
   };
 
   const handleWorkflowError = (error: unknown) => {
-    if (!isGlossary && (error as AxiosError)?.response?.status === 409) {
+    if ((error as AxiosError)?.response?.status === 409) {
       setHasWorkflowConflict(true);
     }
     showErrorToast(error as AxiosError);
@@ -749,7 +753,9 @@ const GlossaryHeader = ({
   const handleReloadWorking = async () => {
     try {
       setIsReloadingWorking(true);
-      const latest = await getGlossaryTermsById(selectedData.id);
+      const latest = isGlossary
+        ? await getGlossariesById(selectedData.id)
+        : await getGlossaryTermsById(selectedData.id);
       await onWorkflowTransition?.(latest);
       setHasWorkflowConflict(false);
       setIsCreateDraftModalOpen(false);
@@ -854,6 +860,9 @@ const GlossaryHeader = ({
       Boolean(workflowPermissions?.canReject));
 
   const handleApproveTerm = async () => {
+    if (isApproving || (isGlossary && isApprovePreviewLoading)) {
+      return;
+    }
     try {
       setIsApproving(true);
       await runWorkflowAction('approve');
@@ -869,6 +878,36 @@ const GlossaryHeader = ({
       setIsApproving(false);
     }
   };
+
+  useEffect(() => {
+    if (!isGlossary || !isApproveModalOpen) {
+      return;
+    }
+    let stale = false;
+    setApprovePreviewCount(undefined);
+    setIsApprovePreviewLoading(true);
+    getGlossaryPublishPreview(selectedData.id, { limit: 1 })
+      .then((preview) => {
+        if (!stale) {
+          setApprovePreviewCount(preview.termCount);
+        }
+      })
+      .catch((error) => {
+        if (!stale) {
+          handleWorkflowError(error);
+          setIsApproveModalOpen(false);
+        }
+      })
+      .finally(() => {
+        if (!stale) {
+          setIsApprovePreviewLoading(false);
+        }
+      });
+
+    return () => {
+      stale = true;
+    };
+  }, [isGlossary, isApproveModalOpen, selectedData.id]);
 
   const handleRejectTerm = async () => {
     try {
@@ -1709,9 +1748,20 @@ const GlossaryHeader = ({
       <ConfirmationModal
         bodyText={
           isGlossary
-            ? t('message.confirm-approve-entity-message', {
-                entity: t('label.glossary'),
-              })
+            ? (
+                <Space direction="vertical">
+                  <span>
+                    {isApprovePreviewLoading
+                      ? t('label.loading')
+                      : `${approvePreviewCount ?? 0} CDE`}
+                  </span>
+                  <Alert
+                    showIcon
+                    message="Danh sách cuối cùng sẽ được tính lại khi phê duyệt."
+                    type="warning"
+                  />
+                </Space>
+              )
             : t('message.confirm-approve-glossary-term-message')
         }
         cancelText={t('label.cancel')}
@@ -1723,7 +1773,7 @@ const GlossaryHeader = ({
               })
             : t('message.confirm-approve-glossary-term-title')
         }
-        isLoading={isApproving}
+        isLoading={isApproving || (isGlossary && isApprovePreviewLoading)}
         visible={isApproveModalOpen}
         onCancel={() => setIsApproveModalOpen(false)}
         onConfirm={handleApproveTerm}

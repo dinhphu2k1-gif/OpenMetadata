@@ -16,6 +16,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -152,8 +156,8 @@ public class GlossaryVersioningService {
                     throw new BadRequestException(
                         "payload is required when no published snapshot exists");
                   }
-                  if (GLOSSARY.equals(entityType) && latest == null) {
-                    payload = enrichGlossaryWorkingPayload(dao, entityId, payload);
+                  if (GLOSSARY.equals(entityType)) {
+                    payload = withEmptyTermRevisions(payload);
                   }
                   payload =
                       normalizeWorkingPayload(
@@ -197,7 +201,7 @@ public class GlossaryVersioningService {
             .inTransaction(
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
-                  WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
+                    WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
                   if (!EntityStatus.DRAFT.value().equals(working.entityStatus())) {
                     throw new BadRequestException("Only Draft working versions can be edited");
                   }
@@ -321,6 +325,7 @@ public class GlossaryVersioningService {
               .inTransaction(
                   handle -> {
                     GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                    lockPublicationScope(dao, entityType, entityId);
                     WorkingVersionRecord working = requireWorking(dao, entityType, entityId);
                     if (working.revision() != expectedRevision) {
                       throw conflict("Working version revision conflict");
@@ -339,8 +344,15 @@ public class GlossaryVersioningService {
                     UUID snapshotId = UUID.randomUUID();
                     long sequence = dao.nextPublicationSequence(entityType, entityId);
                     long now = System.currentTimeMillis();
+                    Object publicationPayload = working.payload();
+                    List<TermRevision> termRevisions = List.of();
+                    if (GLOSSARY.equals(entityType)) {
+                      termRevisions = buildActiveTermRevisions(dao, entityId);
+                      publicationPayload = withTermRevisions(working.payload(), termRevisions);
+                    }
                     String approvedPayload =
-                        withPublishedMetadata(working, snapshotId, sequence, now, actor);
+                        withPublishedMetadata(
+                            publicationPayload, working, snapshotId, sequence, now, actor);
                     String contentHash = sha256(approvedPayload);
                     dao.insertSnapshot(
                         snapshotId,
@@ -355,7 +367,7 @@ public class GlossaryVersioningService {
                         now,
                         actor);
                     if (GLOSSARY.equals(entityType)) {
-                      insertGlossaryTermRevisions(dao, entityId, snapshotId, approvedPayload);
+                      insertGlossaryTermRevisions(dao, snapshotId, termRevisions);
                     }
                     dao.upsertPublishedHead(entityType, entityId, snapshotId, sequence);
                     dao.insertOutbox(
@@ -365,8 +377,20 @@ public class GlossaryVersioningService {
                         approvedPayload,
                         now);
                     requireUpdated(dao.deleteWorking(entityType, entityId, expectedRevision));
-                    return dao.findPublishedVersion(
-                        entityType, entityId, working.businessVersion());
+                    return new PublishedSnapshotRecord(
+                        snapshotId,
+                        entityType,
+                        entityId,
+                        working.glossaryId(),
+                        working.businessVersion(),
+                        working.nativeVersion(),
+                        sequence,
+                        approvedPayload,
+                        contentHash,
+                        now,
+                        actor,
+                        null,
+                        null);
                   });
     } catch (UnableToExecuteStatementException exception) {
       if (isConstraintConflict(exception)) {
@@ -437,6 +461,7 @@ public class GlossaryVersioningService {
             .inTransaction(
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                  lockPublicationScope(dao, entityType, entityId);
                   PublishedSnapshotRecord latest = dao.findLatestPublished(entityType, entityId);
                   if (latest == null) {
                     throw new NotFoundException("No published snapshot exists");
@@ -599,27 +624,19 @@ public class GlossaryVersioningService {
     return businessVersion.equals(getLatestPublished(entityType, entityId).businessVersion());
   }
 
-  public List<PublishedSnapshotRecord> listWorkingGlossaryTerms(UUID glossaryId) {
-    WorkingVersionRecord working = getWorking(GLOSSARY, glossaryId);
-    com.fasterxml.jackson.databind.JsonNode revisions =
-        JsonUtils.readTree(working.payload()).path("termRevisions");
-    if (!revisions.isArray()) {
-      throw new BadRequestException("Glossary working payload must contain termRevisions");
-    }
-    GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
-    java.util.List<PublishedSnapshotRecord> snapshots = new java.util.ArrayList<>();
-    for (com.fasterxml.jackson.databind.JsonNode revision : revisions) {
-      PublishedSnapshotRecord snapshot = dao.findSnapshot(requiredUuid(revision, "termSnapshotId"));
-      if (snapshot == null
-          || !GLOSSARY_TERM.equals(snapshot.entityType())
-          || !glossaryId.equals(snapshot.glossaryId())) {
-        throw new BadRequestException(
-            "Working glossary contains an invalid term snapshot reference");
-      }
-      snapshots.add(snapshot);
-    }
-    return sortTermSnapshotsByName(snapshots);
+  public PublishPreview publishPreview(UUID glossaryId, int limit, String after) {
+    List<TermRevision> revisions =
+        buildActiveTermRevisions(
+            Entity.getJdbi().onDemand(GlossaryVersionDAO.class), glossaryId);
+    int offset = decodePreviewCursor(after, revisions.size());
+    int end = Math.min(offset + limit, revisions.size());
+    String next = end < revisions.size() ? Integer.toString(end) : null;
+    return new PublishPreview(
+        List.copyOf(revisions.subList(offset, end)), revisions.size(), System.currentTimeMillis(), next);
   }
+
+  public record PublishPreview(
+      List<TermRevision> data, int termCount, long evaluatedAt, String after) {}
 
   private static WorkingVersionRecord requireWorking(
       GlossaryVersionDAO dao, String entityType, UUID entityId) {
@@ -707,9 +724,7 @@ public class GlossaryVersioningService {
     return blank;
   }
 
-  @SuppressWarnings("unchecked")
-  private static Object enrichGlossaryWorkingPayload(
-      GlossaryVersionDAO dao, UUID glossaryId, Object sourcePayload) {
+  private static Object withEmptyTermRevisions(Object sourcePayload) {
     Object parsed =
         sourcePayload instanceof String
             ? JsonUtils.readValue((String) sourcePayload, Object.class)
@@ -719,38 +734,8 @@ public class GlossaryVersioningService {
     }
     java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
     raw.forEach((key, value) -> payload.put(String.valueOf(key), value));
-    Object existingRevisions = payload.get("termRevisions");
-    if (existingRevisions instanceof List<?> revisions && !revisions.isEmpty()) {
-      return payload;
-    }
-
-    List<PublishedSnapshotRecord> termSnapshots =
-        sortTermSnapshotsByName(dao.listLatestTermsForGlossary(glossaryId));
-    Map<UUID, UUID> snapshotByEntity =
-        termSnapshots.stream()
-            .collect(
-                Collectors.toMap(
-                    PublishedSnapshotRecord::entityId, PublishedSnapshotRecord::snapshotId));
-    java.util.List<Map<String, Object>> revisions = new java.util.ArrayList<>();
-    int displayOrder = 0;
-    for (PublishedSnapshotRecord termSnapshot : termSnapshots) {
-      com.fasterxml.jackson.databind.JsonNode term = JsonUtils.readTree(termSnapshot.payload());
-      Map<String, Object> revision = new java.util.LinkedHashMap<>();
-      revision.put("termId", termSnapshot.entityId());
-      revision.put("termSnapshotId", termSnapshot.snapshotId());
-      revision.put("termBusinessVersion", termSnapshot.businessVersion());
-      revision.put("termNativeVersion", termSnapshot.nativeVersion());
-      String parentId = term.path("parent").path("id").asText(null);
-      if (parentId != null) {
-        UUID parentSnapshot = snapshotByEntity.get(UUID.fromString(parentId));
-        if (parentSnapshot != null) {
-          revision.put("parentTermSnapshotId", parentSnapshot);
-        }
-      }
-      revision.put("displayOrder", displayOrder++);
-      revisions.add(revision);
-    }
-    payload.put("termRevisions", revisions);
+    payload.put("termRevisions", List.of());
+    payload.put("termCount", 0);
     return payload;
   }
 
@@ -759,8 +744,8 @@ public class GlossaryVersioningService {
     return snapshots.stream()
         .sorted(
             Comparator.comparing(
-                    GlossaryVersioningService::snapshotTermName,
-                    String.CASE_INSENSITIVE_ORDER)
+                    snapshot -> snapshotTermName(snapshot).toLowerCase(Locale.ROOT))
+                .thenComparing(GlossaryVersioningService::snapshotTermName)
                 .thenComparing(PublishedSnapshotRecord::entityId))
         .toList();
   }
@@ -769,92 +754,88 @@ public class GlossaryVersioningService {
     return JsonUtils.readTree(snapshot.payload()).path("name").asText("");
   }
 
+  private static List<TermRevision> buildActiveTermRevisions(
+      GlossaryVersionDAO dao, UUID glossaryId) {
+    List<PublishedSnapshotRecord> snapshots =
+        sortTermSnapshotsByName(dao.listActiveLatestTermsForGlossary(glossaryId));
+    Set<UUID> termIds = new HashSet<>();
+    Set<UUID> snapshotIds = new HashSet<>();
+    List<TermRevision> revisions = new ArrayList<>(snapshots.size());
+    for (int index = 0; index < snapshots.size(); index++) {
+      PublishedSnapshotRecord snapshot = snapshots.get(index);
+      if (!termIds.add(snapshot.entityId()) || !snapshotIds.add(snapshot.snapshotId())) {
+        throw new IllegalStateException("Duplicate active CDE published head");
+      }
+      revisions.add(
+          new TermRevision(
+              snapshot.entityId(), snapshot.snapshotId(), snapshot.businessVersion(), index));
+    }
+    return revisions;
+  }
+
+  private static Object withTermRevisions(Object sourcePayload, List<TermRevision> revisions) {
+    Object parsed =
+        sourcePayload instanceof String
+            ? JsonUtils.readValue((String) sourcePayload, Object.class)
+            : JsonUtils.readValue(JsonUtils.pojoToJson(sourcePayload), Object.class);
+    Map<String, Object> payload = new LinkedHashMap<>();
+    ((Map<?, ?>) parsed).forEach((key, value) -> payload.put(String.valueOf(key), value));
+    payload.put("termRevisions", revisions);
+    payload.put("termCount", revisions.size());
+    return payload;
+  }
+
   private static void insertGlossaryTermRevisions(
-      GlossaryVersionDAO dao, UUID glossaryId, UUID glossarySnapshotId, String payloadJson) {
-    com.fasterxml.jackson.databind.JsonNode root = JsonUtils.readTree(payloadJson);
-    com.fasterxml.jackson.databind.JsonNode revisions = root.path("termRevisions");
-    if (!revisions.isArray()) {
-      throw new BadRequestException("Glossary working payload must contain termRevisions");
-    }
-    java.util.List<TermRevision> resolved = new java.util.ArrayList<>();
-    java.util.Set<UUID> snapshotIds = new java.util.HashSet<>();
-    for (com.fasterxml.jackson.databind.JsonNode revision : revisions) {
-      UUID termId = requiredUuid(revision, "termId");
-      UUID termSnapshotId = requiredUuid(revision, "termSnapshotId");
-      PublishedSnapshotRecord termSnapshot = dao.findSnapshot(termSnapshotId);
-      if (termSnapshot == null
-          || !GLOSSARY_TERM.equals(termSnapshot.entityType())
-          || !termId.equals(termSnapshot.entityId())
-          || !glossaryId.equals(termSnapshot.glossaryId())
-          || termSnapshot.archivedAt() != null) {
-        throw new BadRequestException(
-            "termSnapshotId does not identify an active published term in this glossary: "
-                + termId);
-      }
-      String requestedBusinessVersion = revision.path("termBusinessVersion").asText();
-      if (!termSnapshot.businessVersion().equals(requestedBusinessVersion)) {
-        throw new BadRequestException(
-            "Term business version does not match its published snapshot: " + termId);
-      }
-      if (revision.hasNonNull("termNativeVersion")
-          && termSnapshot.nativeVersion() != null
-          && Double.compare(
-                  revision.path("termNativeVersion").asDouble(), termSnapshot.nativeVersion())
-              != 0) {
-        throw new BadRequestException(
-            "Term native version does not match its published snapshot: " + termId);
-      }
-      UUID parentSnapshotId = optionalUuid(revision, "parentTermSnapshotId");
-      if (!snapshotIds.add(termSnapshotId)) {
-        throw new BadRequestException("A glossary cannot contain the same term snapshot twice");
-      }
-      resolved.add(
-          new TermRevision(termSnapshotId, parentSnapshotId, snapshotTermName(termSnapshot)));
-    }
-    resolved.sort(
-        Comparator.comparing(TermRevision::termName, String.CASE_INSENSITIVE_ORDER)
-            .thenComparing(TermRevision::snapshotId));
-    int displayOrder = 0;
-    for (TermRevision revision : resolved) {
-      if (revision.parentSnapshotId() != null
-          && !snapshotIds.contains(revision.parentSnapshotId())) {
-        throw new BadRequestException("A term parent must belong to the same glossary snapshot");
-      }
-      dao.insertSnapshotTerm(
-          glossarySnapshotId,
-          revision.snapshotId(),
-          revision.parentSnapshotId(),
-          displayOrder++);
-    }
+      GlossaryVersionDAO dao, UUID glossarySnapshotId, List<TermRevision> revisions) {
+    revisions.forEach(
+        revision ->
+            dao.insertSnapshotTerm(
+                glossarySnapshotId, revision.termSnapshotId(), revision.displayOrder()));
   }
 
-  private record TermRevision(UUID snapshotId, UUID parentSnapshotId, String termName) {}
+  public record TermRevision(
+      UUID termId, UUID termSnapshotId, String termBusinessVersion, int displayOrder) {}
 
-  private static UUID requiredUuid(com.fasterxml.jackson.databind.JsonNode node, String fieldName) {
-    UUID value = optionalUuid(node, fieldName);
-    if (value == null) {
-      throw new BadRequestException(fieldName + " is required for every term revision");
+  private static int decodePreviewCursor(String after, int size) {
+    if (after == null || after.isBlank()) {
+      return 0;
     }
-    return value;
-  }
-
-  private static UUID optionalUuid(com.fasterxml.jackson.databind.JsonNode node, String fieldName) {
-    String value = node.path(fieldName).asText(null);
     try {
-      return value == null || value.isBlank() ? null : UUID.fromString(value);
-    } catch (IllegalArgumentException exception) {
-      throw new BadRequestException(fieldName + " must be a UUID");
+      int offset = Integer.parseInt(after);
+      if (offset < 0 || offset > size) {
+        throw new NumberFormatException();
+      }
+      return offset;
+    } catch (NumberFormatException exception) {
+      throw new BadRequestException("Invalid publish preview cursor");
+    }
+  }
+
+  private static void lockPublicationScope(
+      GlossaryVersionDAO dao, String entityType, UUID entityId) {
+    UUID glossaryId = entityId;
+    if (GLOSSARY_TERM.equals(entityType)) {
+      WorkingVersionRecord working = dao.findWorking(entityType, entityId);
+      PublishedSnapshotRecord published = dao.findLatestPublished(entityType, entityId);
+      glossaryId = working != null ? working.glossaryId() : published == null ? null : published.glossaryId();
+    }
+    if (glossaryId == null || dao.lockGlossaryIdentity(glossaryId) == null) {
+      throw new NotFoundException("Data Dictionary identity not found");
     }
   }
 
   @SuppressWarnings("unchecked")
   private static String withPublishedMetadata(
+      Object sourcePayload,
       WorkingVersionRecord working,
       UUID snapshotId,
       long publicationSequence,
       long publishedAt,
       String publishedBy) {
-    Object parsed = JsonUtils.readValue(working.payload(), Object.class);
+    Object parsed =
+        sourcePayload instanceof String
+            ? JsonUtils.readValue((String) sourcePayload, Object.class)
+            : JsonUtils.readValue(JsonUtils.pojoToJson(sourcePayload), Object.class);
     if (!(parsed instanceof java.util.Map<?, ?> raw)) {
       throw new BadRequestException("Working payload must be a JSON object");
     }

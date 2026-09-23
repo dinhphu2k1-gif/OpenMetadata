@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { useLocation } from 'react-router-dom';
 import { OperationPermission } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import { EntityTabs } from '../../../enums/entity.enum';
@@ -229,6 +229,26 @@ describe('Test Glossary-term component', () => {
         expect(tab).not.toHaveAttribute('aria-selected', 'true');
       });
 
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('updates term state without refetching the full term details', async () => {
+    render(<GlossaryTerms {...mockProps} />);
+
+    const onUpdate = (GenericProvider as jest.Mock).mock.lastCall[0].onUpdate;
+    const updatedTerm = {
+      ...mockProps.glossaryTerm,
+      description: 'Updated description',
+    };
+
+    await act(async () => {
+      await onUpdate(updatedTerm);
+    });
+
+    expect(mockProps.handleGlossaryTermUpdate).toHaveBeenCalledWith(
+      updatedTerm
+    );
+    expect(mockProps.refreshActiveGlossaryTerm).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

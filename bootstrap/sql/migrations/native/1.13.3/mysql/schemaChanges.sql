@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS `glossary_published_head` (
 CREATE TABLE IF NOT EXISTS `glossary_snapshot_term` (
   `glossarySnapshotId` varchar(36) NOT NULL,
   `termSnapshotId` varchar(36) NOT NULL,
-  `parentTermSnapshotId` varchar(36) DEFAULT NULL,
   `displayOrder` int unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`glossarySnapshotId`, `termSnapshotId`),
   KEY `idx_glossary_snapshot_term_order` (`glossarySnapshotId`, `displayOrder`)

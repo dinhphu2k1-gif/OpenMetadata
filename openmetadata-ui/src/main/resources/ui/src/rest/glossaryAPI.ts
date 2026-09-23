@@ -25,6 +25,7 @@ import { CreateGlossary } from '../generated/api/data/createGlossary';
 import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
 import { CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
 import { CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
+import { GlossaryWorkflowTransitionRequest } from '../generated/api/data/glossaryWorkflowTransitionRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityReference, Glossary } from '../generated/entity/data/glossary';
@@ -74,6 +75,13 @@ export interface GlossaryWorkflowRequest {
   expectedRevision?: number;
   businessVersion?: string;
   payload?: Glossary | GlossaryTerm;
+}
+
+export interface GlossaryPublishPreview {
+  data: NonNullable<Glossary['termRevisions']>;
+  paging: { after?: string };
+  termCount: number;
+  evaluatedAt: number;
 }
 
 export interface GlossaryVersionPermissions {
@@ -194,9 +202,13 @@ export const getPublishedGlossaryTerms = async (
   return response.data;
 };
 
-export const getWorkingGlossaryTerms = async (id: string) => {
-  const response = await APIClient.get<GlossaryTerm[]>(
-    `/glossaries/${id}/working/terms`
+export const getGlossaryPublishPreview = async (
+  id: string,
+  params?: { limit?: number; after?: string }
+) => {
+  const response = await APIClient.get<GlossaryPublishPreview>(
+    `/glossaries/${id}/working/publish-preview`,
+    { params }
   );
 
   return response.data;
@@ -213,7 +225,7 @@ export const getGlossaryVersionPermissions = async (id: string) => {
 export const transitionGlossaryWorkflow = async (
   id: string,
   action: GlossaryWorkflowAction,
-  request: GlossaryWorkflowRequest
+  request: GlossaryWorkflowRequest | GlossaryWorkflowTransitionRequest
 ) => {
   if (action === 'revoke') {
     const response = await APIClient.post<undefined, AxiosResponse<Glossary>>(
@@ -221,6 +233,9 @@ export const transitionGlossaryWorkflow = async (
     );
 
     return response.data;
+  }
+  if (action !== 'createDraft') {
+    request = { expectedRevision: request.expectedRevision as number };
   }
   const path = action === 'createDraft' ? 'working' : `working/${action}`;
   const response = await APIClient.post<

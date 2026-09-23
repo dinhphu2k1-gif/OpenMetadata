@@ -120,6 +120,17 @@ const GlossaryPage = () => {
     updateActiveGlossary,
   } = useGlossaryStore();
 
+  // Entity updates replace the glossary object in the list. Keep route/data
+  // resolution tied to list membership and identity only, so inline metadata
+  // edits do not refetch the working version and flash the full-page loader.
+  const glossaryNavigationKey = useMemo(
+    () =>
+      glossaries
+        .map(({ id, fullyQualifiedName }) => `${id}:${fullyQualifiedName ?? ''}`)
+        .join('|'),
+    [glossaries]
+  );
+
   const isImportAction = useMemo(
     () => action === EntityAction.IMPORT,
     [action]
@@ -446,7 +457,12 @@ const GlossaryPage = () => {
     } else {
       setIsRightPanelLoading(false);
     }
-  }, [businessVersion, isGlossaryActive, glossaryFqn, glossaries]);
+  }, [
+    businessVersion,
+    isGlossaryActive,
+    glossaryFqn,
+    glossaryNavigationKey,
+  ]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
@@ -482,7 +498,14 @@ const GlossaryPage = () => {
           )
         );
 
-        if (activeGlossary?.name !== updatedData.name) {
+        // Attribute editors can send a partial entity without `name`. Detect an
+        // actual rename from the authoritative response instead, otherwise a
+        // normal inline update would navigate and reload the whole page.
+        if (
+          activeGlossary?.fullyQualifiedName &&
+          response.fullyQualifiedName &&
+          activeGlossary.fullyQualifiedName !== response.fullyQualifiedName
+        ) {
           navigate(getGlossaryPath(response.fullyQualifiedName));
           fetchGlossaryList();
         }
@@ -587,12 +610,6 @@ const GlossaryPage = () => {
         return;
       }
 
-      const shouldRefreshTerms = jsonPatch.some(
-        (patch) =>
-          patch.path.startsWith('/owners') ||
-          patch.path.startsWith('/entityStatus')
-      );
-
       try {
         const working =
           activeGlossary?.workingRevision != null
@@ -605,13 +622,6 @@ const GlossaryPage = () => {
         );
         if (response) {
           setActiveGlossary(response as ModifiedGlossary);
-          if (activeGlossary?.name !== normalizedUpdatedData.name) {
-            navigate(getGlossaryPath(response.fullyQualifiedName));
-            fetchGlossaryList();
-          }
-          if (shouldRefreshTerms) {
-            fetchGlossaryTermDetails();
-          }
         } else {
           throw t('server.entity-updating-error', {
             entity: t('label.glossary-term'),

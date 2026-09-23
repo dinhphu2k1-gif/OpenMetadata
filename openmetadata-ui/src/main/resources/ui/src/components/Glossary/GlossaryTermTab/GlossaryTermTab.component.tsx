@@ -106,7 +106,6 @@ import {
   getFirstLevelGlossaryTermsPaginated,
   getGlossaryVersionPermissions,
   getPublishedGlossaryTerms,
-  getWorkingGlossaryTerms,
   getGlossaryTermChildrenLazy,
   getGlossaryTermWorkingVersion,
   getGlossaryTerms,
@@ -1102,7 +1101,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
     const workflowKey = [
       displayedGlossary.id,
-      displayedGlossary.entityStatus,
       displayedGlossary.businessVersion,
       displayedGlossary.termRevisions
         ?.map((revision) => revision.termSnapshotId)
@@ -1133,7 +1131,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               displayedGlossary.id,
               displayedGlossary.businessVersion as string
             )
-          : await getWorkingGlossaryTerms(displayedGlossary.id);
+          : [];
         if (!isConsumer && !isVersionView && isCDEGlossary) {
           const authoringTerms = await getFirstLevelGlossaryTermsPaginated(
             activeGlossary.fullyQualifiedName,
@@ -1153,8 +1151,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             authoringTerms.data.map((term) => [term.id, term])
           );
 
-          // Exact revisions selected for the release package take precedence,
-          // while unpinned authoring CDEs remain visible after reload.
+          // Authoring CDEs are independent from immutable published membership.
           snapshotTerms.forEach((term) => termsById.set(term.id, term));
           snapshotTerms = Array.from(termsById.values());
         }

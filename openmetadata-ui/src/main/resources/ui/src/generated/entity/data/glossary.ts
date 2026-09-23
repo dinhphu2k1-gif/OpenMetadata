@@ -165,9 +165,7 @@ export interface GlossaryTermRevisionReference {
   termId: string;
   termSnapshotId: string;
   termBusinessVersion: string;
-  termNativeVersion: number;
-  parentTermSnapshotId?: string;
-  displayOrder?: number;
+  displayOrder: number;
 }
 
 export enum VersioningMode {
