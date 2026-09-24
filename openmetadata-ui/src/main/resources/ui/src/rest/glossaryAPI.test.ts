@@ -8,6 +8,7 @@ import {
   getFirstLevelGlossaryTermsPaginated,
   getGlossaryPublishPreview,
   getGlossaryTermWorkingVersion,
+  searchGlossaryTermsPaginated,
   transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
   updateGlossaryTermWorkingVersion,
@@ -194,9 +195,52 @@ describe('F09 Data Dictionary publication API', () => {
   it('does not retain the removed F08 working terms route', async () => {
     client.get.mockResolvedValue({ data: {} });
     await getGlossaryPublishPreview('dictionary-id');
+
     expect(client.get).not.toHaveBeenCalledWith(
       expect.stringContaining('/working/terms'),
       expect.anything()
     );
+  });
+});
+
+describe('F12 CDE business-version search API', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('serializes the immutable scope and stable filter identifiers', async () => {
+    client.get.mockResolvedValue({
+      data: { data: [], paging: { total: 0, limit: 15, offset: 30 } },
+    });
+
+    await searchGlossaryTermsPaginated({
+      glossary: 'dictionary-id',
+      parentBusinessVersion: '2',
+      q: 'Dữ liệu *',
+      statuses: 'Draft,Approved',
+      domainIds: 'domain-id',
+      ownerIds: 'owner-id',
+      dataSourceTags: 'DataSource.Core',
+      classificationTags: 'DataClassification.Restricted',
+      sortField: 'businessVersion',
+      sortOrder: 'desc',
+      limit: 15,
+      offset: 30,
+    });
+
+    expect(client.get).toHaveBeenCalledWith('/glossaryTerms/search', {
+      params: expect.objectContaining({
+        glossary: 'dictionary-id',
+        parentBusinessVersion: '2',
+        q: 'Dữ liệu *',
+        statuses: 'Draft,Approved',
+        domainIds: 'domain-id',
+        ownerIds: 'owner-id',
+        dataSourceTags: 'DataSource.Core',
+        classificationTags: 'DataClassification.Restricted',
+        sortField: 'businessVersion',
+        sortOrder: 'desc',
+        limit: 15,
+        offset: 30,
+      }),
+    });
   });
 });

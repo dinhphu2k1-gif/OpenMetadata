@@ -91,6 +91,8 @@ import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.versioning.CdeBusinessVersionSearchService;
+import org.openmetadata.service.glossary.versioning.CdeBusinessVersionSearchService.Criteria;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Candidates;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Scope;
@@ -109,14 +111,15 @@ import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
 import org.openmetadata.service.security.Authorizer;
+import org.openmetadata.service.security.DefaultAuthorizer;
 import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContextInterface;
 import org.openmetadata.service.util.AsyncService;
+import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.GlossaryBusinessVersion;
-import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.MoveGlossaryTermResponse;
 import org.openmetadata.service.util.RestUtil;
 import org.openmetadata.service.util.WebsocketNotificationHandler;
@@ -136,6 +139,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final GlossaryMapper glossaryMapper = new GlossaryMapper();
   private final GlossaryVersioningService versioningService = new GlossaryVersioningService();
   private final CdeFlatListService cdeFlatListService = new CdeFlatListService();
+  private final CdeBusinessVersionSearchService cdeSearchService =
+      new CdeBusinessVersionSearchService();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -812,7 +817,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                     mediaType = "application/json",
                     schema = @Schema(implementation = GlossaryTermList.class)))
       })
-  public ResultList<GlossaryTerm> searchGlossaryTerms(
+  public Object searchGlossaryTerms(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @Parameter(description = "Search query for term names, display names, or descriptions")
@@ -850,7 +855,35 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               description =
                   "Filter by entity status (comma-separated: Approved,Draft,In Review,Rejected,Deprecated,Unprocessed)")
           @QueryParam("entityStatus")
-          String entityStatus) {
+          String entityStatus,
+      @QueryParam("parentBusinessVersion") String parentBusinessVersion,
+      @QueryParam("statuses") String statuses,
+      @QueryParam("domainIds") String domainIds,
+      @QueryParam("ownerIds") String ownerIds,
+      @QueryParam("dataSourceTags") String dataSourceTags,
+      @QueryParam("classificationTags") String classificationTags,
+      @QueryParam("sortField") String sortField,
+      @QueryParam("sortOrder") String sortOrder) {
+
+    if (parentBusinessVersion != null) {
+      if (glossaryId == null) {
+        throw new BadRequestException("glossary is required for CDE business-version search");
+      }
+      return searchCdeBusinessVersions(
+          securityContext,
+          glossaryId,
+          parentBusinessVersion,
+          query,
+          statuses,
+          domainIds,
+          ownerIds,
+          dataSourceTags,
+          classificationTags,
+          sortField,
+          sortOrder,
+          limitParam,
+          offsetParam);
+    }
 
     Fields fields = getFields(fieldsParam);
     ResourceContextInterface glossaryResourceContext = new ResourceContext<>(GLOSSARY);
@@ -923,6 +956,60 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
 
     return addHref(uriInfo, result);
+  }
+
+  private Map<String, Object> searchCdeBusinessVersions(
+      SecurityContext securityContext,
+      UUID glossaryId,
+      String parentBusinessVersion,
+      String query,
+      String statuses,
+      String domainIds,
+      String ownerIds,
+      String dataSourceTags,
+      String classificationTags,
+      String sortField,
+      String sortOrder,
+      int limit,
+      int offset) {
+    Criteria criteria =
+        CdeBusinessVersionSearchService.validate(
+            new Criteria(
+                glossaryId,
+                parentBusinessVersion,
+                query,
+                CdeBusinessVersionSearchService.splitCsvParameter(statuses),
+                CdeBusinessVersionSearchService.splitCsvParameter(domainIds),
+                CdeBusinessVersionSearchService.splitCsvParameter(ownerIds),
+                CdeBusinessVersionSearchService.splitCsvParameter(dataSourceTags),
+                CdeBusinessVersionSearchService.splitCsvParameter(classificationTags),
+                sortField,
+                sortOrder,
+                limit,
+                offset),
+            false);
+    EntityReference glossaryReference = repository.getGlossary(glossaryId.toString());
+    DataDictionaryResolver.resolveDataDictionary(glossaryReference);
+    Scope scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
+    Glossary glossary = JsonUtils.readValue(scope.payload(), Glossary.class);
+    GlossaryAuthorizationResolver.Capabilities capabilities =
+        capabilitiesForAuthorizationGlossary(securityContext, glossary);
+    boolean consumerOnly =
+        GlossaryAuthorizationResolver.isConsumerOnly(
+            DefaultAuthorizer.getSubjectContext(securityContext));
+    if ((scope.type() == ScopeType.ACTIVE
+            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC))
+        || (scope.type() == ScopeType.WORKING && (consumerOnly || !capabilities.canViewWorking()))
+        || (scope.type() == ScopeType.ARCHIVED
+            && (consumerOnly || (!capabilities.canViewWorking() && !capabilities.canArchive())))) {
+      throw new NotFoundException("Data Dictionary scope was not found");
+    }
+    if (scope.type() != ScopeType.ARCHIVED && criteria.statuses().contains("Archived")) {
+      throw new BadRequestException("Archived status is only valid for an archived scope");
+    }
+    versioningService.processPendingOutbox();
+    return cdeSearchService.search(
+        criteria, DefaultAuthorizer.getSubjectContext(securityContext), consumerOnly);
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {

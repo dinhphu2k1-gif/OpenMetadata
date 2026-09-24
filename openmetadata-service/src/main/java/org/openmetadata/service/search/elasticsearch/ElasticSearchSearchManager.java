@@ -321,6 +321,7 @@ public class ElasticSearchSearchManager implements SearchManagementClient {
             sortMode);
       } else {
         requestBuilder.sort(searchSortFilter.getSortField(), sortOrder, "long");
+        addCdeStableSorts(requestBuilder, searchSortFilter.getSortField());
       }
     }
 
@@ -363,6 +364,20 @@ public class ElasticSearchSearchManager implements SearchManagementClient {
         throw buildSearchException(e);
       }
     }
+  }
+
+  private void addCdeStableSorts(ElasticSearchRequestBuilder requestBuilder, String primaryField) {
+    if (!primaryField.startsWith("cdeSort.")) {
+      return;
+    }
+    if (!"cdeSort.normalizedName".equals(primaryField)) {
+      requestBuilder.sort("cdeSort.normalizedName", SortOrder.Asc, SORT_TYPE_KEYWORD);
+    }
+    if (!"cdeSort.businessVersion".equals(primaryField)) {
+      requestBuilder.sort("cdeSort.businessVersion", SortOrder.Desc, SORT_TYPE_KEYWORD);
+    }
+    requestBuilder.sort("termId", SortOrder.Asc, SORT_TYPE_KEYWORD);
+    requestBuilder.sort("recordType", SortOrder.Asc, SORT_TYPE_KEYWORD);
   }
 
   private void applyRbacCondition(

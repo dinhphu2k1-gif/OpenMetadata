@@ -739,6 +739,35 @@ public class GlossaryVersioningService {
     searchRepository
         .getSearchClient()
         .createEntity(indexName, entityId.toString(), JsonUtils.pojoToJson(document));
+
+    if (GLOSSARY_TERM.equals(entityType)) {
+      for (PublishedSnapshotRecord snapshot : dao.listPublished(entityType, entityId)) {
+        CdeBusinessVersionIndexDocument.IndexedDocument indexed =
+            CdeBusinessVersionIndexDocument.published(snapshot);
+        searchRepository
+            .getSearchClient()
+            .createEntity(
+                searchRepository.getIndexOrAliasName(CdeBusinessVersionSearchService.MUTABLE_ALIAS),
+                indexed.id(),
+                JsonUtils.pojoToJson(indexed.source()));
+        if (snapshot.archivedAt() == null) {
+          searchRepository
+              .getSearchClient()
+              .createEntity(
+                  searchRepository.getIndexOrAliasName(
+                      CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
+                  indexed.id(),
+                  JsonUtils.pojoToJson(indexed.source()));
+        } else {
+          searchRepository
+              .getSearchClient()
+              .deleteEntity(
+                  searchRepository.getIndexOrAliasName(
+                      CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
+                  indexed.id());
+        }
+      }
+    }
   }
 
   private void refreshManagerIndexSafely(String entityType, UUID entityId) {
@@ -770,6 +799,16 @@ public class GlossaryVersioningService {
       searchRepository
           .getSearchClient()
           .createEntity(indexName, entityId.toString(), JsonUtils.pojoToJson(document));
+      if (GLOSSARY_TERM.equals(entityType) && working != null) {
+        CdeBusinessVersionIndexDocument.IndexedDocument indexed =
+            CdeBusinessVersionIndexDocument.working(working);
+        searchRepository
+            .getSearchClient()
+            .createEntity(
+                searchRepository.getIndexOrAliasName(CdeBusinessVersionSearchService.MUTABLE_ALIAS),
+                indexed.id(),
+                JsonUtils.pojoToJson(indexed.source()));
+      }
     } catch (Exception exception) {
       LOG.warn(
           "Failed to refresh manager glossary index for {} {}", entityType, entityId, exception);

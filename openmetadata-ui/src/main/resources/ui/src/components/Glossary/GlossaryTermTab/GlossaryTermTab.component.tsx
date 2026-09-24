@@ -664,6 +664,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const previousCdeScopeRef = useRef<string>();
   const lastFetchKeyRef = useRef('');
   const termsWorkflowKeyRef = useRef('');
+  const termsRequestGenerationRef = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [isExpandingAll, setIsExpandingAll] = useState(false);
@@ -719,16 +720,18 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         if (domainRes.status === 'fulfilled' && domainRes.value?.data) {
           domainRes.value.data.forEach((d) => {
             const label = d.displayName || d.name || '';
-            if (label && !domains.some((item) => item.value === label)) {
-              domains.push({ label, value: label });
+            const value = d.id || '';
+            if (label && value && !domains.some((item) => item.value === value)) {
+              domains.push({ label, value });
             }
           });
         }
         if (activeGlossary?.domains) {
           activeGlossary.domains.forEach((d) => {
             const label = d.displayName || d.name || '';
-            if (label && !domains.some((item) => item.value === label)) {
-              domains.push({ label, value: label });
+            const value = d.id || '';
+            if (label && value && !domains.some((item) => item.value === value)) {
+              domains.push({ label, value });
             }
           });
         }
@@ -778,7 +781,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         if (teamRes.status === 'fulfilled' && teamRes.value?.data) {
           teamRes.value.data.forEach((tm) => {
             const label = tm.displayName || tm.name || '';
-            const value = tm.name || tm.id || '';
+            const value = tm.id || '';
             if (
               label &&
               value &&
@@ -1128,6 +1131,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return;
     }
 
+    const requestGeneration = ++termsRequestGenerationRef.current;
     const workflowKey = [
       displayedGlossary.id,
       displayedGlossary.businessVersion,
@@ -1160,14 +1164,43 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             'parentBusinessVersion is required for the CDE flat list'
           );
         }
-        const response = await getGlossaryTerms({
-          glossary: activeGlossary.id,
-          parentBusinessVersion,
-          limit: pageSize,
-          offset: (currentPage - 1) * pageSize,
-          fields: CDE_GLOSSARY_TERM_FIELDS,
-        });
-        if (workflowKey !== termsWorkflowKeyRef.current) {
+        const withoutAll = (values: string[]) =>
+          values.filter((value) => value !== 'all');
+        const hasStatusCriteria =
+          !isConsumer && !selectedStatus.includes('all');
+        const hasSearchCriteria =
+          Boolean(searchTerm.trim()) ||
+          hasStatusCriteria ||
+          hasActiveCdeFilters;
+        const response = hasSearchCriteria
+          ? await searchGlossaryTermsPaginated({
+            glossary: activeGlossary.id,
+            parentBusinessVersion,
+            q: searchTerm.trim() || undefined,
+            statuses: hasStatusCriteria
+              ? withoutAll(selectedStatus).join(',')
+              : undefined,
+            domainIds:
+                withoutAll(selectedCdeDomains).join(',') || undefined,
+            ownerIds: withoutAll(selectedCdeOwners).join(',') || undefined,
+            dataSourceTags:
+                withoutAll(selectedCdeDataSources).join(',') || undefined,
+            classificationTags:
+                withoutAll(selectedCdeClassifications).join(',') || undefined,
+            limit: pageSize,
+            offset: (currentPage - 1) * pageSize,
+          })
+          : await getGlossaryTerms({
+            glossary: activeGlossary.id,
+            parentBusinessVersion,
+            limit: pageSize,
+            offset: (currentPage - 1) * pageSize,
+            fields: CDE_GLOSSARY_TERM_FIELDS,
+          });
+        if (
+          workflowKey !== termsWorkflowKeyRef.current ||
+          requestGeneration !== termsRequestGenerationRef.current
+        ) {
           return;
         }
         const flatRows = response.data.map((row) => {
@@ -1341,7 +1374,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         // A workflow transition can start a new request before the previous
         // one finishes. Do not let that stale response clear the refreshed
         // CDE list (the rows otherwise reappear only after a page reload).
-        if (workflowKey !== termsWorkflowKeyRef.current) {
+        if (
+          workflowKey !== termsWorkflowKeyRef.current ||
+          requestGeneration !== termsRequestGenerationRef.current
+        ) {
           return;
         }
 
@@ -1378,7 +1414,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             : undefined;
 
       if (!isWorkingGlossaryVersion && versionTermIds?.length === 0) {
-        if (workflowKey !== termsWorkflowKeyRef.current) {
+        if (
+          workflowKey !== termsWorkflowKeyRef.current ||
+          requestGeneration !== termsRequestGenerationRef.current
+        ) {
           return;
         }
 
@@ -1620,7 +1659,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         )) as unknown as ModifiedGlossary[];
       }
 
-      if (workflowKey !== termsWorkflowKeyRef.current) {
+      if (
+        workflowKey !== termsWorkflowKeyRef.current ||
+        requestGeneration !== termsRequestGenerationRef.current
+      ) {
         return;
       }
 

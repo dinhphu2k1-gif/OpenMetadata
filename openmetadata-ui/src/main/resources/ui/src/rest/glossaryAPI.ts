@@ -55,6 +55,14 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
   parent?: string;
   parentFqn?: string;
   entityStatus?: string;
+  parentBusinessVersion?: string;
+  statuses?: string;
+  domainIds?: string;
+  ownerIds?: string;
+  dataSourceTags?: string;
+  classificationTags?: string;
+  sortField?: 'name' | 'displayName' | 'businessVersion' | 'entityStatus';
+  sortOrder?: 'asc' | 'desc';
 };
 
 const BASE_URL = '/glossaries';
