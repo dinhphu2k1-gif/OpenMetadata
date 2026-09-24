@@ -59,6 +59,10 @@ import {
 } from '../../../utils/RouterUtils';
 import { getTermQuery } from '../../../utils/SearchUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import {
+  getCdeDetailPath,
+  parseCdeRoute,
+} from '../../../utils/routing/cdeRoutingHelper';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
 import Loader from '../../common/Loader/Loader';
 import {
@@ -101,12 +105,16 @@ const GlossaryTermsV1 = ({
   const { fqn: glossaryFqn } = useFqn();
   const navigate = useNavigate();
   const location = useLocation();
-  const businessVersion = new URLSearchParams(location.search).get(
-    'businessVersion',
+  const cdeRoute = useMemo(
+    () =>
+      parseCdeRoute({
+        fqn: glossaryFqn,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [glossaryFqn, location.pathname, location.search],
   );
-  const parentBusinessVersion = new URLSearchParams(location.search).get(
-    'parentBusinessVersion',
-  );
+  const { businessVersion, parentBusinessVersion } = cdeRoute;
   const { currentUser } = useApplicationStore();
   const isAdmin = Boolean(currentUser?.isAdmin);
   const assetTabRef = useRef<AssetsTabRef>(null);
@@ -164,21 +172,42 @@ const GlossaryTermsV1 = ({
           snapshotBusinessVersion,
           currentBusinessVersion,
         ) === 0;
-      const searchParams = new URLSearchParams(location.search);
-
       if (isLatestVersion) {
         setViewedVersion(null);
       } else {
         setViewedVersion(snapshot);
       }
-      searchParams.set('businessVersion', snapshotBusinessVersion);
 
-      navigate({
-        pathname: location.pathname,
-        search: searchParams.toString(),
-      });
+      if (parentBusinessVersion) {
+        navigate(
+          getCdeDetailPath({
+            fqn:
+              snapshot.fullyQualifiedName ??
+              currentGlossaryTerm.fullyQualifiedName ??
+              glossaryFqn,
+            businessVersion: snapshotBusinessVersion,
+            parentBusinessVersion,
+            isWorkingDraft:
+              snapshot.entityStatus !== EntityStatus.Approved,
+          }),
+        );
+      } else {
+        const searchParams = new URLSearchParams(location.search);
+        searchParams.set('businessVersion', snapshotBusinessVersion);
+        navigate({
+          pathname: location.pathname,
+          search: searchParams.toString(),
+        });
+      }
     },
-    [currentGlossaryTerm, location.pathname, location.search, navigate],
+    [
+      currentGlossaryTerm,
+      glossaryFqn,
+      location.pathname,
+      location.search,
+      navigate,
+      parentBusinessVersion,
+    ],
   );
 
   useEffect(() => {
@@ -580,8 +609,28 @@ const GlossaryTermsV1 = ({
               handleVersionSelect(snapshot as GlossaryTerm)
             }
             onWorkflowTransition={async (updated, action) => {
+              const updatedTerm = updated as GlossaryTerm;
               setViewedVersion(null);
-              setTransitionedWorking(updated as GlossaryTerm);
+              setTransitionedWorking(updatedTerm);
+              if (parentBusinessVersion && action !== 'createDraft') {
+                navigate(
+                  getCdeDetailPath({
+                    fqn:
+                      updatedTerm.fullyQualifiedName ??
+                      glossaryTerm.fullyQualifiedName ??
+                      glossaryFqn,
+                    businessVersion: getBusinessVersion(
+                      updatedTerm.businessVersion,
+                    ),
+                    parentBusinessVersion,
+                    isWorkingDraft: ![
+                      EntityStatus.Approved,
+                      EntityStatus.Archived,
+                    ].includes(updatedTerm.entityStatus as EntityStatus),
+                  }),
+                  { replace: true },
+                );
+              }
               if (action !== 'createDraft') {
                 await refreshActiveGlossaryTerm?.();
               }

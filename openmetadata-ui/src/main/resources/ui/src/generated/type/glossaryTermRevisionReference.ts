@@ -11,8 +11,11 @@
  *  limitations under the License.
  */
 /**
- * Optimistic-lock request for a Data Dictionary workflow transition.
+ * Immutable glossary term revision included in a published glossary snapshot.
  */
-export interface GlossaryWorkflowTransitionRequest {
-    expectedRevision: number;
+export interface GlossaryTermRevisionReference {
+    displayOrder:        number;
+    termBusinessVersion: string;
+    termId:              string;
+    termSnapshotId:      string;
 }

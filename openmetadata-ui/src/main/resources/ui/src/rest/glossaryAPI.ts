@@ -23,8 +23,8 @@ import { SearchIndex } from '../enums/search.enum';
 import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssetsRequest';
 import { CreateGlossary } from '../generated/api/data/createGlossary';
 import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
-import { CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
-import { CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
+import { CDEDraftUpdateRequest as CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
+import { CDEWorkflowTransitionRequest as CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
 import { GlossaryWorkflowTransitionRequest } from '../generated/api/data/glossaryWorkflowTransitionRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
@@ -35,6 +35,10 @@ import { ChangeEvent } from '../generated/type/changeEvent';
 import { EntityHistory } from '../generated/type/entityHistory';
 import { ListParams, ListParamsWithOffset } from '../interface/API.interface';
 import { getEncodedFqn } from '../utils/StringUtils';
+import {
+  normalizeCdeParentBusinessVersion,
+  parseCdeRoute,
+} from '../utils/routing/cdeRoutingHelper';
 import APIClient from './index';
 
 export type ListGlossaryTermsParams = ListParams & {
@@ -53,6 +57,18 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
 };
 
 const BASE_URL = '/glossaries';
+
+const parentScopeFromRoute = () => {
+  const scope = parseCdeRoute({
+    pathname: globalThis.location?.pathname,
+    search: globalThis.location?.search,
+  }).parentBusinessVersion;
+  if (!scope) {
+    throw new Error('parentBusinessVersion is required for CDE operations');
+  }
+
+  return scope;
+};
 
 export type GlossaryWorkflowAction =
   | 'createDraft'
@@ -236,6 +252,11 @@ export const transitionGlossaryWorkflow = async (
   }
   if (action !== 'createDraft') {
     request = { expectedRevision: request.expectedRevision as number };
+  } else {
+    request = {
+      businessVersion: (request as GlossaryWorkflowRequest)
+        .businessVersion as string,
+    };
   }
   const path = action === 'createDraft' ? 'working' : `working/${action}`;
   const response = await APIClient.post<
@@ -315,9 +336,19 @@ export const getPublishedGlossaryTerm = async (
   return response.data;
 };
 
-export const getGlossaryTermWorkingVersion = async (id: string) => {
+export const getGlossaryTermWorkingVersion = async (
+  id: string,
+  parentBusinessVersion?: string
+) => {
   const response = await APIClient.get<GlossaryTerm>(
-    `/glossaryTerms/${id}/working`
+    `/glossaryTerms/${id}/working`,
+    {
+      params: {
+        parentBusinessVersion:
+          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+          parentScopeFromRoute(),
+      },
+    }
   );
 
   return response.data;
@@ -325,12 +356,18 @@ export const getGlossaryTermWorkingVersion = async (id: string) => {
 
 export const createGlossaryTermWorkingVersion = async (
   id: string,
-  businessVersion: string
+  businessVersion: string,
+  parentBusinessVersion: string
 ) => {
   const response = await APIClient.post<
     { businessVersion: string },
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/working`, { businessVersion });
+  >(`/glossaryTerms/${id}/working`, {
+    businessVersion,
+    parentBusinessVersion:
+      normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+      parentBusinessVersion,
+  });
 
   return response.data;
 };
@@ -354,6 +391,7 @@ export const updateGlossaryTermWorkingVersion = async (
     CdeDraftUpdateRequest,
     AxiosResponse<GlossaryTerm>
   >(`/glossaryTerms/${id}/working`, request, {
+    params: { parentBusinessVersion: parentScopeFromRoute() },
     headers: { 'Content-Type': 'application/json' },
   });
 
@@ -371,17 +409,20 @@ export const getGlossaryTermVersionPermissions = async (id: string) => {
 export async function transitionGlossaryTermWorkflow(
   id: string,
   action: 'submit' | 'reject' | 'reopen',
-  request: CdeWorkflowTransitionRequest
+  request: CdeWorkflowTransitionRequest,
+  parentBusinessVersion?: string
 ): Promise<GlossaryTerm>;
 export async function transitionGlossaryTermWorkflow(
   id: string,
   action: Exclude<GlossaryWorkflowAction, 'submit' | 'reject' | 'reopen'>,
-  request: GlossaryWorkflowRequest
+  request: GlossaryWorkflowRequest,
+  parentBusinessVersion?: string
 ): Promise<GlossaryTerm>;
 export async function transitionGlossaryTermWorkflow(
   id: string,
   action: GlossaryWorkflowAction,
-  request: GlossaryWorkflowRequest | CdeWorkflowTransitionRequest
+  request: GlossaryWorkflowRequest | CdeWorkflowTransitionRequest,
+  parentBusinessVersion?: string
 ) {
   if (action === 'revoke') {
     const response = await APIClient.post<
@@ -395,7 +436,16 @@ export async function transitionGlossaryTermWorkflow(
   const response = await APIClient.post<
     GlossaryWorkflowRequest,
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/${path}`, request);
+  >(`/glossaryTerms/${id}/${path}`, request, {
+    params:
+      action === 'createDraft'
+        ? undefined
+        : {
+            parentBusinessVersion:
+              normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+              parentScopeFromRoute(),
+          },
+  });
 
   return response.data;
 }
@@ -408,7 +458,7 @@ export async function transitionGlossaryTermWorkflow(
 // by the backend, so callers should compare response length to input.
 export const getGlossaryTermsByIds = async (
   ids: string[],
-  params?: ListParams
+  params?: ListParams & { parentBusinessVersion?: string }
 ): Promise<GlossaryTerm[]> => {
   if (ids.length === 0) {
     return [];
@@ -663,7 +713,8 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   entityStatus?: string,
   fields?: string[],
   before?: string,
-  glossaryId?: string
+  glossaryId?: string,
+  parentBusinessVersion?: string
 ) => {
   const apiUrl = `/glossaryTerms`;
 
@@ -683,6 +734,7 @@ export const getFirstLevelGlossaryTermsPaginated = async (
       after: after,
       before,
       entityStatus,
+      ...(parentBusinessVersion ? { parentBusinessVersion } : {}),
     },
   });
 

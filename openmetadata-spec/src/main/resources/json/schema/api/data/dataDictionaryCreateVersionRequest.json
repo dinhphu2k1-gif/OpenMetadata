@@ -1,0 +1,17 @@
+{
+  "$id": "https://open-metadata.org/schema/api/data/dataDictionaryCreateVersionRequest.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DataDictionaryCreateVersionRequest",
+  "description": "Request to create the exact next, blank Data Dictionary working version.",
+  "javaType": "org.openmetadata.schema.api.data.DataDictionaryCreateVersionRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["businessVersion"],
+  "properties": {
+    "businessVersion": {
+      "type": "string",
+      "pattern": "^[1-9]\\d*$",
+      "maxLength": 64
+    }
+  }
+}

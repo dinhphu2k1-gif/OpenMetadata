@@ -804,7 +804,10 @@ const DQImportPage: FC = () => {
         } else {
           // Tạo mới bản ghi: Luôn ở trạng thái Draft
           const { businessVersion, ...createPayload } = payload;
-          const newTerm = await addGlossaryTerm(createPayload);
+          const newTerm = await addGlossaryTerm({
+            ...createPayload,
+            parentBusinessVersion: businessVersion.split('.')[0],
+          });
           const working = await transitionGlossaryTermWorkflow(
             newTerm.id,
             'createDraft',

@@ -11,8 +11,8 @@
  *  limitations under the License.
  */
 /**
- * Optimistic-lock request for a Data Dictionary workflow transition.
+ * Request to create the exact next, blank Data Dictionary working version.
  */
-export interface GlossaryWorkflowTransitionRequest {
-    expectedRevision: number;
+export interface DataDictionaryCreateVersionRequest {
+    businessVersion: string;
 }

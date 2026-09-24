@@ -178,7 +178,8 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
    * side effects deliberately run only after commit, so a failed working insert cannot leave an
    * index/event for an orphan identity.
    */
-  public WorkingVersionRecord createInitialDraft(GlossaryTerm term, String actor) {
+  public WorkingVersionRecord createInitialDraft(
+      GlossaryTerm term, String parentBusinessVersion, String actor) {
     prepareInternal(term, false);
     term.setUpdatedBy(actor);
     long now = System.currentTimeMillis();
@@ -238,9 +239,11 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                             GLOSSARY_TERM,
                             Relationship.HAS.ordinal());
                   }
+                  String initialVersion = parentBusinessVersion + ".0";
                   GlossaryTerm payload =
                       JsonUtils.readValue(JsonUtils.pojoToJson(term), GlossaryTerm.class)
-                          .withBusinessVersion("1.0")
+                          .withBusinessVersion(initialVersion)
+                          .withParentBusinessVersion(parentBusinessVersion)
                           .withWorkingRevision(null)
                           .withEntityStatus(EntityStatus.DRAFT);
                   versions.insertWorking(
@@ -248,13 +251,15 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                       GLOSSARY_TERM,
                       term.getId(),
                       term.getGlossary().getId(),
-                      "1.0",
+                      parentBusinessVersion,
+                      initialVersion,
                       EntityStatus.DRAFT.value(),
                       term.getVersion(),
                       JsonUtils.pojoToJson(payload),
                       now,
                       actor);
-                  return versions.findWorking(GLOSSARY_TERM, term.getId());
+                  return versions.findWorking(
+                      GLOSSARY_TERM, term.getId(), parentBusinessVersion);
                 });
     postCreate(identity);
     writeThroughCache(identity, false);
@@ -1145,12 +1150,24 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     // Validate parent
     if (entity.getParent() == null) { // Glossary term at the root of the glossary
       entity.setFullyQualifiedName(
-          FullyQualifiedName.build(entity.getGlossary().getFullyQualifiedName(), entity.getName()));
+          buildScopedCdeFqn(
+              entity.getGlossary().getFullyQualifiedName(),
+              entity.getName(),
+              entity.getParentBusinessVersion()));
     } else { // Glossary term that is a child of another glossary term
       EntityReference parent = entity.getParent();
       entity.setFullyQualifiedName(
           FullyQualifiedName.add(parent.getFullyQualifiedName(), entity.getName()));
     }
+  }
+
+  static String buildScopedCdeFqn(
+      String glossaryFullyQualifiedName, String termName, String parentBusinessVersion) {
+    String scopedName =
+        parentBusinessVersion == null
+            ? termName
+            : termName + "@v" + parentBusinessVersion;
+    return FullyQualifiedName.build(glossaryFullyQualifiedName, scopedName);
   }
 
   public BulkOperationResult bulkAddAndValidateGlossaryToAssets(
@@ -1574,8 +1591,14 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     return getFromEntityRef(term.getId(), preferred, GLOSSARY, true);
   }
 
-  public EntityReference getGlossary(String id) {
-    return Entity.getEntityReferenceById(GLOSSARY, UUID.fromString(id), ALL);
+  public EntityReference getGlossary(String idOrFqn) {
+    try {
+      return Entity.getEntityReferenceById(GLOSSARY, UUID.fromString(idOrFqn), ALL);
+    } catch (IllegalArgumentException ignored) {
+      // Older UI call sites use the glossary FQN for this list filter. Resolve both contracts so a
+      // refresh after a bulk workflow action cannot try to parse "Data Dictionary" as a UUID.
+      return Entity.getEntityReferenceByName(GLOSSARY, idOrFqn, ALL);
+    }
   }
 
   @Override
@@ -2102,6 +2125,13 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   }
 
   private void checkDuplicateTerms(GlossaryTerm entity) {
+    // BusinessWorkflow CDE names are unique inside a Data Dictionary business-version scope.
+    // The scoped FQN is protected by glossary_term_entity.fqnHash and provides the race-safe
+    // constraint. This legacy query spans the whole glossary and would reject alo1@v2 merely
+    // because alo1@v1 already exists.
+    if (entity.getParentBusinessVersion() != null) {
+      return;
+    }
     int count =
         daoCollection
             .glossaryTermDAO()

@@ -11,8 +11,13 @@
  *  limitations under the License.
  */
 /**
- * Optimistic-lock request for a Data Dictionary workflow transition.
+ * Request used to create or mutate a glossary or glossary term working business version.
  */
-export interface GlossaryWorkflowTransitionRequest {
-    expectedRevision: number;
+export interface GlossaryWorkingVersionRequest {
+    businessVersion?:  string;
+    expectedRevision?: number;
+    /**
+     * Full working entity payload. The resource validates it against the target entity schema.
+     */
+    payload?: any;
 }

@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS `glossary_business_working` (
   `entityType` varchar(32) NOT NULL,
   `entityId` varchar(36) NOT NULL,
   `glossaryId` varchar(36) DEFAULT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
+  `scopeKey` varchar(64) GENERATED ALWAYS AS (coalesce(`parentBusinessVersion`,_utf8mb4'')) STORED,
   `businessVersion` varchar(64) NOT NULL,
   `entityStatus` varchar(32) NOT NULL,
   `revision` bigint unsigned NOT NULL,
@@ -20,16 +22,33 @@ CREATE TABLE IF NOT EXISTS `glossary_business_working` (
   `rejectedAt` bigint unsigned DEFAULT NULL,
   `rejectedBy` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`workingId`),
-  UNIQUE KEY `uq_glossary_working_entity` (`entityType`, `entityId`),
+  UNIQUE KEY `uq_glossary_working_entity_scope` (`entityType`, `entityId`, `scopeKey`),
   UNIQUE KEY `uq_glossary_working_version` (`entityType`, `entityId`, `businessVersion`),
-  KEY `idx_glossary_working_parent` (`glossaryId`, `entityType`)
+  KEY `idx_glossary_working_parent` (`glossaryId`, `entityType`),
+  KEY `idx_glossary_working_scope_status` (`glossaryId`,`parentBusinessVersion`,`entityStatus`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Early F03 builds created initial CDE drafts through the legacy DAO overload,
+-- leaving their parent scope NULL. Recover the exact Data Dictionary working
+-- scope so scoped workflow operations can resolve those drafts.
+UPDATE `glossary_business_working` AS cde
+JOIN `glossary_business_working` AS parent
+  ON parent.`entityType` = 'glossary'
+ AND parent.`entityId` = cde.`glossaryId`
+SET cde.`parentBusinessVersion` = parent.`businessVersion`,
+    cde.`payload` = JSON_SET(
+      cde.`payload`,
+      '$.parentBusinessVersion',
+      parent.`businessVersion`)
+WHERE cde.`entityType` = 'glossaryTerm'
+  AND cde.`parentBusinessVersion` IS NULL;
 
 CREATE TABLE IF NOT EXISTS `glossary_business_snapshot` (
   `snapshotId` varchar(36) NOT NULL,
   `entityType` varchar(32) NOT NULL,
   `entityId` varchar(36) NOT NULL,
   `glossaryId` varchar(36) DEFAULT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
   `businessVersion` varchar(64) NOT NULL,
   `nativeVersion` double DEFAULT NULL,
   `publicationSequence` bigint unsigned NOT NULL,
@@ -43,15 +62,18 @@ CREATE TABLE IF NOT EXISTS `glossary_business_snapshot` (
   UNIQUE KEY `uq_glossary_snapshot_version` (`entityType`, `entityId`, `businessVersion`),
   UNIQUE KEY `uq_glossary_snapshot_sequence` (`entityType`, `entityId`, `publicationSequence`),
   KEY `idx_glossary_snapshot_latest` (`entityType`, `entityId`, `publishedAt`),
-  KEY `idx_glossary_snapshot_parent` (`glossaryId`, `entityType`, `publishedAt`)
+  KEY `idx_glossary_snapshot_parent` (`glossaryId`, `entityType`, `publishedAt`),
+  KEY `idx_glossary_snapshot_scope` (`glossaryId`,`parentBusinessVersion`,`publishedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `glossary_published_head` (
   `entityType` varchar(32) NOT NULL,
   `entityId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
+  `scopeKey` varchar(64) GENERATED ALWAYS AS (coalesce(`parentBusinessVersion`,_utf8mb4'')) STORED,
   `snapshotId` varchar(36) NOT NULL,
   `publicationSequence` bigint unsigned NOT NULL,
-  PRIMARY KEY (`entityType`, `entityId`),
+  PRIMARY KEY (`entityType`, `entityId`, `scopeKey`),
   UNIQUE KEY `uq_glossary_published_head_snapshot` (`snapshotId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

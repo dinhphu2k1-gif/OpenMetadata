@@ -76,7 +76,7 @@ const AddGlossaryPage: FunctionComponent = () => {
     try {
       const res = await addGlossaries(data);
       const working = await transitionGlossaryWorkflow(res.id, 'createDraft', {
-        businessVersion: '1.0',
+        businessVersion: '1',
         payload: res,
       });
       goToGlossary(working.fullyQualifiedName ?? '');

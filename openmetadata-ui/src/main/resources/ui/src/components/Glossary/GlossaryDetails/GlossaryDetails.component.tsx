@@ -41,6 +41,7 @@ import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import TabsLabel from '../../common/TabsLabel/TabsLabel.component';
 import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
 import { Glossary } from '../../../generated/entity/data/glossary';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
@@ -59,7 +60,11 @@ const GlossaryDetails = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { activeGlossary: glossary, updateActiveGlossary } = useGlossaryStore();
+  const {
+    activeGlossary: glossary,
+    updateActiveGlossary,
+    visibleGlossaryTermsCount,
+  } = useGlossaryStore();
   const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
   const currentGlossary = viewedVersion ?? glossary;
 
@@ -162,9 +167,10 @@ const GlossaryDetails = ({
         label: (
           <TabsLabel
             count={
-              Array.isArray(glossary.termRevisions)
+              visibleGlossaryTermsCount ??
+              (Array.isArray(glossary.termRevisions)
                 ? glossary.termRevisions.length
-                : glossary.termCount ?? glossary.childrenCount ?? 0
+                : glossary.termCount ?? glossary.childrenCount ?? 0)
             }
             id={EntityTabs.TERMS}
             isActive={activeTab === EntityTabs.TERMS}
@@ -211,6 +217,7 @@ const GlossaryDetails = ({
   }, [
     customizedTabs,
     glossary.fullyQualifiedName,
+    visibleGlossaryTermsCount,
     feedCount.conversationCount,
     feedCount.totalTasksCount,
     activeTab,
@@ -235,7 +242,9 @@ const GlossaryDetails = ({
     <GenericProvider<Glossary>
       data={currentGlossary}
       isTabExpanded={isTabExpanded}
-      isVersionView={isVersionView || Boolean(viewedVersion)}
+      isVersionView={
+        isVersionView || viewedVersion?.entityStatus === EntityStatus.Archived
+      }
       permissions={permissions}
       type={EntityType.GLOSSARY}
       onUpdate={updateGlossary}>

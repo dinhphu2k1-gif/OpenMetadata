@@ -1166,6 +1166,8 @@ CREATE TABLE `web_analytic_event` (
 CREATE TABLE IF NOT EXISTS `glossary_business_working` (
   `workingId` varchar(36) NOT NULL, `entityType` varchar(32) NOT NULL,
   `entityId` varchar(36) NOT NULL, `glossaryId` varchar(36) DEFAULT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
+  `scopeKey` varchar(64) GENERATED ALWAYS AS (coalesce(`parentBusinessVersion`,_utf8mb4'')) STORED,
   `businessVersion` varchar(64) NOT NULL, `entityStatus` varchar(32) NOT NULL,
   `revision` bigint unsigned NOT NULL, `nativeVersion` double DEFAULT NULL,
   `payload` json NOT NULL, `createdAt` bigint unsigned NOT NULL,
@@ -1174,14 +1176,16 @@ CREATE TABLE IF NOT EXISTS `glossary_business_working` (
   `submittedBy` varchar(256) DEFAULT NULL, `rejectedAt` bigint unsigned DEFAULT NULL,
   `rejectedBy` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`workingId`),
-  UNIQUE KEY `uq_glossary_working_entity` (`entityType`,`entityId`),
+  UNIQUE KEY `uq_glossary_working_entity_scope` (`entityType`,`entityId`,`scopeKey`),
   UNIQUE KEY `uq_glossary_working_version` (`entityType`,`entityId`,`businessVersion`),
-  KEY `idx_glossary_working_parent` (`glossaryId`,`entityType`)
+  KEY `idx_glossary_working_parent` (`glossaryId`,`entityType`),
+  KEY `idx_glossary_working_scope_status` (`glossaryId`,`parentBusinessVersion`,`entityStatus`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `glossary_business_snapshot` (
   `snapshotId` varchar(36) NOT NULL, `entityType` varchar(32) NOT NULL,
   `entityId` varchar(36) NOT NULL, `glossaryId` varchar(36) DEFAULT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
   `businessVersion` varchar(64) NOT NULL, `nativeVersion` double DEFAULT NULL,
   `publicationSequence` bigint unsigned NOT NULL, `payload` json NOT NULL,
   `contentHash` varchar(64) NOT NULL, `publishedAt` bigint unsigned NOT NULL,
@@ -1191,13 +1195,16 @@ CREATE TABLE IF NOT EXISTS `glossary_business_snapshot` (
   UNIQUE KEY `uq_glossary_snapshot_version` (`entityType`,`entityId`,`businessVersion`),
   UNIQUE KEY `uq_glossary_snapshot_sequence` (`entityType`,`entityId`,`publicationSequence`),
   KEY `idx_glossary_snapshot_latest` (`entityType`,`entityId`,`publishedAt`),
-  KEY `idx_glossary_snapshot_parent` (`glossaryId`,`entityType`,`publishedAt`)
+  KEY `idx_glossary_snapshot_parent` (`glossaryId`,`entityType`,`publishedAt`),
+  KEY `idx_glossary_snapshot_scope` (`glossaryId`,`parentBusinessVersion`,`publishedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `glossary_published_head` (
   `entityType` varchar(32) NOT NULL, `entityId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
+  `scopeKey` varchar(64) GENERATED ALWAYS AS (coalesce(`parentBusinessVersion`,_utf8mb4'')) STORED,
   `snapshotId` varchar(36) NOT NULL, `publicationSequence` bigint unsigned NOT NULL,
-  PRIMARY KEY (`entityType`,`entityId`), UNIQUE KEY `uq_glossary_published_head_snapshot` (`snapshotId`)
+  PRIMARY KEY (`entityType`,`entityId`,`scopeKey`), UNIQUE KEY `uq_glossary_published_head_snapshot` (`snapshotId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `glossary_snapshot_term` (

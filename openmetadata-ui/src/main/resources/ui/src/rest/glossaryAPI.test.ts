@@ -7,6 +7,8 @@ import {
   addGlossaryTerm,
   getFirstLevelGlossaryTermsPaginated,
   getGlossaryPublishPreview,
+  getGlossaryTermWorkingVersion,
+  transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
   updateGlossaryTermWorkingVersion,
 } from './glossaryAPI';
@@ -20,7 +22,10 @@ jest.mock('./index', () => ({
 const client = APIClient as jest.Mocked<typeof APIClient>;
 
 describe('F03 CDE draft API', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.history.replaceState({}, '', '/?parentBusinessVersion=1');
+  });
 
   it('creates the identity and initial Draft with one POST', async () => {
     client.post.mockResolvedValue({
@@ -31,6 +36,7 @@ describe('F03 CDE draft API', () => {
       glossary: 'Data Dictionary',
       name: 'CDE_001',
       description: 'Customer identifier',
+      parentBusinessVersion: '2',
     });
 
     expect(client.post).toHaveBeenCalledTimes(1);
@@ -38,8 +44,36 @@ describe('F03 CDE draft API', () => {
       glossary: 'Data Dictionary',
       name: 'CDE_001',
       description: 'Customer identifier',
+      parentBusinessVersion: '2',
     });
     expect(client.patch).not.toHaveBeenCalled();
+  });
+
+  it('loads a working CDE from the explicitly selected Dictionary scope', async () => {
+    client.get.mockResolvedValue({ data: { id: 'term-id' } });
+
+    await getGlossaryTermWorkingVersion('term-id', '2');
+
+    expect(client.get).toHaveBeenCalledWith('/glossaryTerms/term-id/working', {
+      params: { parentBusinessVersion: '2' },
+    });
+  });
+
+  it('submits a CDE using the row scope instead of the current route fallback', async () => {
+    client.post.mockResolvedValue({ data: { id: 'term-id' } });
+
+    await transitionGlossaryTermWorkflow(
+      'term-id',
+      'submit',
+      { expectedRevision: 1 },
+      '2'
+    );
+
+    expect(client.post).toHaveBeenCalledWith(
+      '/glossaryTerms/term-id/working/submit',
+      { expectedRevision: 1 },
+      { params: { parentBusinessVersion: '2' } }
+    );
   });
 
   it('sends only the complete mutable allowlist when saving', async () => {
@@ -71,7 +105,11 @@ describe('F03 CDE draft API', () => {
         reviewers: [],
         domains: [],
         tags: [],
-        extension: null,
+        extension: {},
+      },
+      {
+        params: { parentBusinessVersion: '1' },
+        headers: { 'Content-Type': 'application/json' },
       }
     );
   });
@@ -138,6 +176,20 @@ describe('F09 Data Dictionary publication API', () => {
       );
     }
   );
+
+  it('sends only businessVersion when creating the exact next Dictionary', async () => {
+    client.post.mockResolvedValue({ data: { businessVersion: '2' } });
+
+    await transitionGlossaryWorkflow('dictionary-id', 'createDraft', {
+      businessVersion: '2',
+      expectedRevision: 99,
+      payload: { description: 'must not be sent' } as never,
+    });
+
+    expect(client.post).toHaveBeenCalledWith('/glossaries/dictionary-id/working', {
+      businessVersion: '2',
+    });
+  });
 
   it('does not retain the removed F08 working terms route', async () => {
     client.get.mockResolvedValue({ data: {} });

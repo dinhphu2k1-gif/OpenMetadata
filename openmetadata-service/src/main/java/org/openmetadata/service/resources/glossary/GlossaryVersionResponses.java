@@ -17,6 +17,7 @@ final class GlossaryVersionResponses {
   static Map<String, Object> working(WorkingVersionRecord record) {
     Map<String, Object> payload = payload(record.payload());
     payload.put("businessVersion", record.businessVersion());
+    putIfPresent(payload, "parentBusinessVersion", record.parentBusinessVersion());
     payload.put("workingRevision", record.revision());
     payload.put("entityStatus", record.entityStatus());
     payload.put("updatedAt", record.updatedAt());
@@ -39,6 +40,7 @@ final class GlossaryVersionResponses {
   static Map<String, Object> published(PublishedSnapshotRecord record) {
     Map<String, Object> payload = payload(record.payload());
     payload.put("businessVersion", record.businessVersion());
+    putIfPresent(payload, "parentBusinessVersion", record.parentBusinessVersion());
     if (record.archivedAt() != null) {
       payload.put("entityStatus", "Archived");
       payload.put("archivedAt", record.archivedAt());

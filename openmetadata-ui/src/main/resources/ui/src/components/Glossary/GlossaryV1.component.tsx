@@ -27,7 +27,10 @@ import {
 import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../enums/common.enum';
 import { EntityAction, EntityTabs, EntityType } from '../../enums/entity.enum';
 import { Glossary } from '../../generated/entity/data/glossary';
-import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../generated/entity/data/glossaryTerm';
 import { PageType } from '../../generated/system/ui/page';
 import { useCustomPages } from '../../hooks/useCustomPages';
 import { VERSION_VIEW_GLOSSARY_PERMISSION } from '../../mocks/Glossary.mock';
@@ -41,6 +44,7 @@ import {
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
 import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
+import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
 import { updateGlossaryTermByFqn } from '../../utils/GlossaryUtils';
 import {
   isDataDictionaryGlossary,
@@ -48,6 +52,7 @@ import {
 } from '../../constants/Glossary.contant';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
+import { getCdeDetailPath } from '../../utils/routing/cdeRoutingHelper';
 import { showErrorToast } from '../../utils/ToastUtils';
 import { useRequiredParams } from '../../utils/useRequiredParams';
 import ErrorPlaceHolder from '../common/ErrorWithPlaceholder/ErrorPlaceHolder';
@@ -140,7 +145,14 @@ const GlossaryV1 = ({
       const { data, paging } = await getFirstLevelGlossaryTermsPaginated(
         params?.glossary ?? params?.parent ?? '',
         PAGE_SIZE_LARGE,
-        append ? afterCursor : undefined
+        append ? afterCursor : undefined,
+        undefined,
+        undefined,
+        undefined,
+        params?.glossary ? selectedData.id : undefined,
+        params?.glossary
+          ? getBusinessVersion(selectedData.businessVersion, '1')
+          : undefined
       );
 
       if (append) {
@@ -218,7 +230,13 @@ const GlossaryV1 = ({
         append
       );
     },
-    [fullyQualifiedName, isGlossaryActive, afterCursor]
+    [
+      fullyQualifiedName,
+      isGlossaryActive,
+      afterCursor,
+      selectedData.id,
+      selectedData.businessVersion,
+    ]
   );
 
   const loadMoreTerms = useCallback(() => {
@@ -254,7 +272,10 @@ const GlossaryV1 = ({
     const working =
       currentData.workingRevision != null
         ? currentData
-        : await getGlossaryTermWorkingVersion(currentData.id);
+        : await getGlossaryTermWorkingVersion(
+            currentData.id,
+            currentData.parentBusinessVersion
+          );
     const response = await updateGlossaryTermWorkingVersion(
       currentData.id,
       working.workingRevision as number,
@@ -282,7 +303,26 @@ const GlossaryV1 = ({
       setTermsLoading(true);
       // Update store with newly created term
       insertNewGlossaryTermToChildTerms(term);
-      if (!isGlossaryActive && tab !== EntityTabs.GLOSSARY_TERMS) {
+      // Close the controlled modal before navigating to the newly-created CDE. Glossary routes
+      // reuse this component, so navigating first can preserve the open state on the next view.
+      setIsEditModalOpen(false);
+      setTermsLoading(false);
+      if (
+        isGlossaryActive &&
+        isDataDictionaryGlossary(selectedData) &&
+        term.fullyQualifiedName &&
+        term.businessVersion &&
+        term.parentBusinessVersion
+      ) {
+        navigate(
+          getCdeDetailPath({
+            fqn: term.fullyQualifiedName,
+            businessVersion: term.businessVersion,
+            parentBusinessVersion: term.parentBusinessVersion,
+            isWorkingDraft: true,
+          })
+        );
+      } else if (!isGlossaryActive && tab !== EntityTabs.GLOSSARY_TERMS) {
         navigate(
           getGlossaryTermDetailsPath(
             selectedData.fullyQualifiedName || '',
@@ -290,15 +330,18 @@ const GlossaryV1 = ({
           )
         );
       }
-      // Close modal and set loading to false
-      setIsEditModalOpen(false);
-      setTermsLoading(false);
       // Refresh glossary list to update term count
       if (isGlossaryActive && refreshGlossaryList) {
         refreshGlossaryList();
       }
     },
-    [isGlossaryActive, tab, selectedData, refreshGlossaryList]
+    [
+      isGlossaryActive,
+      tab,
+      selectedData,
+      refreshGlossaryList,
+      navigate,
+    ]
   );
 
   const handleGlossaryTermAdd = async (formData: GlossaryTermForm) => {
@@ -314,6 +357,10 @@ const GlossaryV1 = ({
         (domain) => domain.fullyQualifiedName ?? domain.name ?? ''
       ),
       glossary: selectedData.fullyQualifiedName ?? '',
+      parentBusinessVersion: getBusinessVersion(
+        selectedData.businessVersion,
+        '1'
+      ),
     });
     onTermModalSuccess(term);
   };
@@ -398,7 +445,11 @@ const GlossaryV1 = ({
           // Fail closed: mutation controls stay hidden when workflow authorization is unknown.
         }
 
-        if (isConsumer) {
+        const isImmutableApprovedTerm =
+          !isGlossaryActive &&
+          selectedData.entityStatus === EntityStatus.Approved;
+
+        if (isConsumer || isImmutableApprovedTerm) {
           const readOnlyPermission = {
             ...VERSION_VIEW_GLOSSARY_PERMISSION,
             ViewAll: permission.ViewAll,
@@ -449,7 +500,13 @@ const GlossaryV1 = ({
     return () => {
       setGlossaryChildTerms([]);
     };
-  }, [id, isGlossaryActive, isVersionsView, action]);
+  }, [
+    id,
+    isGlossaryActive,
+    isVersionsView,
+    action,
+    selectedData.entityStatus,
+  ]);
 
   useEffect(() => {
     setGlossaryFunctionRef({

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS glossary_business_working (
   entityType varchar(32) NOT NULL,
   entityId varchar(36) NOT NULL,
   glossaryId varchar(36),
+  parentBusinessVersion varchar(64),
   businessVersion varchar(64) NOT NULL,
   entityStatus varchar(32) NOT NULL,
   revision bigint NOT NULL,
@@ -19,18 +20,38 @@ CREATE TABLE IF NOT EXISTS glossary_business_working (
   submittedBy varchar(256),
   rejectedAt bigint,
   rejectedBy varchar(256),
-  CONSTRAINT uq_glossary_working_entity UNIQUE (entityType, entityId),
   CONSTRAINT uq_glossary_working_version UNIQUE (entityType, entityId, businessVersion)
 );
 
 CREATE INDEX IF NOT EXISTS idx_glossary_working_parent
   ON glossary_business_working (glossaryId, entityType);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_glossary_working_entity_scope
+  ON glossary_business_working (entityType, entityId, COALESCE(parentBusinessVersion, ''));
+CREATE INDEX IF NOT EXISTS idx_glossary_working_scope_status
+  ON glossary_business_working (glossaryId, parentBusinessVersion, entityStatus);
+
+-- Early F03 builds created initial CDE drafts through the legacy DAO overload,
+-- leaving their parent scope NULL. Recover the exact Data Dictionary working
+-- scope so scoped workflow operations can resolve those drafts.
+UPDATE glossary_business_working AS cde
+SET parentBusinessVersion = parent.businessVersion,
+    payload = jsonb_set(
+      cde.payload,
+      '{parentBusinessVersion}',
+      to_jsonb(parent.businessVersion),
+      true)
+FROM glossary_business_working AS parent
+WHERE cde.entityType = 'glossaryTerm'
+  AND cde.parentBusinessVersion IS NULL
+  AND parent.entityType = 'glossary'
+  AND parent.entityId = cde.glossaryId;
 
 CREATE TABLE IF NOT EXISTS glossary_business_snapshot (
   snapshotId varchar(36) PRIMARY KEY,
   entityType varchar(32) NOT NULL,
   entityId varchar(36) NOT NULL,
   glossaryId varchar(36),
+  parentBusinessVersion varchar(64),
   businessVersion varchar(64) NOT NULL,
   nativeVersion double precision,
   publicationSequence bigint NOT NULL,
@@ -48,14 +69,19 @@ CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_latest
   ON glossary_business_snapshot (entityType, entityId, publishedAt DESC);
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_parent
   ON glossary_business_snapshot (glossaryId, entityType, publishedAt DESC);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_scope
+  ON glossary_business_snapshot (glossaryId, parentBusinessVersion, publishedAt DESC);
 
 CREATE TABLE IF NOT EXISTS glossary_published_head (
   entityType varchar(32) NOT NULL,
   entityId varchar(36) NOT NULL,
+  parentBusinessVersion varchar(64),
   snapshotId varchar(36) NOT NULL UNIQUE,
   publicationSequence bigint NOT NULL,
-  PRIMARY KEY (entityType, entityId)
+  UNIQUE (entityType, entityId, parentBusinessVersion)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_glossary_published_head_entity_scope
+  ON glossary_published_head (entityType, entityId, COALESCE(parentBusinessVersion, ''));
 
 CREATE TABLE IF NOT EXISTS glossary_snapshot_term (
   glossarySnapshotId varchar(36) NOT NULL,

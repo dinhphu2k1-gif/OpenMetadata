@@ -13,7 +13,6 @@
 
 package org.openmetadata.service.resources.glossary;
 
-
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -53,10 +52,10 @@ import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
+import org.openmetadata.schema.api.data.DataDictionaryCreateVersionRequest;
 import org.openmetadata.schema.api.data.GlossaryDraftPayload;
 import org.openmetadata.schema.api.data.GlossaryDraftUpdateRequest;
 import org.openmetadata.schema.api.data.GlossaryWorkflowTransitionRequest;
-import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.RestoreEntity;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.type.ChangeEvent;
@@ -110,6 +109,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   public void initialize(OpenMetadataApplicationConfig config) throws IOException {
     super.initialize(config);
     DataDictionaryBootstrap.initialize();
+    versioningService.processPendingOutbox();
   }
 
   @GET
@@ -160,16 +160,15 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   @Operation(
       operationId = "createGlossaryWorkingVersion",
       summary = "Create a glossary working version")
-  public Map<String, Object> createWorkingVersion(
+  public Response createWorkingVersion(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @Valid GlossaryWorkingVersionRequest request) {
+      @Valid DataDictionaryCreateVersionRequest request) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, FIELDS, Include.NON_DELETED, null);
     GlossaryAuthorizationResolver.requireCreateVersion(capabilities(securityContext, glossary));
-    DataDictionaryResolver.requireDataDictionaryPayload(
-        request.getPayload() == null ? glossary : request.getPayload());
+    DataDictionaryResolver.requireDataDictionary(glossary);
     WorkingVersionRecord working =
         versioningService.createWorking(
             GlossaryVersioningService.GLOSSARY,
@@ -177,9 +176,14 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             null,
             request.getBusinessVersion(),
             glossary.getVersion(),
-            request.getPayload() == null ? glossary : request.getPayload(),
+            glossary,
             securityContext.getUserPrincipal().getName());
-    return GlossaryVersionResponses.working(working);
+    Map<String, Object> response = GlossaryVersionResponses.working(working);
+    response.put("capabilities", capabilitiesForWorking(securityContext, working).asMap());
+    return Response.created(
+            uriInfo.getBaseUriBuilder().path("v1/glossaries/{id}/working").build(id))
+        .entity(response)
+        .build();
   }
 
   @PATCH
@@ -350,10 +354,23 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    DataDictionaryResolver.requireDataDictionary(
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
-    return GlossaryVersionResponses.published(
-        versioningService.getPublished(GlossaryVersioningService.GLOSSARY, id, businessVersion));
+    Glossary glossary =
+        DataDictionaryResolver.requireDataDictionary(
+            getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
+    PublishedSnapshotRecord snapshot =
+        versioningService.getPublished(
+            GlossaryVersioningService.GLOSSARY, id, businessVersion);
+    Map<String, Object> response = GlossaryVersionResponses.published(snapshot);
+    int termCount = versioningService.listPublishedGlossaryTerms(id, businessVersion).size();
+    if (snapshot.archivedAt() == null
+        && versioningService.isLatestPublished(
+            GlossaryVersioningService.GLOSSARY, id, businessVersion)) {
+      if (!isConsumer(securityContext, glossary)) {
+        termCount += versioningService.listWorkingTermsByGlossary(id, businessVersion).size();
+      }
+    }
+    response.put("termCount", termCount);
+    return response;
   }
 
   @GET
@@ -369,16 +386,20 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         DataDictionaryResolver.requireDataDictionary(
             getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
+    PublishedSnapshotRecord glossarySnapshot =
+        versioningService.getPublished(
+            GlossaryVersioningService.GLOSSARY, id, businessVersion);
     List<Map<String, Object>> terms =
         new java.util.ArrayList<>(
             versioningService.listPublishedGlossaryTerms(id, businessVersion).stream()
                 .map(GlossaryVersionResponses::published)
                 .toList());
-    if (!isConsumer(securityContext, glossary)
+    if (glossarySnapshot.archivedAt() == null
+        && !isConsumer(securityContext, glossary)
         && versioningService.isLatestPublished(
             GlossaryVersioningService.GLOSSARY, id, businessVersion)) {
       terms.addAll(
-          versioningService.listWorkingTermsByGlossary(id).stream()
+          versioningService.listWorkingTermsByGlossary(id, businessVersion).stream()
               .map(GlossaryVersionResponses::working)
               .toList());
     }

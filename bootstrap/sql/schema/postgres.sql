@@ -1986,19 +1986,20 @@ GRANT ALL ON SCHEMA public TO openmetadata_user;
 
 CREATE TABLE IF NOT EXISTS public.glossary_business_working (
   workingId varchar(36) PRIMARY KEY, entityType varchar(32) NOT NULL,
-  entityId varchar(36) NOT NULL, glossaryId varchar(36), businessVersion varchar(64) NOT NULL,
+  entityId varchar(36) NOT NULL, glossaryId varchar(36), parentBusinessVersion varchar(64), businessVersion varchar(64) NOT NULL,
   entityStatus varchar(32) NOT NULL, revision bigint NOT NULL, nativeVersion double precision,
   payload jsonb NOT NULL, createdAt bigint NOT NULL, createdBy varchar(256) NOT NULL,
   updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL, submittedAt bigint,
   submittedBy varchar(256), rejectedAt bigint, rejectedBy varchar(256),
-  CONSTRAINT uq_glossary_working_entity UNIQUE (entityType, entityId),
   CONSTRAINT uq_glossary_working_version UNIQUE (entityType, entityId, businessVersion)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_working_parent ON public.glossary_business_working (glossaryId, entityType);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_glossary_working_entity_scope ON public.glossary_business_working (entityType, entityId, COALESCE(parentBusinessVersion, ''));
+CREATE INDEX IF NOT EXISTS idx_glossary_working_scope_status ON public.glossary_business_working (glossaryId, parentBusinessVersion, entityStatus);
 
 CREATE TABLE IF NOT EXISTS public.glossary_business_snapshot (
   snapshotId varchar(36) PRIMARY KEY, entityType varchar(32) NOT NULL,
-  entityId varchar(36) NOT NULL, glossaryId varchar(36), businessVersion varchar(64) NOT NULL,
+  entityId varchar(36) NOT NULL, glossaryId varchar(36), parentBusinessVersion varchar(64), businessVersion varchar(64) NOT NULL,
   nativeVersion double precision, publicationSequence bigint NOT NULL, payload jsonb NOT NULL,
   contentHash varchar(64) NOT NULL, publishedAt bigint NOT NULL, publishedBy varchar(256) NOT NULL,
   archivedAt bigint, archivedBy varchar(256),
@@ -2007,12 +2008,14 @@ CREATE TABLE IF NOT EXISTS public.glossary_business_snapshot (
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_latest ON public.glossary_business_snapshot (entityType, entityId, publishedAt DESC);
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_parent ON public.glossary_business_snapshot (glossaryId, entityType, publishedAt DESC);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_scope ON public.glossary_business_snapshot (glossaryId, parentBusinessVersion, publishedAt DESC);
 
 CREATE TABLE IF NOT EXISTS public.glossary_published_head (
-  entityType varchar(32) NOT NULL, entityId varchar(36) NOT NULL,
+  entityType varchar(32) NOT NULL, entityId varchar(36) NOT NULL, parentBusinessVersion varchar(64),
   snapshotId varchar(36) NOT NULL UNIQUE, publicationSequence bigint NOT NULL,
-  PRIMARY KEY (entityType, entityId)
+  UNIQUE (entityType, entityId, parentBusinessVersion)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_glossary_published_head_entity_scope ON public.glossary_published_head (entityType, entityId, COALESCE(parentBusinessVersion, ''));
 
 CREATE TABLE IF NOT EXISTS public.glossary_snapshot_term (
   glossarySnapshotId varchar(36) NOT NULL, termSnapshotId varchar(36) NOT NULL,

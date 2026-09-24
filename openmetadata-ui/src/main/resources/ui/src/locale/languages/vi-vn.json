@@ -3184,6 +3184,7 @@
     "no-features-data-available": "Không có dữ liệu tính năng nào khả dụng",
     "no-feed-available-for-selected-filter": "Không tìm thấy nguồn cấp dữ liệu nào. Hãy thử thay đổi bộ lọc.",
     "no-glossary-term": "Có vẻ như hiện tại chưa có Thuật ngữ Glossary nào được định nghĩa. Để tạo một thuật ngữ mới, hãy sử dụng nút 'Thêm thuật ngữ'.",
+    "no-approved-term-in-archived-glossary": "Phiên bản lưu trữ này không có thuật ngữ đã phê duyệt.",
     "no-glossary-terms-found": "Không tìm thấy thuật ngữ glossary nào. Hãy tạo một glossary và thêm các thuật ngữ để trực quan hóa các khái niệm kinh doanh của bạn.",
     "no-glossary-to-export": "Không có glossary nào khả dụng để xuất.",
     "no-hierarchical-relations-found": "Không tìm thấy quan hệ phân cấp nào.",

@@ -319,9 +319,11 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             allTags
           );
 
-          const { businessVersion: _serverOwnedBusinessVersion, ...createPayload } =
-            payload;
-          await addGlossaryTerm(createPayload);
+          const { businessVersion, ...createPayload } = payload;
+          await addGlossaryTerm({
+            ...createPayload,
+            parentBusinessVersion: businessVersion.split('.')[0],
+          });
           createdCount++;
         } catch (error: any) {
           failedCount++;

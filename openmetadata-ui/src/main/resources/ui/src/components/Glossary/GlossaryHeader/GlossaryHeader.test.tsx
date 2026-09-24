@@ -29,11 +29,16 @@ import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import {
   getGlossaryTermsVersionsList,
+  getGlossaryVersionsList,
+  getGlossaryWorkingVersion,
   transitionGlossaryTermWorkflow,
 } from '../../../rest/glossaryAPI';
 import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
-import GlossaryHeader, { suggestNextVersion } from './GlossaryHeader.component';
+import GlossaryHeader, {
+  getCreatedDraftSearch,
+  suggestNextVersion,
+} from './GlossaryHeader.component';
 
 const mockGlossaryTermPermission = {
   All: true,
@@ -185,6 +190,9 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   moveGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
   getGlossaryTermsVersionsList: jest.fn(),
   getGlossaryVersionsList: jest.fn(),
+  getGlossaryWorkingVersion: jest
+    .fn()
+    .mockRejectedValue({ response: { status: 404 } }),
   getGlossaryPublishPreview: jest.fn().mockResolvedValue({
     data: [],
     paging: {},
@@ -211,6 +219,15 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     canReject: true,
     canArchive: true,
   }),
+  createGlossaryTermWorkingVersion: jest
+    .fn()
+    .mockImplementation((_id, businessVersion) =>
+      Promise.resolve({
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.Draft,
+        businessVersion,
+      })
+    ),
   transitionGlossaryTermWorkflow: jest
     .fn()
     .mockImplementation((_id, action, request) => {
@@ -251,6 +268,88 @@ jest.mock('../../Customization/GenericProvider/GenericProvider', () => ({
 }));
 
 describe('GlossaryHeader component', () => {
+  it('lists both the active and archived Data Dictionary versions', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValue({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the newer working Dictionary in the selector while viewing v2', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    const inReviewV3 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '3',
+      entityStatus: EntityStatus.InReview,
+      workingRevision: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValueOnce({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+    (getGlossaryWorkingVersion as jest.Mock).mockResolvedValueOnce(inReviewV3);
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/label\.version: 3.*label\.in-review/i)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
   it('should render name of Glossary', () => {
     render(
       <GlossaryHeader
@@ -703,6 +802,17 @@ describe('GlossaryHeader component', () => {
     it('should handle non-standard version strings gracefully', () => {
       expect(suggestNextVersion('1.0-alpha')).toBe('1.0-alpha.1');
       expect(suggestNextVersion('')).toBe('1.1');
+    });
+  });
+
+  describe('getCreatedDraftSearch', () => {
+    it('updates businessVersion and preserves parentBusinessVersion', () => {
+      expect(
+        getCreatedDraftSearch(
+          '?businessVersion=1.0&parentBusinessVersion=2.3',
+          '1.1',
+        )
+      ).toBe('businessVersion=1.1&parentBusinessVersion=2.3');
     });
   });
 

@@ -11,119 +11,18 @@
  *  limitations under the License.
  */
 /**
- * Create Glossary term entity request
+ * Complete set of client-mutable fields for a Data Dictionary draft.
  */
-export interface CreateGlossaryTerm {
-    /**
-     * Optional mappings to external concepts (e.g., SKOS alignments).
-     */
-    conceptMappings?: ConceptMapping[];
-    /**
-     * Description of the glossary term.
-     */
+export interface GlossaryDraftPayload {
     description: string;
-    /**
-     * Display Name that identifies this glossary term.
-     */
-    displayName?: string;
-    /**
-     * Fully qualified names of the domains the Glossary Term belongs to.
-     */
-    domains?: string[];
-    /**
-     * Entity extension data with custom attributes added to the entity.
-     */
-    extension?: any;
-    /**
-     * FullyQualifiedName of the glossary that this term is part of.
-     */
-    glossary: string;
-    /**
-     * Glossary terms that are children of this term are mutually exclusive. When mutually
-     * exclusive is `true` only one term can be used to label an entity from this group. When
-     * mutually exclusive is `false`, multiple terms from this group can be used to label an
-     * entity.
-     */
-    mutuallyExclusive?: boolean;
-    /**
-     * Preferred name for the glossary term.
-     */
-    name: string;
-    /**
-     * Owners of this glossary term.
-     */
-    owners?: EntityReference[];
-    /**
-     * Fully qualified name of  the parent glossary term.
-     */
-    parent?:   string;
-    /**
-     * Business version of the Data Dictionary scope where this CDE is created.
-     */
-    parentBusinessVersion: string;
-    provider?: ProviderType;
-    /**
-     * Link to a reference from an external glossary.
-     */
-    references?: TermReference[];
-    /**
-     * Other array of glossary term fully qualified names that are related to this glossary term.
-     */
-    relatedTerms?: string[];
-    /**
-     * User or Team references of the reviewers for this glossary.
-     */
-    reviewers?: EntityReference[];
-    style?:     Style;
-    /**
-     * Alternate names that are synonyms or near-synonyms for the glossary term.
-     */
-    synonyms?: string[];
-    /**
-     * Tags for this glossary term.
-     */
-    tags?: TagLabel[];
+    domains:     EntityReference[];
+    extension?:  any;
+    owners:      EntityReference[];
+    reviewers:   EntityReference[];
+    tags:        TagLabel[];
 }
 
 /**
- * Mapping to an external concept (e.g., SKOS concept IRI).
- */
-export interface ConceptMapping {
-    /**
-     * External concept IRI to map this glossary term to.
-     */
-    conceptIri: string;
-    /**
-     * Type of mapping used for the external concept alignment.
-     */
-    mappingType: ConceptMappingType;
-    /**
-     * Optional external concept scheme IRI for the mapped concept.
-     */
-    schemeIri?: string;
-    /**
-     * Optional source label or catalog for the external concept.
-     */
-    source?: string;
-}
-
-/**
- * Type of mapping used for the external concept alignment.
- *
- * Type of mapping used to align this term with an external concept.
- */
-export enum ConceptMappingType {
-    BroadMatch = "BROAD_MATCH",
-    CloseMatch = "CLOSE_MATCH",
-    ExactMatch = "EXACT_MATCH",
-    NarrowMatch = "NARROW_MATCH",
-    RelatedMatch = "RELATED_MATCH",
-    SameAs = "SAME_AS",
-}
-
-/**
- * Owners of this glossary term.
- *
  * This schema defines the EntityReferenceList type used for referencing an entity.
  * EntityReference is used for capturing relationships from one entity to another. For
  * example, a table has an attribute called database of type EntityReference that captures
@@ -175,66 +74,6 @@ export interface EntityReference {
      * `dashboardService`...
      */
     type: string;
-}
-
-/**
- * Type of provider of an entity. Some entities are provided by the `system`. Some are
- * entities created and provided by the `user`. Typically `system` provide entities can't be
- * deleted and can only be disabled. Some apps such as AutoPilot create entities with
- * `automation` provider type. These entities can be deleted by the user.
- */
-export enum ProviderType {
-    Automation = "automation",
-    System = "system",
-    User = "user",
-}
-
-export interface TermReference {
-    /**
-     * Name that identifies the source of an external glossary term. Example `HealthCare.gov`.
-     */
-    endpoint?: string;
-    /**
-     * Name that identifies the source of an external glossary term. Example `HealthCare.gov`.
-     */
-    name?: string;
-}
-
-/**
- * UI Style is used to associate a color code and/or icon to entity to customize the look of
- * that entity in UI.
- */
-export interface Style {
-    /**
-     * Hex Color Code to mark an entity such as GlossaryTerm, Tag, Domain or Data Product.
-     */
-    color?: string;
-    /**
-     * Cover image configuration for the entity.
-     */
-    coverImage?: CoverImage;
-    /**
-     * An icon to associate with GlossaryTerm, Tag, Domain or Data Product.
-     */
-    iconURL?: string;
-}
-
-/**
- * Cover image configuration for the entity.
- *
- * Cover image configuration for an entity. This is used to display a banner or header image
- * for entities like Domain, Glossary, Data Product, etc.
- */
-export interface CoverImage {
-    /**
-     * Position of the cover image in CSS background-position format. Supports keywords (top,
-     * center, bottom) or pixel values (e.g., '20px 30px').
-     */
-    position?: string;
-    /**
-     * URL of the cover image.
-     */
-    url?: string;
 }
 
 /**
@@ -398,4 +237,41 @@ export enum TagSource {
 export enum State {
     Confirmed = "Confirmed",
     Suggested = "Suggested",
+}
+
+/**
+ * UI Style is used to associate a color code and/or icon to entity to customize the look of
+ * that entity in UI.
+ */
+export interface Style {
+    /**
+     * Hex Color Code to mark an entity such as GlossaryTerm, Tag, Domain or Data Product.
+     */
+    color?: string;
+    /**
+     * Cover image configuration for the entity.
+     */
+    coverImage?: CoverImage;
+    /**
+     * An icon to associate with GlossaryTerm, Tag, Domain or Data Product.
+     */
+    iconURL?: string;
+}
+
+/**
+ * Cover image configuration for the entity.
+ *
+ * Cover image configuration for an entity. This is used to display a banner or header image
+ * for entities like Domain, Glossary, Data Product, etc.
+ */
+export interface CoverImage {
+    /**
+     * Position of the cover image in CSS background-position format. Supports keywords (top,
+     * center, bottom) or pixel values (e.g., '20px 30px').
+     */
+    position?: string;
+    /**
+     * URL of the cover image.
+     */
+    url?: string;
 }

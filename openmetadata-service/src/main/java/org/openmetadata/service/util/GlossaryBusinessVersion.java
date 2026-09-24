@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 public final class GlossaryBusinessVersion {
   private static final Pattern CANONICAL_VERSION =
       Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
+  private static final Pattern CANONICAL_DICTIONARY_VERSION = Pattern.compile("^[1-9]\\d*$");
   private static final int MAX_LENGTH = 64;
 
   private GlossaryBusinessVersion() {}
@@ -27,6 +28,26 @@ public final class GlossaryBusinessVersion {
           "businessVersion must be canonical MAJOR.MINOR without leading zeroes");
     }
     return version;
+  }
+
+  public static String requireCanonicalDictionary(String version) {
+    if (version == null
+        || version.length() > MAX_LENGTH
+        || !CANONICAL_DICTIONARY_VERSION.matcher(version).matches()) {
+      throw new IllegalArgumentException(
+          "Data Dictionary businessVersion must be a canonical positive integer");
+    }
+    return version;
+  }
+
+  public static String requireCdeInScope(String version, String parentBusinessVersion) {
+    String canonical = requireCanonical(version);
+    String parent = requireCanonicalDictionary(parentBusinessVersion);
+    if (!canonical.startsWith(parent + ".")) {
+      throw new IllegalArgumentException(
+          "CDE businessVersion prefix must equal parentBusinessVersion");
+    }
+    return canonical;
   }
 
   public static int compare(String left, String right) {

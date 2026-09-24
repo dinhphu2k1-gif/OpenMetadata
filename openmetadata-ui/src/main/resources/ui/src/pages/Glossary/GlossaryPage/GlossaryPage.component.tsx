@@ -47,7 +47,10 @@ import {
   TabSpecificField,
 } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
@@ -77,6 +80,7 @@ import { checkPermission } from '../../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import { parseCdeRoute } from '../../../utils/routing/cdeRoutingHelper';
 import GlossaryLeftPanel from '../GlossaryLeftPanel/GlossaryLeftPanel.component';
 
 const GlossaryPage = () => {
@@ -88,12 +92,16 @@ const GlossaryPage = () => {
   const { handleOnAsyncEntityDeleteConfirm } = useAsyncDeleteProvider();
   const { action } = useRequiredParams<{ action: EntityAction }>();
   const [initialised, setInitialised] = useState(false);
-  const searchParams = useMemo(
-    () => new URLSearchParams(location.search),
-    [location.search]
+  const cdeRoute = useMemo(
+    () =>
+      parseCdeRoute({
+        fqn: glossaryFqn,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [glossaryFqn, location.pathname, location.search]
   );
-  const businessVersion = searchParams.get('businessVersion');
-  const parentBusinessVersion = searchParams.get('parentBusinessVersion');
+  const { businessVersion, parentBusinessVersion } = cdeRoute;
   const [isGlossaryHistorical, setIsGlossaryHistorical] = useState(false);
   const [isTermHistorical, setIsTermHistorical] = useState(false);
 
@@ -316,17 +324,39 @@ const GlossaryPage = () => {
         : '';
       const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
       const reqCdeVer = getBusinessVersion(businessVersion, '');
-      const liveCdeVer = getBusinessVersion(current.businessVersion, '');
 
       if (
         liveParentVer &&
         compareBusinessVersions(liveParentVer, reqParentVer) === 0
       ) {
-        if (compareBusinessVersions(liveCdeVer, reqCdeVer) === 0) {
-          setIsTermHistorical(false);
-          setActiveGlossary(current as ModifiedGlossary);
+        try {
+          // The FQN endpoint resolves the stable term identity. It must not be
+          // used as the scoped working representation because a CDE can have
+          // independent working rows in different Data Dictionary versions.
+          const working = await getGlossaryTermWorkingVersion(
+            current.id,
+            reqParentVer
+          );
+          const workingVersion = getBusinessVersion(
+            working.businessVersion,
+            ''
+          );
+          if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
+            setIsTermHistorical(false);
+            setActiveGlossary(working as ModifiedGlossary);
 
-          return;
+            return;
+          }
+        } catch (error) {
+          const status = (error as AxiosError)?.response?.status;
+          // A Consumer cannot read a working version, and a published-only CDE
+          // has no working row. Both cases should continue to snapshot lookup.
+          if (
+            status !== ClientErrors.FORBIDDEN &&
+            status !== ClientErrors.NOT_FOUND
+          ) {
+            throw error;
+          }
         }
       }
 
@@ -345,7 +375,11 @@ const GlossaryPage = () => {
 
           return;
         }
-        setIsTermHistorical(true);
+        // A published response is not necessarily a historical view. The
+        // current Approved head is still the live CDE page and must expose
+        // actions such as "Create new version". Only an archived snapshot is
+        // read-only historical content.
+        setIsTermHistorical(response.entityStatus === EntityStatus.Archived);
         setActiveGlossary(response as ModifiedGlossary);
       } catch {
         navigate(ROUTES.NOT_FOUND, { replace: true });
@@ -411,7 +445,12 @@ const GlossaryPage = () => {
                 current.id,
                 businessVersion
               );
-              setIsGlossaryHistorical(true);
+              // A business-version deep link can still point at the current
+              // Approved head. Only an Archived Dictionary is historical and
+              // must suppress live workflow actions such as Create New Version.
+              setIsGlossaryHistorical(
+                snapshot.entityStatus === EntityStatus.Archived
+              );
               setActiveGlossary(snapshot);
             })
             .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
@@ -614,7 +653,10 @@ const GlossaryPage = () => {
         const working =
           activeGlossary?.workingRevision != null
             ? (activeGlossary as GlossaryTerm)
-            : await getGlossaryTermWorkingVersion(activeGlossary?.id);
+            : await getGlossaryTermWorkingVersion(
+                activeGlossary?.id,
+                parentBusinessVersion
+              );
         const response = await updateGlossaryTermWorkingVersion(
           activeGlossary?.id,
           working.workingRevision as number,

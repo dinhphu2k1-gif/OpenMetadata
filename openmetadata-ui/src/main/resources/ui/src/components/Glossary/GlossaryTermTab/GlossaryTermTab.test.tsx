@@ -678,6 +678,7 @@ describe('Test GlossaryTermTab component', () => {
       const columns = getCDEGlossaryTableColumns({
         handleLoadMoreChildren: jest.fn(),
         loadingChildren: {},
+        parentBusinessVersion: '1.0',
         t,
       });
 

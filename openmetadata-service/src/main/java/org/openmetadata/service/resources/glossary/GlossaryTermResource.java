@@ -61,10 +61,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.api.AddGlossaryToAssetsRequest;
 import org.openmetadata.schema.api.ValidateGlossaryTagsRequest;
 import org.openmetadata.schema.api.VoteRequest;
-import org.openmetadata.schema.api.data.CreateGlossaryTerm;
 import org.openmetadata.schema.api.data.CdeCreateVersionRequest;
 import org.openmetadata.schema.api.data.CdeDraftUpdateRequest;
 import org.openmetadata.schema.api.data.CdeWorkflowTransitionRequest;
+import org.openmetadata.schema.api.data.CreateGlossaryTerm;
 import org.openmetadata.schema.api.data.GlossaryWorkingVersionRequest;
 import org.openmetadata.schema.api.data.LoadGlossary;
 import org.openmetadata.schema.api.data.MoveGlossaryTermRequest;
@@ -101,12 +101,13 @@ import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
 import org.openmetadata.service.security.Authorizer;
+import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
-import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContextInterface;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.EntityUtil;
+import org.openmetadata.service.util.GlossaryBusinessVersion;
 import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.MoveGlossaryTermResponse;
 import org.openmetadata.service.util.RestUtil;
@@ -159,11 +160,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   public Map<String, Object> getWorkingVersion(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
-      @PathParam("id") UUID id) {
+      @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     GlossaryAuthorizationResolver.requireViewWorking(capabilities(securityContext, term));
     return GlossaryVersionResponses.working(
-        versioningService.getWorking(GlossaryVersioningService.GLOSSARY_TERM, id));
+        versioningService.getWorking(
+            GlossaryVersioningService.GLOSSARY_TERM, id, parentBusinessVersion));
   }
 
   @POST
@@ -177,12 +180,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @PathParam("id") UUID id,
       @NotNull @Valid CdeCreateVersionRequest request) {
     GlossaryTerm term = createVersionEntity(uriInfo, securityContext, id);
+    requireCdeIdentityScope(term, request.getParentBusinessVersion());
     GlossaryAuthorizationResolver.requireCreateVersion(capabilities(securityContext, term));
     WorkingVersionRecord working =
         versioningService.createNextTermWorking(
             id,
             term.getGlossary() == null ? null : term.getGlossary().getId(),
             request.getBusinessVersion(),
+            request.getParentBusinessVersion(),
             term.getVersion(),
             term,
             securityContext.getUserPrincipal().getName(),
@@ -207,6 +212,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
       @Valid CdeDraftUpdateRequest request) {
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     GlossaryAuthorizationResolver.requireEdit(capabilities(securityContext, term));
@@ -216,6 +222,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         versioningService.saveWorking(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
+            parentBusinessVersion,
             request.getExpectedRevision(),
             term.getVersion(),
             payload,
@@ -231,12 +238,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
       @NotNull @Valid CdeWorkflowTransitionRequest request) {
     versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
+            parentBusinessVersion,
             request.getExpectedRevision(),
             EntityStatus.DRAFT,
             EntityStatus.IN_REVIEW,
@@ -253,12 +262,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
       @NotNull @Valid CdeWorkflowTransitionRequest request) {
     versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
+            parentBusinessVersion,
             request.getExpectedRevision(),
             EntityStatus.IN_REVIEW,
             EntityStatus.REJECTED,
@@ -277,12 +288,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
       @NotNull @Valid CdeWorkflowTransitionRequest request) {
     versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.working(
         versioningService.transition(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
+            parentBusinessVersion,
             request.getExpectedRevision(),
             EntityStatus.REJECTED,
             EntityStatus.DRAFT,
@@ -301,12 +314,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
       @NotNull @Valid CdeWorkflowTransitionRequest request) {
     versionEntity(uriInfo, securityContext, id);
     return GlossaryVersionResponses.published(
         versioningService.publish(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
+            parentBusinessVersion,
             request.getExpectedRevision(),
             securityContext.getUserPrincipal().getName(),
             working -> authorizeAndValidateApprove(securityContext, working)));
@@ -405,7 +420,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
     try {
       PublishedSnapshotRecord latest =
-          versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
+          versioningService.getLatestPublished(
+              GlossaryVersioningService.GLOSSARY_TERM, term.getId());
       GlossaryTerm publishedAuthorizationTerm =
           JsonUtils.readValue(latest.payload(), GlossaryTerm.class);
       return capabilitiesForAuthorizationTerm(securityContext, publishedAuthorizationTerm);
@@ -578,7 +594,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context SecurityContext securityContext,
       @Parameter(
               description =
-                  "List glossary terms filtered by glossary identified by Id given in `glossary` parameter.",
+                  "List glossary terms filtered by glossary ID or fully qualified name given in `glossary` parameter.",
               schema = @Schema(type = "string", example = FIELDS))
           @QueryParam("glossary")
           String glossaryIdParam,
@@ -629,7 +645,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               description =
                   "Filter by entity status (comma-separated: Approved,Draft,In Review,Rejected,Deprecated,Unprocessed)")
           @QueryParam("entityStatus")
-          String entityStatus) {
+          String entityStatus,
+      @Parameter(description = "Filter CDE representations by Data Dictionary business version")
+          @QueryParam("parentBusinessVersion")
+          String parentBusinessVersion) {
     RestUtil.validateCursors(before, after);
     Fields fields = getFields(fieldsParam);
 
@@ -719,7 +738,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       List<GlossaryTerm> resolved =
           glossaryIdParam == null
               ? resolveRepresentations(securityContext, terms.getData())
-              : resolveAuthoringRepresentations(securityContext, terms.getData());
+              : resolveAuthoringRepresentations(
+                  securityContext, terms.getData(), parentBusinessVersion);
       terms.setData(resolved);
       if (glossaryIdParam != null && terms.getPaging() != null) {
         if (resolved.isEmpty()) {
@@ -861,6 +881,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
     return addHref(uriInfo, result);
   }
+
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
     GlossaryTerm authorizationTerm =
         repository.get(
@@ -910,14 +931,21 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   }
 
   private List<GlossaryTerm> resolveAuthoringRepresentations(
-      SecurityContext securityContext, List<GlossaryTerm> terms) {
+      SecurityContext securityContext,
+      List<GlossaryTerm> terms,
+      String parentBusinessVersion) {
     List<UUID> ids = terms.stream().map(GlossaryTerm::getId).toList();
     Map<UUID, WorkingVersionRecord> working =
-        versioningService.getWorkingBatch(
-            GlossaryVersioningService.GLOSSARY_TERM, ids);
+        parentBusinessVersion == null
+            ? versioningService.getWorkingBatch(GlossaryVersioningService.GLOSSARY_TERM, ids)
+            : versioningService.getWorkingBatch(
+                GlossaryVersioningService.GLOSSARY_TERM, ids, parentBusinessVersion);
     Map<UUID, PublishedSnapshotRecord> published =
-        versioningService.getLatestPublishedBatch(
-            GlossaryVersioningService.GLOSSARY_TERM, ids);
+        parentBusinessVersion == null
+            ? versioningService.getLatestPublishedBatch(
+                GlossaryVersioningService.GLOSSARY_TERM, ids)
+            : versioningService.getLatestPublishedBatch(
+                GlossaryVersioningService.GLOSSARY_TERM, ids, parentBusinessVersion);
     return terms.stream()
         .map(
             term -> {
@@ -937,8 +965,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         .toList();
   }
 
-  private GlossaryTerm mutableDraftPayload(
-      GlossaryTerm identity, CdeDraftUpdateRequest request) {
+  private GlossaryTerm mutableDraftPayload(GlossaryTerm identity, CdeDraftUpdateRequest request) {
     if (request == null || request.getExpectedRevision() == null) {
       throw new BadRequestException("expectedRevision is required");
     }
@@ -1157,7 +1184,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                       + "If not specified for a field, uses the entity's include value.",
               schema = @Schema(type = "string", example = "owners:non-deleted,followers:all"))
           @QueryParam("includeRelations")
-          String includeRelations) {
+          String includeRelations,
+      @Parameter(description = "Resolve CDE representations in this Data Dictionary version")
+          @QueryParam("parentBusinessVersion")
+          String parentBusinessVersion) {
     List<UUID> ids = parseIdsParam(idsParam);
     List<GlossaryTerm> result = new ArrayList<>(ids.size());
     for (UUID id : ids) {
@@ -1178,7 +1208,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         LOG.warn("byIds: unexpected error hydrating glossary term {}", id, ex);
       }
     }
-    return resolveRepresentations(securityContext, result).stream()
+    List<GlossaryTerm> resolved =
+        parentBusinessVersion == null
+            ? resolveRepresentations(securityContext, result)
+            : resolveAuthoringRepresentations(
+                securityContext, result, parentBusinessVersion);
+    return resolved.stream()
         .map(term -> addHref(uriInfo, term))
         .toList();
   }
@@ -1372,31 +1407,64 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     Glossary glossary =
         DataDictionaryResolver.requireDataDictionary(
             Entity.getEntity(term.getGlossary(), "owners,reviewers", Include.NON_DELETED));
-    WorkingVersionRecord glossaryWorking =
-        versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossary.getId());
-    Glossary authorizationGlossary = JsonUtils.readValue(glossaryWorking.payload(), Glossary.class);
+    String parentBusinessVersion =
+        GlossaryBusinessVersion.requireCanonicalDictionary(create.getParentBusinessVersion());
+    term.setParentBusinessVersion(parentBusinessVersion);
+    Glossary authorizationGlossary =
+        resolveCdeCreateScope(glossary.getId(), parentBusinessVersion);
     authorizer.authorize(
         securityContext,
         new OperationContext(GLOSSARY, MetadataOperation.EDIT_WORKING),
         new ResourceContext<>(GLOSSARY, authorizationGlossary.getId(), null));
     CreateResourceContext<GlossaryTerm> createContext =
         new CreateResourceContext<>(entityType, term);
-    OperationContext createOperation =
-        new OperationContext(entityType, MetadataOperation.CREATE);
+    OperationContext createOperation = new OperationContext(entityType, MetadataOperation.CREATE);
     limits.enforceLimits(securityContext, createContext, createOperation);
-    authorizer.authorize(
-        securityContext,
-        createOperation,
-        createContext);
+    authorizer.authorize(securityContext, createOperation, createContext);
     try {
       WorkingVersionRecord working =
-          repository.createInitialDraft(term, securityContext.getUserPrincipal().getName());
+          repository.createInitialDraft(
+              term,
+              parentBusinessVersion,
+              securityContext.getUserPrincipal().getName());
       return Response.status(Response.Status.CREATED)
           .entity(GlossaryVersionResponses.working(working))
           .build();
     } catch (org.jdbi.v3.core.statement.UnableToExecuteStatementException exception) {
       throw new jakarta.ws.rs.ClientErrorException(
           "A CDE with this name already exists", Response.Status.CONFLICT, exception);
+    }
+  }
+
+  private Glossary resolveCdeCreateScope(UUID glossaryId, String parentBusinessVersion) {
+    try {
+      WorkingVersionRecord working =
+          versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossaryId);
+      if (parentBusinessVersion.equals(working.businessVersion())) {
+        return JsonUtils.readValue(working.payload(), Glossary.class);
+      }
+    } catch (NotFoundException ignored) {
+      // An Approved active Dictionary intentionally has no working record.
+    }
+
+    PublishedSnapshotRecord published =
+        versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY, glossaryId);
+    if (!parentBusinessVersion.equals(published.businessVersion())
+        || published.archivedAt() != null) {
+      throw new BadRequestException(
+          "parentBusinessVersion must identify a working or active Approved Data Dictionary");
+    }
+    return JsonUtils.readValue(published.payload(), Glossary.class);
+  }
+
+  private static void requireCdeIdentityScope(
+      GlossaryTerm term, String requestedParentBusinessVersion) {
+    String requestedScope =
+        GlossaryBusinessVersion.requireCanonicalDictionary(requestedParentBusinessVersion);
+    if (term.getParentBusinessVersion() == null
+        || !requestedScope.equals(term.getParentBusinessVersion())) {
+      throw new BadRequestException(
+          "CDE identity does not belong to parentBusinessVersion " + requestedScope);
     }
   }
 

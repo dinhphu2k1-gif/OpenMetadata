@@ -18,6 +18,7 @@ import { usePermissionProvider } from '../../../context/PermissionProvider/Permi
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import GlossaryPage from '../../../pages/Glossary/GlossaryPage/GlossaryPage.component';
 import { userPermissions } from '../../../utils/PermissionsUtils';
+import { CDE_DETAIL_RELATIVE_ROUTE_PATTERN } from '../../../utils/routing/cdeRoutingHelper';
 import GlossaryVersion from '../../Glossary/GlossaryVersion/GlossaryVersion.component';
 import AdminProtectedRoute from '../AdminProtectedRoute';
 
@@ -54,7 +55,7 @@ const GlossaryRouter = () => {
             <GlossaryPage pageTitle={t('label.glossary')} />
           </AdminProtectedRoute>
         }
-        path={ROUTES.GLOSSARY_DETAILS.replace(ROUTES.GLOSSARY, '')}
+        path={CDE_DETAIL_RELATIVE_ROUTE_PATTERN}
       />
       <Route
         element={

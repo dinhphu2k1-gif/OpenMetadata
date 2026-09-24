@@ -26,7 +26,7 @@ import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
-import { getGlossaryPath } from '../../../utils/RouterUtils';
+import { getCdeDetailPath } from '../../../utils/routing/cdeRoutingHelper';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
@@ -45,7 +45,7 @@ export type CDEExtension = {
 type CDEGlossaryTableColumnsProps = {
   handleLoadMoreChildren: (record: ModifiedGlossaryTerm) => void;
   loadingChildren: Record<string, boolean>;
-  parentBusinessVersion?: string;
+  parentBusinessVersion: string;
   t: TFunction;
 };
 
@@ -144,18 +144,15 @@ export const getCDEGlossaryTableColumns = ({
 
       const businessVersion = getBusinessVersion(record.businessVersion, '');
 
-      const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
-      const toUrl = businessVersion
-        ? `${basePath}?businessVersion=${encodeURIComponent(
-            businessVersion
-          )}${
-            parentBusinessVersion
-              ? `&parentBusinessVersion=${encodeURIComponent(
-                  parentBusinessVersion
-                )}`
-              : ''
-          }`
-        : basePath;
+      const toUrl = getCdeDetailPath({
+        fqn: record.fullyQualifiedName ?? name,
+        businessVersion,
+        // A revision carries the authoritative publication scope. The
+        // glossary header value is only a fallback for legacy list payloads.
+        parentBusinessVersion:
+          record.parentBusinessVersion ?? parentBusinessVersion,
+        isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
+      });
 
       return (
         <Link

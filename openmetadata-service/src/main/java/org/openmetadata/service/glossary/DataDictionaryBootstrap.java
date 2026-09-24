@@ -19,6 +19,7 @@ import org.openmetadata.schema.type.ProviderType;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
@@ -28,7 +29,7 @@ import org.openmetadata.service.util.FullyQualifiedName;
 /** Atomically creates the one system-owned Data Dictionary and its initial working draft. */
 public final class DataDictionaryBootstrap {
   public static final String DISPLAY_NAME = "Từ điển dữ liệu dùng chung";
-  private static final String INITIAL_VERSION = "1.0";
+  private static final String INITIAL_VERSION = "1";
 
   private DataDictionaryBootstrap() {}
 
@@ -53,6 +54,11 @@ public final class DataDictionaryBootstrap {
                 throw inconsistent("working record only");
               }
               if (identity != null) {
+                if (published != null) {
+                  versionDAO.lockGlossaryIdentity(identity.getId());
+                  GlossaryVersioningService.repairDataDictionaryCutover(
+                      versionDAO, identity.getId(), ADMIN_USER_NAME);
+                }
                 // Approval consumes the working row and installs a published head. Both an active
                 // working version and an active published version are valid restart states.
                 if (working == null) {
@@ -141,7 +147,7 @@ public final class DataDictionaryBootstrap {
     PublishedSnapshotRecord archived = snapshots.get(0);
     Map<String, Object> payload =
         new LinkedHashMap<>(JsonUtils.readValue(archived.payload(), Map.class));
-    String nextVersion = nextMinorVersion(archived.businessVersion());
+    String nextVersion = nextDictionaryVersion(archived.businessVersion());
     payload.put("businessVersion", nextVersion);
     payload.put("entityStatus", EntityStatus.REJECTED.value());
     payload.put("termRevisions", List.of());
@@ -169,16 +175,22 @@ public final class DataDictionaryBootstrap {
     return true;
   }
 
-  private static String nextMinorVersion(String businessVersion) {
-    String[] parts = businessVersion.split("\\.", -1);
-    if (parts.length != 2) {
-      throw inconsistent("invalid archived business version " + businessVersion);
+  private static String nextDictionaryVersion(String businessVersion) {
+    if (businessVersion == null) {
+      throw inconsistent("null archived business version");
     }
-    try {
-      return parts[0] + "." + Math.addExact(Long.parseLong(parts[1]), 1L);
-    } catch (ArithmeticException | NumberFormatException exception) {
-      throw inconsistent("invalid archived business version " + businessVersion);
+    String trimmed = businessVersion.trim();
+    if (trimmed.matches("^[1-9]\\d*$")) {
+      return new java.math.BigInteger(trimmed).add(java.math.BigInteger.ONE).toString();
     }
+    String[] parts = trimmed.split("\\.", -1);
+    if (parts.length == 2) {
+      try {
+        return new java.math.BigInteger(parts[0]).add(java.math.BigInteger.ONE).toString();
+      } catch (NumberFormatException ignored) {
+      }
+    }
+    throw inconsistent("invalid archived business version " + businessVersion);
   }
 
   private static IllegalStateException inconsistent(String detail) {

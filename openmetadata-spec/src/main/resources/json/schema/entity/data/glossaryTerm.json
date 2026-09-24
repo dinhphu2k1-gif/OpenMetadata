@@ -83,7 +83,7 @@
       "$ref": "../../type/basic.json#/definitions/style"
     },
     "fullyQualifiedName": {
-      "description": "A unique name that identifies a glossary term. It captures name hierarchy of glossary of terms in the form of `glossaryName.parentTerm.childTerm`.",
+      "description": "A unique technical name that identifies a glossary term. BusinessWorkflow CDE identities include their Data Dictionary scope as `glossaryName.termName@vN`; the user-facing code remains `name`.",
       "$ref": "../../type/basic.json#/definitions/fullyQualifiedEntityName"
     },
     "synonyms": {
@@ -135,6 +135,11 @@
     "businessVersion": {
       "description": "Business-facing version of this glossary term working version or published snapshot.",
       "type": "string"
+    },
+    "parentBusinessVersion": {
+      "description": "Canonical Data Dictionary business version that scopes this CDE version.",
+      "type": "string",
+      "pattern": "^[1-9]\\d*$"
     },
     "workingRevision": {
       "description": "Optimistic-lock revision of the working business version.",

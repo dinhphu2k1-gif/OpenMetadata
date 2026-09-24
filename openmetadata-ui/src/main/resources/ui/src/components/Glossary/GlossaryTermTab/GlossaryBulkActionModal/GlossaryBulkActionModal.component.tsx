@@ -115,10 +115,18 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         chunk.map(async (term) => {
           try {
             setCurrentTermName(term.displayName || term.name || '');
-            const working = await getGlossaryTermWorkingVersion(term.id);
-            await transitionGlossaryTermWorkflow(term.id, action, {
-              expectedRevision: Number(working.workingRevision),
-            });
+            const working = await getGlossaryTermWorkingVersion(
+              term.id,
+              term.parentBusinessVersion
+            );
+            await transitionGlossaryTermWorkflow(
+              term.id,
+              action,
+              {
+                expectedRevision: Number(working.workingRevision),
+              },
+              term.parentBusinessVersion
+            );
             successCount++;
           } catch {
             failedCount++;

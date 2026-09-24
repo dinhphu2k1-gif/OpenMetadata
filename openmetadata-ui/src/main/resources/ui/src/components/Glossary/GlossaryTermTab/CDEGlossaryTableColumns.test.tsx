@@ -11,6 +11,7 @@ const columns = getCDEGlossaryTableColumns({
   t: ((key: string) => key) as TFunction,
   handleLoadMoreChildren: jest.fn(),
   loadingChildren: {},
+  parentBusinessVersion: '1.0',
 });
 const renderCell = (key: string, extension = {}, isLoadMoreButton = false) => {
   const column = columns.find(

@@ -6,11 +6,16 @@
   "javaType": "org.openmetadata.schema.api.data.CdeCreateVersionRequest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["businessVersion"],
+  "required": ["businessVersion", "parentBusinessVersion"],
   "properties": {
     "businessVersion": {
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+      "maxLength": 64
+    },
+    "parentBusinessVersion": {
+      "type": "string",
+      "pattern": "^[1-9]\\d*$",
       "maxLength": 64
     }
   }

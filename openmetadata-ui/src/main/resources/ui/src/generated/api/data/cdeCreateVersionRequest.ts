@@ -11,8 +11,9 @@
  *  limitations under the License.
  */
 /**
- * Optimistic-lock request for a Data Dictionary workflow transition.
+ * Request to create the next working business version of an approved CDE.
  */
-export interface GlossaryWorkflowTransitionRequest {
-    expectedRevision: number;
+export interface CDECreateVersionRequest {
+    businessVersion:       string;
+    parentBusinessVersion: string;
 }

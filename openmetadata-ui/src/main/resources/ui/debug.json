@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 1,
+  "numPassedTests": 10,
   "numPendingTestSuites": 0,
-  "numPendingTests": 28,
+  "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 29,
+  "numTotalTests": 10,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1790196451128,
+  "startTime": 1790217937633,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 1,
-      "numPendingTests": 28,
+      "numPassingTests": 10,
+      "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1790196456652,
-        "runtime": 5190,
-        "slow": true,
-        "start": 1790196451462
+        "end": 1790217939234,
+        "runtime": 1021,
+        "slow": false,
+        "start": 1790217938213
       },
       "skipped": false,
       "snapshot": {
@@ -52,456 +52,157 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryHeader/GlossaryHeader.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.test.ts",
       "testResults": [
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F03 CDE draft API"
           ],
-          "duration": null,
+          "duration": 15,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should render name of Glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should render name of Glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should render import and export dropdown menu items only for glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should render import and export dropdown menu items only for glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should not render import and export dropdown menu items if no permission",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should not render import and export dropdown menu items if no permission"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should render changeParentHierarchy and style dropdown menu items only for glossaryTerm",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should render changeParentHierarchy and style dropdown menu items only for glossaryTerm"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should not render ChangeParentHierarchy component when it is close",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should not render ChangeParentHierarchy component when it is close"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should render ChangeParentHierarchy component after clicking dropdown menu item",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should render ChangeParentHierarchy component after clicking dropdown menu item"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should not render ChangeParentHierarchy component after onCancel call",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should not render ChangeParentHierarchy component after onCancel call"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": 105,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component should render revoke approval action for approved glossary term and handle confirm",
+          "fullName": "F03 CDE draft API creates the identity and initial Draft with one POST",
           "invocations": 1,
           "location": null,
           "numPassingAsserts": 3,
           "retryReasons": [],
           "status": "passed",
-          "title": "should render revoke approval action for approved glossary term and handle confirm"
+          "title": "creates the identity and initial Draft with one POST"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F03 CDE draft API"
           ],
-          "duration": null,
+          "duration": 2,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should render Submit for Review action when term is Draft and trigger submit",
+          "fullName": "F03 CDE draft API sends only the complete mutable allowlist when saving",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should render Submit for Review action when term is Draft and trigger submit"
+          "status": "passed",
+          "title": "sends only the complete mutable allowlist when saving"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F03 CDE draft API"
           ],
-          "duration": null,
+          "duration": 2,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should render Approve and Reject actions when term is InReview and trigger approve",
+          "fullName": "F03 CDE draft API loads authoring rows by glossary so unpinned Drafts survive reload",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 2,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should render Approve and Reject actions when term is InReview and trigger approve"
+          "status": "passed",
+          "title": "loads authoring rows by glossary so unpinned Drafts survive reload"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 1,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should trigger reject when reject action is clicked",
+          "fullName": "F09 Data Dictionary publication API requests a server-paginated dynamic publish preview",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should trigger reject when reject action is clicked"
+          "status": "passed",
+          "title": "requests a server-paginated dynamic publish preview"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 0,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should render Version badge with status tone and prompt for version when submitting CDE for review",
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for submit",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should render Version badge with status tone and prompt for version when submitting CDE for review"
+          "status": "passed",
+          "title": "sends only expectedRevision for submit"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 0,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should prompt for version when submitting CDE for review and save version",
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for reject",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should prompt for version when submitting CDE for review and save version"
+          "status": "passed",
+          "title": "sends only expectedRevision for reject"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 1,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component should not render Approve, Reject, or Revoke buttons for Data Proposer role",
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for reopen",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should not render Approve, Reject, or Revoke buttons for Data Proposer role"
+          "status": "passed",
+          "title": "sends only expectedRevision for reopen"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component",
-            "suggestNextVersion"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 0,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component suggestNextVersion should increment minor version correctly",
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for approve",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should increment minor version correctly"
+          "status": "passed",
+          "title": "sends only expectedRevision for approve"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component",
-            "suggestNextVersion"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 1,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component suggestNextVersion should handle non-standard version strings gracefully",
+          "fullName": "F09 Data Dictionary publication API sends only businessVersion when creating the exact next Dictionary",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should handle non-standard version strings gracefully"
+          "status": "passed",
+          "title": "sends only businessVersion when creating the exact next Dictionary"
         },
         {
           "ancestorTitles": [
-            "GlossaryHeader component",
-            "Create Draft (Tạo bản nháp)"
+            "F09 Data Dictionary publication API"
           ],
-          "duration": null,
+          "duration": 1,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" for Data Proposer on Approved CDE and create draft on submit",
+          "fullName": "F09 Data Dictionary publication API does not retain the removed F08 working terms route",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 0,
+          "numPassingAsserts": 1,
           "retryReasons": [],
-          "status": "pending",
-          "title": "should show \"Tạo bản nháp\" for Data Proposer on Approved CDE and create draft on submit"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "Create Draft (Tạo bản nháp)"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" for Admin on Approved CDE",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show \"Tạo bản nháp\" for Admin on Approved CDE"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "Create Draft (Tạo bản nháp)"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should NOT show \"Tạo bản nháp\" for Data Steward role",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should NOT show \"Tạo bản nháp\" for Data Steward role"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "Create Draft (Tạo bản nháp)"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should NOT show \"Tạo bản nháp\" when CDE is not in Approved status",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should NOT show \"Tạo bản nháp\" when CDE is not in Approved status"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "Create Draft (Tạo bản nháp)"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" and custom Version badge for Data Quality terms",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show \"Tạo bản nháp\" and custom Version badge for Data Quality terms"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component lists approved CDE versions and opens the selected version",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "lists approved CDE versions and opens the selected version"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "CDE Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "CDE Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Admin on CDE glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Nhập Excel and Xuất Excel for Admin on CDE glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "CDE Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Data Proposer on CDE glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Nhập Excel and Xuất Excel for Data Proposer on CDE glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "CDE Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should hide Nhập Excel for Data Steward on CDE glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should hide Nhập Excel for Data Steward on CDE glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "DQ Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel on DQ glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel on DQ glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "DQ Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Admin on DQ glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Nhập Excel and Xuất Excel for Admin on DQ glossary"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryHeader component",
-            "DQ Import and Export permissions in GlossaryHeader"
-          ],
-          "duration": null,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Data Proposer on DQ glossary",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 0,
-          "retryReasons": [],
-          "status": "pending",
-          "title": "should show Nhập Excel and Xuất Excel for Data Proposer on DQ glossary"
+          "status": "passed",
+          "title": "does not retain the removed F08 working terms route"
         }
       ],
       "displayName": {
