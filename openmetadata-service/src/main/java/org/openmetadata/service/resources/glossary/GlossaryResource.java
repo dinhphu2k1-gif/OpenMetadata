@@ -401,8 +401,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     if (!capabilities.canArchive()) {
       throw new ForbiddenException("Not authorized to archive the published version");
     }
-    return GlossaryVersionResponses.published(
-        versioningService.archiveLatest(
+    return GlossaryVersionResponses.working(
+        versioningService.revokeLatestToRejectedWorking(
             GlossaryVersioningService.GLOSSARY, id, securityContext.getUserPrincipal().getName()));
   }
 

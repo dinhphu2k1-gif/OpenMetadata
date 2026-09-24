@@ -60,6 +60,10 @@ jest.mock('react-router-dom', () => ({
     action: 'action',
   }),
   useNavigate: jest.fn().mockReturnValue(jest.fn()),
+  useLocation: jest.fn().mockReturnValue({
+    pathname: '/glossary/Data%20Dictionary.Term1',
+    search: '',
+  }),
 }));
 
 jest.mock(
@@ -187,6 +191,26 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     termCount: 0,
     evaluatedAt: 1,
   }),
+  getGlossaryVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canCreateVersion: true,
+    canApprove: true,
+    canReject: true,
+    canArchive: true,
+  }),
+  getGlossaryTermVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canCreateVersion: true,
+    canApprove: true,
+    canReject: true,
+    canArchive: true,
+  }),
   transitionGlossaryTermWorkflow: jest
     .fn()
     .mockImplementation((_id, action, request) => {
@@ -196,7 +220,7 @@ jest.mock('../../../rest/glossaryAPI', () => ({
         approve: EntityStatus.Approved,
         reject: EntityStatus.Rejected,
         reopen: EntityStatus.Draft,
-        revoke: EntityStatus.Draft,
+        revoke: EntityStatus.Rejected,
       };
 
       return Promise.resolve({
@@ -410,8 +434,9 @@ describe('GlossaryHeader component', () => {
 
     expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityStatus: 'Draft',
-      })
+        entityStatus: EntityStatus.Rejected,
+      }),
+      'revoke'
     );
   });
 

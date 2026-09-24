@@ -505,6 +505,78 @@ public class GlossaryVersioningService {
     return archived;
   }
 
+  /**
+   * Archives the active published version and creates an editable successor in one transaction.
+   *
+   * <p>The UI exposes this operation as "revoke approval". Leaving the identity with neither a
+   * published head nor a working row makes its canonical route resolve to 404, so revocation must
+   * also establish the next working state. The archived snapshot remains immutable and the
+   * rejected working copy receives the next minor business version; the owner can then explicitly
+   * reopen it for editing.
+   */
+  public WorkingVersionRecord revokeLatestToRejectedWorking(
+      String entityType, UUID entityId, String actor) {
+    requireEntityType(entityType);
+    WorkingVersionRecord rejectedWorking =
+        Entity.getJdbi()
+            .inTransaction(
+                handle -> {
+                  GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                  lockPublicationScope(dao, entityType, entityId);
+                  PublishedSnapshotRecord latest = dao.findLatestPublished(entityType, entityId);
+                  if (latest == null) {
+                    throw new NotFoundException("No published snapshot exists");
+                  }
+                  if (dao.lockWorking(entityType, entityId) != null) {
+                    throw conflict("A working version already exists");
+                  }
+
+                  long now = System.currentTimeMillis();
+                  requireUpdated(dao.archiveSnapshot(latest.snapshotId(), now, actor));
+                  requireUpdated(
+                      dao.deletePublishedHead(entityType, entityId, latest.snapshotId()));
+                  PublishedSnapshotRecord previous =
+                      dao.findNewestActivePublished(entityType, entityId);
+                  if (previous != null) {
+                    dao.upsertPublishedHead(
+                        entityType,
+                        entityId,
+                        previous.snapshotId(),
+                        previous.publicationSequence());
+                  }
+                  dao.insertOutbox(
+                      UUID.randomUUID(),
+                      latest.snapshotId(),
+                      "PUBLISHED_SNAPSHOT_ARCHIVE",
+                      latest.payload(),
+                      now);
+
+                  String nextVersion = nextMinorBusinessVersion(latest.businessVersion());
+                  Object payload =
+                      normalizeWorkingPayload(
+                          GLOSSARY.equals(entityType)
+                              ? withEmptyTermRevisions(latest.payload())
+                              : latest.payload(),
+                          nextVersion,
+                          EntityStatus.REJECTED.value());
+                  dao.insertWorking(
+                      UUID.randomUUID(),
+                      entityType,
+                      entityId,
+                      latest.glossaryId(),
+                      nextVersion,
+                      EntityStatus.REJECTED.value(),
+                      latest.nativeVersion(),
+                      JsonUtils.pojoToJson(payload),
+                      now,
+                      actor);
+                  return dao.findWorking(entityType, entityId);
+                });
+    processPendingOutbox();
+    refreshManagerIndexSafely(entityType, entityId);
+    return rejectedWorking;
+  }
+
   /** Flushes snapshot outbox events idempotently; failures remain pending for a later request. */
   public void processPendingOutbox() {
     GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
@@ -744,7 +816,8 @@ public class GlossaryVersioningService {
     return snapshots.stream()
         .sorted(
             Comparator.comparing(
-                    snapshot -> snapshotTermName(snapshot).toLowerCase(Locale.ROOT))
+                    (PublishedSnapshotRecord snapshot) ->
+                        snapshotTermName(snapshot).toLowerCase(Locale.ROOT))
                 .thenComparing(GlossaryVersioningService::snapshotTermName)
                 .thenComparing(PublishedSnapshotRecord::entityId))
         .toList();
@@ -888,6 +961,15 @@ public class GlossaryVersioningService {
     payload.remove("archivedAt");
     payload.remove("archivedBy");
     return payload;
+  }
+
+  private static String nextMinorBusinessVersion(String businessVersion) {
+    String[] parts = requireBusinessVersion(businessVersion).split("\\.", -1);
+    try {
+      return parts[0] + "." + Math.addExact(Long.parseLong(parts[1]), 1L);
+    } catch (ArithmeticException | NumberFormatException exception) {
+      throw new BadRequestException("businessVersion cannot be advanced", exception);
+    }
   }
 
   @SuppressWarnings("unchecked")

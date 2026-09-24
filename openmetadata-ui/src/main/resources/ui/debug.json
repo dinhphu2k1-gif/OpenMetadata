@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 12,
+  "numPassedTests": 1,
   "numPendingTestSuites": 0,
-  "numPendingTests": 0,
+  "numPendingTests": 28,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 12,
+  "numTotalTests": 29,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1790156789586,
+  "startTime": 1790196451128,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 12,
-      "numPendingTests": 0,
+      "numPassingTests": 1,
+      "numPendingTests": 28,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1790156806769,
-        "runtime": 16004,
+        "end": 1790196456652,
+        "runtime": 5190,
         "slow": true,
-        "start": 1790156790765
+        "start": 1790196451462
       },
       "skipped": false,
       "snapshot": {
@@ -52,191 +52,456 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/pages/Glossary/GlossaryPage/GlossaryPage.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryHeader/GlossaryHeader.test.tsx",
       "testResults": [
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 74,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page GlossaryComponent Page Should render",
+          "fullName": "GlossaryHeader component should render name of Glossary",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "GlossaryComponent Page Should render"
+          "status": "pending",
+          "title": "should render name of Glossary"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 23,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page All Function call should work properly - part 1",
+          "fullName": "GlossaryHeader component should render import and export dropdown menu items only for glossary",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "All Function call should work properly - part 1"
+          "status": "pending",
+          "title": "should render import and export dropdown menu items only for glossary"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 18,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page updates an inline attribute without navigating or reloading the glossary list",
+          "fullName": "GlossaryHeader component should not render import and export dropdown menu items if no permission",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 4,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "updates an inline attribute without navigating or reloading the glossary list"
+          "status": "pending",
+          "title": "should not render import and export dropdown menu items if no permission"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 20,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page does not refetch the working version when glossary metadata changes",
+          "fullName": "GlossaryHeader component should render changeParentHierarchy and style dropdown menu items only for glossaryTerm",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "does not refetch the working version when glossary metadata changes"
+          "status": "pending",
+          "title": "should render changeParentHierarchy and style dropdown menu items only for glossaryTerm"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 56,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page All Function call should work properly - part 2",
+          "fullName": "GlossaryHeader component should not render ChangeParentHierarchy component when it is close",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "All Function call should work properly - part 2"
+          "status": "pending",
+          "title": "should not render ChangeParentHierarchy component when it is close"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 13,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page updates a glossary term without refetching page content",
+          "fullName": "GlossaryHeader component should render ChangeParentHierarchy component after clicking dropdown menu item",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 5,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "updates a glossary term without refetching page content"
+          "status": "pending",
+          "title": "should render ChangeParentHierarchy component after clicking dropdown menu item"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page",
-            "Render Sad Paths"
+            "GlossaryHeader component"
           ],
-          "duration": 9,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page Render Sad Paths shows an error if updating the working term resolves without data",
+          "fullName": "GlossaryHeader component should not render ChangeParentHierarchy component after onCancel call",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "shows an error if updating the working term resolves without data"
+          "status": "pending",
+          "title": "should not render ChangeParentHierarchy component after onCancel call"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page",
-            "handleGlossaryDelete"
+            "GlossaryHeader component"
           ],
-          "duration": 12,
+          "duration": 105,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page handleGlossaryDelete should update glossaries list and navigate to first remaining glossary after deletion",
+          "fullName": "GlossaryHeader component should render revoke approval action for approved glossary term and handle confirm",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 3,
           "retryReasons": [],
           "status": "passed",
-          "title": "should update glossaries list and navigate to first remaining glossary after deletion"
+          "title": "should render revoke approval action for approved glossary term and handle confirm"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page",
-            "handleGlossaryDelete"
+            "GlossaryHeader component"
           ],
-          "duration": 11,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page handleGlossaryDelete should navigate to empty glossary path when no glossaries remain after deletion",
+          "fullName": "GlossaryHeader component should render Submit for Review action when term is Draft and trigger submit",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "should navigate to empty glossary path when no glossaries remain after deletion"
+          "status": "pending",
+          "title": "should render Submit for Review action when term is Draft and trigger submit"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page",
-            "handleGlossaryDelete"
+            "GlossaryHeader component"
           ],
-          "duration": 9,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page handleGlossaryDelete should filter out deleted glossary from list",
+          "fullName": "GlossaryHeader component should render Approve and Reject actions when term is InReview and trigger approve",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "should filter out deleted glossary from list"
+          "status": "pending",
+          "title": "should render Approve and Reject actions when term is InReview and trigger approve"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 8,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page should pass entity name as pageTitle to withPageLayout",
+          "fullName": "GlossaryHeader component should trigger reject when reject action is clicked",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "should pass entity name as pageTitle to withPageLayout"
+          "status": "pending",
+          "title": "should trigger reject when reject action is clicked"
         },
         {
           "ancestorTitles": [
-            "Test GlossaryComponent page"
+            "GlossaryHeader component"
           ],
-          "duration": 6,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "Test GlossaryComponent page should enable the left-panel collapse control for all glossaries",
+          "fullName": "GlossaryHeader component should render Version badge with status tone and prompt for version when submitting CDE for review",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 1,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "should enable the left-panel collapse control for all glossaries"
+          "status": "pending",
+          "title": "should render Version badge with status tone and prompt for version when submitting CDE for review"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component should prompt for version when submitting CDE for review and save version",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should prompt for version when submitting CDE for review and save version"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component should not render Approve, Reject, or Revoke buttons for Data Proposer role",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should not render Approve, Reject, or Revoke buttons for Data Proposer role"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "suggestNextVersion"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component suggestNextVersion should increment minor version correctly",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should increment minor version correctly"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "suggestNextVersion"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component suggestNextVersion should handle non-standard version strings gracefully",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should handle non-standard version strings gracefully"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "Create Draft (Tạo bản nháp)"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" for Data Proposer on Approved CDE and create draft on submit",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show \"Tạo bản nháp\" for Data Proposer on Approved CDE and create draft on submit"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "Create Draft (Tạo bản nháp)"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" for Admin on Approved CDE",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show \"Tạo bản nháp\" for Admin on Approved CDE"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "Create Draft (Tạo bản nháp)"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should NOT show \"Tạo bản nháp\" for Data Steward role",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should NOT show \"Tạo bản nháp\" for Data Steward role"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "Create Draft (Tạo bản nháp)"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should NOT show \"Tạo bản nháp\" when CDE is not in Approved status",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should NOT show \"Tạo bản nháp\" when CDE is not in Approved status"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "Create Draft (Tạo bản nháp)"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component Create Draft (Tạo bản nháp) should show \"Tạo bản nháp\" and custom Version badge for Data Quality terms",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show \"Tạo bản nháp\" and custom Version badge for Data Quality terms"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component lists approved CDE versions and opens the selected version",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "lists approved CDE versions and opens the selected version"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "CDE Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "CDE Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Admin on CDE glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Nhập Excel and Xuất Excel for Admin on CDE glossary"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "CDE Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Data Proposer on CDE glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Nhập Excel and Xuất Excel for Data Proposer on CDE glossary"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "CDE Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component CDE Import and Export permissions in GlossaryHeader should hide Nhập Excel for Data Steward on CDE glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should hide Nhập Excel for Data Steward on CDE glossary"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "DQ Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel on DQ glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Xuất Excel for all users (e.g. Consumer) and hide Nhập Excel on DQ glossary"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "DQ Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Admin on DQ glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Nhập Excel and Xuất Excel for Admin on DQ glossary"
+        },
+        {
+          "ancestorTitles": [
+            "GlossaryHeader component",
+            "DQ Import and Export permissions in GlossaryHeader"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "GlossaryHeader component DQ Import and Export permissions in GlossaryHeader should show Nhập Excel and Xuất Excel for Data Proposer on DQ glossary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "should show Nhập Excel and Xuất Excel for Data Proposer on DQ glossary"
         }
       ],
       "displayName": {

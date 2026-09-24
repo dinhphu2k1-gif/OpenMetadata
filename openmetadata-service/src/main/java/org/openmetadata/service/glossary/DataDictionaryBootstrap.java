@@ -8,6 +8,9 @@ package org.openmetadata.service.glossary;
 import static org.openmetadata.service.Entity.ADMIN_USER_NAME;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.type.EntityStatus;
@@ -18,6 +21,7 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
 
@@ -36,15 +40,30 @@ public final class DataDictionaryBootstrap {
               GlossaryVersionDAO versionDAO = handle.attach(GlossaryVersionDAO.class);
               Glossary identity = findIdentity(collectionDAO);
               WorkingVersionRecord working = findDataDictionaryWorking(versionDAO);
+              PublishedSnapshotRecord published =
+                  identity == null
+                      ? null
+                      : versionDAO.findLatestPublished("glossary", identity.getId());
 
               // A deleted identity is intentional. Restore behavior belongs to F16.
               if (identity != null && Boolean.TRUE.equals(identity.getDeleted())) {
                 return;
               }
-              if ((identity == null) != (working == null)) {
-                throw inconsistent(identity == null ? "working record only" : "identity only");
+              if (identity == null && working != null) {
+                throw inconsistent("working record only");
               }
               if (identity != null) {
+                // Approval consumes the working row and installs a published head. Both an active
+                // working version and an active published version are valid restart states.
+                if (working == null) {
+                  if (published != null) {
+                    return;
+                  }
+                  if (restoreRejectedWorkingFromArchived(versionDAO, identity)) {
+                    return;
+                  }
+                  throw inconsistent("identity only");
+                }
                 if (!identity.getId().equals(working.entityId())) {
                   throw inconsistent("identity and working record IDs do not match");
                 }
@@ -108,6 +127,58 @@ public final class DataDictionaryBootstrap {
       }
     }
     return found;
+  }
+
+  /** Repairs the state left by the old revoke implementation: archived snapshot, no head/working. */
+  @SuppressWarnings("unchecked")
+  private static boolean restoreRejectedWorkingFromArchived(
+      GlossaryVersionDAO dao, Glossary identity) {
+    List<PublishedSnapshotRecord> snapshots = dao.listPublished("glossary", identity.getId());
+    if (snapshots.isEmpty() || snapshots.get(0).archivedAt() == null) {
+      return false;
+    }
+
+    PublishedSnapshotRecord archived = snapshots.get(0);
+    Map<String, Object> payload =
+        new LinkedHashMap<>(JsonUtils.readValue(archived.payload(), Map.class));
+    String nextVersion = nextMinorVersion(archived.businessVersion());
+    payload.put("businessVersion", nextVersion);
+    payload.put("entityStatus", EntityStatus.REJECTED.value());
+    payload.put("termRevisions", List.of());
+    payload.put("termCount", 0);
+    payload.remove("workingRevision");
+    payload.remove("snapshotId");
+    payload.remove("publicationSequence");
+    payload.remove("publishedAt");
+    payload.remove("publishedBy");
+    payload.remove("archivedAt");
+    payload.remove("archivedBy");
+
+    long now = System.currentTimeMillis();
+    dao.insertWorking(
+        UUID.randomUUID(),
+        "glossary",
+        identity.getId(),
+        null,
+        nextVersion,
+        EntityStatus.REJECTED.value(),
+        archived.nativeVersion(),
+        JsonUtils.pojoToJson(payload),
+        now,
+        ADMIN_USER_NAME);
+    return true;
+  }
+
+  private static String nextMinorVersion(String businessVersion) {
+    String[] parts = businessVersion.split("\\.", -1);
+    if (parts.length != 2) {
+      throw inconsistent("invalid archived business version " + businessVersion);
+    }
+    try {
+      return parts[0] + "." + Math.addExact(Long.parseLong(parts[1]), 1L);
+    } catch (ArithmeticException | NumberFormatException exception) {
+      throw inconsistent("invalid archived business version " + businessVersion);
+    }
   }
 
   private static IllegalStateException inconsistent(String detail) {

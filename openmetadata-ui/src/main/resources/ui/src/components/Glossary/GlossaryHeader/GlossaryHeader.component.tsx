@@ -61,7 +61,6 @@ import {
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
 import { useFqn } from '../../../hooks/useFqn';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import {
   isDataDictionaryGlossary,
   isDataQualityGlossary,
@@ -79,7 +78,6 @@ import {
   getGlossaryVersionsList,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
-  getGlossaryPublishPreview,
   GlossaryVersionPermissions,
   GlossaryWorkflowAction,
   transitionGlossaryTermWorkflow,
@@ -176,9 +174,6 @@ const GlossaryHeader = ({
     useState<boolean>(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
-  const [approvePreviewCount, setApprovePreviewCount] = useState<number>();
-  const [isApprovePreviewLoading, setIsApprovePreviewLoading] =
-    useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const [isReopening, setIsReopening] = useState(false);
@@ -202,7 +197,6 @@ const GlossaryHeader = ({
     useState<GlossaryVersionPermissions>();
   const [isWorkflowPermissionLoading, setIsWorkflowPermissionLoading] =
     useState(true);
-  const { currentUser } = useApplicationStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -860,7 +854,7 @@ const GlossaryHeader = ({
       Boolean(workflowPermissions?.canReject));
 
   const handleApproveTerm = async () => {
-    if (isApproving || (isGlossary && isApprovePreviewLoading)) {
+    if (isApproving) {
       return;
     }
     try {
@@ -879,36 +873,6 @@ const GlossaryHeader = ({
     }
   };
 
-  useEffect(() => {
-    if (!isGlossary || !isApproveModalOpen) {
-      return;
-    }
-    let stale = false;
-    setApprovePreviewCount(undefined);
-    setIsApprovePreviewLoading(true);
-    getGlossaryPublishPreview(selectedData.id, { limit: 1 })
-      .then((preview) => {
-        if (!stale) {
-          setApprovePreviewCount(preview.termCount);
-        }
-      })
-      .catch((error) => {
-        if (!stale) {
-          handleWorkflowError(error);
-          setIsApproveModalOpen(false);
-        }
-      })
-      .finally(() => {
-        if (!stale) {
-          setIsApprovePreviewLoading(false);
-        }
-      });
-
-    return () => {
-      stale = true;
-    };
-  }, [isGlossary, isApproveModalOpen, selectedData.id]);
-
   const handleRejectTerm = async () => {
     try {
       setIsRejecting(true);
@@ -926,26 +890,10 @@ const GlossaryHeader = ({
     }
   };
 
-  const isAssignedReviewer = useMemo(() => {
-    if (isGlossary || !currentUser) {
-      return false;
-    }
-    const term = selectedData as GlossaryTerm;
-    const inReviewers = term.reviewers?.some(
-      (r) => r.id === currentUser.id || r.name === currentUser.name,
-    );
-    const inOwners = term.owners?.some(
-      (o) => o.id === currentUser.id || o.name === currentUser.name,
-    );
-
-    return Boolean(inReviewers && !inOwners && !currentUser.isAdmin);
-  }, [isGlossary, selectedData, currentUser]);
-
   const canReopen =
     !isVersionView &&
     glossaryTermStatus === EntityStatus.Rejected &&
-    Boolean(workflowPermissions?.canEditWorking) &&
-    !isAssignedReviewer;
+    Boolean(workflowPermissions?.canEditWorking);
 
   const handleReopen = async () => {
     try {
@@ -1748,20 +1696,9 @@ const GlossaryHeader = ({
       <ConfirmationModal
         bodyText={
           isGlossary
-            ? (
-                <Space direction="vertical">
-                  <span>
-                    {isApprovePreviewLoading
-                      ? t('label.loading')
-                      : `${approvePreviewCount ?? 0} CDE`}
-                  </span>
-                  <Alert
-                    showIcon
-                    message="Danh sách cuối cùng sẽ được tính lại khi phê duyệt."
-                    type="warning"
-                  />
-                </Space>
-              )
+            ? t('message.confirm-approve-entity-message', {
+                entity: t('label.glossary'),
+              })
             : t('message.confirm-approve-glossary-term-message')
         }
         cancelText={t('label.cancel')}
@@ -1773,7 +1710,7 @@ const GlossaryHeader = ({
               })
             : t('message.confirm-approve-glossary-term-title')
         }
-        isLoading={isApproving || (isGlossary && isApprovePreviewLoading)}
+        isLoading={isApproving}
         visible={isApproveModalOpen}
         onCancel={() => setIsApproveModalOpen(false)}
         onConfirm={handleApproveTerm}

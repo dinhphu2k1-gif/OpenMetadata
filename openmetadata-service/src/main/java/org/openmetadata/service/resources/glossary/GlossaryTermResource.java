@@ -357,8 +357,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     if (!capabilities.canArchive()) {
       throw new AuthorizationException("Not authorized to archive the published version");
     }
-    return GlossaryVersionResponses.published(
-        versioningService.archiveLatest(
+    return GlossaryVersionResponses.working(
+        versioningService.revokeLatestToRejectedWorking(
             GlossaryVersioningService.GLOSSARY_TERM,
             id,
             securityContext.getUserPrincipal().getName()));
