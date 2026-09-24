@@ -557,7 +557,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Row identity/key là `(termId, parentBusinessVersion, businessVersion)`; `entityStatus` không thuộc key vì working row có thể đổi trạng thái. Click row tạo URL scoped FQN có đủ `businessVersion` và `parentBusinessVersion`; detail/history backend cũng phải kiểm tra identity thuộc đúng parent scope và trả `404` khi không khớp.
 - Consumer-only chỉ nhận published `Approved` rows của Data Dictionary active. Consumer truy cập working hoặc archived scope nhận `404`. Manager nhận published và working rows đúng scope theo capability hiệu lực; actor có quyền history/audit nhận archived rows read-only. Không suy quyền từ tên role.
 - Thứ tự xử lý bắt buộc là validate/authorize parent scope → xác định các `termId` actor được xem → dựng flat rows → tính `total` → sort → pagination. Không lọc authorization sau khi đã cắt page. Default order ổn định là normalized `name ASC` → business version giảm dần theo từng đoạn số → `termId ASC` → `recordType ASC`.
-- F11 sở hữu pagination nền tảng và default ordering. F12 tái sử dụng cùng service/DAO/query builder để thêm search, filters và custom sort; không triển khai một read path hoặc cơ chế pagination thứ hai.
+- F11 là authoritative default-list read path và luôn đọc database. F12 dùng OpenSearch projection theo từng CDE business-version row để thực hiện search, filters và custom sort. Hai chức năng dùng chung row DTO, authorization semantics, page-size allowlist và stable tie-breaker, nhưng không dùng chung persistence/query engine và không được fallback âm thầm giữa database với mutable search index.
 - Frontend gọi đúng một flat-list request cho mỗi page và dùng `paging.total` từ backend; xóa luồng gọi history theo từng term, client-side expansion và client-side pagination của business-version rows. Khi đổi Dictionary scope hoặc có workflow mutation, reset trang đầu, xóa row scope cũ trong lúc loading và bỏ qua stale response.
 - Với dataset không đổi giữa hai request, stable order và tie-breaker bảo đảm pagination không trùng/mất row. Nếu dữ liệu thay đổi do workflow mutation trong lúc chuyển trang, frontend reload trang đầu từ representation authoritative.
 
@@ -576,24 +576,34 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 **Phạm vi**
 
-- Search name + displayName, debounce 500 ms.
-- Multi-status gồm Rejected cho manager.
-- Domain, DataSource, Owner và DataClassification.
-- Điều kiện kết hợp AND.
-- Tái sử dụng pagination `10/15/25/50`, authorization, total và stable tie-breaker của F11; đổi điều kiện reset trang đầu.
+- F12 dùng `GET /v1/glossaryTerms/search` với `glossary`, canonical `parentBusinessVersion`, `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`, `limit` và `offset`. Khi có `parentBusinessVersion`, endpoint bắt buộc dùng CDE business-version OpenSearch projection; caller Native/DQ không có parent scope giữ nguyên behavior hiện hữu.
+- F12 không query index `glossaryTerm` hiện hữu vì index đó có document identity là `termId` và chỉ biểu diễn một projection hiện tại. Tạo `cdeBusinessVersion` và consumer-safe `cdeBusinessVersionPublished` trong cùng search cluster. Mỗi row F11 là một document, có stable `rowKey = (termId, parentBusinessVersion, businessVersion)` và document id là encoding/hash ổn định của row key; các business version cùng `termId` không được ghi đè nhau.
+- Document tối thiểu gồm `rowKey`, `termId`, `glossaryId`, `parentBusinessVersion`, `businessVersion`, `businessVersionSortKey`, `recordType`, `scopeType`, `entityStatus`, `name`, `normalizedName`, `displayName`, `description`, `domainIds`, `ownerIds`, `reviewerIds`, tag FQN tách theo `DataSource`/`DataClassification`, authorization projection và các timestamp cần sort/audit. Filter dùng UUID/FQN ổn định, không dùng domain display name, owner name hoặc label có thể đổi/trùng.
+- Search `q` là text literal sau trim/Unicode normalization, tối đa 200 ký tự, tìm đồng thời `name OR displayName`; client không được truyền raw OpenSearch DSL hoặc wildcard expression. Mapping dùng analyzer/ngram phù hợp thay vì leading wildcard không được kiểm soát. Frontend debounce 500 ms và nút clear đưa bảng về F11 default list.
+- `statuses` hỗ trợ `Draft`, `In Review`, `Rejected`, `Approved`; `Archived` chỉ hợp lệ trong scope history/audit. Nhiều giá trị trong cùng một multi-select kết hợp `OR`; các nhóm search/status/domain/owner/tag kết hợp `AND`. Parameter rỗng sau trim được coi là absent; UUID/FQN/status/sort sai, CSV có phần tử rỗng hoặc vượt allowlist/giới hạn trả `400`.
+- `sortField` chỉ nhận allowlist ban đầu `name`, `displayName`, `businessVersion`, `entityStatus`; `sortOrder` chỉ nhận `asc|desc`. Indexer sinh `businessVersionSortKey` bằng cùng numeric-segment normalization của F11 để `1.10 > 1.9 > 1.2`. Mọi custom sort luôn nối default tie-breaker `normalizedName ASC → businessVersionSortKey DESC → termId ASC → recordType ASC`; null ordering được cố định và test trên cả hai database nguồn.
+- Thứ tự xử lý bắt buộc là validate request → resolve/authorize Dictionary scope authoritative từ database → dựng subject/effective-capability filter → query đúng OpenSearch alias → áp authorization/search/filters → tính `total` → stable sort → pagination. Không được page OpenSearch trước rồi lọc quyền trong application. Consumer-only luôn được route sang `cdeBusinessVersionPublished`, chỉ chứa published `Approved` rows của active Dictionary; gửi `Draft` hoặc `Rejected` không được mở rộng kết quả. Working/archived/unauthorized parent scope vẫn trả `404` như F11.
+- Authorization projection phải biểu diễn đủ user/team/role/policy/capability cần thiết để OpenSearch loại row trước `total` và pagination, hoặc backend phải thêm authoritative allowed-row-key restriction vào chính OpenSearch query. Nếu không dựng được filter quyền đầy đủ thì fail closed; tuyệt đối không trả unfiltered hits, total hoặc facet rồi mới loại row.
+- Database snapshot/working/manifest là source of truth và nguồn full reindex. Mọi create/update/submit/reject/reopen/approve/cutover/archive/delete phát transactional outbox sau commit để idempotently upsert/delete document. Index failure không rollback workflow transaction; retry queue, reconciliation và full reindex phải sửa được missing, stale và orphan documents. Cutover loại scope cũ khỏi published alias/index và đưa Approved rows của active scope mới vào consumer-safe projection.
+- F11 và F12 trả cùng row DTO `{ data, paging: { total, limit, offset } }`, cùng page sizes `10/15/25/50` và cùng stable default order. F11 authoritative ngay sau commit; F12 có eventual consistency. Sau mutation UI dùng response/F11 authoritative, không dùng việc OpenSearch chưa thấy row để kết luận mutation thất bại và không fallback từ published sang mutable index.
+- Frontend dùng F11 khi không có search/filter/custom sort; khi bất kỳ F12 criteria nào hoạt động thì gọi `/glossaryTerms/search`. Mọi thay đổi criteria hoặc page size reset `offset = 0`, xóa rows của request cũ trong lúc loading và dùng abort/request-generation token để response cũ không ghi đè state mới.
 
 **Test/DoD**
 
-- Contract test từng filter và tổ hợp.
-- Consumer gửi status Draft vẫn chỉ nhận Approved.
-- Response cũ trả chậm không ghi đè response mới.
-- Có query-count và performance test; không N+1.
+- Contract/validation test từng parameter, empty/duplicate/unknown/oversized values, từng filter và tổ hợp `OR` trong nhóm/`AND` giữa nhóm; search bao phủ name, displayName, null, Unicode tiếng Việt và ký tự wildcard được coi là literal.
+- Fixture cùng `termId A`, parent scope `1` có `1.0`, `1.1`, `1.2` tạo ba document/row độc lập; không document nào ghi đè document khác. Identity B cùng mã ở scope `2` không lọt vào query scope `1`.
+- Consumer được route vào published projection, gửi `Draft` hoặc `Draft,Approved` vẫn chỉ nhận Approved active rows; không lộ working/archived row qua data, `total`, sort hoặc facet. Manager/partial Manager/history actor chỉ nhận row theo effective capability và parent scope.
+- Sort test bao phủ mọi allowlist field/direction, null ordering, numeric version `1.11/1.10/1.9/1.2`, stable tie-breaker, page đầu/cuối/out-of-range và không trùng/mất row trên index generation cố định.
+- Outbox test bao phủ create/update/status transition/approve/cutover/archive/delete, duplicate delivery, out-of-order retry, failure sau database commit và eventual recovery. Full reindex và incremental indexing phải tạo cùng document set; reconciliation phát hiện missing/stale/orphan rows.
+- F11-vs-F12 parity test trên cùng committed/indexed dataset chứng minh cùng authorization, row DTO, default order và total khi F12 không có content filter. Native/DQ Glossary cùng index `glossaryTerm` hiện hữu không hồi quy.
+- Frontend test chứng minh debounce 500 ms, reset trang khi criteria đổi, clear criteria quay lại F11, serialization UUID/FQN đúng, Consumer hard-lock Approved và response cũ trả chậm không ghi đè response mới.
+- Có query-count/performance test trên dataset business-version đủ lớn; authorization và hydration không N+1. Test riêng search-index lag chứng minh detail/workflow/F11 vẫn đúng và UI không báo mutation thất bại giả.
 
 ### F13 — Export theo quyền và bộ lọc
 
 **Phạm vi**
 
-- Export dùng chung filter DTO, query builder và authorization với F11/F12.
+- Export dùng chung immutable filter/sort criteria và authorization semantics với F12. OpenSearch trả ordered authorized `rowKey`; backend bulk-hydrate payload authoritative từ database trước khi tạo file, không export trực tiếp `_source` và không N+1.
 - Async export lưu actor và filter trong audit.
 - Frontend gửi search/filter/sort context và hiển thị progress/error.
 

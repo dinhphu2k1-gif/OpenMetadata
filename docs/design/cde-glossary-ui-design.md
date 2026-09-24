@@ -257,7 +257,7 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
 3. **Công cụ Tìm kiếm, Lọc và Phân trang (Search, Filters & Pagination):**
    - **Thanh tìm kiếm văn bản (Text Search Bar):**
      - *Vị trí:* Nằm ở góc trái thanh công cụ phía trên bảng (chiều rộng 280px, có nút xóa nhanh `x`).
-     - *Phạm vi tìm kiếm:* Tìm kiếm gần đúng (wildcard query `*<keyword>*`) đồng thời trên **Mã CDE (`name`)** và **Tên hiển thị CDE (`displayName`)**.
+     - *Phạm vi tìm kiếm:* Tìm kiếm gần đúng đồng thời trên **Mã CDE (`name`)** và **Tên hiển thị CDE (`displayName`)**. Input là text literal; UI không gửi raw OpenSearch DSL/wildcard. Backend dùng analyzer/ngram và Unicode normalization để cung cấp behavior tương đương contains search mà không phụ thuộc leading wildcard.
      - *Cơ chế:* Tích hợp cơ chế Debounce 500ms để tối ưu tải truy vấn server khi người dùng nhập liệu.
    - **Bộ lọc Trạng thái (Status Filter Dropdown):**
      - *Hình thức:* Dropdown đa chọn (Multi-select checkbox).
@@ -266,15 +266,17 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
        - Với **Role Khai thác (Consumer):** Hệ thống tự động khóa cứng (hard-lock) duy nhất trạng thái `Đã phê duyệt (Approved)`.
        - Với **Nhóm Quản trị (Admin / Steward / Proposer):** Mặc định chọn tất cả, người dùng có thể tick/bỏ tick để lọc riêng bản nháp, bản chờ duyệt hoặc bản đã phê duyệt.
    - **4 Bộ lọc Chuyên biệt cho CDE (CDE Specific Filter Dropdowns):**
-     - **(1) Khối / Miền nghiệp vụ (Business Group / Domain):** Dropdown đa chọn nạp động danh sách Miền từ hệ thống (ví dụ: *Khối Bán lẻ, Khối Khách hàng doanh nghiệp, Khối Quản trị rủi ro, Khối Tài chính kế toán,...*). Lọc theo trường `domains.displayName`.
-     - **(2) Hệ thống nguồn (Data Source):** Dropdown đa chọn nạp danh sách các tag thuộc phân loại `DataSource` (ví dụ: *Core Banking, LOS, CRM, DWH, ERP, ECM,...*). Lọc theo mã tag trong `classificationTags`.
-     - **(3) Chủ sở hữu / Đầu mối phụ trách (Data Owner):** Dropdown đa chọn nạp danh sách user và team phụ trách CDE trong hệ thống. Lọc theo định danh `owners.name`.
-     - **(4) Phân loại dữ liệu (Data Classification):** Dropdown đa chọn nạp danh sách tag bảo mật thuộc nhóm `DataClassification` (ví dụ: *Công khai, Nội bộ, Bí mật, Tuyệt mật*). Lọc theo mã tag trong `classificationTags`.
+     - **(1) Khối / Miền nghiệp vụ (Business Group / Domain):** Dropdown đa chọn nạp động danh sách Miền từ hệ thống (ví dụ: *Khối Bán lẻ, Khối Khách hàng doanh nghiệp, Khối Quản trị rủi ro, Khối Tài chính kế toán,...*). UI hiển thị display name nhưng gửi `domainIds`; backend lọc theo UUID ổn định.
+     - **(2) Hệ thống nguồn (Data Source):** Dropdown đa chọn nạp danh sách các tag thuộc phân loại `DataSource` (ví dụ: *Core Banking, LOS, CRM, DWH, ERP, ECM,...*). UI gửi tag FQN và backend lọc theo `dataSourceTagFqns`.
+     - **(3) Chủ sở hữu / Đầu mối phụ trách (Data Owner):** Dropdown đa chọn nạp danh sách user và team phụ trách CDE trong hệ thống. UI hiển thị tên nhưng gửi `ownerIds`; backend lọc theo UUID ổn định.
+     - **(4) Phân loại dữ liệu (Data Classification):** Dropdown đa chọn nạp danh sách tag bảo mật thuộc nhóm `DataClassification` (ví dụ: *Công khai, Nội bộ, Bí mật, Tuyệt mật*). UI gửi tag FQN và backend lọc theo `classificationTagFqns`.
    - **Cơ chế phối hợp truy vấn & Phân trang:**
-     - Mọi tiêu chí tìm kiếm và lọc được kết hợp đồng thời theo điều kiện **`AND`** (mệnh đề `must` trong truy vấn Elasticsearch).
+     - Nhiều giá trị trong cùng một bộ lọc được kết hợp bằng **`OR`**; các nhóm search/status/domain/owner/tag được kết hợp bằng **`AND`** trong OpenSearch query.
      - Mỗi khi người dùng thay đổi từ khóa hoặc điều kiện lọc, hệ thống tự động reset về trang 1 và tính toán lại tổng số dòng.
      - Phân trang tính trên toàn bộ các dòng kết quả tìm kiếm/lọc được (hỗ trợ các mức kích thước trang: 10, 15, 25, 50 dòng/trang).
-     - F11 cung cấp flat read model, authorization, total, default stable ordering và pagination nền tảng. F12 chỉ bổ sung search, filters và custom sort trên cùng read path; không tạo cơ chế pagination thứ hai.
+     - F11 là authoritative default-list read path từ database. Khi không có search/filter/custom sort, UI gọi F11. Khi có bất kỳ tiêu chí F12 nào, UI gọi OpenSearch-backed search endpoint; hai path trả cùng row DTO, page sizes và stable tie-breaker nhưng không fallback âm thầm giữa database và mutable/published search index.
+     - OpenSearch lưu một document cho mỗi row `(termId, parentBusinessVersion, businessVersion)`, không dùng document đơn `termId` của index `glossaryTerm`. Consumer chỉ query consumer-safe published projection; authorization được áp dụng trước `total`, sort và pagination.
+     - F11 có hiệu lực authoritative ngay sau workflow commit; F12 có eventual consistency. Sau mutation UI dùng response/F11 để hiển thị trạng thái và không coi search-index lag là mutation thất bại.
    - **Tính năng Xuất dữ liệu (Export):** Khi người dùng bấm Export trong menu ba chấm `...`, file xuất ra sẽ phản ánh đúng các điều kiện lọc và tìm kiếm đang kích hoạt trên màn hình, đồng thời tuân thủ 100% phân quyền của người thực hiện xuất.
 
 #### Ví dụ minh họa cụ thể:
@@ -493,18 +495,26 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Tham số Query Params:**
   * `glossary={glossaryId}`: ID của Glossary cha.
   * `parentBusinessVersion={parentBusinessVersion}`: Bắt buộc với Data Dictionary flat list; là canonical version của đúng một Dictionary scope.
-  * `q={keyword}`: Từ khóa tìm kiếm theo Mã hoặc Tên CDE.
-  * `domain={domain}`: Lọc theo Miền nghiệp vụ.
-  * `status={status}`: Lọc theo trạng thái (`Approved`, `Draft`, `InReview`, `Rejected`).
   * `limit={limit}&offset={offset}`: Phân trang.
 * **Response:** `{ data, paging: { total, limit, offset } }`. Mỗi row gồm tối thiểu `termId`, `name`, scoped `fullyQualifiedName`, `parentBusinessVersion`, `businessVersion`, `entityStatus`, `recordType = working|published|archived` và các field cần render. Row key là `(termId, parentBusinessVersion, businessVersion)`.
-* **Nguồn dữ liệu:** Backend dựng flat read model từ business snapshot/working stores; archived scope dùng frozen manifest. Không page native identity rồi hydrate history, không gọi history riêng cho từng term và không fallback giữa scope.
+* **Nguồn dữ liệu:** Database authoritative. Backend dựng flat read model từ business snapshot/working stores; archived scope dùng frozen manifest. Không page native identity rồi hydrate history, không gọi history riêng cho từng term và không fallback giữa scope.
 * **Thứ tự mặc định:** normalized `name ASC` → business version numeric `DESC` → `termId ASC` → `recordType ASC`. Authorization thực hiện trước `total`, sort và pagination.
 * **Quy tắc phân quyền trả về từ Backend:**
   * *Consumer-only:* Chỉ được request Dictionary active và backend lọc cứng published `Approved`; working/archived/unauthorized scope trả `404`.
   * *Người có quyền working:* Nhận published và working rows đúng scope theo capability hiệu lực.
   * *Người có quyền history/audit:* Nhận archived rows read-only đúng frozen scope.
   * Thiếu/sai canonical `parentBusinessVersion` trả `400`; scope không tồn tại hoặc không được xem trả `404` để không lộ dữ liệu.
+
+#### Tìm kiếm, lọc và custom sort CDE business-version (Mục 6.3):
+* **Backend Endpoint:** `GET /v1/glossaryTerms/search`
+* **Nguồn dữ liệu:** OpenSearch alias `cdeBusinessVersion`; Consumer-only được backend route sang consumer-safe alias `cdeBusinessVersionPublished`. Database snapshot/working/manifest là source of truth và nguồn full reindex.
+* **Tham số bắt buộc:** `glossary`, canonical `parentBusinessVersion`, `limit`, `offset`.
+* **Criteria optional:** `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`. Filter đa chọn truyền UUID/FQN; không truyền display name. Nhiều giá trị trong cùng nhóm là OR, giữa các nhóm là AND.
+* **Sort allowlist:** `name`, `displayName`, `businessVersion`, `entityStatus` với `asc|desc`; luôn nối stable tie-breaker của default list. `businessVersion` dùng precomputed numeric `businessVersionSortKey`, không lexical sort hoặc JavaScript number.
+* **Search document:** Một document cho mỗi row key `(termId, parentBusinessVersion, businessVersion)`, chứa scope/status/record type, searchable business payload, filter IDs/FQNs, authorization projection và timestamp. Document id là encoding/hash ổn định của row key nên các version không ghi đè nhau.
+* **Authorization:** Backend authorize parent scope authoritative trước khi query; effective capability được đưa vào OpenSearch filter trước `total`, sort và pagination. Không page trước rồi post-filter quyền. Không dựng được filter quyền đầy đủ thì fail closed.
+* **Consistency:** F12 có eventual consistency và được cập nhật qua transactional outbox sau database commit, kèm retry, reconciliation và full reindex. Index failure không rollback workflow; UI sau mutation dùng response/F11 authoritative. Không fallback từ published alias sang mutable alias.
+* **Response:** Cùng row DTO và `{ data, paging: { total, limit, offset } }` của default list để UI chuyển giữa F11/F12 mà không hydrate từng row.
 
 ---
 
