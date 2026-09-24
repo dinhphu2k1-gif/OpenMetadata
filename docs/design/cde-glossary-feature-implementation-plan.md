@@ -43,8 +43,8 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F06 | Tạo business version CDE kế tiếp | F05 | Nhiều version CDE |
 | F09 | Workflow, active membership và cutover/archive Data Dictionary | F01, F05, F07 | Vòng đời Dictionary |
 | F10 | Tạo business version Data Dictionary kế tiếp | F09 | Nhiều version Dictionary |
-| F11 | Bảng flat mọi CDE business version | F02, F05 | Tra cứu đầy đủ |
-| F12 | Search, filter, sort và pagination | F11 | Khai thác dữ liệu |
+| F11 | Bảng flat mọi CDE business version trong một Dictionary scope | F02, F05, F06, F09, F10 | Tra cứu đầy đủ |
+| F12 | Search, filter và custom sort trên flat read model | F11 | Khai thác dữ liệu |
 | F13 | Export theo quyền và bộ lọc | F12 | Export |
 | F14 | Import vào Draft | F03, F07 | Import |
 | F15 | CDE Overview và Assets | F02, F05 | Chi tiết CDE |
@@ -71,7 +71,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 | F09 | §3; §4; §5.1 term revisions tự động; §6.2; §8; §9.3.4 |
 | F10 | §5.2 Data Dictionary version mới là bản trắng; §6.2; §8 |
 | F11 | §6.3 Flat List và quyền xem |
-| F12 | §6.3 Search, filters, pagination |
+| F12 | §6.3 Search, filters và custom sort |
 | F13 | §6.3 Export theo filter/quyền; §8 Export; §9.3.5 |
 | F14 | §4.2–4.3 quyền Import; §6.2; §8 Import |
 | F15 | §7.1 Overview, custom properties và Assets; §9.5–9.6 |
@@ -545,22 +545,34 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Frontend test bao phủ capability, latest-vs-historical, prefill bắt buộc `N+1`, validation integer, modal, loading, double-submit, response-authoritative, conflict/reload và không tạo optimistic status change.
 - E2E `Dictionary 1 Approved + alo1(termId A)/1.x → tạo Dictionary 2 trắng + tạo alo1(termId B)/2.0 qua F03 → F07 sửa/lưu → F09 Submit/Approve`: trước Approve, hai identity hoạt động độc lập; sau Approve, A/Approved 1.x Archived, predecessor non-Approved bị xóa, B thuộc scope `2` active và không kế thừa dữ liệu từ A.
 
-### F11 — Bảng flat mọi CDE business version
+### F11 — Bảng flat mọi CDE business version trong một Dictionary scope
 
 **Phạm vi**
 
-- Backend read model luôn nhận `parentBusinessVersion` và trả một row cho `(termId, parentBusinessVersion, businessVersion, status)`; không trộn scope.
-- Consumer chỉ nhận Approved CDE của Data Dictionary active. Manager nhận working + Approved trong scope active/working và Archived qua chế độ lịch sử theo quyền.
-- Total count tính sau authorization.
-- Row key gồm termId, parentBusinessVersion và businessVersion; click row tạo URL có đủ hai version.
+- Bảng luôn hoạt động trong đúng một Data Dictionary scope, được định danh bởi `glossaryId` và canonical `parentBusinessVersion`. Một request/response không bao giờ chứa CDE của nhiều parent scope; Manager chuyển giữa active, working hoặc historical Dictionary bằng version selector thay vì ghép nhiều scope vào cùng bảng.
+- `GET /v1/glossaryTerms?glossary={dataDictionaryId}&parentBusinessVersion={N}&limit={limit}&offset={offset}` là contract flat-list cho Data Dictionary. `parentBusinessVersion` bắt buộc, `limit` chỉ nhận `10`, `15`, `25`, `50`, `offset >= 0`; thiếu/sai định dạng trả `400`. Scope không tồn tại hoặc actor không được xem trả `404` để không lộ trạng thái. Các caller legacy ngoài Data Dictionary không truyền `parentBusinessVersion` và giữ nguyên hành vi hiện hữu.
+- Backend tự phân loại scope từ Data Dictionary authoritative thành `active`, `working` hoặc `archived`; client không được truyền `mode` để chọn read source. Active/working đọc business snapshot và working stores đúng scope. Archived dùng frozen manifest để xác định tập CDE identity, sau đó chỉ trả các published snapshots cùng `parentBusinessVersion`; không query live membership hoặc fallback sang scope khác.
+- Backend dựng flat read model trực tiếp từ `glossary_business_snapshot` và `glossary_business_working`, với archive membership qua `glossary_snapshot_term`; không page native `glossary_term_entity` rồi hydrate lịch sử. Mỗi published snapshot hoặc working record có quyền xem là một row độc lập.
+- DTO row tối thiểu gồm `termId`, `name`, scoped `fullyQualifiedName`, `parentBusinessVersion`, `businessVersion`, `entityStatus`, `recordType = working|published|archived` và các field bảng yêu cầu (`displayName`, `description`, `owners`, `reviewers`, `domains`, `tags`, `extension`). Response dùng `{ data, paging: { total, limit, offset } }`.
+- Row identity/key là `(termId, parentBusinessVersion, businessVersion)`; `entityStatus` không thuộc key vì working row có thể đổi trạng thái. Click row tạo URL scoped FQN có đủ `businessVersion` và `parentBusinessVersion`; detail/history backend cũng phải kiểm tra identity thuộc đúng parent scope và trả `404` khi không khớp.
+- Consumer-only chỉ nhận published `Approved` rows của Data Dictionary active. Consumer truy cập working hoặc archived scope nhận `404`. Manager nhận published và working rows đúng scope theo capability hiệu lực; actor có quyền history/audit nhận archived rows read-only. Không suy quyền từ tên role.
+- Thứ tự xử lý bắt buộc là validate/authorize parent scope → xác định các `termId` actor được xem → dựng flat rows → tính `total` → sort → pagination. Không lọc authorization sau khi đã cắt page. Default order ổn định là normalized `name ASC` → business version giảm dần theo từng đoạn số → `termId ASC` → `recordType ASC`.
+- F11 sở hữu pagination nền tảng và default ordering. F12 tái sử dụng cùng service/DAO/query builder để thêm search, filters và custom sort; không triển khai một read path hoặc cơ chế pagination thứ hai.
+- Frontend gọi đúng một flat-list request cho mỗi page và dùng `paging.total` từ backend; xóa luồng gọi history theo từng term, client-side expansion và client-side pagination của business-version rows. Khi đổi Dictionary scope hoặc có workflow mutation, reset trang đầu, xóa row scope cũ trong lúc loading và bỏ qua stale response.
+- Với dataset không đổi giữa hai request, stable order và tie-breaker bảo đảm pagination không trùng/mất row. Nếu dữ liệu thay đổi do workflow mutation trong lúc chuyển trang, frontend reload trang đầu từ representation authoritative.
 
 **Test/DoD**
 
-- Fixture khi Dictionary `1` active và `2` working gồm Approved `1.0`, Rejected `1.1`, Approved `2.0`, Draft `2.1`; Consumer trong scope `1` chỉ thấy `1.0`, Manager thấy đúng các dòng theo scope/quyền.
-- Pagination không trùng hoặc mất row.
-- Không client-side N+1 để hydrate lịch sử.
+- Fixture có Dictionary `1` active với identity A/CDE1 (`1.0 Approved`, `1.1 Approved`, `1.2 Rejected`) và Dictionary `2` working với identity B/CDE1 (`2.0 Approved`, `2.1 Draft`). A và B có `termId`/scoped FQN khác nhau dù cùng mã nghiệp vụ.
+- Consumer request scope `1` chỉ nhận `1.0`, `1.1`; không nhận `1.2` hoặc `2.x`. Manager request scope `1` nhận đúng `1.x` theo quyền; request scope `2` nhận đúng `2.0`, `2.1` và không có `1.x`. Consumer request scope `2` working nhận `404`.
+- Archived Dictionary dùng frozen manifest, chỉ trả published history của identity thuộc manifest/cùng scope, không đọc live head, working row hoặc identity scope khác; mọi row read-only.
+- Thiếu/sai/non-canonical `parentBusinessVersion`, business-version prefix sai, scoped identity không khớp, parent không tồn tại và actor không có quyền đều được test với `400/404` đúng contract và không lộ payload.
+- `total` bằng số row sau authorization và trước pagination. Test page size `10/15/25/50`, page đầu/cuối, empty/out-of-range offset, numeric version order (`1.10` trước `1.2`) và không trùng/mất row trên dataset cố định.
+- Query-count test chứng minh số query không tăng theo số CDE; không client-side hoặc server-side N+1 để hydrate history. MySQL/PostgreSQL trả cùng row, total và thứ tự.
+- Frontend component/API test chứng minh mỗi page chỉ dùng một flat-list request, row key/URL có đủ scope, loading/empty/error hoạt động, đổi scope reset page và response cũ trả chậm không ghi đè scope mới.
+- Regression test chứng minh Native/DQ Glossary và các caller legacy không truyền `parentBusinessVersion` giữ nguyên hành vi hiện hữu.
 
-### F12 — Search, filter, sort và pagination
+### F12 — Search, filter và custom sort trên flat read model
 
 **Phạm vi**
 
@@ -568,7 +580,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Multi-status gồm Rejected cho manager.
 - Domain, DataSource, Owner và DataClassification.
 - Điều kiện kết hợp AND.
-- Page size 10/15/25/50; đổi điều kiện reset trang đầu.
+- Tái sử dụng pagination `10/15/25/50`, authorization, total và stable tie-breaker của F11; đổi điều kiện reset trang đầu.
 
 **Test/DoD**
 
