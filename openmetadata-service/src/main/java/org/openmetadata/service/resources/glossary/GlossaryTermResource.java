@@ -51,9 +51,13 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -87,6 +91,10 @@ import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.versioning.CdeFlatListService;
+import org.openmetadata.service.glossary.versioning.CdeFlatListService.Candidates;
+import org.openmetadata.service.glossary.versioning.CdeFlatListService.Scope;
+import org.openmetadata.service.glossary.versioning.CdeFlatListService.ScopeType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -127,6 +135,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final GlossaryTermMapper mapper = new GlossaryTermMapper();
   private final GlossaryMapper glossaryMapper = new GlossaryMapper();
   private final GlossaryVersioningService versioningService = new GlossaryVersioningService();
+  private final CdeFlatListService cdeFlatListService = new CdeFlatListService();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -335,9 +344,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   public List<Map<String, Object>> listPublishedVersions(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
-      @PathParam("id") UUID id) {
-    versionEntity(uriInfo, securityContext, id);
+      @PathParam("id") UUID id,
+      @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
+    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
+    if (term.getParentBusinessVersion() != null) {
+      requireCdeIdentityScopeNotFound(term, parentBusinessVersion);
+      authorizeCdeDetailScope(securityContext, term, parentBusinessVersion);
+    }
     return versioningService.listPublished(GlossaryVersioningService.GLOSSARY_TERM, id).stream()
+        .filter(
+            record ->
+                parentBusinessVersion == null
+                    || parentBusinessVersion.equals(record.parentBusinessVersion()))
         .map(GlossaryVersionResponses::published)
         .toList();
   }
@@ -351,11 +369,22 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @PathParam("businessVersion") String businessVersion) {
-    versionEntity(uriInfo, securityContext, id);
-    return GlossaryVersionResponses.published(
+      @PathParam("businessVersion") String businessVersion,
+      @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
+    GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
+    if (term.getParentBusinessVersion() != null) {
+      requireCdeIdentityScopeNotFound(term, parentBusinessVersion);
+      requireCdeVersionScopeNotFound(businessVersion, parentBusinessVersion);
+      authorizeCdeDetailScope(securityContext, term, parentBusinessVersion);
+    }
+    PublishedSnapshotRecord snapshot =
         versioningService.getPublished(
-            GlossaryVersioningService.GLOSSARY_TERM, id, businessVersion));
+            GlossaryVersioningService.GLOSSARY_TERM, id, businessVersion);
+    if (parentBusinessVersion != null
+        && !parentBusinessVersion.equals(snapshot.parentBusinessVersion())) {
+      throw new NotFoundException("CDE business version was not found in the requested scope");
+    }
+    return GlossaryVersionResponses.published(snapshot);
   }
 
   @POST
@@ -589,7 +618,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                     mediaType = "application/json",
                     schema = @Schema(implementation = GlossaryTermList.class)))
       })
-  public ResultList<GlossaryTerm> list(
+  public Object list(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @Parameter(
@@ -648,9 +677,23 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           String entityStatus,
       @Parameter(description = "Filter CDE representations by Data Dictionary business version")
           @QueryParam("parentBusinessVersion")
-          String parentBusinessVersion) {
+          String parentBusinessVersion,
+      @Parameter(description = "Offset for Data Dictionary flat-list pagination")
+          @DefaultValue("0")
+          @Min(value = 0, message = "must be greater than or equal to 0")
+          @QueryParam("offset")
+          int offsetParam) {
     RestUtil.validateCursors(before, after);
     Fields fields = getFields(fieldsParam);
+
+    if (parentBusinessVersion != null) {
+      return listCdeFlatRows(
+          securityContext,
+          glossaryIdParam,
+          parentBusinessVersion,
+          limitParam,
+          offsetParam);
+    }
 
     ResourceContextInterface glossaryResourceContext = new ResourceContext<>(GLOSSARY);
     OperationContext glossaryOperationContext =
@@ -1457,6 +1500,177 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return JsonUtils.readValue(published.payload(), Glossary.class);
   }
 
+  private Map<String, Object> listCdeFlatRows(
+      SecurityContext securityContext,
+      String glossaryIdParam,
+      String requestedParentBusinessVersion,
+      int limit,
+      int offset) {
+    if (glossaryIdParam == null || glossaryIdParam.isBlank()) {
+      throw new BadRequestException("glossary is required for a Data Dictionary flat list");
+    }
+    if (!List.of(10, 15, 25, 50).contains(limit)) {
+      throw new BadRequestException("limit must be one of 10, 15, 25, or 50");
+    }
+    if (offset < 0) {
+      throw new BadRequestException("offset must be greater than or equal to 0");
+    }
+
+    final String parentBusinessVersion;
+    try {
+      parentBusinessVersion =
+          GlossaryBusinessVersion.requireCanonicalDictionary(requestedParentBusinessVersion);
+    } catch (IllegalArgumentException exception) {
+      throw new BadRequestException(exception.getMessage());
+    }
+
+    EntityReference glossaryReference = repository.getGlossary(glossaryIdParam);
+    DataDictionaryResolver.resolveDataDictionary(glossaryReference);
+    UUID glossaryId = glossaryReference.getId();
+    Scope scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
+    Glossary authorizationGlossary = JsonUtils.readValue(scope.payload(), Glossary.class);
+    GlossaryAuthorizationResolver.Capabilities parentCapabilities =
+        capabilitiesForAuthorizationGlossary(securityContext, authorizationGlossary);
+    if ((scope.type() == ScopeType.ACTIVE
+            && !policyAllowsGlossary(
+                securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC))
+        || (scope.type() == ScopeType.WORKING && !parentCapabilities.canViewWorking())
+        || (scope.type() == ScopeType.ARCHIVED
+            && !parentCapabilities.canViewWorking()
+            && !parentCapabilities.canArchive())) {
+      throw new NotFoundException("Data Dictionary scope was not found");
+    }
+
+    Candidates candidates = cdeFlatListService.loadCandidates(glossaryId, scope);
+    List<Map<String, Object>> visibleRows = new ArrayList<>();
+    for (PublishedSnapshotRecord record : candidates.published()) {
+      GlossaryTerm term = JsonUtils.readValue(record.payload(), GlossaryTerm.class);
+      if (!capabilitiesForAuthorizationTerm(securityContext, term).canViewPublished()
+          || !policyAllows(securityContext, term, MetadataOperation.VIEW_BASIC)) {
+        continue;
+      }
+      Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.published(record));
+      normalizeFlatRow(
+          row,
+          record.entityId(),
+          parentBusinessVersion,
+          scope.type() == ScopeType.ARCHIVED ? "archived" : "published");
+      visibleRows.add(row);
+    }
+    for (WorkingVersionRecord record : candidates.working()) {
+      if (!capabilitiesForWorking(securityContext, record).canViewWorking()) {
+        continue;
+      }
+      Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.working(record));
+      normalizeFlatRow(row, record.entityId(), parentBusinessVersion, "working");
+      visibleRows.add(row);
+    }
+
+    visibleRows.sort(CDE_FLAT_ROW_COMPARATOR);
+    int total = visibleRows.size();
+    int from = Math.min(offset, total);
+    int to = Math.min(from + limit, total);
+    return Map.of(
+        "data",
+        new ArrayList<>(visibleRows.subList(from, to)),
+        "paging",
+        Map.of("total", total, "limit", limit, "offset", offset));
+  }
+
+  private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationGlossary(
+      SecurityContext securityContext, Glossary glossary) {
+    return GlossaryAuthorizationResolver.fromPolicy(
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_WORKING),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.EDIT_WORKING),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.SUBMIT_WORKING),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.CREATE_VERSION),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.APPROVE_WORKING),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.REJECT_WORKING),
+        policyAllowsGlossary(securityContext, glossary, MetadataOperation.ARCHIVE_PUBLISHED));
+  }
+
+  private void authorizeCdeDetailScope(
+      SecurityContext securityContext, GlossaryTerm term, String parentBusinessVersion) {
+    if (term.getGlossary() == null || term.getGlossary().getId() == null) {
+      throw new NotFoundException("CDE was not found in the requested Data Dictionary scope");
+    }
+    Scope scope =
+        cdeFlatListService.resolveScope(term.getGlossary().getId(), parentBusinessVersion);
+    Glossary glossary = JsonUtils.readValue(scope.payload(), Glossary.class);
+    GlossaryAuthorizationResolver.Capabilities capabilities =
+        capabilitiesForAuthorizationGlossary(securityContext, glossary);
+    if ((scope.type() == ScopeType.ACTIVE
+            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC))
+        || (scope.type() == ScopeType.WORKING && !capabilities.canViewWorking())
+        || (scope.type() == ScopeType.ARCHIVED
+            && !capabilities.canViewWorking()
+            && !capabilities.canArchive())) {
+      throw new NotFoundException("CDE was not found in the requested Data Dictionary scope");
+    }
+  }
+
+  private boolean policyAllowsGlossary(
+      SecurityContext securityContext, Glossary glossary, MetadataOperation operation) {
+    try {
+      authorizer.authorize(
+          securityContext,
+          new OperationContext(GLOSSARY, operation),
+          new ResourceContext<Glossary>(
+              GLOSSARY,
+              glossary,
+              (GlossaryRepository) Entity.getEntityRepository(GLOSSARY)));
+      return true;
+    } catch (AuthorizationException exception) {
+      return false;
+    }
+  }
+
+  private static void normalizeFlatRow(
+      Map<String, Object> row,
+      UUID termId,
+      String parentBusinessVersion,
+      String recordType) {
+    row.put("termId", termId.toString());
+    row.put("id", termId.toString());
+    row.put("parentBusinessVersion", parentBusinessVersion);
+    row.put("recordType", recordType);
+    row.putIfAbsent("displayName", null);
+    row.putIfAbsent("description", null);
+    row.putIfAbsent("owners", List.of());
+    row.putIfAbsent("reviewers", List.of());
+    row.putIfAbsent("domains", List.of());
+    row.putIfAbsent("tags", List.of());
+    row.putIfAbsent("extension", Map.of());
+  }
+
+  private static final Comparator<Map<String, Object>> CDE_FLAT_ROW_COMPARATOR =
+      Comparator.<Map<String, Object>, String>comparing(
+              row -> String.valueOf(row.getOrDefault("name", "")).toLowerCase(Locale.ROOT))
+          .thenComparing(
+              (left, right) ->
+                  compareNumericBusinessVersion(
+                      String.valueOf(right.get("businessVersion")),
+                      String.valueOf(left.get("businessVersion"))))
+          .thenComparing(row -> String.valueOf(row.get("termId")))
+          .thenComparing(row -> String.valueOf(row.get("recordType")));
+
+  private static int compareNumericBusinessVersion(String left, String right) {
+    String[] leftParts = left.split("\\.");
+    String[] rightParts = right.split("\\.");
+    int length = Math.max(leftParts.length, rightParts.length);
+    for (int i = 0; i < length; i++) {
+      BigInteger leftPart =
+          i < leftParts.length ? new BigInteger(leftParts[i]) : BigInteger.ZERO;
+      BigInteger rightPart =
+          i < rightParts.length ? new BigInteger(rightParts[i]) : BigInteger.ZERO;
+      int result = leftPart.compareTo(rightPart);
+      if (result != 0) {
+        return result;
+      }
+    }
+    return 0;
+  }
+
   private static void requireCdeIdentityScope(
       GlossaryTerm term, String requestedParentBusinessVersion) {
     String requestedScope =
@@ -1465,6 +1679,30 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         || !requestedScope.equals(term.getParentBusinessVersion())) {
       throw new BadRequestException(
           "CDE identity does not belong to parentBusinessVersion " + requestedScope);
+    }
+  }
+
+  private static void requireCdeIdentityScopeNotFound(
+      GlossaryTerm term, String requestedParentBusinessVersion) {
+    final String requestedScope;
+    try {
+      requestedScope =
+          GlossaryBusinessVersion.requireCanonicalDictionary(requestedParentBusinessVersion);
+    } catch (IllegalArgumentException exception) {
+      throw new NotFoundException("CDE was not found in the requested Data Dictionary scope");
+    }
+    if (term.getParentBusinessVersion() == null
+        || !requestedScope.equals(term.getParentBusinessVersion())) {
+      throw new NotFoundException("CDE was not found in the requested Data Dictionary scope");
+    }
+  }
+
+  private static void requireCdeVersionScopeNotFound(
+      String businessVersion, String parentBusinessVersion) {
+    try {
+      GlossaryBusinessVersion.requireCdeInScope(businessVersion, parentBusinessVersion);
+    } catch (IllegalArgumentException exception) {
+      throw new NotFoundException("CDE business version was not found in the requested scope");
     }
   }
 

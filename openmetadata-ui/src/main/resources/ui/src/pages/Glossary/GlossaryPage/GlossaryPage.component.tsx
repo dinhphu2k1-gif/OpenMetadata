@@ -363,7 +363,8 @@ const GlossaryPage = () => {
       try {
         const response = await getPublishedGlossaryTerm(
           current.id,
-          reqCdeVer
+          reqCdeVer,
+          reqParentVer
         );
         if (
           compareBusinessVersions(
@@ -445,6 +446,16 @@ const GlossaryPage = () => {
                 current.id,
                 businessVersion
               );
+              const canViewHistory =
+                capabilities.canViewWorking || capabilities.canArchive;
+              if (
+                snapshot.entityStatus === EntityStatus.Archived &&
+                !canViewHistory
+              ) {
+                navigate(ROUTES.NOT_FOUND, { replace: true });
+
+                return;
+              }
               // A business-version deep link can still point at the current
               // Approved head. Only an Archived Dictionary is historical and
               // must suppress live workflow actions such as Create New Version.

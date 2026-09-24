@@ -30,6 +30,8 @@ export type ModifiedGlossaryTerm = Omit<GlossaryTerm, 'children'> & {
   level?: number;
   snapshotVersion?: string;
   versionRowKey?: string;
+  termId?: string;
+  recordType?: 'working' | 'published' | 'archived';
 };
 
 export type MoveGlossaryTermType = {

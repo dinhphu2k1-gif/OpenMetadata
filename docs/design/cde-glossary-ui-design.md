@@ -249,10 +249,11 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
    - Không áp dụng cơ chế phân cấp chính/con hay thụt lề `↳`.
    - Mọi CDE là con trực tiếp của Data Dictionary; backend từ chối `parent` trỏ tới một CDE khác.
    - Các dòng có cùng mã CDE được xếp cạnh nhau, sắp xếp theo thứ tự phiên bản mới nhất ở trên để người dùng dễ theo dõi.
-2. **Quyền xem theo Role (Người dùng tự do tra cứu theo quyền):**
+   - Mỗi lần mở bảng chỉ hiển thị một `parentBusinessVersion` đang được chọn. Một response không ghép CDE của Dictionary active, working hoặc historical khác scope; Manager chuyển scope bằng Data Dictionary version selector.
+2. **Quyền xem theo capability hiệu lực (Người dùng tự do tra cứu theo quyền):**
    - **Data Consumer:** Trong Data Dictionary active `N`, chỉ thấy CDE `N.x` Approved. Không thấy Draft/InReview/Rejected/Archived hoặc bất kỳ CDE scope khác.
-   - **Nhóm nội bộ (Admin, Steward, Proposer):** Nhìn thấy đầy đủ tất cả các dòng phiên bản (bao gồm cả `Draft`, `In Review`, `Rejected`, `Approved`). Chỉ Admin/Proposer được chỉnh sửa; Steward chỉ thực hiện thao tác kiểm duyệt.
-   - Khi xem Data Dictionary Approved active, bảng là live scoped read model: CDE cùng scope xuất hiện cho Consumer ngay khi Approved. Khi xem Data Dictionary Archived, bảng dùng archive manifest đã đóng băng và không nhận mutation.
+   - **Người có quyền working:** Trong scope đang chọn, nhìn thấy published và working rows theo capability hiệu lực. Không suy quyền từ tên role; ownership, reviewer assignment và policy có thể thay đổi quyền trên từng CDE.
+   - Khi xem Data Dictionary Approved active, bảng là live scoped read model: CDE cùng scope xuất hiện cho Consumer ngay khi Approved. Khi xem Data Dictionary working, Consumer nhận `404`. Khi xem Data Dictionary Archived, bảng dùng frozen archive manifest để xác định identity, chỉ trả published history đúng scope và không nhận mutation.
 3. **Công cụ Tìm kiếm, Lọc và Phân trang (Search, Filters & Pagination):**
    - **Thanh tìm kiếm văn bản (Text Search Bar):**
      - *Vị trí:* Nằm ở góc trái thanh công cụ phía trên bảng (chiều rộng 280px, có nút xóa nhanh `x`).
@@ -273,19 +274,21 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
      - Mọi tiêu chí tìm kiếm và lọc được kết hợp đồng thời theo điều kiện **`AND`** (mệnh đề `must` trong truy vấn Elasticsearch).
      - Mỗi khi người dùng thay đổi từ khóa hoặc điều kiện lọc, hệ thống tự động reset về trang 1 và tính toán lại tổng số dòng.
      - Phân trang tính trên toàn bộ các dòng kết quả tìm kiếm/lọc được (hỗ trợ các mức kích thước trang: 10, 15, 25, 50 dòng/trang).
+     - F11 cung cấp flat read model, authorization, total, default stable ordering và pagination nền tảng. F12 chỉ bổ sung search, filters và custom sort trên cùng read path; không tạo cơ chế pagination thứ hai.
    - **Tính năng Xuất dữ liệu (Export):** Khi người dùng bấm Export trong menu ba chấm `...`, file xuất ra sẽ phản ánh đúng các điều kiện lọc và tìm kiếm đang kích hoạt trên màn hình, đồng thời tuân thủ 100% phân quyền của người thực hiện xuất.
 
 #### Ví dụ minh họa cụ thể:
 Giả sử hai identity độc lập cùng có mã nghiệp vụ `CDE1`:
 - Identity A thuộc Dictionary `1`: `v1.0` Approved, `v1.1` Approved và `v1.2` Rejected.
-- Identity B thuộc Dictionary `2`: `v2.0` Draft, có `termId`, scoped FQN và business content riêng.
+- Identity B thuộc Dictionary `2`: `v2.0` Approved và `v2.1` Draft, có `termId`, scoped FQN và business content riêng.
 
-*So sánh nội dung hiển thị trên bảng giữa các nhóm người dùng:*
+*So sánh nội dung hiển thị theo từng Dictionary scope:*
 
-| Nhóm người dùng | Các dòng hiển thị trên bảng (Ngang hàng) | Quy tắc |
+| Ngữ cảnh xem | Các dòng hiển thị trên bảng (Ngang hàng) | Quy tắc |
 | :--- | :--- | :--- |
 | **Data Consumer trong Dictionary 1** | • **`CDE1`** - Version `1.1` `[Approved]`<br>• **`CDE1`** - Version `1.0` `[Approved]` | Chỉ Approved `1.x`; không thấy `2.x` hoặc non-Approved. |
-| **Data Steward / Admin / Proposer** | • **`CDE1` (identity B)** - Version `2.0` `[Draft]` trong Dictionary `2`<br>• **`CDE1` (identity A)** - Version `1.2` `[Rejected]` trong Dictionary `1`<br>• **`CDE1` (identity A)** - Version `1.1` `[Approved]` trong Dictionary `1` | Hiển thị theo từng scope cha; cùng mã không đồng nghĩa cùng identity và không trộn một dòng CDE vào sai Data Dictionary. |
+| **Manager trong Dictionary 1** | • **`CDE1` (identity A)** - Version `1.2` `[Rejected]`<br>• **`CDE1` (identity A)** - Version `1.1` `[Approved]`<br>• **`CDE1` (identity A)** - Version `1.0` `[Approved]` | Chỉ identity và version thuộc scope `1`. |
+| **Manager chuyển sang Dictionary 2** | • **`CDE1` (identity B)** - Version `2.1` `[Draft]`<br>• **`CDE1` (identity B)** - Version `2.0` `[Approved]` | Request riêng cho scope `2`; không chứa row `1.x`. |
 
 ## 7. Luồng màn hình Thành tố dữ liệu dùng chung (CDE)
 
@@ -489,14 +492,19 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Màn hình sử dụng:** Bảng danh sách CDE trong Từ điển (`GlossaryTermsV1.component.tsx`).
 * **Tham số Query Params:**
   * `glossary={glossaryId}`: ID của Glossary cha.
-  * `parentBusinessVersion={parentBusinessVersion}`: Phiên bản nghiệp vụ của Data Dictionary cha đang cung cấp ngữ cảnh cho CDE.
+  * `parentBusinessVersion={parentBusinessVersion}`: Bắt buộc với Data Dictionary flat list; là canonical version của đúng một Dictionary scope.
   * `q={keyword}`: Từ khóa tìm kiếm theo Mã hoặc Tên CDE.
   * `domain={domain}`: Lọc theo Miền nghiệp vụ.
   * `status={status}`: Lọc theo trạng thái (`Approved`, `Draft`, `InReview`, `Rejected`).
   * `limit={limit}&offset={offset}`: Phân trang.
+* **Response:** `{ data, paging: { total, limit, offset } }`. Mỗi row gồm tối thiểu `termId`, `name`, scoped `fullyQualifiedName`, `parentBusinessVersion`, `businessVersion`, `entityStatus`, `recordType = working|published|archived` và các field cần render. Row key là `(termId, parentBusinessVersion, businessVersion)`.
+* **Nguồn dữ liệu:** Backend dựng flat read model từ business snapshot/working stores; archived scope dùng frozen manifest. Không page native identity rồi hydrate history, không gọi history riêng cho từng term và không fallback giữa scope.
+* **Thứ tự mặc định:** normalized `name ASC` → business version numeric `DESC` → `termId ASC` → `recordType ASC`. Authorization thực hiện trước `total`, sort và pagination.
 * **Quy tắc phân quyền trả về từ Backend:**
-  * *Consumer:* Backend tự động lọc cứng chỉ trả về các dòng có `entityStatus = Approved`.
-  * *Admin / Steward / Proposer:* Trả về đầy đủ tất cả các dòng phiên bản (`Draft`, `InReview`, `Rejected`, `Approved`) ngang hàng nhau; chỉ Admin/Proposer được chỉnh sửa, Steward chỉ được kiểm duyệt.
+  * *Consumer-only:* Chỉ được request Dictionary active và backend lọc cứng published `Approved`; working/archived/unauthorized scope trả `404`.
+  * *Người có quyền working:* Nhận published và working rows đúng scope theo capability hiệu lực.
+  * *Người có quyền history/audit:* Nhận archived rows read-only đúng frozen scope.
+  * Thiếu/sai canonical `parentBusinessVersion` trả `400`; scope không tồn tại hoặc không được xem trả `404` để không lộ dữ liệu.
 
 ---
 
@@ -505,7 +513,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 #### 1. Lấy chi tiết mặc định và lịch sử Approved của CDE:
 * **Phân giải identity:** CDE detail ưu tiên `termId` cùng `parentBusinessVersion`. Nếu dùng `GET /v1/glossaryTerms/name/{cdeFqn}`, `cdeFqn` bắt buộc là FQN đã scope hóa (`...{name}@v{N}`); FQN không có scope không được tự chọn một identity khi nhiều Data Dictionary version cùng có mã đó. Frontend không hiển thị payload khi URL thiếu cặp version bắt buộc.
 * **Danh sách version theo scope:** `GET /v1/glossaryTerms/{id}/published?parentBusinessVersion={N}`; active scope trả Approved, audit scope trả Archived theo quyền.
-* **Chi tiết một bản phát hành:** `GET /v1/glossaryTerms/{id}/published/{businessVersion}` qua `getGlossaryTermsVersion(id, businessVersion)`.
+* **Chi tiết một bản phát hành:** `GET /v1/glossaryTerms/{id}/published/{businessVersion}?parentBusinessVersion={N}` qua `getGlossaryTermsVersion(id, parentVersion, businessVersion)`; backend xác nhận identity/version thuộc đúng parent scope.
 * **Đồng bộ URL:** `businessVersion` và `parentBusinessVersion` là trạng thái định tuyến bắt buộc. Route phải giữ `termId` hoặc scoped FQN để hai identity cùng mã ở các scope khác nhau không bị nhập nhằng; không truyền business version thành native query `version` của endpoint theo FQN.
 * **Ngữ cảnh Data Dictionary:** Với parent Approved active, frontend/backend dùng scoped read model `parentBusinessVersion`; với parent Archived dùng archive manifest. Phần nguyên CDE version phải bằng parent integer; không khớp trả `404` và không fallback.
 * URL CDE bắt buộc có đồng thời `businessVersion` và `parentBusinessVersion`. Thiếu một trong hai param hoặc thiếu cả hai đều trả `404 Not Found`; không tự resolve param còn thiếu và không hỗ trợ CDE độc lập.

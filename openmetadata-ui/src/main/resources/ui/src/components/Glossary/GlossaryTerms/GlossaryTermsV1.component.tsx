@@ -222,7 +222,10 @@ const GlossaryTermsV1 = ({
         return;
       }
 
-      getGlossaryTermsVersionsList(currentGlossaryTerm.id)
+      getGlossaryTermsVersionsList(
+        currentGlossaryTerm.id,
+        parentBusinessVersion ?? currentGlossaryTerm.parentBusinessVersion
+      )
         .then((history) => {
           if (cancelled) {
             return;

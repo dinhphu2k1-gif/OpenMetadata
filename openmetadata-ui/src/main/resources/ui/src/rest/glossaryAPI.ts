@@ -41,10 +41,11 @@ import {
 } from '../utils/routing/cdeRoutingHelper';
 import APIClient from './index';
 
-export type ListGlossaryTermsParams = ListParams & {
+export type ListGlossaryTermsParams = ListParamsWithOffset & {
   glossary?: string;
   parent?: string;
   entityStatus?: string;
+  parentBusinessVersion?: string;
 };
 
 export type SearchGlossaryTermsParams = ListParamsWithOffset & {
@@ -327,10 +328,12 @@ export const getLatestPublishedGlossaryTerm = async (id: string) => {
 
 export const getPublishedGlossaryTerm = async (
   id: string,
-  businessVersion: string
+  businessVersion: string,
+  parentBusinessVersion?: string
 ) => {
   const response = await APIClient.get<GlossaryTerm>(
-    `/glossaryTerms/${id}/published/${encodeURIComponent(businessVersion)}`
+    `/glossaryTerms/${id}/published/${encodeURIComponent(businessVersion)}`,
+    { params: { parentBusinessVersion } }
   );
 
   return response.data;
@@ -554,9 +557,13 @@ export const getGlossaryVersion = async (
   return response.data;
 };
 
-export const getGlossaryTermsVersionsList = async (id: string) => {
+export const getGlossaryTermsVersionsList = async (
+  id: string,
+  parentBusinessVersion?: string
+) => {
   const response = await APIClient.get<GlossaryTerm[]>(
-    `/glossaryTerms/${id}/published`
+    `/glossaryTerms/${id}/published`,
+    { params: { parentBusinessVersion } }
   );
   const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
 
@@ -565,11 +572,14 @@ export const getGlossaryTermsVersionsList = async (id: string) => {
 
 export const getGlossaryTermsVersion = async (
   id: string,
-  businessVersion: string
+  businessVersion: string,
+  parentBusinessVersion?: string
 ) => {
   const url = `/glossaryTerms/${id}/published/${businessVersion}`;
 
-  const response = await APIClient.get<GlossaryTerm>(url);
+  const response = await APIClient.get<GlossaryTerm>(url, {
+    params: { parentBusinessVersion },
+  });
 
   return response.data;
 };

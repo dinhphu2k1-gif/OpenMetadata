@@ -209,7 +209,12 @@ const expandCDETermVersions = async (
   parentBusinessVersion?: string
 ) => {
   const histories = await Promise.allSettled(
-    terms.map((term) => getGlossaryTermsVersionsList(term.id))
+    terms.map((term) =>
+      getGlossaryTermsVersionsList(
+        term.id,
+        parentBusinessVersion ?? term.parentBusinessVersion
+      )
+    )
   );
 
   const expandedTerms = terms
@@ -656,6 +661,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   >({});
 
   const previousGlossaryFQNRef = useRef<string>();
+  const previousCdeScopeRef = useRef<string>();
   const lastFetchKeyRef = useRef('');
   const termsWorkflowKeyRef = useRef('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1140,6 +1146,54 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     try {
       let data: ModifiedGlossary[] = [];
       let pagingResponse: Paging | undefined;
+
+      if (isCDEGlossary) {
+        if (
+          isConsumer &&
+          displayedGlossary.entityStatus === EntityStatus.Archived
+        ) {
+          return;
+        }
+        const parentBusinessVersion = displayedGlossary.businessVersion;
+        if (!parentBusinessVersion) {
+          throw new Error(
+            'parentBusinessVersion is required for the CDE flat list'
+          );
+        }
+        const response = await getGlossaryTerms({
+          glossary: activeGlossary.id,
+          parentBusinessVersion,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+          fields: CDE_GLOSSARY_TERM_FIELDS,
+        });
+        if (workflowKey !== termsWorkflowKeyRef.current) {
+          return;
+        }
+        const flatRows = response.data.map((row) => {
+          const flatRow = row as ModifiedGlossaryTerm;
+          const termId = flatRow.termId ?? flatRow.id;
+
+          return {
+            ...flatRow,
+            id: termId,
+            versionRowKey: [
+              termId,
+              flatRow.parentBusinessVersion,
+              getBusinessVersion(flatRow.businessVersion),
+            ].join('|'),
+          } as ModifiedGlossary;
+        });
+        const total = response.paging?.total ?? flatRows.length;
+        setTotalTermsCount(total);
+        setVisibleGlossaryTermsCount(total);
+        handlePagingChange({ total });
+        setGlossaryChildTerms(flatRows);
+        setExpandedRowKeys([]);
+
+        return;
+      }
+
       const isPublishedGlossarySnapshot =
         isGlossary &&
         Boolean(displayedGlossary.businessVersion) &&
@@ -2985,13 +3039,44 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return;
     }
 
+    const cdeScopeKey = isCDEGlossary
+      ? `${activeGlossary.id}|${displayedGlossary.businessVersion ?? ''}`
+      : undefined;
+    if (cdeScopeKey && previousCdeScopeRef.current !== cdeScopeKey) {
+      previousCdeScopeRef.current = cdeScopeKey;
+      lastFetchKeyRef.current = '';
+      termsWorkflowKeyRef.current = cdeScopeKey;
+      setGlossaryChildTerms([]);
+      setTotalTermsCount(0);
+      setVisibleGlossaryTermsCount(0);
+      handlePagingChange({ total: 0 });
+      if (currentPage !== INITIAL_PAGING_VALUE) {
+        handlePageChange(INITIAL_PAGING_VALUE, {
+          cursorType: null,
+          cursorValue: undefined,
+        });
+
+        return;
+      }
+    }
+
     if (lastFetchKeyRef.current === fetchKey) {
       return;
     }
 
     lastFetchKeyRef.current = fetchKey;
     fetchAllTerms();
-  }, [fetchKey, isWorkflowPermissionLoading, toggleExpandBtn]);
+  }, [
+    fetchKey,
+    isWorkflowPermissionLoading,
+    toggleExpandBtn,
+    isCDEGlossary,
+    activeGlossary.id,
+    displayedGlossary.businessVersion,
+    currentPage,
+    handlePageChange,
+    handlePagingChange,
+  ]);
 
   const paginationProps = useMemo(
     () => ({
@@ -3174,7 +3259,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                 pagination={false}
                 rowClassName={getRowClassName}
                 rowKey={(record: ModifiedGlossaryTerm) =>
-                  record.versionRowKey ?? record.fullyQualifiedName ?? record.id
+                  record.versionRowKey ??
+                  [
+                    record.termId ?? record.id,
+                    record.parentBusinessVersion,
+                    getBusinessVersion(record.businessVersion),
+                  ].join('|')
                 }
                 rowSelection={rowSelection}
                 size="small"

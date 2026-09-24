@@ -287,6 +287,9 @@ const GlossaryHeader = ({
     : false;
   const canRenderMutationActions =
     !isWorkflowPermissionLoading && !isConsumer && Boolean(workflowPermissions);
+  const canViewHistory = Boolean(
+    workflowPermissions?.canViewWorking || workflowPermissions?.canArchive
+  );
   const { permissions: globalPermissions } = usePermissionProvider();
 
   const createGlossaryTermPermission = useMemo(
@@ -534,7 +537,10 @@ const GlossaryHeader = ({
     try {
       const history = isGlossary
         ? await getGlossaryVersionsList(selectedData.id)
-        : await getGlossaryTermsVersionsList(selectedData.id);
+        : await getGlossaryTermsVersionsList(
+            selectedData.id,
+            cdeRoute.parentBusinessVersion ?? selectedData.parentBusinessVersion
+          );
       let versions: {
         label: string;
         snapshotVersion: string;
@@ -553,9 +559,8 @@ const GlossaryHeader = ({
                 : EntityStatus.Approved);
 
             return isGlossary
-              ? [EntityStatus.Approved, EntityStatus.Archived].includes(
-                  status as EntityStatus,
-                )
+              ? status === EntityStatus.Approved ||
+                  (status === EntityStatus.Archived && canViewHistory)
               : status === EntityStatus.Approved;
           },
         )
@@ -663,7 +668,13 @@ const GlossaryHeader = ({
         }
       }
 
-      if (!versions.some((v) => v.label === currentVerClean)) {
+      const currentIsArchived =
+        selectedData.entityStatus === EntityStatus.Archived ||
+        selectedData.archivedAt != null;
+      if (
+        (!currentIsArchived || canViewHistory) &&
+        !versions.some((v) => v.label === currentVerClean)
+      ) {
         versions.unshift({
           label: currentVerClean,
           snapshotVersion: currentVerClean,
@@ -722,7 +733,11 @@ const GlossaryHeader = ({
 
       const snapshot = isGlossary
         ? await getGlossaryVersion(selectedData.id, snapshotVersion)
-        : await getGlossaryTermsVersion(selectedData.id, snapshotVersion);
+        : await getGlossaryTermsVersion(
+            selectedData.id,
+            snapshotVersion,
+            cdeRoute.parentBusinessVersion ?? selectedData.parentBusinessVersion
+          );
       onVersionSelect?.(
         isGlossary && !snapshot.entityStatus
           ? { ...snapshot, entityStatus: EntityStatus.Approved }
