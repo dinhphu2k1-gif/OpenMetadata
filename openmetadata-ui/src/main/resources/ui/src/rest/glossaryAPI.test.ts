@@ -5,10 +5,13 @@
 import APIClient from './index';
 import {
   addGlossaryTerm,
+  commitCdeImport,
+  downloadCdeImportTemplate,
   getFirstLevelGlossaryTermsPaginated,
   getGlossaryPublishPreview,
   getGlossaryTermWorkingVersion,
   searchGlossaryTermsPaginated,
+  previewCdeImport,
   transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
   updateGlossaryTermWorkingVersion,
@@ -139,6 +142,41 @@ describe('F03 CDE draft API', () => {
         params: expect.objectContaining({ directChildrenOf: 'Data Dictionary' }),
       })
     );
+  });
+});
+
+describe('F14 CDE import API', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('downloads the dedicated XLSX template as a blob', async () => {
+    client.get.mockResolvedValue({ data: new Blob(['xlsx']) });
+    await downloadCdeImportTemplate();
+    expect(client.get).toHaveBeenCalledWith('/glossaryTerms/import/template', {
+      responseType: 'blob',
+    });
+  });
+
+  it('uploads only the workbook and immutable scope for preview', async () => {
+    client.post.mockResolvedValue({ data: { importSessionId: 'session-id' } });
+    const file = new File(['xlsx'], 'cde.xlsx');
+    await previewCdeImport('glossary-id', '2', 'SKIP_EXISTING', file);
+    expect(client.post).toHaveBeenCalledWith(
+      '/glossaryTerms/import/preview',
+      expect.any(FormData),
+      expect.objectContaining({
+        params: {
+          glossary: 'glossary-id',
+          parentBusinessVersion: '2',
+          existingCodePolicy: 'SKIP_EXISTING',
+        },
+      })
+    );
+  });
+
+  it('commits only the opaque import session id', async () => {
+    client.post.mockResolvedValue({ data: { committed: 2 } });
+    await commitCdeImport('session-id');
+    expect(client.post).toHaveBeenCalledWith('/glossaryTerms/import/session-id/commit');
   });
 });
 

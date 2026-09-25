@@ -122,7 +122,8 @@ describe('CDEImportExport.utils', () => {
 
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(mockClick).toHaveBeenCalled();
-      expect(CDE_EXPORT_HEADERS).toHaveLength(16);
+      expect(CDE_EXPORT_HEADERS).toHaveLength(15);
+      expect(CDE_EXPORT_HEADERS).not.toContain('Trạng thái');
 
       const blob = (URL.createObjectURL as jest.Mock).mock.calls[0][0];
       const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {

@@ -750,22 +750,16 @@ public class GlossaryVersioningService {
                 searchRepository.getIndexOrAliasName(CdeBusinessVersionSearchService.MUTABLE_ALIAS),
                 indexed.id(),
                 JsonUtils.pojoToJson(indexed.source()));
-        if (snapshot.archivedAt() == null) {
-          searchRepository
-              .getSearchClient()
-              .createEntity(
-                  searchRepository.getIndexOrAliasName(
-                      CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
-                  indexed.id(),
-                  JsonUtils.pojoToJson(indexed.source()));
-        } else {
-          searchRepository
-              .getSearchClient()
-              .deleteEntity(
-                  searchRepository.getIndexOrAliasName(
-                      CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
-                  indexed.id());
-        }
+        // This alias is consumer-safe because it contains immutable published snapshots only.
+        // Archived rows remain searchable for the frozen historical Data Dictionary scope;
+        // callers must constrain every query by parentBusinessVersion and scopeType.
+        searchRepository
+            .getSearchClient()
+            .createEntity(
+                searchRepository.getIndexOrAliasName(
+                    CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
+                indexed.id(),
+                JsonUtils.pojoToJson(indexed.source()));
       }
     }
   }

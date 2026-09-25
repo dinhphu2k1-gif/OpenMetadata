@@ -39,11 +39,15 @@ public class CdeBusinessVersionSearchService {
   private static final int MAX_FILTER_VALUES = 50;
 
   public Map<String, Object> search(
-      Criteria criteria, SubjectContext subject, boolean consumerOnly) {
-    Criteria validated = validate(criteria, consumerOnly);
+      Criteria criteria,
+      SubjectContext subject,
+      boolean consumerOnly,
+      boolean archivedScope,
+      boolean workingScope) {
+    Criteria validated = validate(criteria, consumerOnly, archivedScope);
     String alias = consumerOnly ? PUBLISHED_ALIAS : MUTABLE_ALIAS;
     String index = Entity.getSearchRepository().getIndexOrAliasName(alias);
-    String filter = buildFilter(validated, consumerOnly);
+    String filter = buildFilter(validated, consumerOnly, archivedScope, workingScope);
     String query = buildLiteralTextQuery(validated.q());
     SearchSortFilter sort =
         new SearchSortFilter(
@@ -75,6 +79,11 @@ public class CdeBusinessVersionSearchService {
   }
 
   public static Criteria validate(Criteria criteria, boolean consumerOnly) {
+    return validate(criteria, consumerOnly, false);
+  }
+
+  public static Criteria validate(
+      Criteria criteria, boolean consumerOnly, boolean archivedScope) {
     if (criteria == null) {
       throw new BadRequestException("Search criteria are required");
     }
@@ -104,7 +113,7 @@ public class CdeBusinessVersionSearchService {
       throw new BadRequestException("statuses contains an unsupported value");
     }
     if (consumerOnly) {
-      statuses = List.of("Approved");
+      statuses = List.of(archivedScope ? "Archived" : "Approved");
     }
     List<String> domainIds = parseUuids(criteria.domainIds(), "domainIds");
     List<String> ownerIds = parseUuids(criteria.ownerIds(), "ownerIds");
@@ -138,10 +147,30 @@ public class CdeBusinessVersionSearchService {
   }
 
   static String buildFilter(Criteria criteria, boolean consumerOnly) {
+    return buildFilter(criteria, consumerOnly, false);
+  }
+
+  static String buildFilter(Criteria criteria, boolean consumerOnly, boolean archivedScope) {
+    return buildFilter(criteria, consumerOnly, archivedScope, false);
+  }
+
+  static String buildFilter(
+      Criteria criteria, boolean consumerOnly, boolean archivedScope, boolean workingScope) {
     List<Map<String, Object>> filters = new ArrayList<>();
     addTerm(filters, "glossaryId", criteria.glossaryId().toString());
     addTerm(filters, "parentBusinessVersion", criteria.parentBusinessVersion());
-    addTerms(filters, "entityStatus", consumerOnly ? List.of("Approved") : criteria.statuses());
+    addTerms(
+        filters,
+        "scopeType",
+        archivedScope
+            ? List.of("archived")
+            : workingScope ? List.of("active", "working") : List.of("active"));
+    addTerms(
+        filters,
+        "entityStatus",
+        consumerOnly
+            ? List.of(archivedScope ? "Archived" : "Approved")
+            : criteria.statuses());
     addTerms(filters, "domainIds", criteria.domainIds());
     addTerms(filters, "ownerIds", criteria.ownerIds());
     addTerms(filters, "dataSourceTags", criteria.dataSourceTags());

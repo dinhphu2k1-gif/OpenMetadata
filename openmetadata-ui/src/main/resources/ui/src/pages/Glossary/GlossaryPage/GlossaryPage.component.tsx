@@ -492,16 +492,10 @@ const GlossaryPage = () => {
                 current.id,
                 businessVersion
               );
-              const canViewHistory =
-                capabilities.canViewWorking || capabilities.canArchive;
-              if (
-                snapshot.entityStatus === EntityStatus.Archived &&
-                !canViewHistory
-              ) {
-                navigate(ROUTES.NOT_FOUND, { replace: true });
-
-                return;
-              }
+              // Authorization for the exact published business version is enforced by
+              // GET /glossaries/{id}/published/{businessVersion}. Consumers are allowed
+              // to read Archived snapshots, so mutation capabilities such as
+              // canViewWorking/canArchive must not be used as a second read gate here.
               // A business-version deep link can still point at the current
               // Approved head. Only an Archived Dictionary is historical and
               // must suppress live workflow actions such as Create New Version.

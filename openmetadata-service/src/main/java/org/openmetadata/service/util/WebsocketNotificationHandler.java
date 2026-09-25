@@ -314,6 +314,30 @@ public class WebsocketNotificationHandler {
     }
   }
 
+  public static void sendCdeImportNotification(
+      String jobId,
+      SecurityContext securityContext,
+      String status,
+      Integer progress,
+      Integer total,
+      String message,
+      String error) {
+    CSVImportMessage importMessage =
+        new CSVImportMessage(jobId, status, null, error, progress, total, message);
+    String jsonMessage = JsonUtils.pojoToJson(importMessage);
+    UUID userId = getUserIdFromSecurityContext(securityContext);
+    if (userId != null) {
+      try {
+        WebSocketManager.getInstance()
+            .sendToOne(userId, WebSocketManager.CDE_IMPORT_CHANNEL, jsonMessage);
+      } catch (RuntimeException exception) {
+        LOG.warn(
+            "Unable to publish CDE import notification jobId={} status={} userId={}",
+            jobId, status, userId, exception);
+      }
+    }
+  }
+
   public static void sendDeleteOperationCompleteNotification(
       String jobId, SecurityContext securityContext, EntityInterface entity) {
     DeleteEntityMessage message =

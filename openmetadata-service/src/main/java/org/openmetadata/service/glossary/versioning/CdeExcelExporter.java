@@ -51,12 +51,11 @@ public final class CdeExcelExporter {
     "Văn bản quy định liên quan",
     "Quy định chất lượng dữ liệu",
     "Phiên bản",
-    "Trạng thái",
     "Ngày hiệu lực",
     "Ngày hết hiệu lực"
   };
   private static final int[] COLUMN_WIDTHS = {
-    20, 28, 36, 28, 55, 50, 32, 28, 22, 50, 26, 16, 20, 18, 18
+    20, 28, 36, 28, 55, 50, 32, 28, 22, 50, 26, 16, 18, 18
   };
 
   private CdeExcelExporter() {}
@@ -150,7 +149,6 @@ public final class CdeExcelExporter {
                 extensionValue(
                     extension, "dataQualityRules", "quy_dinh_chat_luong_du_lieu")),
             text(source.get("businessVersion")),
-            status(source.get("entityStatus")),
             date(extension.get("effectiveDate")),
             date(extension.get("expirationDate")));
     Row row = sheet.createRow(rowIndex);
@@ -233,18 +231,6 @@ public final class CdeExcelExporter {
     return List.of("TRUE", "1", "Y", "YES", "CO", "CÓ").contains(normalized)
         ? "Có"
         : "Không";
-  }
-
-  private static String status(Object value) {
-    return switch (text(value)) {
-      case "Approved" -> "Đã phê duyệt";
-      case "Draft", "Unprocessed" -> "Bản nháp";
-      case "In Review" -> "Đang chờ duyệt";
-      case "Rejected" -> "Đã từ chối";
-      case "Archived" -> "Đã lưu trữ";
-      case "Deprecated" -> "Không còn sử dụng";
-      default -> text(value);
-    };
   }
 
   private static String date(Object value) {

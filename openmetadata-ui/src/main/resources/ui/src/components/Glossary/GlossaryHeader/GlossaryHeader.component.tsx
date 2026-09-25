@@ -288,7 +288,9 @@ const GlossaryHeader = ({
   const canRenderMutationActions =
     !isWorkflowPermissionLoading && !isConsumer && Boolean(workflowPermissions);
   const canViewHistory = Boolean(
-    workflowPermissions?.canViewWorking || workflowPermissions?.canArchive
+    isConsumer ||
+      workflowPermissions?.canViewWorking ||
+      workflowPermissions?.canArchive,
   );
   const { permissions: globalPermissions } = usePermissionProvider();
 
@@ -476,7 +478,12 @@ const GlossaryHeader = ({
     !isVersionView &&
     glossaryTermStatus !== EntityStatus.Archived &&
     Boolean(workflowPermissions?.canEditWorking);
-  const canImportCDE = canImportCustomGlossary;
+  const canImportCDE =
+    canImportCustomGlossary &&
+    isGlossary &&
+    isCDEGlossary &&
+    [EntityStatus.Approved, EntityStatus.Draft].includes(glossaryTermStatus) &&
+    Boolean(workflowPermissions?.canImportCdeDrafts);
   const canImportDQ = canImportCustomGlossary;
 
   const businessVersion = useMemo(() => {
@@ -528,13 +535,20 @@ const GlossaryHeader = ({
     onAddGlossaryTerm(!isGlossary ? selectedData : undefined);
   }, [fqn]);
 
-  const handleGlossaryImport = () =>
-    navigate(
-      getEntityImportPath(
-        EntityType.GLOSSARY,
-        selectedData?.fullyQualifiedName || fqn,
-      ),
+  const handleGlossaryImport = () => {
+    const importPath = getEntityImportPath(
+      EntityType.GLOSSARY,
+      selectedData?.fullyQualifiedName || fqn,
     );
+
+    navigate(
+      isCDEGlossary
+        ? `${importPath}?parentBusinessVersion=${encodeURIComponent(
+            String(businessVersion),
+          )}`
+        : importPath,
+    );
+  };
 
   const handleVersionClick = async () => {
     let path: string;
@@ -1299,9 +1313,15 @@ const GlossaryHeader = ({
           (item) => item?.key === 'export-button',
         )
       : []
-    : canRenderMutationActions
-      ? availableManageButtonContent
-      : [];
+    : isCDEGlossary
+      ? canRenderMutationActions
+        ? availableManageButtonContent
+        : availableManageButtonContent.filter(
+            (item) => item?.key === 'export-button',
+          )
+      : canRenderMutationActions
+        ? availableManageButtonContent
+        : [];
 
   const statusBadge = useMemo(() => {
     const entityStatus = glossaryTermStatus;

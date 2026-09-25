@@ -93,7 +93,7 @@ Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ vi�
 | Glossary Draft | Có | Có trong phạm vi quản lý | Có khi được gán duyệt | Có khi là owner/người tạo hoặc có quyền edit | Không | Không |
 | Glossary In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
 | Glossary Approved mới nhất | Có | Có | Có | Có | Có | Có |
-| Data Dictionary Archived | Có | Có | Có khi có quyền audit | Có khi có quyền lịch sử | Không mặc định | Không |
+| Data Dictionary Archived | Có | Có | Có khi có quyền audit | Có khi có quyền lịch sử | Có, chỉ đọc | Có, chỉ đọc |
 | CDE Draft/Rejected | Có | Có trong phạm vi quản lý | Có khi liên quan phiên duyệt | Có khi được phép chỉnh sửa | Không | Không |
 | CDE In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
 | CDE Approved | Có | Có | Có | Có | Có | Có |
@@ -111,7 +111,7 @@ Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ vi�
 | Approve/Reject | Có | Có | Có khi được gán | Không | Không | Không |
 | Thu hồi Approved | Có | Có theo policy | Không mặc định | Không | Không | Không |
 | Xóa | Có | Không | Không | Theo policy với Draft | Không | Không |
-| Xem/chọn version | Có | Có | Có | Có | Chỉ Approved | Chỉ Approved |
+| Xem/chọn version | Có | Có | Có | Có | Active Approved và Archived | Active Approved và Archived |
 
 ## 5. Thiết kế version của Từ điển dữ liệu dùng chung và CDE
 
@@ -217,7 +217,8 @@ Toàn bộ thông tin chi tiết về phiên bản, trạng thái, mô tả và 
        - *Consumer-only:* Tự động mở bản phát hành `Approved` mới nhất.
        - *Người dùng không phải Consumer-only:* Giữ nguyên cách OpenMetadata chọn identity/working/published representation theo quyền hiện có.
    - **Phân quyền trong danh sách Dropdown:**
-      - *Consumer:* Chỉ thấy Data Dictionary `Approved` active; không thấy Draft/InReview/Rejected hoặc Archived mặc định.
+      - *Consumer:* Thấy Data Dictionary `Approved` active và các version `Archived`; không thấy Draft/InReview/Rejected. Archived luôn chỉ đọc.
+     - *Consumer-only:* Thấy bản active Approved và toàn bộ Data Dictionary `Archived`; không thấy working.
      - *Người có `canViewWorking` hoặc quyền audit:* Thấy bản active, working `N+1` theo quyền và lịch sử `Archived`.
 3. **Badge trạng thái (Status Badge):**
    - `[ Draft ]`: Màu xám/vàng - Bản đang soạn thảo; cho phép sửa metadata Data Dictionary và quản lý nội dung CDE qua workflow riêng, không chọn CDE thủ công.
@@ -231,11 +232,11 @@ Bố cục góc phải Header: `[ Bộ chọn Version ]  [ Nút trực diện ] 
 
 | Trạng thái Glossary đang xem | Nút hiển thị trực diện trên Header (Role Quản trị) | Tùy chọn trong Menu ba chấm `...` | Role Khai thác (Consumer) |
 | :--- | :--- | :--- | :--- |
-| **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` theo capability | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **In Review** | • `Phê duyệt` (Steward/Reviewer - Xanh lá)<br>• `Từ chối` (Steward/Reviewer - Đỏ)<br>• `Chờ duyệt` (Proposer - Read-only) | • `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Rejected** | • `Chỉnh sửa lại` (Proposer - đưa về Draft) | • `Xóa bản nháp` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Approved (Đang hoạt động)** | • `Tạo phiên bản mới`<br>• thao tác CDE theo capability | • `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` | Chỉ đọc; thấy live Approved CDE cùng scope. |
-| **Archived** | Không có nút mutation. | • `Xuất dữ liệu (Export)` theo quyền audit | Không hiển thị mặc định; chỉ đọc nếu được cấp quyền lịch sử. |
+| **Archived** | Không có nút mutation. | • `Xuất dữ liệu (Export)` | Được chọn/xem lại, chỉ đọc và được Export; không có mutation hoặc Import. |
 
 ---
 
@@ -251,7 +252,7 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
    - Các dòng có cùng mã CDE được xếp cạnh nhau, sắp xếp theo thứ tự phiên bản mới nhất ở trên để người dùng dễ theo dõi.
    - Mỗi lần mở bảng chỉ hiển thị một `parentBusinessVersion` đang được chọn. Một response không ghép CDE của Dictionary active, working hoặc historical khác scope; Manager chuyển scope bằng Data Dictionary version selector.
 2. **Quyền xem theo capability hiệu lực (Người dùng tự do tra cứu theo quyền):**
-   - **Data Consumer:** Trong Data Dictionary active `N`, chỉ thấy CDE `N.x` Approved. Không thấy Draft/InReview/Rejected/Archived hoặc bất kỳ CDE scope khác.
+   - **Data Consumer:** Trong Data Dictionary active `N`, chỉ thấy CDE `N.x` Approved. Khi chủ động chọn Data Dictionary Archived, chỉ thấy các published CDE snapshots thuộc frozen manifest của đúng scope đó. Không thấy Draft/InReview/Rejected/working hoặc CDE thuộc scope khác.
    - **Người có quyền working:** Trong scope đang chọn, nhìn thấy published và working rows theo capability hiệu lực. Không suy quyền từ tên role; ownership, reviewer assignment và policy có thể thay đổi quyền trên từng CDE.
    - Khi xem Data Dictionary Approved active, bảng là live scoped read model: CDE cùng scope xuất hiện cho Consumer ngay khi Approved. Khi xem Data Dictionary working, Consumer nhận `404`. Khi xem Data Dictionary Archived, bảng dùng frozen archive manifest để xác định identity, chỉ trả published history đúng scope và không nhận mutation.
 3. **Công cụ Tìm kiếm, Lọc và Phân trang (Search, Filters & Pagination):**
@@ -371,7 +372,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 | Reject | Xác nhận thao tác, không nhập lý do | Badge Rejected và hiển thị người từ chối. |
 | Tạo version kế tiếp | Hiển thị số nguyên `N+1` bắt buộc | Tạo Draft trắng; không đổi trạng thái bản active/CDE hiện tại và không kế thừa dữ liệu. |
 | Chọn version lịch sử | Với Data Dictionary, cập nhật `?businessVersion=...`; với CDE, bắt buộc cập nhật đầy đủ `?businessVersion=...&parentBusinessVersion=...`, loading riêng cho nội dung | Nạp dữ liệu snapshot theo đúng cặp version đã chọn, toàn bộ trường chỉ đọc (Read-only), ẩn các nút Thêm/Sửa. |
-| Import | Hiển thị bước validation trước khi ghi | Chỉ tạo/cập nhật Draft; không tự động Approved. |
+| Import | Tải template/chọn XLSX, preview summary và lỗi từng dòng trước khi ghi; cảnh báo nếu có CDE In Review sẽ bị hủy duyệt | Commit nguyên tử: tạo/cập nhật working Draft; CDE In Review/Rejected bị ghi đè sẽ về Draft; không tự động submit/Approved. |
 | Export | Bấm chọn Export trong menu dấu ba chấm (...) | Gọi API cho đúng Data Dictionary version đang mở và tự tải file Excel `.xlsx` khi hoàn tất; không mở modal/job/progress, không yêu cầu bấm tải lần hai và không áp dụng search/filter/page hiện tại. |
 
 Các request mutation cần có optimistic locking. Nếu entity đã thay đổi từ lúc người dùng mở màn hình, UI hiển thị thông báo conflict và yêu cầu tải lại, không âm thầm ghi đè.
@@ -485,12 +486,30 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Frontend Function:** `exportDataDictionaryVersion(glossaryId, parentBusinessVersion)`
 * **Màn hình sử dụng:** Nút Export duy nhất trong menu ba chấm (`...`) trên Header Glossary.
 * **Scope và nguồn dữ liệu:** Export toàn bộ authorized rows của đúng `glossaryId + parentBusinessVersion` đang xem, không áp dụng search/filter/page hiện tại. Backend dùng F11 authoritative database read path và stable order; không dùng OpenSearch, native `GlossaryTerm` projection hoặc `GlossaryCsv`. Sau khi authorize, backend dùng một read-only consistent database snapshot cho mọi batch; mutation/cutover đồng thời không được làm file trộn dữ liệu từ hai thời điểm.
-* **Quyền:** Consumer-only chỉ export published `Approved` rows của active scope. Người có quyền working export published/working rows theo effective capability. Archived scope chỉ export theo frozen manifest cho actor có quyền history/audit. Scope không tồn tại hoặc không được phép xem trả `404`.
+* **Quyền:** Consumer-only được export published `Approved` rows của active scope và các published archived rows thuộc frozen manifest khi đang xem Data Dictionary Archived; không bao giờ export working/non-Approved. Người có quyền working export published/working rows theo effective capability. Scope không tồn tại hoặc không được phép xem trả `404`.
 * **Định dạng:** Backend đọc batch/keyset và ghi workbook bằng streaming API vào file tạm giới hạn trong thư mục temp chuyên biệt để không giữ toàn bộ dataset/workbook trong heap. Chỉ sau khi workbook đóng/validate thành công mới trả attachment; file tạm luôn cleanup khi thành công, client disconnect hoặc lỗi. Tên file `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`; một sheet tên `Data Dictionary v{N}`, freeze header, autofilter, wrap text và tự chia sheet khi vượt giới hạn dòng của Excel.
-* **Cột presentation theo đúng thứ tự bảng:** `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Trạng thái`, `Ngày hiệu lực`, `Ngày hết hiệu lực`.
+* **Cột presentation theo đúng thứ tự bảng:** `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. File Export không có cột `Trạng thái`.
 * **Không xuất field kỹ thuật:** Không có `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`. Reference/tag dùng display label; nhiều giá trị xuống dòng trong ô; Markdown chuyển thành text giữ line break; chất lượng dữ liệu hiển thị `Có/Không`; ngày và trạng thái theo presentation của UI; thiếu dữ liệu để ô trống.
 * **An toàn và vận hành:** Neutralize text có prefix công thức Excel (`=`, `+`, `-`, `@`, tab, CR/LF). Audit lưu actor, scope, thời điểm, kết quả và row count nhưng không lưu nội dung file.
 * **UX:** Giữ thao tác một lần bấm như hiện tại: chọn `Xuất Excel`, action loading/disabled trong lúc chờ và trình duyệt tự tải file khi response hoàn tất. Không mở modal, không hiển thị job/progress, không yêu cầu bấm tải lần hai; lỗi hiển thị toast và cho thử lại.
+
+#### 6. Nhập CDE vào Draft (Import):
+* **Scope hỗ trợ:** Import vào đúng Data Dictionary `Approved` active `N` hoặc Data Dictionary working `Draft` `N+1` đang mở, định danh bằng `glossaryId + parentBusinessVersion`. Không import vào Data Dictionary `InReview`, `Rejected` hoặc `Archived`; không sửa business payload/revision của Data Dictionary hay CDE snapshot `Approved`/`Archived`.
+* **Capability:** Backend trả `canImportCdeDrafts` từ policy hiệu lực, ownership và scope; không hard-code tên role. Mặc định Admin có quyền, Data Proposer theo policy, Data Steward/Reviewer/Consumer-only không có. Action Import chỉ xuất hiện ở Header của Dictionary `Approved` active hoặc `Draft` khi capability này bằng true.
+* **Template:** `GET /v1/glossaryTerms/import/template` tải workbook `.xlsx` riêng cho import. Template có một sheet dữ liệu với 13 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Import không hiển thị hoặc nhận cột `Người xem xét`/reviewer. File Export F13 không phải import template vì có thể chứa nhiều version của cùng mã; client không gửi version, status, UUID, FQN kỹ thuật, revision hoặc raw `extension`.
+* **Header mapping:** Trang Import đọc dữ liệu theo tên header thay vì vị trí. DataGrid Import không hiển thị hoặc duy trì field `Phiên bản`. Nếu chọn file Export F13, UI bỏ qua cột `Phiên bản`, giữ đúng mapping hai cột ngày và dựng lại workbook 13 cột trước khi preview. Thiếu bất kỳ header import bắt buộc nào thì từ chối file; nhiều version cùng mã trong file Export vẫn bị xem là duplicate.
+* **Chính sách mã đã tồn tại:** Trước preview, người dùng chọn một trong hai radio: `SKIP_EXISTING` — **Bỏ qua bản ghi trùng** (mặc định), hoặc `OVERWRITE_EXISTING` — **Cập nhật ghi đè bản ghi**. Chính sách chỉ áp dụng cho mã đã tồn tại trong đúng Dictionary scope; duplicate giữa các dòng trong workbook vẫn là lỗi chặn. Đổi lựa chọn sau preview bắt buộc hủy kết quả/session hiện tại và preview lại.
+* **Preview endpoint:** `POST /v1/glossaryTerms/import/preview?glossary={glossaryId}&parentBusinessVersion={N}&existingCodePolicy={SKIP_EXISTING|OVERWRITE_EXISTING}`, `multipart/form-data`. UI luôn gửi policy tường minh; thiếu/sai policy trả `400`. Backend authorize scope, parse/validate file, resolve reference và dựng normalized import plan nhưng không mutation/outbox. Import session server-side bind với actor, scope, policy, SHA-256 file, parent state và expected revision của từng row sẽ mutation; TTL 30 phút, single-use. Response gồm `importSessionId`, `expiresAt`, `fileHash`, scope, policy, summary `create/createVersion/update/skip/warning/error`, kết quả từng dòng và `canCommit`.
+* **Commit endpoint:** `POST /v1/glossaryTerms/import/{importSessionId}/commit`; không nhận lại workbook hoặc normalized payload. Backend re-authorize và xác nhận session còn hạn/chưa dùng, parent chưa cutover/archive, expected revision/state/unique key/reference chưa đổi. Stale preview, concurrent mutation, permission/reference/scope change trả `409`, không tự merge/retry và không ghi một phần.
+* **Frontend Functions:** `downloadCdeImportTemplate()`, `previewCdeImport(glossaryId, parentBusinessVersion, existingCodePolicy, file)` và `commitCdeImport(importSessionId)` phải được khai báo trong `glossaryAPI.ts`; component không gọi Axios trực tiếp. Commit không nhận lại policy vì policy đã khóa trong session.
+* **Status và lỗi:** File/request/schema sai trả `400`; scope không tồn tại hoặc actor không được xem trả `404`; preview hợp lệ về cú pháp nhưng có lỗi dữ liệu từng dòng trả `200` với `canCommit=false`; session/revision/state/quyền/reference thay đổi sau preview trả `409`; giới hạn upload trả `413`. Lỗi từng dòng có tối thiểu `rowNumber`, `column`, mã lỗi ổn định và message an toàn.
+* **Match và action:** Match duy nhất bằng `(glossaryId, parentBusinessVersion, normalizedName)` với `Mã CDE = name` bất biến. Mã chưa tồn tại luôn tạo identity + Draft `N.0`. Với `SKIP_EXISTING`, mã đã tồn tại nhận action `SKIP` và không mutation/revision/transition/outbox. Với `OVERWRITE_EXISTING`, working `Draft` được thay toàn bộ payload; working `InReview`/`Rejected` được thay toàn bộ payload và chuyển về `Draft`, vô hiệu hóa phiên duyệt cũ nhưng giữ audit; CDE chỉ có `Approved` thì tạo version Draft kế tiếp rồi ghi payload. Không reuse identity cùng mã ở scope khác. Preview hiển thị action `CREATE`, `SKIP`, `UPDATE_DRAFT`, `REPLACE_IN_REVIEW_AND_REOPEN`, `REPLACE_REJECTED_AND_REOPEN` hoặc `CREATE_VERSION`.
+* **Semantics dữ liệu:** Import là full-state replacement; với update, ô trống xóa custom property bằng cách bỏ key khỏi `extension` mới, không gửi JSON `null` cho trường typed. Duplicate mã sau normalization là error. Export và Import thống nhất hai cột ngày theo `dd/MM/yyyy`; Import chỉ nhận chính xác định dạng này, backend parse nghiêm ngặt rồi chuẩn hóa về ISO string khi lưu. Ngày hết hiệu lực không trước ngày hiệu lực. Chất lượng dữ liệu chỉ nhận `Có/Không` và được lưu theo schema enum array dưới dạng `["Y"]`/`["N"]`, không phải scalar string. Preview chạy schema validator giống commit để lỗi kiểu custom property được hiển thị trước khi cho phép Cập nhật. Reference trong file dùng `displayName` giống Export và nhiều giá trị phân cách bằng line break. Backend resolve duy nhất theo `displayName` trong đúng loại entity; không fallback sang FQN/name nhập từ file và không tự tạo reference. Reference thiếu, trùng display name, sai classification hoặc trái quyền là error; owner được resolve trên User + Team, tag bị giới hạn trong classification tương ứng.
+* **An toàn lookup:** Resolver tôn trọng capability soft-delete của từng repository (`NON_DELETED` khi được hỗ trợ, nếu không dùng `ALL`). Lỗi SQL/JDBI nội bộ được log phía server và trả row error `REFERENCE_LOOKUP_FAILED`; UI không hiển thị raw SQL, statement, tên class exception hoặc stack trace.
+* **Atomicity và locking:** Commit atomic cho toàn bộ row có action mutation; row `SKIP` là kết quả có chủ đích, không phải partial success. Không được bỏ qua row lỗi. Backend lock parent/working rows theo thứ tự ổn định và dùng service F03/F04/F06, không dùng native CSV/direct GlossaryTerm PATCH. Mỗi working row thay đổi tăng `workingRevision` đúng một lần; Dictionary revision không đổi. Lỗi bất kỳ row mutation nào rollback toàn bộ identity, working, transition, audit-success và outbox. Commit thành công phát transactional outbox idempotent theo `importSessionId + rowNumber`; UI reload F11 authoritative và không chờ F12 index.
+* **File safety:** Tối đa 5 MB, 5.000 data rows và 32.000 ký tự mỗi ô. Từ chối macro, formula, external link, embedded object, sheet/header ngoài schema, workbook malformed/zip bomb. File tạm/session có quota, TTL, cleanup và không ghi workbook/cell content vào application log.
+* **Frontend route/flow:** Action Import điều hướng tới trang import riêng theo route chuẩn `getEntityImportPath(EntityType.GLOSSARY, glossaryFqn)` và mang `parentBusinessVersion` của Dictionary đang mở trên query string; không hiển thị modal import. Trang này giữ hai radio policy và luồng `Tải template → Chọn file/chọn policy → Preview → Xem summary/action/lỗi theo dòng-cột → Xác nhận nhập`. `SKIP_EXISTING` là mặc định. Chỉ enable commit khi không có error; với `OVERWRITE_EXISTING`, nếu có `InReview` phải hiển thị rõ số phiên duyệt sẽ bị hủy và chuyển về Draft, còn `SKIP_EXISTING` chỉ hiển thị action `SKIP`. Disable/deduplicate request khi loading. Commit thành công điều hướng/reload F11; `409` hoặc session hết hạn giữ báo cáo để tham chiếu nhưng khóa commit và yêu cầu preview lại.
+* **Realtime progress:** Commit giữ transaction atomic nhưng phát tiến độ xử lý theo batch qua WebSocket channel riêng `cdeImportChannel`, dùng `importSessionId` làm job key. UI hiển thị `round(rowsProcessed/totalRows*100)` và thông điệp “Đã xử lý X/Y”; trước khi database commit chỉ hiển thị tối đa 99%. Chỉ `COMPLETED`/HTTP success mới hiển thị 100% và diễn đạt là đã cập nhật. `FAILED` nghĩa là toàn bộ transaction rollback. Mất WebSocket không làm commit thất bại; UI vẫn hoàn tất từ HTTP response.
 
 ---
 
@@ -508,7 +527,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Nguồn dữ liệu:** Database authoritative. Backend dựng flat read model từ business snapshot/working stores; archived scope dùng frozen manifest. Không page native identity rồi hydrate history, không gọi history riêng cho từng term và không fallback giữa scope.
 * **Thứ tự mặc định:** normalized `name ASC` → business version numeric `DESC` → `termId ASC` → `recordType ASC`. Authorization thực hiện trước `total`, sort và pagination.
 * **Quy tắc phân quyền trả về từ Backend:**
-  * *Consumer-only:* Chỉ được request Dictionary active và backend lọc cứng published `Approved`; working/archived/unauthorized scope trả `404`.
+  * *Consumer-only:* Được request Dictionary active hoặc Archived. Active chỉ trả published `Approved`; Archived chỉ trả published snapshots thuộc frozen manifest và luôn read-only. Working/unauthorized scope trả `404`.
   * *Người có quyền working:* Nhận published và working rows đúng scope theo capability hiệu lực.
   * *Người có quyền history/audit:* Nhận archived rows read-only đúng frozen scope.
   * Thiếu/sai canonical `parentBusinessVersion` trả `400`; scope không tồn tại hoặc không được xem trả `404` để không lộ dữ liệu.
@@ -537,7 +556,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * Version không tồn tại, prefix không khớp parent, hoặc actor không có quyền xem active/archive scope trả `404` và không lộ payload. Archived luôn chỉ đọc.
 
 #### 2. Bộ chọn Business Version của CDE:
-* Selector được scope bởi `parentBusinessVersion`: Consumer chỉ thấy Approved của active scope; Manager thấy working/published đúng scope và Archived trong chế độ audit. Không trộn `1.x` vào selector của Dictionary `2`.
+* Selector được scope bởi `parentBusinessVersion`: Consumer thấy published rows của active scope và archived published rows khi xem Data Dictionary Archived; Manager thấy working/published đúng scope. Không trộn `1.x` vào selector của Dictionary `2`.
 * Badge và selector dùng `businessVersion` của CDE; breadcrumb và URL dùng đồng thời `businessVersion` của CDE và `parentBusinessVersion` của Data Dictionary cha. Không dùng `version`, `nativeVersion` hoặc `publicationSequence` làm alias.
 * Danh sách sắp xếp giảm dần theo từng đoạn số, vì vậy `1.10` đứng trước `1.2`.
 

@@ -29,7 +29,6 @@ import { EntityReference } from '../../../generated/entity/type';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
-import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
 import {
   CDE_TAG_CLASSIFICATIONS,
   CDEExtension,
@@ -87,7 +86,6 @@ export const CDE_EXPORT_HEADERS = [
   'Ngày hiệu lực',
   'Ngày hết hiệu lực',
   'Người kiểm soát',
-  'Trạng thái',
 ];
 
 export const CDE_TEMPLATE_HEADERS = [
@@ -105,7 +103,6 @@ export const CDE_TEMPLATE_HEADERS = [
   'Phiên bản',
   'Ngày hiệu lực',
   'Ngày hết hiệu lực',
-  'Người kiểm soát',
 ];
 
 export const CDE_COLUMN_WIDTHS = [
@@ -124,7 +121,6 @@ export const CDE_COLUMN_WIDTHS = [
   { wch: 18 }, // Ngày hiệu lực
   { wch: 18 }, // Ngày hết hiệu lực
   { wch: 22 }, // Người kiểm soát
-  { wch: 20 }, // Trạng thái
 ];
 
 /**
@@ -225,10 +221,6 @@ export const exportCDEToExcel = (
         ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
       );
       const version = term.businessVersion ?? ext.version ?? '1.0';
-      const statusLabel = getEntityStatusLabel(
-        term.entityStatus ?? EntityStatus.Approved
-      );
-
       return [
         term.name ?? '',
         term.displayName ?? '',
@@ -251,7 +243,6 @@ export const exportCDEToExcel = (
         formatCDEDate(ext.effectiveDate, ''),
         formatCDEDate(ext.expirationDate, ''),
         formatReferences(term.reviewers),
-        statusLabel,
       ];
     });
 
@@ -299,7 +290,6 @@ export const downloadCDEExcelTemplate = () => {
       '1.0',
       '',
       '',
-      'steward_user',
     ],
     [
       'CDE002',
@@ -316,7 +306,6 @@ export const downloadCDEExcelTemplate = () => {
       '1.0',
       '',
       '',
-      'steward_user',
     ],
   ];
 

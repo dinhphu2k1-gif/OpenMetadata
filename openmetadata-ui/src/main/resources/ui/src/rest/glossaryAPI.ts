@@ -124,7 +124,37 @@ export interface GlossaryVersionPermissions {
   canApprove: boolean;
   canReject: boolean;
   canArchive: boolean;
+  canImportCdeDrafts?: boolean;
 }
+
+export interface CdeImportIssue {
+  rowNumber: number;
+  column: string;
+  code: string;
+  message: string;
+}
+
+export interface CdeImportPreviewRow {
+  rowNumber: number;
+  cdeCode: string;
+  action: string;
+  businessVersion?: string;
+  payload?: Record<string, unknown>;
+  warnings: string[];
+  errors: CdeImportIssue[];
+}
+
+export interface CdeImportPreview {
+  importSessionId: string;
+  expiresAt: string;
+  fileHash: string;
+  existingCodePolicy: CdeExistingCodePolicy;
+  summary: Record<string, number>;
+  rows: CdeImportPreviewRow[];
+  canCommit: boolean;
+}
+
+export type CdeExistingCodePolicy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
 
 export const getGlossariesList = async (params?: ListParams) => {
   const response = await APIClient.get<PagingResponse<Glossary[]>>(BASE_URL, {
@@ -311,6 +341,42 @@ export const exportDataDictionaryVersion = async (
       match?.[1] ??
       `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v${parentBusinessVersion}.xlsx`,
   };
+};
+
+export const downloadCdeImportTemplate = async (): Promise<Blob> => {
+  const response = await APIClient.get<Blob>('/glossaryTerms/import/template', {
+    responseType: 'blob',
+  });
+
+  return response.data;
+};
+
+export const previewCdeImport = async (
+  glossaryId: string,
+  parentBusinessVersion: string,
+  existingCodePolicy: CdeExistingCodePolicy,
+  file: File
+): Promise<CdeImportPreview> => {
+  const data = new FormData();
+  data.append('file', file);
+  const response = await APIClient.post<FormData, AxiosResponse<CdeImportPreview>>(
+    '/glossaryTerms/import/preview',
+    data,
+    {
+      params: { glossary: glossaryId, parentBusinessVersion, existingCodePolicy },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+
+  return response.data;
+};
+
+export const commitCdeImport = async (importSessionId: string) => {
+  const response = await APIClient.post(
+    `/glossaryTerms/import/${importSessionId}/commit`
+  );
+
+  return response.data;
 };
 
 export const queryGlossaryTerms = async (glossaryName: string) => {

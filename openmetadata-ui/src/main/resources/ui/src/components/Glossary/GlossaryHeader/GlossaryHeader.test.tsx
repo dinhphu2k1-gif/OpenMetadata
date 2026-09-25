@@ -29,6 +29,7 @@ import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import {
   getGlossaryTermsVersionsList,
+  getGlossaryVersionPermissions,
   getGlossaryVersionsList,
   getGlossaryWorkingVersion,
   transitionGlossaryTermWorkflow,
@@ -212,6 +213,7 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     canApprove: true,
     canReject: true,
     canArchive: true,
+    canImportCdeDrafts: true,
   }),
   getGlossaryTermVersionPermissions: jest.fn().mockResolvedValue({
     canViewWorking: true,
@@ -222,6 +224,7 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     canApprove: true,
     canReject: true,
     canArchive: true,
+    canImportCdeDrafts: true,
   }),
   createGlossaryTermWorkingVersion: jest
     .fn()
@@ -301,6 +304,53 @@ describe('GlossaryHeader component', () => {
     );
 
     fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
+  it('allows a Consumer to select an archived Data Dictionary', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionPermissions as jest.Mock).mockResolvedValueOnce({
+      isConsumer: true,
+      canViewWorking: false,
+      canViewPublished: true,
+      canEditWorking: false,
+      canSubmit: false,
+      canCreateVersion: false,
+      canApprove: false,
+      canReject: false,
+      canArchive: false,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValueOnce({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId('version-button'));
 
     await waitFor(() => {
       expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();

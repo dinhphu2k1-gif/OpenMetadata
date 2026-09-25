@@ -45,6 +45,20 @@ class CdeBusinessVersionSearchServiceTest {
     String filter = CdeBusinessVersionSearchService.buildFilter(validated, true);
     assertTrue(filter.contains("Approved"));
     assertFalse(filter.contains("Draft"));
+    assertTrue(filter.contains("active"));
+  }
+
+  @Test
+  void consumerArchivedScopeIsRestrictedToArchivedProjection() {
+    Criteria validated =
+        CdeBusinessVersionSearchService.validate(
+            criteria("cde", List.of("Draft", "Approved")), true, true);
+
+    assertEquals(List.of("Archived"), validated.statuses());
+    String filter = CdeBusinessVersionSearchService.buildFilter(validated, true, true);
+    assertTrue(filter.contains("Archived"));
+    assertTrue(filter.contains("archived"));
+    assertFalse(filter.contains("Draft"));
   }
 
   @Test
@@ -109,6 +123,17 @@ class CdeBusinessVersionSearchServiceTest {
   }
 
   @Test
+  void archivedDocumentHasArchivedScopeAndPresentationStatus() {
+    PublishedSnapshotRecord archived = archivedSnapshot(UUID.randomUUID(), "1.0");
+
+    var document = CdeBusinessVersionIndexDocument.published(archived).source();
+
+    assertEquals("archived", document.get("scopeType"));
+    assertEquals("archived", document.get("recordType"));
+    assertEquals("Archived", document.get("entityStatus"));
+  }
+
+  @Test
   void numericVersionSortKeySortsSegmentsNumerically() {
     assertTrue(
         CdeBusinessVersionIndexDocument.businessVersionSortKey("1.11")
@@ -146,6 +171,14 @@ class CdeBusinessVersionSearchServiceTest {
   }
 
   private static PublishedSnapshotRecord snapshot(UUID termId, String version) {
+    return snapshot(termId, version, null);
+  }
+
+  private static PublishedSnapshotRecord archivedSnapshot(UUID termId, String version) {
+    return snapshot(termId, version, 2L);
+  }
+
+  private static PublishedSnapshotRecord snapshot(UUID termId, String version, Long archivedAt) {
     String payload =
         JsonUtils.pojoToJson(
             Map.of(
@@ -166,7 +199,7 @@ class CdeBusinessVersionSearchServiceTest {
         "hash",
         1,
         "admin",
-        null,
-        null);
+        archivedAt,
+        archivedAt == null ? null : "admin");
   }
 }

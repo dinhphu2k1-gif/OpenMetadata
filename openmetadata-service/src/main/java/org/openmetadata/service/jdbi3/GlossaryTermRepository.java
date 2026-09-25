@@ -57,6 +57,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -115,6 +116,8 @@ import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.versioning.CdeImportService.PlannedRow;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.jdbi3.FeedRepository.TaskWorkflow;
@@ -264,6 +267,140 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     postCreate(identity);
     writeThroughCache(identity, false);
     return working;
+  }
+
+  /** Applies a previously validated CDE import plan in one database transaction. */
+  public List<WorkingVersionRecord> commitImport(
+      UUID glossaryId,
+      String parentBusinessVersion,
+      List<PlannedRow> rows,
+      String actor,
+      java.util.function.BiConsumer<Integer, Integer> progressCallback) {
+    List<GlossaryTerm> newIdentities = new ArrayList<>();
+    Map<Integer, GlossaryTerm> prepared = new LinkedHashMap<>();
+    for (PlannedRow row : rows) {
+      if ("SKIP".equals(row.action())) {
+        continue;
+      }
+      GlossaryTerm payload = JsonUtils.convertValue(row.payload(), GlossaryTerm.class);
+      if ("CREATE".equals(row.action())) {
+        payload.setId(row.termId());
+        prepareInternal(payload, false);
+        payload.setUpdatedBy(actor);
+        payload.setUpdatedAt(System.currentTimeMillis());
+        payload.setVersion(0.1);
+      } else {
+        prepareInternal(payload, true);
+      }
+      prepared.put(row.rowNumber(), payload);
+    }
+
+    List<WorkingVersionRecord> result =
+        Entity.getJdbi()
+            .inTransaction(
+                handle -> {
+                  CollectionDAO collection = handle.attach(CollectionDAO.class);
+                  GlossaryVersionDAO versions = handle.attach(GlossaryVersionDAO.class);
+                  if (versions.lockGlossaryIdentity(glossaryId) == null) {
+                    throw new EntityNotFoundException("Data Dictionary identity not found");
+                  }
+                  List<WorkingVersionRecord> committed = new ArrayList<>();
+                  List<PlannedRow> mutationRows =
+                      rows.stream()
+                          .filter(row -> !"SKIP".equals(row.action()))
+                          .sorted(Comparator.comparing(PlannedRow::cdeCode))
+                          .toList();
+                  int totalRows = mutationRows.size();
+                  int progressInterval = Math.max(1, Math.min(50, Math.max(1, totalRows / 100)));
+                  int processedRows = 0;
+                  for (PlannedRow row : mutationRows) {
+                    GlossaryTerm payload = prepared.get(row.rowNumber());
+                    long now = System.currentTimeMillis();
+                    if ("CREATE".equals(row.action())) {
+                      GlossaryTerm identity =
+                          JsonUtils.readValue(JsonUtils.pojoToJson(payload), GlossaryTerm.class)
+                              .withDisplayName(null)
+                              .withDescription(null)
+                              .withOwners(null)
+                              .withReviewers(null)
+                              .withDomains(null)
+                              .withTags(null)
+                              .withExtension(null);
+                      collection.glossaryTermDAO().insert(identity, identity.getFullyQualifiedName());
+                      collection.relationshipDAO().insert(
+                          glossaryId,
+                          identity.getId(),
+                          GLOSSARY,
+                          GLOSSARY_TERM,
+                          Relationship.CONTAINS.ordinal());
+                      insertImportRelationships(collection, payload);
+                      versions.insertWorking(
+                          UUID.randomUUID(), GLOSSARY_TERM, identity.getId(), glossaryId,
+                          parentBusinessVersion, row.businessVersion(), EntityStatus.DRAFT.value(),
+                          payload.getVersion(), JsonUtils.pojoToJson(payload), now, actor);
+                      newIdentities.add(identity);
+                    } else if ("CREATE_VERSION".equals(row.action())) {
+                      if (versions.lockWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion) != null) {
+                        throw importConflict("A working version was created after preview");
+                      }
+                      PublishedSnapshotRecord latest =
+                          versions.lockLatestPublishedByParent(
+                              GLOSSARY_TERM, row.termId(), parentBusinessVersion);
+                      if (latest == null || !latest.businessVersion().equals(row.expectedPublishedVersion())) {
+                        throw importConflict("Approved CDE changed after preview");
+                      }
+                      versions.insertWorking(
+                          UUID.randomUUID(), GLOSSARY_TERM, row.termId(), glossaryId,
+                          parentBusinessVersion, row.businessVersion(), EntityStatus.DRAFT.value(),
+                          payload.getVersion(), JsonUtils.pojoToJson(payload), now, actor);
+                    } else {
+                      WorkingVersionRecord current =
+                          versions.lockWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion);
+                      if (current == null || row.expectedRevision() == null
+                          || current.revision() != row.expectedRevision()) {
+                        throw importConflict("CDE working revision changed after preview");
+                      }
+                      int updated = versions.updateWorking(
+                          GLOSSARY_TERM, row.termId(), parentBusinessVersion, row.expectedRevision(),
+                          EntityStatus.DRAFT.value(), current.nativeVersion(),
+                          JsonUtils.pojoToJson(payload), now, actor);
+                      if (updated != 1) throw importConflict("CDE changed while import was committing");
+                    }
+                    committed.add(
+                        versions.findWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion));
+                    processedRows++;
+                    if (progressCallback != null
+                        && (processedRows == totalRows
+                            || processedRows % progressInterval == 0)) {
+                      progressCallback.accept(processedRows, totalRows);
+                    }
+                  }
+                  return committed;
+                });
+    for (GlossaryTerm identity : newIdentities) {
+      postCreate(identity);
+      writeThroughCache(identity, false);
+    }
+    return result;
+  }
+
+  private static void insertImportRelationships(CollectionDAO collection, GlossaryTerm term) {
+    for (EntityReference owner : listOrEmpty(term.getOwners())) {
+      collection.relationshipDAO().insert(
+          owner.getId(), term.getId(), owner.getType(), GLOSSARY_TERM, Relationship.OWNS.ordinal());
+    }
+    for (EntityReference reviewer : listOrEmpty(term.getReviewers())) {
+      collection.relationshipDAO().insert(
+          reviewer.getId(), term.getId(), reviewer.getType(), GLOSSARY_TERM, Relationship.REVIEWS.ordinal());
+    }
+    for (EntityReference domain : listOrEmpty(term.getDomains())) {
+      collection.relationshipDAO().insert(
+          domain.getId(), term.getId(), Entity.DOMAIN, GLOSSARY_TERM, Relationship.HAS.ordinal());
+    }
+  }
+
+  private static jakarta.ws.rs.ClientErrorException importConflict(String message) {
+    return new jakarta.ws.rs.ClientErrorException(message, jakarta.ws.rs.core.Response.Status.CONFLICT);
   }
 
   public ResultList<EntityReference> getGlossaryTermAssets(

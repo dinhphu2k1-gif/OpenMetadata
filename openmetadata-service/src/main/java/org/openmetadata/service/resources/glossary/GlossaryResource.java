@@ -439,6 +439,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     Map<String, Boolean> permissions = capabilities(securityContext, glossary).asMap();
+    permissions.put("canImportCdeDrafts", permissions.get("canEditWorking"));
     permissions.put("isConsumer", isConsumer(securityContext, glossary));
     return permissions;
   }

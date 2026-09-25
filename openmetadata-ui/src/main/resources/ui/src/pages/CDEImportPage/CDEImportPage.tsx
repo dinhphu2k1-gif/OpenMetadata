@@ -28,29 +28,25 @@ import {
   Typography,
   Upload,
 } from 'antd';
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DataGrid, { Column, RenderCellProps, textEditor } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { useTranslation } from 'react-i18next';
+import * as XLSX from 'xlsx';
 import {
   CDE_DATE_FIELDS,
-  normalizeCDEDate,
-  formatCDEDate,
   validateCDEDates,
 } from '../../utils/CDEDateUtils';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ReactComponent as FailBadgeIcon } from '../../assets/svg/fail-badge.svg';
 import { ReactComponent as ImportIcon } from '../../assets/svg/ic-drag-drop.svg';
 import { ReactComponent as PaperPlaneIcon } from '../../assets/svg/paper-plane.svg';
 import { ReactComponent as SuccessBadgeIcon } from '../../assets/svg/success-badge.svg';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
 import {
-  downloadCDEExcelTemplate,
   findMatchingDomain,
   formatCDEImportErrorMessage,
-  readAndValidateCDEExcel,
   transformRowToGlossaryTermPayload,
-  validateCDEVersionValue,
   validateDataClassificationValue,
   validateDataQualityRulesValue,
   validateDataSourceValues,
@@ -61,6 +57,8 @@ import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import Stepper from '../../components/Settings/Services/Ingestion/IngestionStepper/IngestionStepper.component';
 import '../../components/UploadFile/upload-file.less';
 import { VALIDATION_STEP } from '../../constants/BulkImport.constant';
+import { SOCKET_EVENTS } from '../../constants/constants';
+import { useWebSocketConnector } from '../../context/WebSocketProvider/WebSocketProvider';
 import { Tag as ClassificationTag } from '../../generated/entity/classification/tag';
 import { Glossary } from '../../generated/entity/data/glossary';
 import {
@@ -73,10 +71,14 @@ import { useFqn } from '../../hooks/useFqn';
 import { useGridEditController } from '../../hooks/useGridEditController';
 import { getDomainList } from '../../rest/domainAPI';
 import {
+  CdeImportPreview,
   addGlossaryTerm,
+  commitCdeImport,
+  downloadCdeImportTemplate,
   getGlossariesByName,
   getGlossaryTerms,
   getGlossaryTermsById,
+  previewCdeImport,
   transitionGlossaryTermWorkflow,
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
@@ -94,7 +96,10 @@ type DuplicateHandling = 'skip' | 'update';
 const CDEImportPage: FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { socket } = useWebSocketConnector();
   const { fqn } = useFqn();
+  const activeImportSessionRef = useRef<string>();
 
   const [activeStep, setActiveStep] = useState<VALIDATION_STEP>(
     VALIDATION_STEP.UPLOAD
@@ -124,6 +129,7 @@ const CDEImportPage: FC = () => {
     Record<string, string>[]
   >([]);
   const [validationData, setValidationData] = useState<CSVImportResult>();
+  const [serverPreview, setServerPreview] = useState<CdeImportPreview>();
   const [statusFilter, setStatusFilter] = useState<
     'all' | 'failure' | 'success'
   >('all');
@@ -154,6 +160,116 @@ const CDEImportPage: FC = () => {
   const [isSubmittingAll, setIsSubmittingAll] = useState<boolean>(false);
   const [isSubmittingAllSuccess, setIsSubmittingAllSuccess] =
     useState<boolean>(false);
+
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+    const handleProgress = (rawMessage: string) => {
+      try {
+        const message = JSON.parse(rawMessage) as {
+          jobId?: string;
+          status?: string;
+          progress?: number;
+          total?: number;
+          message?: string;
+        };
+        if (!message.jobId || message.jobId !== activeImportSessionRef.current) {
+          return;
+        }
+        if (
+          message.status === 'IN_PROGRESS' &&
+          message.total &&
+          message.total > 0
+        ) {
+          setImportProgress(
+            Math.min(99, Math.round(((message.progress ?? 0) / message.total) * 100))
+          );
+        } else if (message.status === 'STARTED') {
+          setImportProgress(0);
+        } else if (message.status === 'COMPLETED') {
+          setImportProgress(100);
+        } else if (message.status === 'FAILED') {
+          setImportProgress(0);
+        }
+        if (message.message) {
+          setCurrentImportName(message.message);
+        }
+      } catch {
+        // Ignore malformed or unrelated socket messages.
+      }
+    };
+    socket.on(SOCKET_EVENTS.CDE_IMPORT_CHANNEL, handleProgress);
+
+    return () => {
+      socket.off(SOCKET_EVENTS.CDE_IMPORT_CHANNEL, handleProgress);
+    };
+  }, [socket]);
+
+  const parentBusinessVersion = useMemo(
+    () =>
+      new URLSearchParams(location.search).get('parentBusinessVersion') ??
+      String(glossary?.businessVersion ?? '1'),
+    [glossary?.businessVersion, location.search]
+  );
+
+  const createServerPreviewFile = useCallback(() => {
+    const headers = [
+      'Mã CDE',
+      'Khối/Miền nghiệp vụ',
+      'Tên thuật ngữ nghiệp vụ',
+      'Hệ thống nguồn',
+      'Ý nghĩa nghiệp vụ',
+      'Mối quan hệ với thực thể',
+      'Chủ sở hữu dữ liệu',
+      'Phân loại dữ liệu',
+      'Dữ liệu cá nhân',
+      'Văn bản quy định liên quan',
+      'Quy định chất lượng dữ liệu',
+      'Ngày hiệu lực',
+      'Ngày hết hiệu lực',
+    ];
+    const values = dataSource.map((row) => [
+      row.name,
+      row.domain,
+      row.displayName,
+      row.dataSource,
+      row.description,
+      row.entityRelationship,
+      row.owner,
+      row.dataClassification,
+      row.personalData,
+      row.relatedRegulatoryDocuments,
+      row.dataQualityRules,
+      row.effectiveDate,
+      row.expirationDate,
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([headers, ...values]),
+      'Import CDE'
+    );
+    const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+    return new File([bytes], 'cde-import-preview.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+  }, [dataSource]);
+
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const blob = await downloadCdeImportTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Agribank_CDE_Import_Template.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showErrorToast(error as Error);
+    }
+  }, []);
 
   // Lấy thông tin Glossary và danh sách terms có sẵn
   useEffect(() => {
@@ -362,14 +478,6 @@ const CDEImportPage: FC = () => {
         renderEditCell: textEditor,
       },
       {
-        key: 'version',
-        name: t('label.cde-version', 'Phiên bản'),
-        width: 120,
-        editable: true,
-        resizable: true,
-        renderEditCell: textEditor,
-      },
-      {
         key: 'effectiveDate',
         name: t('cde.effective-date'),
         width: 160,
@@ -380,14 +488,6 @@ const CDEImportPage: FC = () => {
       {
         key: 'expirationDate',
         name: t('cde.expiration-date'),
-        width: 160,
-        editable: true,
-        resizable: true,
-        renderEditCell: textEditor,
-      },
-      {
-        key: 'reviewer',
-        name: t('label.reviewer', 'Người kiểm soát'),
         width: 160,
         editable: true,
         resizable: true,
@@ -431,10 +531,8 @@ const CDEImportPage: FC = () => {
         personalData: '',
         relatedRegulatoryDocuments: '',
         dataQualityRules: '',
-        version: '1.0',
         effectiveDate: '',
         expirationDate: '',
-        reviewer: '',
       },
     ]);
   }, [setDataSource]);
@@ -444,43 +542,65 @@ const CDEImportPage: FC = () => {
     async (file: File) => {
       setParsing(true);
       try {
-        const result = await readAndValidateCDEExcel(
-          file,
-          existingTerms as GlossaryTerm[],
-          allDomains,
-          allTags,
-          allUsers,
-          allTeams
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const values = XLSX.utils.sheet_to_json<string[]>(sheet, {
+          header: 1,
+          defval: '',
+          raw: false,
+        });
+        const requiredHeaders = [
+          'Mã CDE',
+          'Khối/Miền nghiệp vụ',
+          'Tên thuật ngữ nghiệp vụ',
+          'Hệ thống nguồn',
+          'Ý nghĩa nghiệp vụ',
+          'Mối quan hệ với thực thể',
+          'Chủ sở hữu dữ liệu',
+          'Phân loại dữ liệu',
+          'Dữ liệu cá nhân',
+          'Văn bản quy định liên quan',
+          'Quy định chất lượng dữ liệu',
+          'Ngày hiệu lực',
+          'Ngày hết hiệu lực',
+        ];
+        const headers = (values[0] ?? []).map((value) => String(value).trim());
+        const missingHeaders = requiredHeaders.filter(
+          (header) => !headers.includes(header)
         );
-
-        // Chuyển dữ liệu parsed thành dataSource cho DataGrid
-        const rows: Record<string, string>[] = result.rows.map((r, idx) => ({
-          id: `${idx + 1}`,
-          name: r.name || '',
-          displayName: r.displayName || '',
-          domain: r.domain || '',
-          dataSource: r.dataSource || '',
-          description: r.description || '',
-          entityRelationship: r.entityRelationship || '',
-          owner: r.owner || '',
-          dataClassification: r.dataClassification || '',
-          personalData: r.personalData || '',
-          relatedRegulatoryDocuments: r.relatedRegulatoryDocuments || '',
-          dataQualityRules: r.dataQualityRules || '',
-          version: r.version || '1.0',
-          ...(r.effectiveDate !== undefined
-            ? { effectiveDate: formatCDEDate(r.effectiveDate, r.effectiveDate) }
-            : {}),
-          ...(r.expirationDate !== undefined
-            ? {
-                expirationDate: formatCDEDate(
-                  r.expirationDate,
-                  r.expirationDate
-                ),
-              }
-            : {}),
-          reviewer: r.reviewer || '',
-        }));
+        if (missingHeaders.length > 0) {
+          throw new Error(
+            t(
+              'cde.missing-import-headers',
+              'Thiếu cột bắt buộc: {{headers}}',
+              { headers: missingHeaders.join(', ') }
+            )
+          );
+        }
+        const valueAt = (row: string[], header: string) =>
+          String(row[headers.indexOf(header)] ?? '');
+        const rows: Record<string, string>[] = values
+          .slice(1)
+          .filter((row) => row.some((value) => String(value ?? '').trim()))
+          .map((r, idx) => ({
+            id: `${idx + 1}`,
+            name: valueAt(r, 'Mã CDE'),
+            domain: valueAt(r, 'Khối/Miền nghiệp vụ'),
+            displayName: valueAt(r, 'Tên thuật ngữ nghiệp vụ'),
+            dataSource: valueAt(r, 'Hệ thống nguồn'),
+            description: valueAt(r, 'Ý nghĩa nghiệp vụ'),
+            entityRelationship: valueAt(r, 'Mối quan hệ với thực thể'),
+            owner: valueAt(r, 'Chủ sở hữu dữ liệu'),
+            dataClassification: valueAt(r, 'Phân loại dữ liệu'),
+            personalData: valueAt(r, 'Dữ liệu cá nhân'),
+            relatedRegulatoryDocuments: valueAt(
+              r,
+              'Văn bản quy định liên quan'
+            ),
+            dataQualityRules: valueAt(r, 'Quy định chất lượng dữ liệu'),
+            effectiveDate: valueAt(r, 'Ngày hiệu lực'),
+            expirationDate: valueAt(r, 'Ngày hết hiệu lực'),
+          }));
 
         setDataSource(rows);
         setActiveStep(VALIDATION_STEP.EDIT_VALIDATE);
@@ -498,7 +618,7 @@ const CDEImportPage: FC = () => {
 
       return false; // Ngăn upload mặc định của AntD
     },
-    [existingTerms, allDomains, allTags, allUsers, allTeams, t]
+    [t]
   );
 
   // Điều hướng nút Trước / Quay lại
@@ -511,7 +631,7 @@ const CDEImportPage: FC = () => {
   }, [activeStep]);
 
   // Thẩm định dữ liệu từ Bước 2 để sang Bước 3 (Cập Nhật)
-  const handleValidate = useCallback(() => {
+  const handleValidate = useCallback(async () => {
     const seenNames = new Set<string>();
     const validatedRows: Record<string, string>[] = [];
     let passedCount = 0;
@@ -651,22 +771,7 @@ const CDEImportPage: FC = () => {
         }
       }
 
-      // 8. Thẩm định Người kiểm soát (Reviewer)
-      const reviewerVal = (rowCopy.reviewer || '').trim();
-      if (reviewerVal && (allUsers.length > 0 || allTeams.length > 0)) {
-        const revRes = validateUserOrTeamList(reviewerVal, allUsers, allTeams);
-        if (!revRes.isValid) {
-          errors.push(
-            t(
-              'message.reviewer-not-found',
-              "Người kiểm soát '{{reviewer}}' không tồn tại trên hệ thống (Người dùng hoặc Nhóm)",
-              { reviewer: revRes.invalidNames.join(', ') }
-            )
-          );
-        }
-      }
-
-      // 9. Thẩm định Quy định chất lượng dữ liệu (DataQualityRules)
+      // 8. Thẩm định Quy định chất lượng dữ liệu (DataQualityRules)
       const dqVal = (rowCopy.dataQualityRules || '').trim();
       if (dqVal) {
         const dqRes = validateDataQualityRulesValue(dqVal);
@@ -680,38 +785,25 @@ const CDEImportPage: FC = () => {
         }
       }
 
-      // 10. Thẩm định Phiên bản CDE (CDEVersion)
-      const verVal = (rowCopy.version || '').trim();
-      if (verVal) {
-        const verRes = validateCDEVersionValue(verVal);
-        if (!verRes.isValid) {
-          errors.push(
-            t(
-              'message.cde-version-invalid',
-              "Phiên bản '{{version}}' không đúng định dạng (ví dụ: 1.0, 2.0)",
-              { version: verVal }
-            )
-          );
-        }
-      }
-
       const isExisting = Boolean(name && existingMap.has(name.toLowerCase()));
       const existingTerm = name
         ? existingMap.get(name.toLowerCase())
         : undefined;
-      CDE_DATE_FIELDS.forEach((key) => {
-        if (rowCopy[key] !== undefined) {
-          rowCopy[key] = normalizeCDEDate(rowCopy[key]) ?? rowCopy[key];
-        }
+      const hasInvalidImportDateFormat = CDE_DATE_FIELDS.some((key) => {
+        const value = rowCopy[key]?.trim();
+
+        return Boolean(value && !/^\d{2}\/\d{2}\/\d{4}$/.test(value));
       });
-      const dateError = validateCDEDates({
-        ...existingTerm?.extension,
-        ...Object.fromEntries(
-          CDE_DATE_FIELDS.filter((key) => rowCopy[key] !== undefined).map(
-            (key) => [key, rowCopy[key]]
-          )
-        ),
-      });
+      const dateError = hasInvalidImportDateFormat
+        ? 'cde.invalid-date'
+        : validateCDEDates({
+            ...existingTerm?.extension,
+            ...Object.fromEntries(
+              CDE_DATE_FIELDS.filter((key) => rowCopy[key] !== undefined).map(
+                (key) => [key, rowCopy[key]]
+              )
+            ),
+          });
       if (dateError) {
         errors.push(t(dateError));
       }
@@ -745,7 +837,49 @@ const CDEImportPage: FC = () => {
     });
     setValidateDataSource(validatedRows);
     setStatusFilter('all');
-    setActiveStep(VALIDATION_STEP.UPDATE);
+    setServerPreview(undefined);
+    if (failedCount > 0 || !glossary?.id) {
+      setActiveStep(VALIDATION_STEP.UPDATE);
+
+      return;
+    }
+    setParsing(true);
+    try {
+      const preview = await previewCdeImport(
+        glossary.id,
+        parentBusinessVersion,
+        duplicatePolicy === 'skip' ? 'SKIP_EXISTING' : 'OVERWRITE_EXISTING',
+        createServerPreviewFile()
+      );
+      const previewByRow = new Map(
+        preview.rows.map((previewRow) => [previewRow.rowNumber - 2, previewRow])
+      );
+      const rows = validatedRows.map((row, index) => {
+        const result = previewByRow.get(index);
+        const errors = result?.errors ?? [];
+
+        return {
+          ...row,
+          status: errors.length === 0 ? Status.Success : Status.Failure,
+          details:
+            errors.map((error) => `${error.column}: ${error.message}`).join('; ') ||
+            [result?.action, ...(result?.warnings ?? [])].filter(Boolean).join(' — '),
+        };
+      });
+      const failed = rows.filter((row) => row.status === Status.Failure).length;
+      setServerPreview(preview);
+      setValidateDataSource(rows);
+      setValidationData({
+        numberOfRowsProcessed: rows.length,
+        numberOfRowsPassed: rows.length - failed,
+        numberOfRowsFailed: failed,
+      });
+      setActiveStep(VALIDATION_STEP.UPDATE);
+    } catch (error) {
+      showErrorToast(error as Error);
+    } finally {
+      setParsing(false);
+    }
   }, [
     dataSource,
     existingTerms,
@@ -754,6 +888,9 @@ const CDEImportPage: FC = () => {
     allUsers,
     allTeams,
     duplicatePolicy,
+    glossary?.id,
+    parentBusinessVersion,
+    createServerPreviewFile,
     t,
   ]);
 
@@ -842,9 +979,44 @@ const CDEImportPage: FC = () => {
 
   // Tiến hành lưu dữ liệu CDE vào backend
   const handleStartImport = async () => {
-    if (!validationData || !fqn) {
+    if (!validationData || !fqn || !serverPreview?.canCommit) {
       return;
     }
+
+    setIsImporting(true);
+    activeImportSessionRef.current = serverPreview.importSessionId;
+    setImportProgress(0);
+    setCurrentImportName(
+      t('cde.atomic-import', 'Đang chuẩn bị giao dịch cập nhật toàn bộ tệp')
+    );
+    try {
+      const result = (await commitCdeImport(serverPreview.importSessionId)) as {
+        committed?: number;
+        skipped?: number;
+      };
+      setImportStats({
+        created: serverPreview.summary.CREATE ?? 0,
+        updated:
+          (serverPreview.summary.CREATE_VERSION ?? 0) +
+          (serverPreview.summary.UPDATE_DRAFT ?? 0) +
+          (serverPreview.summary.REPLACE_IN_REVIEW_AND_REOPEN ?? 0) +
+          (serverPreview.summary.REPLACE_REJECTED_AND_REOPEN ?? 0),
+        skipped: result.skipped ?? serverPreview.summary.SKIP ?? 0,
+        failed: 0,
+      });
+      setImportProgress(100);
+      setIsCompleted(true);
+      setServerPreview(undefined);
+      activeImportSessionRef.current = undefined;
+    } catch (error) {
+      showErrorToast(error as Error);
+      setServerPreview(undefined);
+      activeImportSessionRef.current = undefined;
+    } finally {
+      setIsImporting(false);
+    }
+
+    return;
 
     const rowsToProcess = validateDataSource.filter(
       (r) => r.status === Status.Success
@@ -1015,7 +1187,7 @@ const CDEImportPage: FC = () => {
           const { businessVersion, ...createPayload } = payload;
           const working = await addGlossaryTerm({
             ...createPayload,
-            parentBusinessVersion: businessVersion.split('.')[0],
+            parentBusinessVersion,
           });
           createdCount++;
           if (working?.id && working.workingRevision) {
@@ -1102,6 +1274,7 @@ const CDEImportPage: FC = () => {
     setDataSource([]);
     setValidateDataSource([]);
     setValidationData(undefined);
+    setServerPreview(undefined);
     setIsCompleted(false);
     setCreatedTerms([]);
     setIsSubmittingAll(false);
@@ -1208,7 +1381,7 @@ const CDEImportPage: FC = () => {
                   <Button
                     icon={<DownloadOutlined />}
                     type="link"
-                    onClick={downloadCDEExcelTemplate}>
+                    onClick={handleDownloadTemplate}>
                     {t(
                       'cde.download-template-btn',
                       'Tải file Excel mẫu (.xlsx)'
@@ -1556,7 +1729,8 @@ const CDEImportPage: FC = () => {
                     disabled={
                       isImporting ||
                       !validationData ||
-                      validationData.numberOfRowsPassed === 0
+                      validationData.numberOfRowsFailed > 0 ||
+                      !serverPreview?.canCommit
                     }
                     type="primary"
                     onClick={handleStartImport}>

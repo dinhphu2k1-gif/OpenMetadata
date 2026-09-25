@@ -36,6 +36,14 @@ public final class CdeBusinessVersionIndexDocument {
             record.payload(),
             recordType);
     document.put("scopeType", record.archivedAt() == null ? "active" : "archived");
+    String status = record.archivedAt() == null ? "Approved" : "Archived";
+    document.put("entityStatus", status);
+    Map<String, Object> sort = new LinkedHashMap<>();
+    if (document.get("cdeSort") instanceof Map<?, ?> existingSort) {
+      existingSort.forEach((key, value) -> sort.put(String.valueOf(key), value));
+    }
+    sort.put("entityStatus", status);
+    document.put("cdeSort", sort);
     document.put("publishedAt", record.publishedAt());
     if (record.archivedAt() != null) {
       document.put("archivedAt", record.archivedAt());
@@ -90,7 +98,7 @@ public final class CdeBusinessVersionIndexDocument {
             "normalizedName", document.get("normalizedName"),
             "displayName", normalize(String.valueOf(source.getOrDefault("displayName", ""))),
             "businessVersion", document.get("businessVersionSortKey"),
-            "entityStatus", String.valueOf(source.getOrDefault("entityStatus", ""))));
+            "entityStatus", String.valueOf(document.getOrDefault("entityStatus", ""))));
     return document;
   }
 

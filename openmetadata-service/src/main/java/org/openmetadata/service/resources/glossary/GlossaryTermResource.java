@@ -52,6 +52,7 @@ import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
@@ -85,6 +86,7 @@ import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.MetadataOperation;
+import org.openmetadata.schema.type.TagLabel;
 import org.openmetadata.schema.type.TermRelation;
 import org.openmetadata.schema.type.api.BulkOperationResult;
 import org.openmetadata.schema.type.csv.CsvImportResult;
@@ -103,6 +105,9 @@ import org.openmetadata.service.glossary.versioning.CdeFlatListService;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Candidates;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Scope;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.ScopeType;
+import org.openmetadata.service.glossary.versioning.CdeImportService;
+import org.openmetadata.service.glossary.versioning.CdeImportService.PlannedRow;
+import org.openmetadata.service.glossary.versioning.CdeImportService.RowData;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -129,6 +134,8 @@ import org.openmetadata.service.util.GlossaryBusinessVersion;
 import org.openmetadata.service.util.MoveGlossaryTermResponse;
 import org.openmetadata.service.util.RestUtil;
 import org.openmetadata.service.util.WebsocketNotificationHandler;
+import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
+import org.glassfish.jersey.media.multipart.FormDataParam;
 
 @Slf4j
 @Path("/v1/glossaryTerms")
@@ -147,6 +154,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final CdeFlatListService cdeFlatListService = new CdeFlatListService();
   private final CdeBusinessVersionSearchService cdeSearchService =
       new CdeBusinessVersionSearchService();
+  private final CdeImportService cdeImportService = new CdeImportService();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -156,6 +164,116 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private static final int MAX_BATCH_BY_IDS = 100;
   private static final DateTimeFormatter CDE_EXPORT_TIMESTAMP =
       DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
+
+  @GET
+  @Path("/import/template")
+  @Produces(CdeImportService.XLSX_MEDIA_TYPE)
+  @Operation(operationId = "downloadCdeImportTemplate", summary = "Download the CDE XLSX import template")
+  public Response downloadCdeImportTemplate(@Context SecurityContext securityContext) {
+    authorizer.authorize(
+        securityContext,
+        new OperationContext(entityType, MetadataOperation.CREATE),
+        getResourceContext());
+    return Response.ok(cdeImportService.template(), CdeImportService.XLSX_MEDIA_TYPE)
+        .header("Content-Disposition", "attachment; filename=\"Agribank_CDE_Import_Template.xlsx\"")
+        .build();
+  }
+
+  @POST
+  @Path("/import/preview")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Operation(operationId = "previewCdeImport", summary = "Validate and preview an atomic CDE import")
+  public CdeImportService.Preview previewCdeImport(
+      @Context SecurityContext securityContext,
+      @NotNull @QueryParam("glossary") UUID glossaryId,
+      @NotNull @QueryParam("parentBusinessVersion") String requestedParentBusinessVersion,
+      @NotNull @QueryParam("existingCodePolicy") String requestedExistingCodePolicy,
+      @FormDataParam("file") InputStream input,
+      @FormDataParam("file") FormDataContentDisposition fileDetail) {
+    CdeImportService.ExistingCodePolicy existingCodePolicy =
+        CdeImportService.ExistingCodePolicy.from(requestedExistingCodePolicy);
+    ImportScope scope = authorizeImportScope(securityContext, glossaryId, requestedParentBusinessVersion);
+    Map<String, Map<String, Object>> existing = new LinkedHashMap<>();
+    for (Map<String, Object> row : loadAuthorizedCdeFlatRows(
+        securityContext, glossaryId.toString(), scope.parentBusinessVersion()).rows()) {
+      String normalized = CdeImportService.normalizeName(String.valueOf(row.get("name")));
+      Map<String, Object> previous = existing.get(normalized);
+      if (previous == null || "working".equals(row.get("recordType"))) existing.put(normalized, row);
+    }
+    long contentLength = fileDetail == null ? -1 : fileDetail.getSize();
+    String actor = securityContext.getUserPrincipal().getName();
+    DisplayNameReferenceResolver referenceResolver = new DisplayNameReferenceResolver();
+    return cdeImportService.preview(
+        input,
+        contentLength,
+        actor,
+        glossaryId,
+        scope.parentBusinessVersion(),
+        existingCodePolicy,
+        row -> planImportRow(
+            row,
+            scope,
+            existing.get(CdeImportService.normalizeName(row.value(0))),
+            existingCodePolicy,
+            referenceResolver));
+  }
+
+  @POST
+  @Path("/import/{importSessionId}/commit")
+  @Operation(operationId = "commitCdeImport", summary = "Commit a validated CDE import atomically")
+  public Map<String, Object> commitCdeImport(
+      @Context SecurityContext securityContext,
+      @PathParam("importSessionId") UUID importSessionId) {
+    String actor = securityContext.getUserPrincipal().getName();
+    String jobId = importSessionId.toString();
+    WebsocketNotificationHandler.sendCdeImportNotification(
+        jobId, securityContext, "STARTED", 0, null,
+        "Đang chuẩn bị giao dịch import CDE", null);
+    try {
+      Map<String, Object> result = cdeImportService.commit(
+          importSessionId,
+          actor,
+          session -> {
+            ImportScope scope = authorizeImportScope(
+                securityContext, session.glossaryId(), session.parentBusinessVersion());
+            for (PlannedRow row : session.rows()) {
+              if (!"SKIP".equals(row.action())) authorizeImportRow(securityContext, row);
+            }
+            List<WorkingVersionRecord> committed = repository.commitImport(
+                scope.glossary().getId(), scope.parentBusinessVersion(), session.rows(), actor,
+                (processed, total) -> {
+                  try {
+                    WebsocketNotificationHandler.sendCdeImportNotification(
+                        jobId, securityContext, "IN_PROGRESS", processed, total,
+                        "Đã xử lý " + processed + "/" + total + " bản ghi; đang chờ commit", null);
+                  } catch (RuntimeException notificationFailure) {
+                    LOG.warn(
+                        "Unable to publish CDE import progress importSessionId={} processed={} total={}",
+                        importSessionId, processed, total, notificationFailure);
+                  }
+                });
+            LOG.info(
+                "CDE import committed actor={} importSessionId={} glossaryId={} parentBusinessVersion={} rows={} fileHash={}",
+                actor, importSessionId, session.glossaryId(), session.parentBusinessVersion(),
+                committed.size(), session.fileHash());
+            return Map.of(
+                "importSessionId", importSessionId,
+                "committed", committed.size(),
+                "skipped", session.rows().stream().filter(row -> "SKIP".equals(row.action())).count(),
+                "parentBusinessVersion", session.parentBusinessVersion());
+          });
+      WebsocketNotificationHandler.sendCdeImportNotification(
+          jobId, securityContext, "COMPLETED", 1, 1,
+          "Import CDE đã commit thành công", null);
+      return result;
+    } catch (RuntimeException exception) {
+      WebsocketNotificationHandler.sendCdeImportNotification(
+          jobId, securityContext, "FAILED", null, null,
+          "Import CDE thất bại và toàn bộ thay đổi đã được rollback",
+          "Import CDE thất bại");
+      throw exception;
+    }
+  }
 
   @Override
   public GlossaryTerm addHref(UriInfo uriInfo, GlossaryTerm term) {
@@ -497,6 +615,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @PathParam("id") UUID id) {
     GlossaryTerm term = versionEntity(uriInfo, securityContext, id);
     Map<String, Boolean> permissions = capabilities(securityContext, term).asMap();
+    permissions.put("canImportCdeDrafts", permissions.get("canEditWorking"));
     permissions.put("isConsumer", isConsumer(securityContext, term));
     return permissions;
   }
@@ -1074,7 +1193,9 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC))
         || (scope.type() == ScopeType.WORKING && (consumerOnly || !capabilities.canViewWorking()))
         || (scope.type() == ScopeType.ARCHIVED
-            && (consumerOnly || (!capabilities.canViewWorking() && !capabilities.canArchive())))) {
+            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC)
+            && !capabilities.canViewWorking()
+            && !capabilities.canArchive())) {
       throw new NotFoundException("Data Dictionary scope was not found");
     }
     if (scope.type() != ScopeType.ARCHIVED && criteria.statuses().contains("Archived")) {
@@ -1082,7 +1203,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
     versioningService.processPendingOutbox();
     return cdeSearchService.search(
-        criteria, DefaultAuthorizer.getSubjectContext(securityContext), consumerOnly);
+        criteria,
+        DefaultAuthorizer.getSubjectContext(securityContext),
+        consumerOnly,
+        scope.type() == ScopeType.ARCHIVED,
+        scope.type() == ScopeType.WORKING);
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
@@ -1719,6 +1844,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                 securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC))
         || (scope.type() == ScopeType.WORKING && !parentCapabilities.canViewWorking())
         || (scope.type() == ScopeType.ARCHIVED
+            && !policyAllowsGlossary(
+                securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC)
             && !parentCapabilities.canViewWorking()
             && !parentCapabilities.canArchive())) {
       throw new NotFoundException("Data Dictionary scope was not found");
@@ -1756,6 +1883,302 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private record AuthorizedFlatRows(
       String parentBusinessVersion, List<Map<String, Object>> rows) {}
 
+  private ImportScope authorizeImportScope(
+      SecurityContext securityContext, UUID glossaryId, String requestedParentBusinessVersion) {
+    final String parentBusinessVersion;
+    try {
+      parentBusinessVersion =
+          GlossaryBusinessVersion.requireCanonicalDictionary(requestedParentBusinessVersion);
+    } catch (IllegalArgumentException exception) {
+      throw new BadRequestException(exception.getMessage());
+    }
+    Scope scope;
+    try {
+      scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
+    } catch (RuntimeException exception) {
+      throw new NotFoundException("Data Dictionary import scope was not found");
+    }
+    if (scope.type() == ScopeType.ARCHIVED) {
+      throw new NotFoundException("Data Dictionary import scope was not found");
+    }
+    Glossary glossary = JsonUtils.readValue(scope.payload(), Glossary.class);
+    if (scope.type() == ScopeType.WORKING
+        && glossary.getEntityStatus() != EntityStatus.DRAFT) {
+      throw new BadRequestException("Import is allowed only in an active or Draft Data Dictionary");
+    }
+    GlossaryAuthorizationResolver.requireEdit(
+        capabilitiesForAuthorizationGlossary(securityContext, glossary));
+    return new ImportScope(parentBusinessVersion, glossary, scope.type());
+  }
+
+  private PlannedRow planImportRow(
+      RowData row,
+      ImportScope scope,
+      Map<String, Object> existing,
+      CdeImportService.ExistingCodePolicy existingCodePolicy,
+      DisplayNameReferenceResolver referenceResolver) {
+    try {
+      String name = row.value(0).trim();
+      if (existing != null
+          && existingCodePolicy == CdeImportService.ExistingCodePolicy.SKIP_EXISTING) {
+        return new PlannedRow(
+            row.rowNumber(), name, "SKIP", null, null, null, null,
+            Map.of(), List.of("Mã CDE đã tồn tại và sẽ được bỏ qua"), List.of());
+      }
+      UUID termId = existing == null
+          ? UUID.randomUUID()
+          : UUID.fromString(String.valueOf(existing.get("termId")));
+      String action;
+      Long revision = null;
+      String expectedPublishedVersion = null;
+      String businessVersion;
+      List<String> warnings = new ArrayList<>();
+      if (existing == null) {
+        action = "CREATE";
+        businessVersion = scope.parentBusinessVersion() + ".0";
+      } else if ("working".equals(existing.get("recordType"))) {
+        revision = Long.valueOf(String.valueOf(existing.get("workingRevision")));
+        businessVersion = String.valueOf(existing.get("businessVersion"));
+        String status = String.valueOf(existing.get("entityStatus"));
+        action = switch (status.replace(" ", "")) {
+          case "InReview" -> "REPLACE_IN_REVIEW_AND_REOPEN";
+          case "Rejected" -> "REPLACE_REJECTED_AND_REOPEN";
+          default -> "UPDATE_DRAFT";
+        };
+        if (!"UPDATE_DRAFT".equals(action)) {
+          warnings.add("Phiên duyệt hiện tại sẽ bị vô hiệu hóa và CDE trở về Draft");
+        }
+      } else {
+        action = "CREATE_VERSION";
+        String publishedVersion = String.valueOf(existing.get("businessVersion"));
+        expectedPublishedVersion = publishedVersion;
+        businessVersion = nextCdeVersion(scope.parentBusinessVersion(), publishedVersion);
+      }
+
+      GlossaryTerm term =
+          new GlossaryTerm()
+              .withId(termId)
+              .withName(name)
+              .withDisplayName(row.value(2))
+              .withDescription(row.value(4))
+              .withGlossary(
+                  new EntityReference()
+                      .withId(scope.glossary().getId())
+                      .withType(Entity.GLOSSARY)
+                      .withName(scope.glossary().getName())
+                      .withFullyQualifiedName(scope.glossary().getFullyQualifiedName()))
+              .withParentBusinessVersion(scope.parentBusinessVersion())
+              .withBusinessVersion(businessVersion)
+              .withEntityStatus(EntityStatus.DRAFT)
+              .withDomains(referenceResolver.resolve(row.value(1), Entity.DOMAIN))
+              .withOwners(referenceResolver.resolveParties(row.value(6)))
+              .withReviewers(List.of())
+              .withTags(resolveImportTags(row, referenceResolver))
+              .withExtension(importExtension(row));
+      if (existing != null && existing.get("fullyQualifiedName") != null) {
+        term.setFullyQualifiedName(String.valueOf(existing.get("fullyQualifiedName")));
+      }
+      Map<String, Object> payload =
+          JsonUtils.readValue(JsonUtils.pojoToJson(term), Map.class);
+      try {
+        EntityRepository.validateExtension(term.getExtension(), Entity.GLOSSARY_TERM);
+      } catch (RuntimeException exception) {
+        throw new BadRequestException(
+            "Dữ liệu custom property không đúng schema", exception);
+      }
+      return new PlannedRow(
+          row.rowNumber(), name, action, termId, businessVersion, expectedPublishedVersion, revision,
+          payload, warnings, List.of());
+    } catch (BadRequestException exception) {
+      return PlannedRow.error(
+          row.rowNumber(), "", "INVALID_ROW",
+          exception.getMessage() == null ? "Dữ liệu không hợp lệ" : exception.getMessage());
+    } catch (RuntimeException exception) {
+      LOG.error("CDE import reference lookup failed at row {}", row.rowNumber(), exception);
+      return PlannedRow.error(
+          row.rowNumber(), "", "REFERENCE_LOOKUP_FAILED",
+          "Không thể tra cứu dữ liệu tham chiếu. Vui lòng thử lại hoặc liên hệ quản trị viên");
+    }
+  }
+
+  private void authorizeImportRow(SecurityContext securityContext, PlannedRow row) {
+    if ("CREATE".equals(row.action())) {
+      authorizer.authorize(
+          securityContext,
+          new OperationContext(entityType, MetadataOperation.CREATE),
+          getResourceContext());
+      return;
+    }
+    GlossaryTerm term = requireCde(row.termId());
+    GlossaryAuthorizationResolver.requireEdit(
+        capabilitiesForAuthorizationTerm(securityContext, term));
+    if ("CREATE_VERSION".equals(row.action())) {
+      GlossaryAuthorizationResolver.requireCreateVersion(
+          capabilitiesForAuthorizationTerm(securityContext, term));
+    }
+  }
+
+  private static String nextCdeVersion(String parent, String current) {
+    String[] parts = current.split("\\.");
+    if (parts.length != 2 || !parts[0].equals(parent)) {
+      throw new BadRequestException("Approved CDE version does not belong to the import scope");
+    }
+    return parent + "." + new BigInteger(parts[1]).add(BigInteger.ONE);
+  }
+
+  private static Map<String, Object> importExtension(RowData row) {
+    String quality = row.value(10).trim();
+    if (!quality.isBlank() && !List.of("Có", "Không").contains(quality)) {
+      throw new BadRequestException("Quy định chất lượng dữ liệu chỉ nhận Có hoặc Không");
+    }
+    String effective = requireImportDate(row.value(11), "Ngày hiệu lực");
+    String expiration = requireImportDate(row.value(12), "Ngày hết hiệu lực");
+    if (!effective.isBlank() && !expiration.isBlank()
+        && java.time.LocalDate.parse(expiration).isBefore(java.time.LocalDate.parse(effective))) {
+      throw new BadRequestException("Ngày hết hiệu lực không được trước ngày hiệu lực");
+    }
+    Map<String, Object> extension = new LinkedHashMap<>();
+    putImportString(extension, "entityRelationship", row.value(5));
+    putImportString(extension, "relatedRegulatoryDocuments", row.value(9));
+    if (!quality.isBlank()) {
+      extension.put("dataQualityRules", List.of("Có".equals(quality) ? "Y" : "N"));
+    }
+    putImportString(extension, "effectiveDate", effective);
+    putImportString(extension, "expirationDate", expiration);
+    return extension;
+  }
+
+  private static void putImportString(
+      Map<String, Object> extension, String property, String value) {
+    if (value != null && !value.isBlank()) {
+      extension.put(property, value);
+    }
+  }
+
+  private static String requireImportDate(String value, String column) {
+    if (value == null || value.isBlank()) return "";
+    try {
+      java.time.format.DateTimeFormatter formatter =
+          java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu")
+              .withResolverStyle(java.time.format.ResolverStyle.STRICT);
+      return java.time.LocalDate.parse(value.trim(), formatter).toString();
+    } catch (RuntimeException exception) {
+      throw new BadRequestException(column + " phải có định dạng dd/MM/yyyy");
+    }
+  }
+
+  private static List<TagLabel> resolveImportTags(
+      RowData row, DisplayNameReferenceResolver referenceResolver) {
+    List<TagLabel> tags = new ArrayList<>();
+    addImportTags(tags, row.value(3), "DataSource", referenceResolver);
+    addImportTags(tags, row.value(7), "DataClassification", referenceResolver);
+    addImportTags(tags, row.value(8), "PersonalData", referenceResolver);
+    return tags;
+  }
+
+  private static void addImportTags(
+      List<TagLabel> tags,
+      String value,
+      String classification,
+      DisplayNameReferenceResolver referenceResolver) {
+    if (value == null || value.isBlank()) return;
+    for (String line : value.split("\\R")) {
+      EntityReference reference = referenceResolver.resolveTag(line, classification);
+      tags.add(
+          new TagLabel()
+              .withTagFQN(reference.getFullyQualifiedName())
+              .withSource(TagLabel.TagSource.CLASSIFICATION)
+              .withLabelType(TagLabel.LabelType.MANUAL)
+              .withState(TagLabel.State.CONFIRMED));
+    }
+  }
+
+  private static final class DisplayNameReferenceResolver {
+    private final Map<String, Map<String, List<EntityReference>>> byType = new LinkedHashMap<>();
+
+    private List<EntityReference> resolve(String value, String type) {
+      if (value == null || value.isBlank()) return List.of();
+      List<EntityReference> result = new ArrayList<>();
+      for (String label : value.split("\\R")) {
+        result.add(resolveOne(type, label, null));
+      }
+      return result;
+    }
+
+    private List<EntityReference> resolveParties(String value) {
+      if (value == null || value.isBlank()) return List.of();
+      List<EntityReference> result = new ArrayList<>();
+      for (String label : value.split("\\R")) {
+        List<EntityReference> matches = new ArrayList<>();
+        matches.addAll(matches(Entity.USER, label, null));
+        matches.addAll(matches(Entity.TEAM, label, null));
+        result.add(requireUnique(label, "user/team", matches));
+      }
+      return result;
+    }
+
+    private EntityReference resolveTag(String label, String classification) {
+      return resolveOne(Entity.TAG, label, classification + ".");
+    }
+
+    private EntityReference resolveOne(String type, String label, String fqnPrefix) {
+      return requireUnique(label, type, matches(type, label, fqnPrefix));
+    }
+
+    private List<EntityReference> matches(String type, String rawLabel, String fqnPrefix) {
+      String key = normalizeDisplayName(rawLabel);
+      return byType
+          .computeIfAbsent(type, DisplayNameReferenceResolver::load)
+          .getOrDefault(key, List.of())
+          .stream()
+          .filter(
+              reference ->
+                  fqnPrefix == null
+                      || String.valueOf(reference.getFullyQualifiedName()).startsWith(fqnPrefix))
+          .toList();
+    }
+
+    private static Map<String, List<EntityReference>> load(String type) {
+      EntityRepository<? extends org.openmetadata.schema.EntityInterface> repository =
+          Entity.getEntityRepository(type);
+      Include include = repository.supportsSoftDelete ? Include.NON_DELETED : Include.ALL;
+      Map<String, List<EntityReference>> index = new LinkedHashMap<>();
+      for (org.openmetadata.schema.EntityInterface entity :
+          repository.listAll(
+              repository.getFields("displayName"), new ListFilter(include))) {
+        String label =
+            entity.getDisplayName() == null || entity.getDisplayName().isBlank()
+                ? entity.getName()
+                : entity.getDisplayName();
+        index.computeIfAbsent(normalizeDisplayName(label), ignored -> new ArrayList<>())
+            .add(entity.getEntityReference());
+      }
+      return index;
+    }
+
+    private static EntityReference requireUnique(
+        String rawLabel, String type, List<EntityReference> matches) {
+      String label = rawLabel == null ? "" : rawLabel.trim();
+      if (label.isBlank()) throw new BadRequestException("Reference displayName must not be blank");
+      if (matches.isEmpty()) {
+        throw new BadRequestException(type + " displayName '" + label + "' was not found");
+      }
+      if (matches.size() > 1) {
+        throw new BadRequestException(type + " displayName '" + label + "' is ambiguous");
+      }
+      return matches.get(0);
+    }
+
+    private static String normalizeDisplayName(String value) {
+      return java.text.Normalizer.normalize(
+              value == null ? "" : value.trim(), java.text.Normalizer.Form.NFKC)
+          .toLowerCase(Locale.ROOT);
+    }
+  }
+
+  private record ImportScope(
+      String parentBusinessVersion, Glossary glossary, ScopeType scopeType) {}
+
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationGlossary(
       SecurityContext securityContext, Glossary glossary) {
     return GlossaryAuthorizationResolver.fromPolicy(
@@ -1782,6 +2205,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC))
         || (scope.type() == ScopeType.WORKING && !capabilities.canViewWorking())
         || (scope.type() == ScopeType.ARCHIVED
+            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC)
             && !capabilities.canViewWorking()
             && !capabilities.canArchive())) {
       throw new NotFoundException("CDE was not found in the requested Data Dictionary scope");

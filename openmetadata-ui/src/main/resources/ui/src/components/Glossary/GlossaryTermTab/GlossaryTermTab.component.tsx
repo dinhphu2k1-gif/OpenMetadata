@@ -1240,12 +1240,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       let pagingResponse: Paging | undefined;
 
       if (isCDEGlossary) {
-        if (
-          isConsumer &&
-          displayedGlossary.entityStatus === EntityStatus.Archived
-        ) {
-          return;
-        }
         const parentBusinessVersion = displayedGlossary.businessVersion;
         if (!parentBusinessVersion) {
           throw new Error(

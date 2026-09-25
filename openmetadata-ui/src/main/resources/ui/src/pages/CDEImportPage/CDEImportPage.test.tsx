@@ -382,7 +382,7 @@ describe('CDEImportPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should detect errors for all fixed/referenced columns (dataSource, classification, personalData, owner, reviewer, dqRules, version) during validation', async () => {
+  it('should detect errors for import fields during validation', async () => {
     (domainAPI.getDomainList as jest.Mock).mockResolvedValue({
       data: [
         {
@@ -423,8 +423,6 @@ describe('CDEImportPage', () => {
           personalData: 'GiaTriSai',
           relatedRegulatoryDocuments: 'VB 1',
           dataQualityRules: 'SaiDinhDangBoolean',
-          version: 'ban-1.0',
-          reviewer: 'Ghost_Reviewer',
           status: 'Draft' as any,
           errors: [],
           warnings: [],
@@ -476,15 +474,7 @@ describe('CDEImportPage', () => {
       screen.getByText(/Chủ sở hữu 'Ghost_Owner' không tồn tại trên hệ thống/)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /Người kiểm soát 'Ghost_Reviewer' không tồn tại trên hệ thống/
-      )
-    ).toBeInTheDocument();
-    expect(
       screen.getByText(/Quy định chất lượng dữ liệu phải là 'Có' hoặc 'Không'/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Phiên bản 'ban-1.0' không đúng định dạng/)
     ).toBeInTheDocument();
   });
 
