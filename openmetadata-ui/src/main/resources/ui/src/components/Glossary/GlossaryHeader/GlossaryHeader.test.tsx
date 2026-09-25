@@ -178,6 +178,10 @@ jest.mock('../../../utils/RouterUtils', () => ({
 }));
 
 jest.mock('../../../rest/glossaryAPI', () => ({
+  exportDataDictionaryVersion: jest.fn().mockResolvedValue({
+    blob: new Blob(['xlsx']),
+    fileName: 'Data_Dictionary_v2.xlsx',
+  }),
   exportGlossaryInCSVFormat: jest
     .fn()
     .mockImplementation(() => Promise.resolve()),

@@ -65,6 +65,11 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
   sortOrder?: 'asc' | 'desc';
 };
 
+export interface DataDictionaryExcelExport {
+  blob: Blob;
+  fileName: string;
+}
+
 const BASE_URL = '/glossaries';
 
 const parentScopeFromRoute = () => {
@@ -285,6 +290,27 @@ export const getGlossaryTerms = async (params: ListGlossaryTermsParams) => {
   );
 
   return response.data;
+};
+
+export const exportDataDictionaryVersion = async (
+  glossaryId: string,
+  parentBusinessVersion: string
+): Promise<DataDictionaryExcelExport> => {
+  const response = await APIClient.get<Blob>('/glossaryTerms/export', {
+    params: { glossary: glossaryId, parentBusinessVersion },
+    responseType: 'blob',
+  });
+  const disposition = response.headers['content-disposition'] as
+    | string
+    | undefined;
+  const match = disposition?.match(/filename="?([^";]+)"?/i);
+
+  return {
+    blob: response.data,
+    fileName:
+      match?.[1] ??
+      `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v${parentBusinessVersion}.xlsx`,
+  };
 };
 
 export const queryGlossaryTerms = async (glossaryName: string) => {

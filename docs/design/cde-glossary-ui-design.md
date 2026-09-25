@@ -274,10 +274,10 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
      - Nhiều giá trị trong cùng một bộ lọc được kết hợp bằng **`OR`**; các nhóm search/status/domain/owner/tag được kết hợp bằng **`AND`** trong OpenSearch query.
      - Mỗi khi người dùng thay đổi từ khóa hoặc điều kiện lọc, hệ thống tự động reset về trang 1 và tính toán lại tổng số dòng.
      - Phân trang tính trên toàn bộ các dòng kết quả tìm kiếm/lọc được (hỗ trợ các mức kích thước trang: 10, 15, 25, 50 dòng/trang).
-     - F11 là authoritative default-list read path từ database. Khi không có search/filter/custom sort, UI gọi F11. Khi có bất kỳ tiêu chí F12 nào, UI gọi OpenSearch-backed search endpoint; hai path trả cùng row DTO, page sizes và stable tie-breaker nhưng không fallback âm thầm giữa database và mutable/published search index.
+     - F11 là authoritative default-list read path từ database. Khi không có search/filter, UI gọi F11. Khi có bất kỳ tiêu chí F12 nào, UI gọi OpenSearch-backed search endpoint; hai path trả cùng row DTO, page sizes và stable default order nhưng không fallback âm thầm giữa database và mutable/published search index.
      - OpenSearch lưu một document cho mỗi row `(termId, parentBusinessVersion, businessVersion)`, không dùng document đơn `termId` của index `glossaryTerm`. Consumer chỉ query consumer-safe published projection; authorization được áp dụng trước `total`, sort và pagination.
      - F11 có hiệu lực authoritative ngay sau workflow commit; F12 có eventual consistency. Sau mutation UI dùng response/F11 để hiển thị trạng thái và không coi search-index lag là mutation thất bại.
-   - **Tính năng Xuất dữ liệu (Export):** Khi người dùng bấm Export trong menu ba chấm `...`, file xuất ra sẽ phản ánh đúng các điều kiện lọc và tìm kiếm đang kích hoạt trên màn hình, đồng thời tuân thủ 100% phân quyền của người thực hiện xuất.
+   - **Tính năng Xuất dữ liệu (Export):** Khi người dùng bấm Export trong menu ba chấm `...`, hệ thống xuất toàn bộ CDE business-version rows mà người đó được phép xem trong đúng Data Dictionary version đang mở. Export không áp dụng từ khóa, bộ lọc hoặc trang hiện tại trên màn hình. File `.xlsx` dùng đúng các cột presentation của bảng CDE, không chứa field lưu trữ/kỹ thuật của OpenMetadata.
 
 #### Ví dụ minh họa cụ thể:
 Giả sử hai identity độc lập cùng có mã nghiệp vụ `CDE1`:
@@ -372,7 +372,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 | Tạo version kế tiếp | Hiển thị số nguyên `N+1` bắt buộc | Tạo Draft trắng; không đổi trạng thái bản active/CDE hiện tại và không kế thừa dữ liệu. |
 | Chọn version lịch sử | Với Data Dictionary, cập nhật `?businessVersion=...`; với CDE, bắt buộc cập nhật đầy đủ `?businessVersion=...&parentBusinessVersion=...`, loading riêng cho nội dung | Nạp dữ liệu snapshot theo đúng cặp version đã chọn, toàn bộ trường chỉ đọc (Read-only), ẩn các nút Thêm/Sửa. |
 | Import | Hiển thị bước validation trước khi ghi | Chỉ tạo/cập nhật Draft; không tự động Approved. |
-| Export | Bấm chọn Export trong menu dấu ba chấm (...) | Xuất toàn bộ dữ liệu CDE mà người dùng được phép xem theo quyền ra file. |
+| Export | Bấm chọn Export trong menu dấu ba chấm (...) | Gọi API cho đúng Data Dictionary version đang mở và tự tải file Excel `.xlsx` khi hoàn tất; không mở modal/job/progress, không yêu cầu bấm tải lần hai và không áp dụng search/filter/page hiện tại. |
 
 Các request mutation cần có optimistic locking. Nếu entity đã thay đổi từ lúc người dùng mở màn hình, UI hiển thị thông báo conflict và yêu cầu tải lại, không âm thầm ghi đè.
 
@@ -423,7 +423,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 | **Lưu nháp in-place (CDE)** | `PATCH /v1/glossaryTerms/{id}/working?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `updateGlossaryTermWorkingVersion(id, parentVersion, rev, data)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Chuyển trạng thái Workflow (CDE)** | `POST /v1/glossaryTerms/{id}/working/{action}?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `transitionGlossaryTermWorkflow(id, parentVersion, action, req)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Kiểm tra quyền phiên bản** | `GET /v1/glossaryTerms/{id}/permissions?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `getGlossaryTermVersionPermissions(id, parentVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
-| **Xuất dữ liệu CSV (Export)** | `GET /v1/glossaries/name/{fqn}/exportAsync` | `GlossaryResource.java` | `exportGlossaryInCSVFormat(glossaryName)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Xuất Data Dictionary version ra Excel** | `GET /v1/glossaryTerms/export?glossary={id}&parentBusinessVersion={N}` | `GlossaryTermResource.java` | `exportDataDictionaryVersion(glossaryId, parentVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 
 ---
 
@@ -480,9 +480,17 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Endpoint backend: `POST /v1/glossaries/{id}/working/reopen`
 
 #### 5. Xuất dữ liệu Từ điển (Export):
-* **Backend Endpoint:** `GET /v1/glossaries/name/{glossaryFqn}/exportAsync`
-* **Frontend Function:** `exportGlossaryInCSVFormat(glossaryFqn)`
+* **Backend Endpoint:** `GET /v1/glossaryTerms/export?glossary={glossaryId}&parentBusinessVersion={N}`. Không nhận search, filter, pagination hoặc danh sách cột từ client.
+* **Response:** Trả trực tiếp attachment `.xlsx` với content type và `Content-Disposition` đúng; không tạo export job, status/download API hoặc WebSocket flow.
+* **Frontend Function:** `exportDataDictionaryVersion(glossaryId, parentBusinessVersion)`
 * **Màn hình sử dụng:** Nút Export duy nhất trong menu ba chấm (`...`) trên Header Glossary.
+* **Scope và nguồn dữ liệu:** Export toàn bộ authorized rows của đúng `glossaryId + parentBusinessVersion` đang xem, không áp dụng search/filter/page hiện tại. Backend dùng F11 authoritative database read path và stable order; không dùng OpenSearch, native `GlossaryTerm` projection hoặc `GlossaryCsv`. Sau khi authorize, backend dùng một read-only consistent database snapshot cho mọi batch; mutation/cutover đồng thời không được làm file trộn dữ liệu từ hai thời điểm.
+* **Quyền:** Consumer-only chỉ export published `Approved` rows của active scope. Người có quyền working export published/working rows theo effective capability. Archived scope chỉ export theo frozen manifest cho actor có quyền history/audit. Scope không tồn tại hoặc không được phép xem trả `404`.
+* **Định dạng:** Backend đọc batch/keyset và ghi workbook bằng streaming API vào file tạm giới hạn trong thư mục temp chuyên biệt để không giữ toàn bộ dataset/workbook trong heap. Chỉ sau khi workbook đóng/validate thành công mới trả attachment; file tạm luôn cleanup khi thành công, client disconnect hoặc lỗi. Tên file `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`; một sheet tên `Data Dictionary v{N}`, freeze header, autofilter, wrap text và tự chia sheet khi vượt giới hạn dòng của Excel.
+* **Cột presentation theo đúng thứ tự bảng:** `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Trạng thái`, `Ngày hiệu lực`, `Ngày hết hiệu lực`.
+* **Không xuất field kỹ thuật:** Không có `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`. Reference/tag dùng display label; nhiều giá trị xuống dòng trong ô; Markdown chuyển thành text giữ line break; chất lượng dữ liệu hiển thị `Có/Không`; ngày và trạng thái theo presentation của UI; thiếu dữ liệu để ô trống.
+* **An toàn và vận hành:** Neutralize text có prefix công thức Excel (`=`, `+`, `-`, `@`, tab, CR/LF). Audit lưu actor, scope, thời điểm, kết quả và row count nhưng không lưu nội dung file.
+* **UX:** Giữ thao tác một lần bấm như hiện tại: chọn `Xuất Excel`, action loading/disabled trong lúc chờ và trình duyệt tự tải file khi response hoàn tất. Không mở modal, không hiển thị job/progress, không yêu cầu bấm tải lần hai; lỗi hiển thị toast và cho thử lại.
 
 ---
 
@@ -505,12 +513,11 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * *Người có quyền history/audit:* Nhận archived rows read-only đúng frozen scope.
   * Thiếu/sai canonical `parentBusinessVersion` trả `400`; scope không tồn tại hoặc không được xem trả `404` để không lộ dữ liệu.
 
-#### Tìm kiếm, lọc và custom sort CDE business-version (Mục 6.3):
+#### Tìm kiếm và lọc CDE business-version (Mục 6.3):
 * **Backend Endpoint:** `GET /v1/glossaryTerms/search`
 * **Nguồn dữ liệu:** OpenSearch alias `cdeBusinessVersion`; Consumer-only được backend route sang consumer-safe alias `cdeBusinessVersionPublished`. Database snapshot/working/manifest là source of truth và nguồn full reindex.
 * **Tham số bắt buộc:** `glossary`, canonical `parentBusinessVersion`, `limit`, `offset`.
-* **Criteria optional:** `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`. Filter đa chọn truyền UUID/FQN; không truyền display name. Nhiều giá trị trong cùng nhóm là OR, giữa các nhóm là AND.
-* **Sort allowlist:** `name`, `displayName`, `businessVersion`, `entityStatus` với `asc|desc`; luôn nối stable tie-breaker của default list. `businessVersion` dùng precomputed numeric `businessVersionSortKey`, không lexical sort hoặc JavaScript number.
+* **Criteria optional:** `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`. Filter đa chọn truyền UUID/FQN; không truyền display name. Nhiều giá trị trong cùng nhóm là OR, giữa các nhóm là AND.
 * **Search document:** Một document cho mỗi row key `(termId, parentBusinessVersion, businessVersion)`, chứa scope/status/record type, searchable business payload, filter IDs/FQNs, authorization projection và timestamp. Document id là encoding/hash ổn định của row key nên các version không ghi đè nhau.
 * **Authorization:** Backend authorize parent scope authoritative trước khi query; effective capability được đưa vào OpenSearch filter trước `total`, sort và pagination. Không page trước rồi post-filter quyền. Không dựng được filter quyền đầy đủ thì fail closed.
 * **Consistency:** F12 có eventual consistency và được cập nhật qua transactional outbox sau database commit, kèm retry, reconciliation và full reindex. Index failure không rollback workflow; UI sau mutation dùng response/F11 authoritative. Không fallback từ published alias sang mutable alias.

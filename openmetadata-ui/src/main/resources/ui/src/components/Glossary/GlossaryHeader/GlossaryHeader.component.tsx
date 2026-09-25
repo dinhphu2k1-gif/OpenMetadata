@@ -66,6 +66,7 @@ import {
   isDataQualityGlossary,
 } from '../../../constants/Glossary.contant';
 import {
+  exportDataDictionaryVersion,
   exportGlossaryInCSVFormat,
   createGlossaryTermWorkingVersion,
   getGlossariesById,
@@ -86,7 +87,6 @@ import {
 } from '../../../rest/glossaryAPI';
 import { API_RES_MAX_SIZE } from '../../../constants/constants';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
-import { exportCDEToExcel } from '../CDEImportExport/CDEImportExport.utils';
 import { exportDQToExcel } from '../DQImportExport/DQImportExport.utils';
 
 import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
@@ -381,18 +381,40 @@ const GlossaryHeader = ({
     );
   }, [isGlossary, selectedData]);
 
+  const [isExportingCDE, setIsExportingCDE] = useState(false);
+
   const handleCDEExportClick = useCallback(async () => {
+    if (isExportingCDE) {
+      return;
+    }
     try {
-      const { data } = await getGlossaryTerms({
-        glossary: selectedData.id,
-        limit: API_RES_MAX_SIZE,
-        fields: CDE_GLOSSARY_TERM_FIELDS,
-      });
-      exportCDEToExcel(data);
+      setIsExportingCDE(true);
+      const parentBusinessVersion = getBusinessVersion(
+        selectedData.businessVersion,
+        ''
+      );
+      if (!parentBusinessVersion) {
+        throw new Error('parentBusinessVersion is required for CDE export');
+      }
+      const { blob, fileName } = await exportDataDictionaryVersion(
+        selectedData.id,
+        parentBusinessVersion
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       showErrorToast(err as AxiosError);
+    } finally {
+      setIsExportingCDE(false);
     }
-  }, [selectedData.id]);
+  }, [isExportingCDE, selectedData.businessVersion, selectedData.id]);
 
   const handleDQExportClick = useCallback(async () => {
     try {
@@ -1105,6 +1127,7 @@ const GlossaryHeader = ({
               />
             ),
             key: 'export-button',
+            disabled: isCDEGlossary && isExportingCDE,
             onClick: (e) => {
               e.domEvent.stopPropagation();
               if (isDQGlossary) {
@@ -1270,6 +1293,15 @@ const GlossaryHeader = ({
         (item) => !immutableTermActionKeys.has(String(item?.key ?? '')),
       )
     : manageButtonContent;
+  const visibleManageButtonContent = isVersionView
+    ? isCDEGlossary
+      ? availableManageButtonContent.filter(
+          (item) => item?.key === 'export-button',
+        )
+      : []
+    : canRenderMutationActions
+      ? availableManageButtonContent
+      : [];
 
   const statusBadge = useMemo(() => {
     const entityStatus = glossaryTermStatus;
@@ -1632,14 +1664,12 @@ const GlossaryHeader = ({
                 </Tooltip>
               )}
 
-              {!isVersionView &&
-                canRenderMutationActions &&
-                availableManageButtonContent.length > 0 && (
+              {visibleManageButtonContent.length > 0 && (
                   <Dropdown
                     align={{ targetOffset: [-12, 0] }}
                     className="m-l-xs"
                     menu={{
-                      items: availableManageButtonContent,
+                      items: visibleManageButtonContent,
                     }}
                     open={showActions}
                     overlayClassName="glossary-manage-dropdown-list-container"

@@ -49,9 +49,13 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -93,6 +97,8 @@ import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.versioning.CdeBusinessVersionSearchService;
 import org.openmetadata.service.glossary.versioning.CdeBusinessVersionSearchService.Criteria;
+import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
+import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Candidates;
 import org.openmetadata.service.glossary.versioning.CdeFlatListService.Scope;
@@ -148,6 +154,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   // separators) well below Jetty's default 8 KB request-header limit
   // and matches the client's BATCH_SIZE in useOntologyExplorer.ts.
   private static final int MAX_BATCH_BY_IDS = 100;
+  private static final DateTimeFormatter CDE_EXPORT_TIMESTAMP =
+      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
 
   @Override
   public GlossaryTerm addHref(UriInfo uriInfo, GlossaryTerm term) {
@@ -164,6 +172,71 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   public GlossaryTermResource(Authorizer authorizer, Limits limits) {
     super(Entity.GLOSSARY_TERM, authorizer, limits);
+  }
+
+  @GET
+  @Path("/export")
+  @Produces(CdeExcelExporter.XLSX_MEDIA_TYPE)
+  @Operation(
+      operationId = "exportDataDictionaryVersion",
+      summary = "Export one Data Dictionary version as Excel")
+  public Response exportDataDictionaryVersion(
+      @Context SecurityContext securityContext,
+      @NotNull @QueryParam("glossary") UUID glossaryId,
+      @NotNull @QueryParam("parentBusinessVersion") String requestedParentBusinessVersion) {
+    AuthorizedFlatRows authorized =
+        loadAuthorizedCdeFlatRows(
+            securityContext,
+            glossaryId == null ? null : glossaryId.toString(),
+            requestedParentBusinessVersion);
+    ExportedWorkbook workbook = null;
+    try {
+      workbook = CdeExcelExporter.write(authorized.rows(), authorized.parentBusinessVersion());
+      java.nio.file.Path file = workbook.path();
+      file.toFile().deleteOnExit();
+      long contentLength = Files.size(file);
+      String filename =
+          "Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v"
+              + authorized.parentBusinessVersion()
+              + "_"
+              + LocalDateTime.now().format(CDE_EXPORT_TIMESTAMP)
+              + ".xlsx";
+      int rowCount = workbook.rowCount();
+      StreamingOutput stream =
+          output -> {
+            try {
+              Files.copy(file, output);
+            } finally {
+              Files.deleteIfExists(file);
+            }
+          };
+      LOG.info(
+          "CDE Excel export authorized actor={} glossaryId={} parentBusinessVersion={} rows={}",
+          securityContext.getUserPrincipal().getName(),
+          glossaryId,
+          authorized.parentBusinessVersion(),
+          rowCount);
+      return Response.ok(stream, CdeExcelExporter.XLSX_MEDIA_TYPE)
+          .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+          .header("Content-Length", contentLength)
+          .build();
+    } catch (IOException exception) {
+      if (workbook != null) {
+        try {
+          Files.deleteIfExists(workbook.path());
+        } catch (IOException cleanupException) {
+          exception.addSuppressed(cleanupException);
+        }
+      }
+      LOG.error(
+          "CDE Excel export failed actor={} glossaryId={} parentBusinessVersion={}",
+          securityContext.getUserPrincipal().getName(),
+          glossaryId,
+          requestedParentBusinessVersion,
+          exception);
+      throw new jakarta.ws.rs.InternalServerErrorException(
+          "Unable to export Data Dictionary", exception);
+    }
   }
 
   @GET
@@ -1593,9 +1666,6 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String requestedParentBusinessVersion,
       int limit,
       int offset) {
-    if (glossaryIdParam == null || glossaryIdParam.isBlank()) {
-      throw new BadRequestException("glossary is required for a Data Dictionary flat list");
-    }
     if (!List.of(10, 15, 25, 50).contains(limit)) {
       throw new BadRequestException("limit must be one of 10, 15, 25, or 50");
     }
@@ -1603,6 +1673,27 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       throw new BadRequestException("offset must be greater than or equal to 0");
     }
 
+    AuthorizedFlatRows authorized =
+        loadAuthorizedCdeFlatRows(
+            securityContext, glossaryIdParam, requestedParentBusinessVersion);
+    List<Map<String, Object>> visibleRows = authorized.rows();
+    int total = visibleRows.size();
+    int from = Math.min(offset, total);
+    int to = Math.min(from + limit, total);
+    return Map.of(
+        "data",
+        new ArrayList<>(visibleRows.subList(from, to)),
+        "paging",
+        Map.of("total", total, "limit", limit, "offset", offset));
+  }
+
+  private AuthorizedFlatRows loadAuthorizedCdeFlatRows(
+      SecurityContext securityContext,
+      String glossaryIdParam,
+      String requestedParentBusinessVersion) {
+    if (glossaryIdParam == null || glossaryIdParam.isBlank()) {
+      throw new BadRequestException("glossary is required for a Data Dictionary flat list");
+    }
     final String parentBusinessVersion;
     try {
       parentBusinessVersion =
@@ -1611,8 +1702,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       throw new BadRequestException(exception.getMessage());
     }
 
-    EntityReference glossaryReference = repository.getGlossary(glossaryIdParam);
-    DataDictionaryResolver.resolveDataDictionary(glossaryReference);
+    final EntityReference glossaryReference;
+    try {
+      glossaryReference = repository.getGlossary(glossaryIdParam);
+      DataDictionaryResolver.resolveDataDictionary(glossaryReference);
+    } catch (BadRequestException | EntityNotFoundException exception) {
+      throw new NotFoundException("Data Dictionary scope was not found");
+    }
     UUID glossaryId = glossaryReference.getId();
     Scope scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
     Glossary authorizationGlossary = JsonUtils.readValue(scope.payload(), Glossary.class);
@@ -1654,15 +1750,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
 
     visibleRows.sort(CDE_FLAT_ROW_COMPARATOR);
-    int total = visibleRows.size();
-    int from = Math.min(offset, total);
-    int to = Math.min(from + limit, total);
-    return Map.of(
-        "data",
-        new ArrayList<>(visibleRows.subList(from, to)),
-        "paging",
-        Map.of("total", total, "limit", limit, "offset", offset));
+    return new AuthorizedFlatRows(parentBusinessVersion, visibleRows);
   }
+
+  private record AuthorizedFlatRows(
+      String parentBusinessVersion, List<Map<String, Object>> rows) {}
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationGlossary(
       SecurityContext securityContext, Glossary glossary) {

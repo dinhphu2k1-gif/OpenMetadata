@@ -44,8 +44,8 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F09 | Workflow, active membership và cutover/archive Data Dictionary | F01, F05, F07 | Vòng đời Dictionary |
 | F10 | Tạo business version Data Dictionary kế tiếp | F09 | Nhiều version Dictionary |
 | F11 | Bảng flat mọi CDE business version trong một Dictionary scope | F02, F05, F06, F09, F10 | Tra cứu đầy đủ |
-| F12 | Search, filter và custom sort trên flat read model | F11 | Khai thác dữ liệu |
-| F13 | Export theo quyền và bộ lọc | F12 | Export |
+| F12 | Search và filter trên flat read model | F11 | Khai thác dữ liệu |
+| F13 | Export phiên bản Data Dictionary theo quyền | F11 | Export |
 | F14 | Import vào Draft | F03, F07 | Import |
 | F15 | CDE Overview và Assets | F02, F05 | Chi tiết CDE |
 | F16 | Archive/delete, audit và vận hành | F05, F09 | Production-ready |
@@ -71,8 +71,8 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 | F09 | §3; §4; §5.1 term revisions tự động; §6.2; §8; §9.3.4 |
 | F10 | §5.2 Data Dictionary version mới là bản trắng; §6.2; §8 |
 | F11 | §6.3 Flat List và quyền xem |
-| F12 | §6.3 Search, filters và custom sort |
-| F13 | §6.3 Export theo filter/quyền; §8 Export; §9.3.5 |
+| F12 | §6.3 Search và filters |
+| F13 | §6.3 Export toàn scope theo quyền; §8 Export; §9.3.5 |
 | F14 | §4.2–4.3 quyền Import; §6.2; §8 Import |
 | F15 | §7.1 Overview, custom properties và Assets; §9.5–9.6 |
 | F16 | §4.3 Delete/thu hồi; §6.2–7.1 action; §8 optimistic locking; §9.7 |
@@ -557,7 +557,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Row identity/key là `(termId, parentBusinessVersion, businessVersion)`; `entityStatus` không thuộc key vì working row có thể đổi trạng thái. Click row tạo URL scoped FQN có đủ `businessVersion` và `parentBusinessVersion`; detail/history backend cũng phải kiểm tra identity thuộc đúng parent scope và trả `404` khi không khớp.
 - Consumer-only chỉ nhận published `Approved` rows của Data Dictionary active. Consumer truy cập working hoặc archived scope nhận `404`. Manager nhận published và working rows đúng scope theo capability hiệu lực; actor có quyền history/audit nhận archived rows read-only. Không suy quyền từ tên role.
 - Thứ tự xử lý bắt buộc là validate/authorize parent scope → xác định các `termId` actor được xem → dựng flat rows → tính `total` → sort → pagination. Không lọc authorization sau khi đã cắt page. Default order ổn định là normalized `name ASC` → business version giảm dần theo từng đoạn số → `termId ASC` → `recordType ASC`.
-- F11 là authoritative default-list read path và luôn đọc database. F12 dùng OpenSearch projection theo từng CDE business-version row để thực hiện search, filters và custom sort. Hai chức năng dùng chung row DTO, authorization semantics, page-size allowlist và stable tie-breaker, nhưng không dùng chung persistence/query engine và không được fallback âm thầm giữa database với mutable search index.
+- F11 là authoritative default-list read path và luôn đọc database. F12 dùng OpenSearch projection theo từng CDE business-version row để thực hiện search và filters. Hai chức năng dùng chung row DTO, authorization semantics, page-size allowlist và stable default order, nhưng không dùng chung persistence/query engine và không được fallback âm thầm giữa database với mutable search index.
 - Frontend gọi đúng một flat-list request cho mỗi page và dùng `paging.total` từ backend; xóa luồng gọi history theo từng term, client-side expansion và client-side pagination của business-version rows. Khi đổi Dictionary scope hoặc có workflow mutation, reset trang đầu, xóa row scope cũ trong lúc loading và bỏ qua stale response.
 - Với dataset không đổi giữa hai request, stable order và tie-breaker bảo đảm pagination không trùng/mất row. Nếu dữ liệu thay đổi do workflow mutation trong lúc chuyển trang, frontend reload trang đầu từ representation authoritative.
 
@@ -572,46 +572,58 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Frontend component/API test chứng minh mỗi page chỉ dùng một flat-list request, row key/URL có đủ scope, loading/empty/error hoạt động, đổi scope reset page và response cũ trả chậm không ghi đè scope mới.
 - Regression test chứng minh Native/DQ Glossary và các caller legacy không truyền `parentBusinessVersion` giữ nguyên hành vi hiện hữu.
 
-### F12 — Search, filter và custom sort trên flat read model
+### F12 — Search và filter trên flat read model
 
 **Phạm vi**
 
-- F12 dùng `GET /v1/glossaryTerms/search` với `glossary`, canonical `parentBusinessVersion`, `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`, `limit` và `offset`. Khi có `parentBusinessVersion`, endpoint bắt buộc dùng CDE business-version OpenSearch projection; caller Native/DQ không có parent scope giữ nguyên behavior hiện hữu.
+- F12 dùng `GET /v1/glossaryTerms/search` với `glossary`, canonical `parentBusinessVersion`, `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `limit` và `offset`. Khi có `parentBusinessVersion`, endpoint bắt buộc dùng CDE business-version OpenSearch projection; caller Native/DQ không có parent scope giữ nguyên behavior hiện hữu.
 - F12 không query index `glossaryTerm` hiện hữu vì index đó có document identity là `termId` và chỉ biểu diễn một projection hiện tại. Tạo `cdeBusinessVersion` và consumer-safe `cdeBusinessVersionPublished` trong cùng search cluster. Mỗi row F11 là một document, có stable `rowKey = (termId, parentBusinessVersion, businessVersion)` và document id là encoding/hash ổn định của row key; các business version cùng `termId` không được ghi đè nhau.
 - Document tối thiểu gồm `rowKey`, `termId`, `glossaryId`, `parentBusinessVersion`, `businessVersion`, `businessVersionSortKey`, `recordType`, `scopeType`, `entityStatus`, `name`, `normalizedName`, `displayName`, `description`, `domainIds`, `ownerIds`, `reviewerIds`, tag FQN tách theo `DataSource`/`DataClassification`, authorization projection và các timestamp cần sort/audit. Filter dùng UUID/FQN ổn định, không dùng domain display name, owner name hoặc label có thể đổi/trùng.
 - Search `q` là text literal sau trim/Unicode normalization, tối đa 200 ký tự, tìm đồng thời `name OR displayName`; client không được truyền raw OpenSearch DSL hoặc wildcard expression. Mapping dùng analyzer/ngram phù hợp thay vì leading wildcard không được kiểm soát. Frontend debounce 500 ms và nút clear đưa bảng về F11 default list.
-- `statuses` hỗ trợ `Draft`, `In Review`, `Rejected`, `Approved`; `Archived` chỉ hợp lệ trong scope history/audit. Nhiều giá trị trong cùng một multi-select kết hợp `OR`; các nhóm search/status/domain/owner/tag kết hợp `AND`. Parameter rỗng sau trim được coi là absent; UUID/FQN/status/sort sai, CSV có phần tử rỗng hoặc vượt allowlist/giới hạn trả `400`.
-- `sortField` chỉ nhận allowlist ban đầu `name`, `displayName`, `businessVersion`, `entityStatus`; `sortOrder` chỉ nhận `asc|desc`. Indexer sinh `businessVersionSortKey` bằng cùng numeric-segment normalization của F11 để `1.10 > 1.9 > 1.2`. Mọi custom sort luôn nối default tie-breaker `normalizedName ASC → businessVersionSortKey DESC → termId ASC → recordType ASC`; null ordering được cố định và test trên cả hai database nguồn.
+- `statuses` hỗ trợ `Draft`, `In Review`, `Rejected`, `Approved`; `Archived` chỉ hợp lệ trong scope history/audit. Nhiều giá trị trong cùng một multi-select kết hợp `OR`; các nhóm search/status/domain/owner/tag kết hợp `AND`. Parameter rỗng sau trim được coi là absent; UUID/FQN/status sai, CSV có phần tử rỗng hoặc vượt allowlist/giới hạn trả `400`.
 - Thứ tự xử lý bắt buộc là validate request → resolve/authorize Dictionary scope authoritative từ database → dựng subject/effective-capability filter → query đúng OpenSearch alias → áp authorization/search/filters → tính `total` → stable sort → pagination. Không được page OpenSearch trước rồi lọc quyền trong application. Consumer-only luôn được route sang `cdeBusinessVersionPublished`, chỉ chứa published `Approved` rows của active Dictionary; gửi `Draft` hoặc `Rejected` không được mở rộng kết quả. Working/archived/unauthorized parent scope vẫn trả `404` như F11.
 - Authorization projection phải biểu diễn đủ user/team/role/policy/capability cần thiết để OpenSearch loại row trước `total` và pagination, hoặc backend phải thêm authoritative allowed-row-key restriction vào chính OpenSearch query. Nếu không dựng được filter quyền đầy đủ thì fail closed; tuyệt đối không trả unfiltered hits, total hoặc facet rồi mới loại row.
 - Database snapshot/working/manifest là source of truth và nguồn full reindex. Mọi create/update/submit/reject/reopen/approve/cutover/archive/delete phát transactional outbox sau commit để idempotently upsert/delete document. Index failure không rollback workflow transaction; retry queue, reconciliation và full reindex phải sửa được missing, stale và orphan documents. Cutover loại scope cũ khỏi published alias/index và đưa Approved rows của active scope mới vào consumer-safe projection.
 - F11 và F12 trả cùng row DTO `{ data, paging: { total, limit, offset } }`, cùng page sizes `10/15/25/50` và cùng stable default order. F11 authoritative ngay sau commit; F12 có eventual consistency. Sau mutation UI dùng response/F11 authoritative, không dùng việc OpenSearch chưa thấy row để kết luận mutation thất bại và không fallback từ published sang mutable index.
-- Frontend dùng F11 khi không có search/filter/custom sort; khi bất kỳ F12 criteria nào hoạt động thì gọi `/glossaryTerms/search`. Mọi thay đổi criteria hoặc page size reset `offset = 0`, xóa rows của request cũ trong lúc loading và dùng abort/request-generation token để response cũ không ghi đè state mới.
+- Frontend dùng F11 khi không có search/filter; khi bất kỳ F12 criteria nào hoạt động thì gọi `/glossaryTerms/search`. Mọi thay đổi criteria hoặc page size reset `offset = 0`, xóa rows của request cũ trong lúc loading và dùng abort/request-generation token để response cũ không ghi đè state mới.
 
 **Test/DoD**
 
 - Contract/validation test từng parameter, empty/duplicate/unknown/oversized values, từng filter và tổ hợp `OR` trong nhóm/`AND` giữa nhóm; search bao phủ name, displayName, null, Unicode tiếng Việt và ký tự wildcard được coi là literal.
 - Fixture cùng `termId A`, parent scope `1` có `1.0`, `1.1`, `1.2` tạo ba document/row độc lập; không document nào ghi đè document khác. Identity B cùng mã ở scope `2` không lọt vào query scope `1`.
 - Consumer được route vào published projection, gửi `Draft` hoặc `Draft,Approved` vẫn chỉ nhận Approved active rows; không lộ working/archived row qua data, `total`, sort hoặc facet. Manager/partial Manager/history actor chỉ nhận row theo effective capability và parent scope.
-- Sort test bao phủ mọi allowlist field/direction, null ordering, numeric version `1.11/1.10/1.9/1.2`, stable tie-breaker, page đầu/cuối/out-of-range và không trùng/mất row trên index generation cố định.
+- Pagination test bao phủ page đầu/cuối/out-of-range và không trùng/mất row trên index generation cố định theo stable default order.
 - Outbox test bao phủ create/update/status transition/approve/cutover/archive/delete, duplicate delivery, out-of-order retry, failure sau database commit và eventual recovery. Full reindex và incremental indexing phải tạo cùng document set; reconciliation phát hiện missing/stale/orphan rows.
 - F11-vs-F12 parity test trên cùng committed/indexed dataset chứng minh cùng authorization, row DTO, default order và total khi F12 không có content filter. Native/DQ Glossary cùng index `glossaryTerm` hiện hữu không hồi quy.
 - Frontend test chứng minh debounce 500 ms, reset trang khi criteria đổi, clear criteria quay lại F11, serialization UUID/FQN đúng, Consumer hard-lock Approved và response cũ trả chậm không ghi đè response mới.
 - Có query-count/performance test trên dataset business-version đủ lớn; authorization và hydration không N+1. Test riêng search-index lag chứng minh detail/workflow/F11 vẫn đúng và UI không báo mutation thất bại giả.
 
-### F13 — Export theo quyền và bộ lọc
+### F13 — Export phiên bản Data Dictionary theo quyền
 
 **Phạm vi**
 
-- Export dùng chung immutable filter/sort criteria và authorization semantics với F12. OpenSearch trả ordered authorized `rowKey`; backend bulk-hydrate payload authoritative từ database trước khi tạo file, không export trực tiếp `_source` và không N+1.
-- Async export lưu actor và filter trong audit.
-- Frontend gửi search/filter/sort context và hiển thị progress/error.
+- Export toàn bộ CDE business-version rows thuộc đúng Data Dictionary scope đang được xem, định danh bằng `glossaryId` và canonical `parentBusinessVersion`. Export không áp dụng từ khóa, bộ lọc, phân trang hoặc danh sách cột do client gửi; frontend chỉ gửi scope đang xem.
+- Backend resolve và authorize scope authoritative giống F11. Scope không tồn tại hoặc actor không có quyền xem trả `404`. Consumer-only chỉ export published `Approved` rows của Data Dictionary active; Consumer không được export working/archived scope. Người có quyền working export published và working rows đúng scope theo capability hiệu lực; người có quyền history/audit export archived rows thuộc frozen manifest.
+- Dữ liệu được đọc trực tiếp từ business snapshot/working stores và archive manifest giống F11, không dùng OpenSearch, native `GlossaryTerm` projection hoặc `GlossaryCsv`. Mỗi row `(termId, parentBusinessVersion, businessVersion)` là một dòng và dùng stable default order của F11. Backend đọc theo batch/keyset và bulk-hydrate, không N+1 hoặc giữ toàn bộ dataset trong heap.
+- API riêng là `GET /v1/glossaryTerms/export?glossary={glossaryId}&parentBusinessVersion={N}`; chỉ nhận đúng hai query parameter bắt buộc và từ chối search, filter, pagination hoặc danh sách cột. Response thành công trả trực tiếp file attachment với media type `.xlsx`; không tạo export job, không có status/download API và không dùng WebSocket.
+- File đầu ra là Excel `.xlsx`, tên `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`; một sheet tên `Data Dictionary v{N}`, freeze header, bật autofilter, wrap text và đặt độ rộng cột phù hợp. Nếu vượt giới hạn số dòng của một Excel sheet thì tự chia nhiều sheet và lặp lại header. Backend đọc dữ liệu theo batch/keyset và ghi workbook bằng streaming API vào file tạm giới hạn trong thư mục temp chuyên biệt, không giữ toàn bộ dataset/workbook trong heap. Chỉ sau khi workbook đóng và validate thành công mới trả attachment; file tạm luôn được xóa ở success, client disconnect và exception.
+- Excel chứa đúng các cột presentation đang hiển thị trên bảng CDE, theo thứ tự: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Trạng thái`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Không xuất field lưu trữ/kỹ thuật như `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`.
+- Giá trị trong Excel theo presentation semantics của UI: reference/tag dùng display label; nhiều giá trị xuống dòng trong cùng ô; Markdown chuyển thành text đọc được và giữ line break, không xuất HTML; quy định chất lượng hiển thị `Có/Không`; ngày dùng cùng format UI; trạng thái dùng nhãn nghiệp vụ; giá trị thiếu để ô trống, không ghi placeholder UI. Mọi text có thể bị Excel diễn giải thành công thức (`=`, `+`, `-`, `@`, tab, CR/LF prefix) phải được ghi an toàn dưới dạng text.
+- Backend authorize scope trước khi đọc và mở một read-only consistent database snapshot dùng chung cho mọi batch để workflow mutation/cutover đồng thời không làm file trộn hai thời điểm. Lỗi query/generate trước lúc trả attachment phải dừng export và xóa file tạm; không gửi header thành công hoặc file hợp lệ một phần.
+- UX giữ nguyên thao tác một lần bấm: người dùng chọn `Xuất Excel`, UI gọi API với Data Dictionary version đang xem và trình duyệt tải file khi response hoàn tất. Không mở modal, không hiển thị job/progress và không yêu cầu bấm nút tải lần hai; trong thời gian chờ chỉ disable action/hiển thị loading chống double-click, lỗi thì toast và cho phép thử lại.
+- Audit export tối thiểu actor ID, `glossaryId`, `parentBusinessVersion`, thời điểm, kết quả và số row; không ghi nội dung file vào audit.
 
 **Test/DoD**
 
-- List/export parity test cùng điều kiện.
-- Consumer export không chứa non-Approved.
-- Test CSV escaping, Unicode tiếng Việt và Markdown.
+- Contract test chứng minh request bắt buộc đúng `glossary` UUID và canonical `parentBusinessVersion`, từ chối search/filter/pagination/columns, và response thành công có đúng content type, `Content-Disposition` cùng filename `.xlsx`.
+- F11/export parity test chứng minh file chứa toàn bộ authorized rows của scope theo cùng stable order, không chỉ page đang hiển thị; mỗi CDE business version là một dòng, không trùng/mất dòng.
+- Test active, working và archived scope cho Consumer-only, working actor, partial Manager và history/audit actor; unauthorized/nonexistent scope trả `404`, Consumer không thể export working/archived và không bao giờ nhận non-Approved.
+- Test mutation/cutover giữa các batch chứng minh mọi dòng cùng một database snapshot; lỗi query/generate, client disconnect và download exception không làm lộ payload trái quyền, không tạo workbook được coi là hoàn chỉnh giả và luôn cleanup file tạm.
+- Test chính xác 15 header, thứ tự cột, filename `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`, sheet split/header repeat, Unicode tiếng Việt, nhiều reference/tag, Markdown đa dòng, ngày, `Có/Không`, status label, null/empty và không có field kỹ thuật.
+- Test chống Excel formula injection với `=`, `+`, `-`, `@`, tab và CR/LF prefix; workbook mở được bằng Excel/LibreOffice mà không thực thi dữ liệu như công thức.
+- Query-count/performance test trên dataset lớn chứng minh batch/keyset, không N+1, streaming workbook không giữ toàn bộ dataset trong heap và file tạm bị giới hạn/cleanup.
+- Frontend test chứng minh một click gọi đúng scope hiện tại, action loading/disabled khi chờ, response tự tải `.xlsx`, double-click không tạo request thứ hai và lỗi hiển thị toast; không mở modal/job/progress hoặc yêu cầu tải lần hai.
+- Regression test chứng minh Native/DQ Glossary và export CSV hiện hữu ngoài Data Dictionary không thay đổi hành vi.
 
 ### F14 — Import vào Draft
 
