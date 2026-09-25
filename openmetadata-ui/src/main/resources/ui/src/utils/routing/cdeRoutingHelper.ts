@@ -11,10 +11,7 @@
  *  limitations under the License.
  */
 
-import {
-  PLACEHOLDER_ROUTE_FQN,
-  ROUTES,
-} from '../../constants/constants';
+import { PLACEHOLDER_ROUTE_FQN, ROUTES } from '../../constants/constants';
 import { getEncodedFqn } from '../StringUtils';
 
 export const CDE_DETAIL_ROUTE_PATTERN = ROUTES.GLOSSARY_DETAILS;
@@ -24,6 +21,7 @@ export const CDE_DETAIL_RELATIVE_ROUTE_PATTERN =
 export const CDE_ROUTE_QUERY = {
   businessVersion: 'businessVersion',
   parentBusinessVersion: 'parentBusinessVersion',
+  termId: 'termId',
   view: 'view',
 } as const;
 
@@ -33,6 +31,7 @@ export interface CdeRouteParams {
   fqn: string;
   businessVersion: string;
   parentBusinessVersion: string;
+  termId?: string;
   isWorkingDraft?: boolean;
 }
 
@@ -47,6 +46,7 @@ export interface ParsedCdeRoute {
   fqn?: string;
   businessVersion?: string;
   parentBusinessVersion?: string;
+  termId?: string;
   isWorkingDraft: boolean;
   isValid: boolean;
   errors: string[];
@@ -100,6 +100,7 @@ export const getCdeDetailPath = ({
   fqn,
   businessVersion,
   parentBusinessVersion,
+  termId,
   isWorkingDraft = false,
 }: CdeRouteParams): string => {
   const normalizedFqn = nonEmpty(fqn);
@@ -124,10 +125,11 @@ export const getCdeDetailPath = ({
   );
   const search = new URLSearchParams();
   search.set(CDE_ROUTE_QUERY.businessVersion, normalizedBusinessVersion);
-  search.set(
-    CDE_ROUTE_QUERY.parentBusinessVersion,
-    normalizedParentVersion
-  );
+  search.set(CDE_ROUTE_QUERY.parentBusinessVersion, normalizedParentVersion);
+  const normalizedTermId = nonEmpty(termId);
+  if (normalizedTermId) {
+    search.set(CDE_ROUTE_QUERY.termId, normalizedTermId);
+  }
   if (isWorkingDraft) {
     search.set(CDE_ROUTE_QUERY.view, CDE_WORKING_VIEW);
   }
@@ -161,6 +163,7 @@ export const parseCdeRoute = ({
     searchParams.get(CDE_ROUTE_QUERY.parentBusinessVersion)
   );
   const view = nonEmpty(searchParams.get(CDE_ROUTE_QUERY.view));
+  const termId = nonEmpty(searchParams.get(CDE_ROUTE_QUERY.termId));
   const errors: string[] = [];
 
   if (!parsedFqn) {
@@ -180,6 +183,7 @@ export const parseCdeRoute = ({
     fqn: parsedFqn,
     businessVersion,
     parentBusinessVersion,
+    termId,
     isWorkingDraft: view === CDE_WORKING_VIEW,
     isValid: errors.length === 0,
     errors,

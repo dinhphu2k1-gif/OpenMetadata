@@ -449,8 +449,13 @@ const GlossaryHeader = ({
     hasEditDisplayNamePermission &&
     canManageBusinessContent &&
     (!isCDEGlossaryTerm || selectedData.workingRevision != null);
-  const canImportCDE = importExportPermissions && canManageBusinessContent;
-  const canImportDQ = importExportPermissions && canManageBusinessContent;
+  const canImportCustomGlossary =
+    canRenderMutationActions &&
+    !isVersionView &&
+    glossaryTermStatus !== EntityStatus.Archived &&
+    Boolean(workflowPermissions?.canEditWorking);
+  const canImportCDE = canImportCustomGlossary;
+  const canImportDQ = canImportCustomGlossary;
 
   const businessVersion = useMemo(() => {
     if (!isCustomManagedTerm && !isCustomManagedGlossary) {

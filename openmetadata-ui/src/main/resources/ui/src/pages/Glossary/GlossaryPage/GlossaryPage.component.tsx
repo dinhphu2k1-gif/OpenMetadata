@@ -64,6 +64,7 @@ import {
   getGlossaryWorkingVersion,
   getPublishedGlossaryTerm,
   getGlossaryTermByFQN,
+  getGlossaryTermsById,
   getGlossaryTermWorkingVersion,
   updateGlossaryTermWorkingVersion,
   updateGlossaryWorkingVersion,
@@ -80,7 +81,10 @@ import { checkPermission } from '../../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
-import { parseCdeRoute } from '../../../utils/routing/cdeRoutingHelper';
+import {
+  getCdeDetailPath,
+  parseCdeRoute,
+} from '../../../utils/routing/cdeRoutingHelper';
 import GlossaryLeftPanel from '../GlossaryLeftPanel/GlossaryLeftPanel.component';
 
 const GlossaryPage = () => {
@@ -101,7 +105,7 @@ const GlossaryPage = () => {
       }),
     [glossaryFqn, location.pathname, location.search]
   );
-  const { businessVersion, parentBusinessVersion } = cdeRoute;
+  const { businessVersion, parentBusinessVersion, termId } = cdeRoute;
   const [isGlossaryHistorical, setIsGlossaryHistorical] = useState(false);
   const [isTermHistorical, setIsTermHistorical] = useState(false);
 
@@ -269,25 +273,67 @@ const GlossaryPage = () => {
   const fetchGlossaryTermDetails = useCallback(async () => {
     setIsRightPanelLoading(true);
     if (!businessVersion || !parentBusinessVersion) {
+      // Explore's legacy glossary index can return the scoped CDE FQN without
+      // the F12 route metadata. Resolve that stable identity once and replace
+      // the incomplete URL with the canonical versioned CDE URL.
+      const scopedParentVersion = glossaryFqn.match(/@v([1-9]\d*)$/)?.[1];
+      if (scopedParentVersion) {
+        try {
+          const current = await getGlossaryTermByFQN(glossaryFqn);
+          if (current.businessVersion && current.parentBusinessVersion) {
+            navigate(
+              getCdeDetailPath({
+                fqn: current.fullyQualifiedName ?? glossaryFqn,
+                businessVersion: current.businessVersion,
+                parentBusinessVersion: current.parentBusinessVersion,
+                termId: current.id,
+                isWorkingDraft: current.entityStatus !== EntityStatus.Approved,
+              }),
+              { replace: true }
+            );
+
+            return;
+          }
+        } catch (error) {
+          const status = (error as AxiosError)?.response?.status;
+          navigate(
+            status === ClientErrors.FORBIDDEN
+              ? ROUTES.FORBIDDEN
+              : ROUTES.NOT_FOUND,
+            { replace: true }
+          );
+
+          return;
+        } finally {
+          setIsRightPanelLoading(false);
+        }
+      }
+
       navigate(ROUTES.NOT_FOUND, { replace: true });
       setIsRightPanelLoading(false);
 
       return;
     }
     try {
-      const current = await getGlossaryTermByFQN(glossaryFqn, {
-        fields: [
-          TabSpecificField.RELATED_TERMS,
-          TabSpecificField.REVIEWERS,
-          TabSpecificField.TAGS,
-          TabSpecificField.OWNERS,
-          TabSpecificField.CHILDREN,
-          TabSpecificField.VOTES,
-          TabSpecificField.DOMAINS,
-          TabSpecificField.EXTENSION,
-          TabSpecificField.CHILDREN_COUNT,
-        ],
-      });
+      const termFields = [
+        TabSpecificField.RELATED_TERMS,
+        TabSpecificField.REVIEWERS,
+        TabSpecificField.TAGS,
+        TabSpecificField.OWNERS,
+        TabSpecificField.CHILDREN,
+        TabSpecificField.VOTES,
+        TabSpecificField.DOMAINS,
+        TabSpecificField.EXTENSION,
+        TabSpecificField.CHILDREN_COUNT,
+      ];
+      // Search results already carry the stable term id. Prefer it because a
+      // working CDE may be visible in the search index before the generic FQN
+      // endpoint can resolve that working identity for the current user.
+      const current = termId
+        ? await getGlossaryTermsById(termId, { fields: termFields })
+        : await getGlossaryTermByFQN(glossaryFqn, {
+            fields: termFields,
+          });
 
       const parentGlossaryId = current.glossary?.id;
       if (!parentGlossaryId) {
@@ -395,7 +441,7 @@ const GlossaryPage = () => {
     } finally {
       setIsRightPanelLoading(false);
     }
-  }, [businessVersion, glossaryFqn, parentBusinessVersion, glossaries]);
+  }, [businessVersion, glossaryFqn, parentBusinessVersion, termId, glossaries]);
 
   useEffect(() => {
     setIsRightPanelLoading(true);

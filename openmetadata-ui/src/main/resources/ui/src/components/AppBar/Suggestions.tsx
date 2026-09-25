@@ -26,6 +26,7 @@ import {
 } from '../../context/GlobalSearchProvider/GlobalSearchSuggestions/GlobalSearchSuggestions.interface';
 import { useTourProvider } from '../../context/TourProvider/TourProvider';
 import { EntityType } from '../../enums/entity.enum';
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import { SearchIndex } from '../../enums/search.enum';
 import { useApplicationStore } from '../../hooks/useApplicationStore';
 import { searchQuery } from '../../rest/searchAPI';
@@ -342,7 +343,10 @@ const Suggestions = ({
             (hit) =>
               hit._source?.entityType !== EntityType.TAG &&
               hit._source?.entityType !== EntityType.METRIC &&
-              hit._source?.entityType !== EntityType.CLASSIFICATION
+              hit._source?.entityType !== EntityType.CLASSIFICATION &&
+              (hit._source?.entityType !== EntityType.GLOSSARY_TERM ||
+                (hit._source as { entityStatus?: EntityStatus })
+                  .entityStatus === EntityStatus.Approved)
           )
         : rawHits;
 

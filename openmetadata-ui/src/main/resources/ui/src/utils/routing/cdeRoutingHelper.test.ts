@@ -33,10 +33,11 @@ describe('cdeRoutingHelper', () => {
         fqn: 'Data Dictionary.alo1@v2',
         businessVersion: '2.0',
         parentBusinessVersion: '2',
+        termId: 'term-123',
         isWorkingDraft: true,
       })
     ).toBe(
-      '/glossary/Data%20Dictionary.alo1%40v2?businessVersion=2.0&parentBusinessVersion=2&view=working'
+      '/glossary/Data%20Dictionary.alo1%40v2?businessVersion=2.0&parentBusinessVersion=2&termId=term-123&view=working'
     );
   });
 
@@ -44,13 +45,13 @@ describe('cdeRoutingHelper', () => {
     expect(
       parseCdeRoute({
         pathname: '/glossary/Data%20Dictionary.alo1',
-        search:
-          '?businessVersion=1.1&parentBusinessVersion=2.0&view=working',
+        search: '?businessVersion=1.1&parentBusinessVersion=2.0&view=working',
       })
     ).toEqual({
       fqn: 'Data Dictionary.alo1',
       businessVersion: '1.1',
       parentBusinessVersion: '2',
+      termId: undefined,
       isWorkingDraft: true,
       isValid: true,
       errors: [],
