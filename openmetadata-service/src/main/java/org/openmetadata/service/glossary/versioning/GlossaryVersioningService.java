@@ -740,28 +740,6 @@ public class GlossaryVersioningService {
         .getSearchClient()
         .createEntity(indexName, entityId.toString(), JsonUtils.pojoToJson(document));
 
-    if (GLOSSARY_TERM.equals(entityType)) {
-      for (PublishedSnapshotRecord snapshot : dao.listPublished(entityType, entityId)) {
-        CdeBusinessVersionIndexDocument.IndexedDocument indexed =
-            CdeBusinessVersionIndexDocument.published(snapshot);
-        searchRepository
-            .getSearchClient()
-            .createEntity(
-                searchRepository.getIndexOrAliasName(CdeBusinessVersionSearchService.MUTABLE_ALIAS),
-                indexed.id(),
-                JsonUtils.pojoToJson(indexed.source()));
-        // This alias is consumer-safe because it contains immutable published snapshots only.
-        // Archived rows remain searchable for the frozen historical Data Dictionary scope;
-        // callers must constrain every query by parentBusinessVersion and scopeType.
-        searchRepository
-            .getSearchClient()
-            .createEntity(
-                searchRepository.getIndexOrAliasName(
-                    CdeBusinessVersionSearchService.PUBLISHED_ALIAS),
-                indexed.id(),
-                JsonUtils.pojoToJson(indexed.source()));
-      }
-    }
   }
 
   private void refreshManagerIndexSafely(String entityType, UUID entityId) {
@@ -793,16 +771,6 @@ public class GlossaryVersioningService {
       searchRepository
           .getSearchClient()
           .createEntity(indexName, entityId.toString(), JsonUtils.pojoToJson(document));
-      if (GLOSSARY_TERM.equals(entityType) && working != null) {
-        CdeBusinessVersionIndexDocument.IndexedDocument indexed =
-            CdeBusinessVersionIndexDocument.working(working);
-        searchRepository
-            .getSearchClient()
-            .createEntity(
-                searchRepository.getIndexOrAliasName(CdeBusinessVersionSearchService.MUTABLE_ALIAS),
-                indexed.id(),
-                JsonUtils.pojoToJson(indexed.source()));
-      }
     } catch (Exception exception) {
       LOG.warn(
           "Failed to refresh manager glossary index for {} {}", entityType, entityId, exception);

@@ -1266,9 +1266,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               ownerIds: withoutAll(selectedCdeOwners).join(',') || undefined,
               dataSourceTags:
                 withoutAll(selectedCdeDataSources).join(',') || undefined,
-            classificationTags:
+              classificationTags:
                 withoutAll(selectedCdeClassifications).join(',') || undefined,
-            limit: pageSize,
+              limit: pageSize,
               offset: (currentPage - 1) * pageSize,
             })
           : await getGlossaryTerms({

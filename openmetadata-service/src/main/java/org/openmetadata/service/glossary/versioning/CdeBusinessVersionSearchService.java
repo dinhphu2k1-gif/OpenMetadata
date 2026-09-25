@@ -6,76 +6,46 @@
 package org.openmetadata.service.glossary.versioning;
 
 import jakarta.ws.rs.BadRequestException;
-import jakarta.ws.rs.ServiceUnavailableException;
-import java.io.IOException;
+import java.math.BigInteger;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.openmetadata.schema.utils.JsonUtils;
-import org.openmetadata.service.Entity;
-import org.openmetadata.service.search.SearchResultListMapper;
-import org.openmetadata.service.search.SearchSortFilter;
-import org.openmetadata.service.security.policyevaluator.SubjectContext;
 
-/** OpenSearch query boundary for the CDE business-version projection. */
+/** Search and filter boundary over the authoritative database-backed CDE flat read model. */
 public class CdeBusinessVersionSearchService {
-  public static final String MUTABLE_ALIAS = "cdeBusinessVersion";
-  public static final String PUBLISHED_ALIAS = "cdeBusinessVersionPublished";
   private static final Set<Integer> PAGE_SIZES = Set.of(10, 15, 25, 50);
   private static final Set<String> STATUSES =
       Set.of("Draft", "In Review", "Rejected", "Approved", "Archived");
-  private static final Map<String, String> SORT_FIELDS =
-      Map.of(
-          "name", "cdeSort.normalizedName",
-          "displayName", "cdeSort.displayName",
-          "businessVersion", "cdeSort.businessVersion",
-          "entityStatus", "cdeSort.entityStatus");
+  private static final Set<String> SORT_FIELDS =
+      Set.of("name", "displayName", "businessVersion", "entityStatus");
   private static final int MAX_QUERY_LENGTH = 200;
   private static final int MAX_FILTER_VALUES = 50;
 
   public Map<String, Object> search(
       Criteria criteria,
-      SubjectContext subject,
+      List<Map<String, Object>> authorizedDatabaseRows,
       boolean consumerOnly,
-      boolean archivedScope,
-      boolean workingScope) {
+      boolean archivedScope) {
     Criteria validated = validate(criteria, consumerOnly, archivedScope);
-    String alias = consumerOnly ? PUBLISHED_ALIAS : MUTABLE_ALIAS;
-    String index = Entity.getSearchRepository().getIndexOrAliasName(alias);
-    String filter = buildFilter(validated, consumerOnly, archivedScope, workingScope);
-    String query = buildLiteralTextQuery(validated.q());
-    SearchSortFilter sort =
-        new SearchSortFilter(
-            resolveSortField(validated.sortField()),
-            validated.sortOrder() == null ? "asc" : validated.sortOrder(),
-            null,
-            null);
-    try {
-      SearchResultListMapper result =
-          Entity.getSearchRepository()
-              .getSearchClient()
-              .listWithOffset(
-                  filter, validated.limit(), validated.offset(), index, sort, null, query, subject);
-      return Map.of(
-          "data",
-          result.getResults(),
-          "paging",
-          Map.of(
-              "total", result.getTotal(),
-              "limit", validated.limit(),
-              "offset", validated.offset()));
-    } catch (IOException exception) {
-      throw new ServiceUnavailableException("CDE business-version search is unavailable", 1L);
-    }
-  }
-
-  static String resolveSortField(String sortField) {
-    return sortField == null ? "cdeSort.normalizedName" : SORT_FIELDS.get(sortField);
+    List<Map<String, Object>> filtered =
+        authorizedDatabaseRows.stream()
+            .filter(row -> matches(row, validated))
+            .sorted(comparator(validated))
+            .toList();
+    int total = filtered.size();
+    int from = Math.min(validated.offset(), total);
+    int to = Math.min(from + validated.limit(), total);
+    return Map.of(
+        "data",
+        new ArrayList<>(filtered.subList(from, to)),
+        "paging",
+        Map.of("total", total, "limit", validated.limit(), "offset", validated.offset()));
   }
 
   public static Criteria validate(Criteria criteria, boolean consumerOnly) {
@@ -108,7 +78,7 @@ public class CdeBusinessVersionSearchService {
     if (q != null && q.codePointCount(0, q.length()) > MAX_QUERY_LENGTH) {
       throw new BadRequestException("q must not exceed 200 characters");
     }
-    List<String> statuses = parseCsv(criteria.statuses(), "statuses");
+    List<String> statuses = parseValues(criteria.statuses(), "statuses");
     if (!STATUSES.containsAll(statuses)) {
       throw new BadRequestException("statuses contains an unsupported value");
     }
@@ -122,7 +92,7 @@ public class CdeBusinessVersionSearchService {
         parseFqns(criteria.classificationTags(), "classificationTags");
     String sortField = normalizeOptional(criteria.sortField());
     String sortOrder = normalizeOptional(criteria.sortOrder());
-    if (sortField != null && !SORT_FIELDS.containsKey(sortField)) {
+    if (sortField != null && !SORT_FIELDS.contains(sortField)) {
       throw new BadRequestException("sortField contains an unsupported value");
     }
     if (sortOrder != null && !Set.of("asc", "desc").contains(sortOrder)) {
@@ -146,70 +116,89 @@ public class CdeBusinessVersionSearchService {
         criteria.offset());
   }
 
-  static String buildFilter(Criteria criteria, boolean consumerOnly) {
-    return buildFilter(criteria, consumerOnly, false);
-  }
-
-  static String buildFilter(Criteria criteria, boolean consumerOnly, boolean archivedScope) {
-    return buildFilter(criteria, consumerOnly, archivedScope, false);
-  }
-
-  static String buildFilter(
-      Criteria criteria, boolean consumerOnly, boolean archivedScope, boolean workingScope) {
-    List<Map<String, Object>> filters = new ArrayList<>();
-    addTerm(filters, "glossaryId", criteria.glossaryId().toString());
-    addTerm(filters, "parentBusinessVersion", criteria.parentBusinessVersion());
-    addTerms(
-        filters,
-        "scopeType",
-        archivedScope
-            ? List.of("archived")
-            : workingScope ? List.of("active", "working") : List.of("active"));
-    addTerms(
-        filters,
-        "entityStatus",
-        consumerOnly
-            ? List.of(archivedScope ? "Archived" : "Approved")
-            : criteria.statuses());
-    addTerms(filters, "domainIds", criteria.domainIds());
-    addTerms(filters, "ownerIds", criteria.ownerIds());
-    addTerms(filters, "dataSourceTags", criteria.dataSourceTags());
-    addTerms(filters, "classificationTags", criteria.classificationTags());
-    Map<String, Object> bool = new LinkedHashMap<>();
-    bool.put("filter", filters);
-    return JsonUtils.pojoToJson(Map.of("query", Map.of("bool", bool)));
-  }
-
-  static String buildLiteralTextQuery(String q) {
-    if (q == null) {
-      return null;
+  private static boolean matches(Map<String, Object> row, Criteria criteria) {
+    if (!criteria.statuses().isEmpty()
+        && !criteria.statuses().contains(String.valueOf(row.get("entityStatus")))) {
+      return false;
     }
-    return JsonUtils.pojoToJson(
-        Map.of(
-            "bool",
-            Map.of(
-                "must",
-                List.of(
-                    Map.of(
-                        "multi_match",
-                        Map.of(
-                            "query",
-                            q,
-                            "fields",
-                            List.of("name", "displayName"),
-                            "operator",
-                            "and"))))));
-  }
-
-  private static void addTerm(List<Map<String, Object>> filters, String field, String value) {
-    filters.add(Map.of("term", Map.of(field, value)));
-  }
-
-  private static void addTerms(
-      List<Map<String, Object>> filters, String field, List<String> values) {
-    if (!values.isEmpty()) {
-      filters.add(Map.of("terms", Map.of(field, values)));
+    if (criteria.q() != null) {
+      String needle = searchable(criteria.q());
+      if (!searchable(row.get("name")).contains(needle)
+          && !searchable(row.get("displayName")).contains(needle)) {
+        return false;
+      }
     }
+    return matchesReferences(row.get("domains"), criteria.domainIds(), "id")
+        && matchesReferences(row.get("owners"), criteria.ownerIds(), "id")
+        && matchesReferences(row.get("tags"), criteria.dataSourceTags(), "tagFQN")
+        && matchesReferences(row.get("tags"), criteria.classificationTags(), "tagFQN");
+  }
+
+  private static boolean matchesReferences(Object raw, List<String> requested, String key) {
+    if (requested.isEmpty()) {
+      return true;
+    }
+    if (!(raw instanceof List<?> values)) {
+      return false;
+    }
+    Set<String> actual = new LinkedHashSet<>();
+    for (Object value : values) {
+      if (value instanceof Map<?, ?> reference && reference.get(key) != null) {
+        actual.add(String.valueOf(reference.get(key)));
+      }
+    }
+    return requested.stream().anyMatch(actual::contains);
+  }
+
+  private static Comparator<Map<String, Object>> comparator(Criteria criteria) {
+    Comparator<Map<String, Object>> primary =
+        switch (criteria.sortField() == null ? "name" : criteria.sortField()) {
+          case "displayName" -> Comparator.comparing(row -> searchable(row.get("displayName")));
+          case "entityStatus" -> Comparator.comparing(row -> searchable(row.get("entityStatus")));
+          case "businessVersion" ->
+              (left, right) ->
+                  compareNumericVersion(
+                      String.valueOf(left.get("businessVersion")),
+                      String.valueOf(right.get("businessVersion")));
+          default -> Comparator.comparing(row -> searchable(row.get("name")));
+        };
+    if (criteria.sortField() == null) {
+      primary =
+          primary.thenComparing(
+              (left, right) ->
+                  compareNumericVersion(
+                      String.valueOf(right.get("businessVersion")),
+                      String.valueOf(left.get("businessVersion"))));
+    } else if ("desc".equals(criteria.sortOrder())) {
+      primary = primary.reversed();
+    }
+    return primary
+        .thenComparing(row -> String.valueOf(row.get("termId")))
+        .thenComparing(row -> String.valueOf(row.get("recordType")));
+  }
+
+  private static int compareNumericVersion(String left, String right) {
+    String[] leftParts = left.split("\\.");
+    String[] rightParts = right.split("\\.");
+    int length = Math.max(leftParts.length, rightParts.length);
+    for (int index = 0; index < length; index++) {
+      BigInteger leftPart =
+          index < leftParts.length ? new BigInteger(leftParts[index]) : BigInteger.ZERO;
+      BigInteger rightPart =
+          index < rightParts.length ? new BigInteger(rightParts[index]) : BigInteger.ZERO;
+      int compared = leftPart.compareTo(rightPart);
+      if (compared != 0) {
+        return compared;
+      }
+    }
+    return 0;
+  }
+
+  public static List<String> splitCsvParameter(String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return List.of();
+    }
+    return List.of(value.split(",", -1));
   }
 
   private static List<String> parseUuids(List<String> values, String field) {
@@ -230,17 +219,6 @@ public class CdeBusinessVersionSearchService {
       throw new BadRequestException(field + " contains an invalid FQN");
     }
     return parsed;
-  }
-
-  private static List<String> parseCsv(List<String> values, String field) {
-    return parseValues(values, field);
-  }
-
-  public static List<String> splitCsvParameter(String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return List.of();
-    }
-    return List.of(value.split(",", -1));
   }
 
   private static List<String> parseValues(List<String> values, String field) {
@@ -268,6 +246,12 @@ public class CdeBusinessVersionSearchService {
       return null;
     }
     return Normalizer.normalize(value.trim(), Normalizer.Form.NFC);
+  }
+
+  private static String searchable(Object value) {
+    return Normalizer.normalize(
+            value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
+        .toLowerCase(Locale.ROOT);
   }
 
   public record Criteria(

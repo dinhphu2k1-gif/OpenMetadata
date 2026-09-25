@@ -122,7 +122,6 @@ import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
 import org.openmetadata.service.security.Authorizer;
-import org.openmetadata.service.security.DefaultAuthorizer;
 import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
@@ -1165,49 +1164,33 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       int limit,
       int offset) {
     Criteria criteria =
+        new Criteria(
+            glossaryId,
+            parentBusinessVersion,
+            query,
+            CdeBusinessVersionSearchService.splitCsvParameter(statuses),
+            CdeBusinessVersionSearchService.splitCsvParameter(domainIds),
+            CdeBusinessVersionSearchService.splitCsvParameter(ownerIds),
+            CdeBusinessVersionSearchService.splitCsvParameter(dataSourceTags),
+            CdeBusinessVersionSearchService.splitCsvParameter(classificationTags),
+            sortField,
+            sortOrder,
+            limit,
+            offset);
+    AuthorizedFlatRows authorized =
+        loadAuthorizedCdeFlatRows(securityContext, glossaryId.toString(), parentBusinessVersion);
+    Criteria validated =
         CdeBusinessVersionSearchService.validate(
-            new Criteria(
-                glossaryId,
-                parentBusinessVersion,
-                query,
-                CdeBusinessVersionSearchService.splitCsvParameter(statuses),
-                CdeBusinessVersionSearchService.splitCsvParameter(domainIds),
-                CdeBusinessVersionSearchService.splitCsvParameter(ownerIds),
-                CdeBusinessVersionSearchService.splitCsvParameter(dataSourceTags),
-                CdeBusinessVersionSearchService.splitCsvParameter(classificationTags),
-                sortField,
-                sortOrder,
-                limit,
-                offset),
-            false);
-    EntityReference glossaryReference = repository.getGlossary(glossaryId.toString());
-    DataDictionaryResolver.resolveDataDictionary(glossaryReference);
-    Scope scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
-    Glossary glossary = JsonUtils.readValue(scope.payload(), Glossary.class);
-    GlossaryAuthorizationResolver.Capabilities capabilities =
-        capabilitiesForAuthorizationGlossary(securityContext, glossary);
-    boolean consumerOnly =
-        GlossaryAuthorizationResolver.isConsumerOnly(
-            DefaultAuthorizer.getSubjectContext(securityContext));
-    if ((scope.type() == ScopeType.ACTIVE
-            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC))
-        || (scope.type() == ScopeType.WORKING && (consumerOnly || !capabilities.canViewWorking()))
-        || (scope.type() == ScopeType.ARCHIVED
-            && !policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_BASIC)
-            && !capabilities.canViewWorking()
-            && !capabilities.canArchive())) {
-      throw new NotFoundException("Data Dictionary scope was not found");
-    }
-    if (scope.type() != ScopeType.ARCHIVED && criteria.statuses().contains("Archived")) {
+            criteria, authorized.consumerOnly(), authorized.scopeType() == ScopeType.ARCHIVED);
+    if (authorized.scopeType() != ScopeType.ARCHIVED
+        && validated.statuses().contains("Archived")) {
       throw new BadRequestException("Archived status is only valid for an archived scope");
     }
-    versioningService.processPendingOutbox();
     return cdeSearchService.search(
-        criteria,
-        DefaultAuthorizer.getSubjectContext(securityContext),
-        consumerOnly,
-        scope.type() == ScopeType.ARCHIVED,
-        scope.type() == ScopeType.WORKING);
+        validated,
+        authorized.rows(),
+        authorized.consumerOnly(),
+        authorized.scopeType() == ScopeType.ARCHIVED);
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
@@ -1837,12 +1820,16 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     UUID glossaryId = glossaryReference.getId();
     Scope scope = cdeFlatListService.resolveScope(glossaryId, parentBusinessVersion);
     Glossary authorizationGlossary = JsonUtils.readValue(scope.payload(), Glossary.class);
+    boolean consumerOnly =
+        GlossaryAuthorizationResolver.isConsumerOnly(
+            org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext(securityContext));
     GlossaryAuthorizationResolver.Capabilities parentCapabilities =
         capabilitiesForAuthorizationGlossary(securityContext, authorizationGlossary);
     if ((scope.type() == ScopeType.ACTIVE
             && !policyAllowsGlossary(
                 securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC))
-        || (scope.type() == ScopeType.WORKING && !parentCapabilities.canViewWorking())
+        || (scope.type() == ScopeType.WORKING
+            && (consumerOnly || !parentCapabilities.canViewWorking()))
         || (scope.type() == ScopeType.ARCHIVED
             && !policyAllowsGlossary(
                 securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC)
@@ -1877,11 +1864,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
 
     visibleRows.sort(CDE_FLAT_ROW_COMPARATOR);
-    return new AuthorizedFlatRows(parentBusinessVersion, visibleRows);
+    return new AuthorizedFlatRows(
+        parentBusinessVersion, scope.type(), consumerOnly, visibleRows);
   }
 
   private record AuthorizedFlatRows(
-      String parentBusinessVersion, List<Map<String, Object>> rows) {}
+      String parentBusinessVersion,
+      ScopeType scopeType,
+      boolean consumerOnly,
+      List<Map<String, Object>> rows) {}
 
   private ImportScope authorizeImportScope(
       SecurityContext securityContext, UUID glossaryId, String requestedParentBusinessVersion) {

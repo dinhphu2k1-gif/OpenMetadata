@@ -339,20 +339,6 @@
     ],
     "childAliases": []
   },
-  "cdeBusinessVersion": {
-    "indexName": "cde_business_version_search_index",
-    "indexMappingFile": "/elasticsearch/%s/cde_business_version_index_mapping.json",
-    "alias": "cdeBusinessVersion",
-    "parentAliases": [],
-    "childAliases": []
-  },
-  "cdeBusinessVersionPublished": {
-    "indexName": "cde_business_version_published_search_index",
-    "indexMappingFile": "/elasticsearch/%s/cde_business_version_index_mapping.json",
-    "alias": "cdeBusinessVersionPublished",
-    "parentAliases": [],
-    "childAliases": []
-  },
   "tag": {
     "indexName": "tag_search_index",
     "indexMappingFile": "/elasticsearch/%s/tag_index_mapping.json",
