@@ -55,7 +55,10 @@ import '../../components/UploadFile/upload-file.less';
 import { VALIDATION_STEP } from '../../constants/BulkImport.constant';
 import { Tag as ClassificationTag } from '../../generated/entity/classification/tag';
 import { Glossary } from '../../generated/entity/data/glossary';
-import { EntityStatus, GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../generated/entity/data/glossaryTerm';
 import { CSVImportResult, Status } from '../../generated/type/csvImportResult';
 import { useFqn } from '../../hooks/useFqn';
 import { useGridEditController } from '../../hooks/useGridEditController';
@@ -63,7 +66,9 @@ import {
   addGlossaryTerm,
   getGlossariesByName,
   getGlossaryTerms,
-  patchGlossaryTerm,
+  getGlossaryTermsById,
+  transitionGlossaryTermWorkflow,
+  updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
 import { getTags } from '../../rest/tagAPI';
 import { getGlossaryPath } from '../../utils/RouterUtils';
@@ -84,7 +89,10 @@ const DQImportPage: FC = () => {
   );
   const [glossary, setGlossary] = useState<Glossary>();
   const [existingTerms, setExistingTerms] = useState<
-    (GlossaryTerm | { name?: string; fullyQualifiedName?: string; id?: string })[]
+    (
+      | GlossaryTerm
+      | { name?: string; fullyQualifiedName?: string; id?: string }
+    )[]
   >([]);
 
   const [duplicatePolicy, setDuplicatePolicy] =
@@ -121,7 +129,7 @@ const DQImportPage: FC = () => {
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [createdTerms, setCreatedTerms] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; workingRevision: number }[]
   >([]);
   const [isSubmittingAll, setIsSubmittingAll] = useState<boolean>(false);
   const [isSubmittingAllSuccess, setIsSubmittingAllSuccess] =
@@ -263,7 +271,10 @@ const DQImportPage: FC = () => {
       },
       {
         key: 'targetPopulation',
-        name: t('dq.target-population', 'Tiêu chí cơ sở (Tập dữ liệu kiểm tra)'),
+        name: t(
+          'dq.target-population',
+          'Tiêu chí cơ sở (Tập dữ liệu kiểm tra)'
+        ),
         width: 240,
         editable: true,
         resizable: true,
@@ -433,9 +444,13 @@ const DQImportPage: FC = () => {
         const lower = name.toLowerCase();
         if (seenNames.has(lower)) {
           errors.push(
-            t('dq.rule-code-duplicate-in-data', "Mã quy tắc '{{code}}' bị trùng lặp trong bảng", {
-              code: name,
-            })
+            t(
+              'dq.rule-code-duplicate-in-data',
+              "Mã quy tắc '{{code}}' bị trùng lặp trong bảng",
+              {
+                code: name,
+              }
+            )
           );
         } else {
           seenNames.add(lower);
@@ -496,7 +511,10 @@ const DQImportPage: FC = () => {
       // 6. Tiêu chí cơ sở / Tập dữ liệu kiểm tra
       const targetPopRaw = (rowCopy.targetPopulation || '').trim();
       if (targetPopRaw) {
-        const targetRes = validateDQTargetPopulationValue(targetPopRaw, allTags);
+        const targetRes = validateDQTargetPopulationValue(
+          targetPopRaw,
+          allTags
+        );
         if (!targetRes.isValid) {
           errors.push(
             t(
@@ -529,11 +547,9 @@ const DQImportPage: FC = () => {
         const freqRes = validateDQFrequencyValue(frequencyRaw, allTags);
         if (!freqRes.isValid) {
           errors.push(
-            t(
-              'dq.invalid-frequency',
-              "Tần suất '{{value}}' không hợp lệ",
-              { value: frequencyRaw }
-            )
+            t('dq.invalid-frequency', "Tần suất '{{value}}' không hợp lệ", {
+              value: frequencyRaw,
+            })
           );
         }
       }
@@ -555,7 +571,9 @@ const DQImportPage: FC = () => {
 
       // 10. Kiểm tra trùng lặp trên hệ thống
       const isExisting = name ? existingMap.has(name.toLowerCase()) : false;
-      const existingTerm = name ? existingMap.get(name.toLowerCase()) : undefined;
+      const existingTerm = name
+        ? existingMap.get(name.toLowerCase())
+        : undefined;
 
       if (isExisting && duplicatePolicy === 'skip') {
         rowCopy.isSkipped = 'true';
@@ -666,7 +684,12 @@ const DQImportPage: FC = () => {
   // Thực thi nạp dữ liệu vào backend
   const handleStartImport = useCallback(async () => {
     if (!glossary) {
-      showErrorToast(t('dq.error-glossary-not-found', 'Không tìm thấy thông tin danh mục CLDL.'));
+      showErrorToast(
+        t(
+          'dq.error-glossary-not-found',
+          'Không tìm thấy thông tin danh mục CLDL.'
+        )
+      );
 
       return;
     }
@@ -677,7 +700,10 @@ const DQImportPage: FC = () => {
 
     if (rowsToProcess.length === 0) {
       showErrorToast(
-        t('dq.no-valid-records-to-import', 'Không có bản ghi hợp lệ nào để cập nhật.')
+        t(
+          'dq.no-valid-records-to-import',
+          'Không có bản ghi hợp lệ nào để cập nhật.'
+        )
       );
 
       return;
@@ -693,7 +719,11 @@ const DQImportPage: FC = () => {
     let skipped = 0;
     let failed = 0;
     const errors: { row: number; name: string; reason: string }[] = [];
-    const createdTermsList: { id: string; name: string }[] = [];
+    const createdTermsList: {
+      id: string;
+      name: string;
+      workingRevision: number;
+    }[] = [];
 
     const total = rowsToProcess.length;
 
@@ -708,6 +738,7 @@ const DQImportPage: FC = () => {
       if (isExisting && duplicatePolicy === 'skip') {
         skipped++;
         setImportProgress(Math.round(((i + 1) / total) * 100));
+
         continue;
       }
 
@@ -738,38 +769,56 @@ const DQImportPage: FC = () => {
         );
 
         if (isExisting && duplicatePolicy === 'update' && row.existingId) {
-          // Cập nhật bản ghi có sẵn bằng JSON Patch
-          const patchJson = [
+          let editable = await getGlossaryTermsById(row.existingId, {
+            fields: 'extension',
+          });
+          if (
+            editable.entityStatus === EntityStatus.Approved ||
+            !editable.workingRevision
+          ) {
+            editable = await transitionGlossaryTermWorkflow(
+              editable.id,
+              'createDraft',
+              {
+                businessVersion: payload.businessVersion,
+              }
+            );
+          } else if (editable.entityStatus === EntityStatus.Rejected) {
+            editable = await transitionGlossaryTermWorkflow(
+              editable.id,
+              'reopen',
+              { expectedRevision: Number(editable.workingRevision) }
+            );
+          }
+          await updateGlossaryTermWorkingVersion(
+            editable.id,
+            Number(editable.workingRevision),
             {
-              op: 'replace',
-              path: '/description',
-              value: payload.description,
-            },
-            {
-              op: 'add',
-              path: '/tags',
-              value: payload.tags || [],
-            },
-            {
-              op: 'add',
-              path: '/extension',
-              value: payload.extension,
-            },
-          ];
-
-          await patchGlossaryTerm(row.existingId, patchJson);
+              ...editable,
+              ...payload,
+              id: editable.id,
+              glossary: editable.glossary,
+            } as GlossaryTerm
+          );
           updated++;
         } else {
           // Tạo mới bản ghi: Luôn ở trạng thái Draft
+          const { businessVersion, ...createPayload } = payload;
           const newTerm = await addGlossaryTerm({
-            ...payload,
-            status: EntityStatus.Draft,
+            ...createPayload,
+            parentBusinessVersion: businessVersion.split('.')[0],
           });
+          const working = await transitionGlossaryTermWorkflow(
+            newTerm.id,
+            'createDraft',
+            { businessVersion }
+          );
           created++;
-          if (newTerm?.id) {
+          if (working?.id && working.workingRevision) {
             createdTermsList.push({
-              id: newTerm.id,
-              name: newTerm.name || termName,
+              id: working.id,
+              name: working.name || termName,
+              workingRevision: working.workingRevision,
             });
           }
         }
@@ -778,7 +827,8 @@ const DQImportPage: FC = () => {
         errors.push({
           row: rowNum,
           name: termName,
-          reason: err?.message || err?.response?.data?.message || 'Unknown error',
+          reason:
+            err?.message || err?.response?.data?.message || 'Unknown error',
         });
       }
 
@@ -808,13 +858,9 @@ const DQImportPage: FC = () => {
       await Promise.allSettled(
         chunk.map(async (term) => {
           try {
-            await patchGlossaryTerm(term.id, [
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: EntityStatus.InReview,
-              },
-            ]);
+            await transitionGlossaryTermWorkflow(term.id, 'submit', {
+              expectedRevision: term.workingRevision,
+            });
             successCount++;
           } catch (err) {
             // ignore individual error
@@ -877,7 +923,10 @@ const DQImportPage: FC = () => {
             <Col span={24}>
               <Card
                 className="m-t-sm"
-                title={t('dq.duplicate-handling-title', 'Xử lý khi trùng Mã quy tắc nghiệp vụ')}>
+                title={t(
+                  'dq.duplicate-handling-title',
+                  'Xử lý khi trùng Mã quy tắc nghiệp vụ'
+                )}>
                 <Radio.Group
                   value={duplicatePolicy}
                   onChange={(e) => setDuplicatePolicy(e.target.value)}>
@@ -914,7 +963,10 @@ const DQImportPage: FC = () => {
                   <div className="upload-file-content">
                     <ImportIcon className="m-b-xs" height={40} width={40} />
                     <Typography.Text className="font-semibold text-md text-primary">
-                      {t('dq.drag-drop-prompt', 'Kéo thả tệp Excel (.xlsx) vào đây hoặc bấm để chọn')}
+                      {t(
+                        'dq.drag-drop-prompt',
+                        'Kéo thả tệp Excel (.xlsx) vào đây hoặc bấm để chọn'
+                      )}
                     </Typography.Text>
                     <Typography.Text className="text-grey-muted text-xs m-t-xss">
                       {t(
@@ -933,7 +985,10 @@ const DQImportPage: FC = () => {
                   icon={<DownloadOutlined />}
                   type="default"
                   onClick={downloadDQExcelTemplate}>
-                  {t('dq.download-template-button', 'Tải file mẫu Excel (.xlsx)')}
+                  {t(
+                    'dq.download-template-button',
+                    'Tải file mẫu Excel (.xlsx)'
+                  )}
                 </Button>
                 <Typography.Text type="secondary">
                   {t(
@@ -974,9 +1029,15 @@ const DQImportPage: FC = () => {
                 {isImporting ? (
                   <Col span={24}>
                     <Card className="text-center p-y-lg m-t-md">
-                      <Space direction="vertical" size="middle" style={{ width: '60%' }}>
+                      <Space
+                        direction="vertical"
+                        size="middle"
+                        style={{ width: '60%' }}>
                         <Typography.Title level={4}>
-                          {t('dq.importing-in-progress', 'Đang cập nhật danh mục Quy tắc CLDL...')}
+                          {t(
+                            'dq.importing-in-progress',
+                            'Đang cập nhật danh mục Quy tắc CLDL...'
+                          )}
                         </Typography.Title>
                         <Progress
                           percent={importProgress}
@@ -987,7 +1048,8 @@ const DQImportPage: FC = () => {
                           }}
                         />
                         <Typography.Text type="secondary">
-                          {t('dq.currently-processing', 'Đang xử lý:')} {currentImportName}
+                          {t('dq.currently-processing', 'Đang xử lý:')}{' '}
+                          {currentImportName}
                         </Typography.Text>
                       </Space>
                     </Card>
@@ -1055,7 +1117,9 @@ const DQImportPage: FC = () => {
                                   label: (
                                     <span className="filter-item">
                                       <span className="filter-status-dot dot-error" />
-                                      <span>{t('label.errors-only', 'Bị lỗi')}</span>
+                                      <span>
+                                        {t('label.errors-only', 'Bị lỗi')}
+                                      </span>
                                       <span
                                         className={
                                           validationData.numberOfRowsFailed > 0
@@ -1197,6 +1261,7 @@ const DQImportPage: FC = () => {
                         )}
                         {importErrors.length > 0 && (
                           <Alert
+                            showIcon
                             className="m-t-sm text-left"
                             description={
                               <ul
@@ -1221,13 +1286,13 @@ const DQImportPage: FC = () => {
                                             row: err.row,
                                           })}
                                     </strong>
-                                    : {formatDQImportErrorMessage(err.reason, t)}
+                                    :{' '}
+                                    {formatDQImportErrorMessage(err.reason, t)}
                                   </li>
                                 ))}
                               </ul>
                             }
                             message={t('label.failure-reason', 'Lý do lỗi')}
-                            showIcon
                             type="error"
                           />
                         )}

@@ -1,0 +1,16 @@
+{
+  "$id": "https://open-metadata.org/schema/api/data/cdeWorkflowTransitionRequest.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CdeWorkflowTransitionRequest",
+  "description": "Optimistic-lock request for a CDE working workflow transition.",
+  "javaType": "org.openmetadata.schema.api.data.CdeWorkflowTransitionRequest",
+  "type": "object",
+  "properties": {
+    "expectedRevision": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": ["expectedRevision"],
+  "additionalProperties": false
+}

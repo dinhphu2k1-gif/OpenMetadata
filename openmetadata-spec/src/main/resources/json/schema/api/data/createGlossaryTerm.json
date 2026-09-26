@@ -16,6 +16,12 @@
       "description": "Fully qualified name of  the parent glossary term.",
       "$ref": "../../type/basic.json#/definitions/fullyQualifiedEntityName"
     },
+    "parentBusinessVersion": {
+      "description": "Business version of the Data Dictionary scope where this CDE is created.",
+      "type": "string",
+      "pattern": "^[1-9]\\d*$",
+      "maxLength": 64
+    },
     "name": {
       "description": "Preferred name for the glossary term.",
       "$ref": "../../type/basic.json#/definitions/entityName"
@@ -96,6 +102,6 @@
       }
     }
   },
-  "required": ["glossary", "name", "description"],
+  "required": ["glossary", "name", "description", "parentBusinessVersion"],
   "additionalProperties": false
 }

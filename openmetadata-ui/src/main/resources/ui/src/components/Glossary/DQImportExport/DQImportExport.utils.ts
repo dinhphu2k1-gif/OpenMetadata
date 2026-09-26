@@ -13,13 +13,17 @@
 
 import { isEmpty } from 'lodash';
 import * as XLSX from 'xlsx';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
-import { EntityReference } from '../../../generated/entity/type';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
-import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
-import { DQ_TAG_CLASSIFICATIONS, DQExtension } from '../GlossaryTermTab/DQGlossaryTableColumns';
+import {
+  DQ_TAG_CLASSIFICATIONS,
+  DQExtension,
+} from '../GlossaryTermTab/DQGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
 
 export interface DQImportRowData {
@@ -133,36 +137,87 @@ export const normalizeDQText = (str?: string): string => {
     .toLowerCase();
 };
 
-export const STANDARD_DQ_DIMENSIONS: Record<string, { fqn: string; label: string }> = {
-  completeness: { fqn: 'DataQualityDimension.Completeness', label: 'Tính đầy đủ' },
+export const STANDARD_DQ_DIMENSIONS: Record<
+  string,
+  { fqn: string; label: string }
+> = {
+  completeness: {
+    fqn: 'DataQualityDimension.Completeness',
+    label: 'Tính đầy đủ',
+  },
   accuracy: { fqn: 'DataQualityDimension.Accuracy', label: 'Tính chính xác' },
-  consistency: { fqn: 'DataQualityDimension.Consistency', label: 'Tính nhất quán' },
-  compliance: { fqn: 'DataQualityDimension.Compliance', label: 'Tính tuân thủ' },
-  timeliness: { fqn: 'DataQualityDimension.Timeliness', label: 'Tính kịp thời' },
+  consistency: {
+    fqn: 'DataQualityDimension.Consistency',
+    label: 'Tính nhất quán',
+  },
+  compliance: {
+    fqn: 'DataQualityDimension.Compliance',
+    label: 'Tính tuân thủ',
+  },
+  timeliness: {
+    fqn: 'DataQualityDimension.Timeliness',
+    label: 'Tính kịp thời',
+  },
 };
 
-export const STANDARD_DQ_POPULATIONS: Record<string, { fqn: string; label: string }> = {
-  entirecustomerbase: { fqn: 'DataQualityTargetPopulation.EntireCustomerBase', label: 'Toàn nền khách hàng' },
-  individualcustomers: { fqn: 'DataQualityTargetPopulation.IndividualCustomers', label: 'Khách hàng cá nhân' },
-  customerswithinfo: { fqn: 'DataQualityTargetPopulation.CustomersWithInfo', label: 'Toàn bộ khách hàng có thông tin' },
-  creditriskdata: { fqn: 'DataQualityTargetPopulation.CreditRiskData', label: 'Dữ liệu rủi ro tín dụng' },
+export const STANDARD_DQ_POPULATIONS: Record<
+  string,
+  { fqn: string; label: string }
+> = {
+  entirecustomerbase: {
+    fqn: 'DataQualityTargetPopulation.EntireCustomerBase',
+    label: 'Toàn nền khách hàng',
+  },
+  individualcustomers: {
+    fqn: 'DataQualityTargetPopulation.IndividualCustomers',
+    label: 'Khách hàng cá nhân',
+  },
+  customerswithinfo: {
+    fqn: 'DataQualityTargetPopulation.CustomersWithInfo',
+    label: 'Toàn bộ khách hàng có thông tin',
+  },
+  creditriskdata: {
+    fqn: 'DataQualityTargetPopulation.CreditRiskData',
+    label: 'Dữ liệu rủi ro tín dụng',
+  },
 };
 
-export const STANDARD_DQ_METHODS: Record<string, { fqn: string; label: string }> = {
-  technicalsqlrule: { fqn: 'DataQualityMethod.TechnicalSqlRule', label: 'Kiểm tra bằng Quy tắc kỹ thuật (SQL)' },
-  dataprofiling: { fqn: 'DataQualityMethod.DataProfiling', label: 'Kiểm tra tự động (Data Profiling)' },
+export const STANDARD_DQ_METHODS: Record<
+  string,
+  { fqn: string; label: string }
+> = {
+  technicalsqlrule: {
+    fqn: 'DataQualityMethod.TechnicalSqlRule',
+    label: 'Kiểm tra bằng Quy tắc kỹ thuật (SQL)',
+  },
+  dataprofiling: {
+    fqn: 'DataQualityMethod.DataProfiling',
+    label: 'Kiểm tra tự động (Data Profiling)',
+  },
 };
 
-export const STANDARD_DQ_FREQUENCIES: Record<string, { fqn: string; label: string }> = {
+export const STANDARD_DQ_FREQUENCIES: Record<
+  string,
+  { fqn: string; label: string }
+> = {
   quarterly: { fqn: 'DataQualityFrequency.Quarterly', label: 'Hàng Quý' },
-  monthlyorquarterly: { fqn: 'DataQualityFrequency.MonthlyOrQuarterly', label: 'Tháng/Quý' },
+  monthlyorquarterly: {
+    fqn: 'DataQualityFrequency.MonthlyOrQuarterly',
+    label: 'Tháng/Quý',
+  },
   monthly: { fqn: 'DataQualityFrequency.Monthly', label: 'Hàng Tháng' },
   daily: { fqn: 'DataQualityFrequency.Daily', label: 'Hàng Ngày' },
 };
 
-export const STANDARD_DQ_DATA_SOURCES: Record<string, { fqn: string; label: string }> = {
+export const STANDARD_DQ_DATA_SOURCES: Record<
+  string,
+  { fqn: string; label: string }
+> = {
   ipcas: { fqn: 'DataSource.IPCAS', label: 'IPCAS' },
-  creditriskdatawarehouse: { fqn: 'DataSource.CreditRiskDataWarehouse', label: 'Kho RRTD' },
+  creditriskdatawarehouse: {
+    fqn: 'DataSource.CreditRiskDataWarehouse',
+    label: 'Kho RRTD',
+  },
   rrtd: { fqn: 'DataSource.CreditRiskDataWarehouse', label: 'Kho RRTD' },
 };
 
@@ -190,6 +245,7 @@ export const validateDQDimensionValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.dimension &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -229,6 +285,7 @@ export const validateDQTargetPopulationValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.targetPopulation &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -277,6 +334,7 @@ export const validateDQMethodValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.method &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -339,6 +397,7 @@ export const validateDQFrequencyValue = (
   if (availableTags.length > 0) {
     const matched = availableTags.find((t) => {
       const tagNorm = normalizeDQText(t.displayName || t.name);
+
       return (
         t.classification?.name === DQ_TAG_CLASSIFICATIONS.frequency &&
         (tagNorm === norm || norm.includes(tagNorm))
@@ -367,7 +426,10 @@ export const validateDQDataSourceValues = (
     return { isValid: true, matchedTags: [], invalidValues: [] };
   }
 
-  const items = raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+  const items = raw
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const matchedTags: TagLabel[] = [];
   const invalidValues: string[] = [];
 
@@ -379,6 +441,7 @@ export const validateDQDataSourceValues = (
     for (const [key, std] of Object.entries(STANDARD_DQ_DATA_SOURCES)) {
       if (norm.includes(key) || norm === normalizeDQText(std.label)) {
         matchedFQN = std.fqn;
+
         break;
       }
     }
@@ -387,6 +450,7 @@ export const validateDQDataSourceValues = (
     if (!matchedFQN && availableTags.length > 0) {
       const found = availableTags.find((t) => {
         const tagNorm = normalizeDQText(t.displayName || t.name);
+
         return (
           t.classification?.name === DQ_TAG_CLASSIFICATIONS.dataSource &&
           (tagNorm === norm || norm.includes(tagNorm))
@@ -422,12 +486,19 @@ export const getDQTagLabelByClassification = (
   tags: TagLabel[] = [],
   classificationName: string
 ): string => {
-  const match = tags.find((t) => t.tagFQN?.startsWith(`${classificationName}.`));
+  const match = tags.find((t) =>
+    t.tagFQN?.startsWith(`${classificationName}.`)
+  );
   if (!match) {
     return '';
   }
 
-  return match.displayName || match.name || match.tagFQN.split('.').at(-1)?.replace(/_/g, ' ') || '';
+  return (
+    match.displayName ||
+    match.name ||
+    match.tagFQN.split('.').at(-1)?.replace(/_/g, ' ') ||
+    ''
+  );
 };
 
 /**
@@ -440,11 +511,26 @@ export const exportDQToExcel = (
     const ext = (term.extension || {}) as DQExtension;
     const tags = term.tags || [];
 
-    const dimension = getDQTagLabelByClassification(tags, DQ_TAG_CLASSIFICATIONS.dimension);
-    const targetPopulation = getDQTagLabelByClassification(tags, DQ_TAG_CLASSIFICATIONS.targetPopulation);
-    const method = getDQTagLabelByClassification(tags, DQ_TAG_CLASSIFICATIONS.method);
-    const frequency = getDQTagLabelByClassification(tags, DQ_TAG_CLASSIFICATIONS.frequency);
-    const dataSource = getDQTagLabelByClassification(tags, DQ_TAG_CLASSIFICATIONS.dataSource);
+    const dimension = getDQTagLabelByClassification(
+      tags,
+      DQ_TAG_CLASSIFICATIONS.dimension
+    );
+    const targetPopulation = getDQTagLabelByClassification(
+      tags,
+      DQ_TAG_CLASSIFICATIONS.targetPopulation
+    );
+    const method = getDQTagLabelByClassification(
+      tags,
+      DQ_TAG_CLASSIFICATIONS.method
+    );
+    const frequency = getDQTagLabelByClassification(
+      tags,
+      DQ_TAG_CLASSIFICATIONS.frequency
+    );
+    const dataSource = getDQTagLabelByClassification(
+      tags,
+      DQ_TAG_CLASSIFICATIONS.dataSource
+    );
 
     return [
       term.name || '',
@@ -590,6 +676,7 @@ export const readAndValidateDQExcel = async (
       Array.isArray(row) &&
       row.some((cell) => {
         const text = normalizeDQText(String(cell || ''));
+
         return (
           text.includes('ma quy tac') ||
           text.includes('tieu chi') ||
@@ -598,6 +685,7 @@ export const readAndValidateDQExcel = async (
       })
     ) {
       headerRowIndex = r;
+
       break;
     }
   }
@@ -613,9 +701,17 @@ export const readAndValidateDQExcel = async (
       colIndexMap.cdeCode = idx;
     } else if (norm.includes('ten thanh to') || norm.includes('ten cde')) {
       colIndexMap.cdeName = idx;
-    } else if (norm.includes('tieu chi danh gia') || norm.includes('tieu chi chat luong') || norm === 'tieu chi') {
+    } else if (
+      norm.includes('tieu chi danh gia') ||
+      norm.includes('tieu chi chat luong') ||
+      norm === 'tieu chi'
+    ) {
       colIndexMap.dimension = idx;
-    } else if (norm.includes('quy tac nghiep vu ve') || norm.includes('quy tac nghiep vu') || norm.includes('mo ta')) {
+    } else if (
+      norm.includes('quy tac nghiep vu ve') ||
+      norm.includes('quy tac nghiep vu') ||
+      norm.includes('mo ta')
+    ) {
       if (colIndexMap.description === undefined) {
         colIndexMap.description = idx;
       }
@@ -625,9 +721,15 @@ export const readAndValidateDQExcel = async (
       colIndexMap.otherConstraints = idx;
     } else if (norm.includes('ngoai le')) {
       colIndexMap.exceptions = idx;
-    } else if (norm.includes('tieu chi co so') || norm.includes('tap du lieu')) {
+    } else if (
+      norm.includes('tieu chi co so') ||
+      norm.includes('tap du lieu')
+    ) {
       colIndexMap.targetPopulation = idx;
-    } else if (norm.includes('hinh thuc kiem tra') || norm.includes('phuong phap')) {
+    } else if (
+      norm.includes('hinh thuc kiem tra') ||
+      norm.includes('phuong phap')
+    ) {
       colIndexMap.method = idx;
     } else if (norm.includes('tan suat')) {
       colIndexMap.frequency = idx;
@@ -640,6 +742,7 @@ export const readAndValidateDQExcel = async (
 
   const getVal = (row: any[], key: string, fallbackIdx: number): string => {
     const idx = colIndexMap[key] !== undefined ? colIndexMap[key] : fallbackIdx;
+
     return String(row[idx] ?? '').trim();
   };
 
@@ -648,7 +751,12 @@ export const readAndValidateDQExcel = async (
 
   for (let r = headerRowIndex + 1; r < rawData.length; r++) {
     const rawRow = rawData[r];
-    if (!rawRow || rawRow.every((c) => c === undefined || c === null || String(c).trim() === '')) {
+    if (
+      !rawRow ||
+      rawRow.every(
+        (c) => c === undefined || c === null || String(c).trim() === ''
+      )
+    ) {
       continue;
     }
 
@@ -675,7 +783,9 @@ export const readAndValidateDQExcel = async (
     } else {
       const codeKey = name.toUpperCase();
       if (seenCodes.has(codeKey)) {
-        rowErrors.push(`Mã quy tắc '${name}' bị trùng lặp với dòng khác trong file Excel.`);
+        rowErrors.push(
+          `Mã quy tắc '${name}' bị trùng lặp với dòng khác trong file Excel.`
+        );
       } else {
         seenCodes.add(codeKey);
       }
@@ -695,14 +805,21 @@ export const readAndValidateDQExcel = async (
 
     // 3. Thẩm định Quy tắc nghiệp vụ
     if (!description) {
-      rowWarnings.push('Chưa có nội dung Quy tắc nghiệp vụ về chất lượng dữ liệu.');
+      rowWarnings.push(
+        'Chưa có nội dung Quy tắc nghiệp vụ về chất lượng dữ liệu.'
+      );
     }
 
     // 4. Thẩm định Tiêu chí cơ sở
     if (targetPopulation) {
-      const popRes = validateDQTargetPopulationValue(targetPopulation, availableTags);
+      const popRes = validateDQTargetPopulationValue(
+        targetPopulation,
+        availableTags
+      );
       if (!popRes.isValid) {
-        rowErrors.push(`Tiêu chí cơ sở '${targetPopulation}' không tồn tại trên hệ thống.`);
+        rowErrors.push(
+          `Tiêu chí cơ sở '${targetPopulation}' không tồn tại trên hệ thống.`
+        );
       }
     }
 
@@ -710,7 +827,9 @@ export const readAndValidateDQExcel = async (
     if (method) {
       const methRes = validateDQMethodValue(method, availableTags);
       if (!methRes.isValid) {
-        rowErrors.push(`Hình thức kiểm tra '${method}' không hợp lệ (phải là SQL hoặc Data Profiling).`);
+        rowErrors.push(
+          `Hình thức kiểm tra '${method}' không hợp lệ (phải là SQL hoặc Data Profiling).`
+        );
       }
     }
 
@@ -718,7 +837,9 @@ export const readAndValidateDQExcel = async (
     if (frequency) {
       const freqRes = validateDQFrequencyValue(frequency, availableTags);
       if (!freqRes.isValid) {
-        rowErrors.push(`Tần suất '${frequency}' không hợp lệ (phải là Hàng Quý, Tháng/Quý, Hàng Tháng hoặc Hàng Ngày).`);
+        rowErrors.push(
+          `Tần suất '${frequency}' không hợp lệ (phải là Hàng Quý, Tháng/Quý, Hàng Tháng hoặc Hàng Ngày).`
+        );
       }
     }
 
@@ -726,7 +847,11 @@ export const readAndValidateDQExcel = async (
     if (dataSource) {
       const dsRes = validateDQDataSourceValues(dataSource, availableTags);
       if (!dsRes.isValid) {
-        rowErrors.push(`Nguồn dữ liệu '${dsRes.invalidValues.join(', ')}' không tồn tại trên hệ thống.`);
+        rowErrors.push(
+          `Nguồn dữ liệu '${dsRes.invalidValues.join(
+            ', '
+          )}' không tồn tại trên hệ thống.`
+        );
       }
     }
 
@@ -734,7 +859,8 @@ export const readAndValidateDQExcel = async (
     const existing = existingTerms.find(
       (term) =>
         term.name.toLowerCase() === name.toLowerCase() ||
-        (term.displayName && term.displayName.toLowerCase() === name.toLowerCase())
+        (term.displayName &&
+          term.displayName.toLowerCase() === name.toLowerCase())
     );
 
     const isExisting = Boolean(existing);
@@ -790,12 +916,13 @@ export const transformDQRowToGlossaryTermPayload = (
   availableTags: Tag[] = [],
   allCdeTerms: GlossaryTerm[] = []
 ): {
+  businessVersion: string;
   name: string;
   displayName: string;
   description: string;
   glossary: string;
   tags?: TagLabel[];
-  relatedTerms?: EntityReference[];
+  relatedTerms?: string[];
   extension?: Record<string, unknown>;
 } => {
   const tags: TagLabel[] = [];
@@ -814,7 +941,10 @@ export const transformDQRowToGlossaryTermPayload = (
 
   // 2. Tag Tiêu chí cơ sở (TargetPopulation)
   if (row.targetPopulation) {
-    const popRes = validateDQTargetPopulationValue(row.targetPopulation, availableTags);
+    const popRes = validateDQTargetPopulationValue(
+      row.targetPopulation,
+      availableTags
+    );
     if (popRes.tagFQN) {
       tags.push({
         tagFQN: popRes.tagFQN,
@@ -857,7 +987,7 @@ export const transformDQRowToGlossaryTermPayload = (
   }
 
   // 6. Liên kết CDE liên quan (relatedTerms)
-  let relatedTerms: EntityReference[] | undefined;
+  let relatedTerms: string[] | undefined;
   if (row.cdeCode && allCdeTerms.length > 0) {
     const cleanCode = row.cdeCode.trim().toUpperCase();
     const matchedCde = allCdeTerms.find(
@@ -866,15 +996,9 @@ export const transformDQRowToGlossaryTermPayload = (
         cde.name.toUpperCase().replace(/\s+/g, '') === cleanCode
     );
     if (matchedCde) {
-      relatedTerms = [
-        {
-          id: matchedCde.id,
-          type: 'glossaryTerm',
-          fullyQualifiedName: matchedCde.fullyQualifiedName,
-          name: matchedCde.name,
-          displayName: matchedCde.displayName,
-        },
-      ];
+      relatedTerms = matchedCde.fullyQualifiedName
+        ? [matchedCde.fullyQualifiedName]
+        : undefined;
     }
   }
 
@@ -889,6 +1013,7 @@ export const transformDQRowToGlossaryTermPayload = (
   };
 
   return {
+    businessVersion: '1.0',
     name: row.name,
     displayName: row.name,
     description: row.description || '',
@@ -938,6 +1063,7 @@ export const formatDQImportErrorMessage = (
   );
   if (termAlreadyExistsMatch) {
     const [, termName, glossaryName] = termAlreadyExistsMatch;
+
     return t(
       'dq.error-term-already-exists',
       `Mã quy tắc '${termName}' đã tồn tại trong danh mục '${glossaryName}'.`,
@@ -951,6 +1077,7 @@ export const formatDQImportErrorMessage = (
   );
   if (entityNameMatch) {
     const [, termName] = entityNameMatch;
+
     return t(
       'dq.error-term-name-exists',
       `Mã quy tắc '${termName}' đã tồn tại trên hệ thống.`,
@@ -967,7 +1094,11 @@ export const formatDQImportErrorMessage = (
   }
 
   // 4. Phân quyền:
-  if (/permission|not allowed|access denied|forbidden|unauthorized|is not admin/i.test(message)) {
+  if (
+    /permission|not allowed|access denied|forbidden|unauthorized|is not admin/i.test(
+      message
+    )
+  ) {
     return t(
       'dq.error-permission-denied',
       'Bạn không có quyền thực hiện thao tác này.'

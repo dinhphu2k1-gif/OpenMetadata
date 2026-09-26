@@ -1,0 +1,25 @@
+{
+  "$id": "https://open-metadata.org/schema/type/glossaryTermRevisionReference.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GlossaryTermRevisionReference",
+  "description": "Immutable glossary term revision included in a published glossary snapshot.",
+  "javaType": "org.openmetadata.schema.type.GlossaryTermRevisionReference",
+  "type": "object",
+  "properties": {
+    "termId": {
+      "$ref": "basic.json#/definitions/uuid"
+    },
+    "termSnapshotId": {
+      "$ref": "basic.json#/definitions/uuid"
+    },
+    "termBusinessVersion": {
+      "type": "string"
+    },
+    "displayOrder": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": ["termId", "termSnapshotId", "termBusinessVersion", "displayOrder"],
+  "additionalProperties": false
+}

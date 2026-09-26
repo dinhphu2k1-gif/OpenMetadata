@@ -8360,7 +8360,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
             }
           }
         } catch (Exception e) {
-          LOG.warn("Failed to inherit reviewers in checkUpdatedByReviewerOrOwner: {}", e.getMessage());
+          LOG.warn(
+              "Failed to inherit reviewers in checkUpdatedByReviewerOrOwner: {}", e.getMessage());
         }
       }
       if (nullOrEmpty(reviewers)) {
@@ -8400,7 +8401,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
                       e -> {
                         if (e.getType().equals(TEAM)) {
                           Team team =
-                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                              Entity.getEntityByName(
+                                  TEAM, e.getName(), "users", Include.NON_DELETED);
                           return team.getUsers().stream()
                               .anyMatch(
                                   u ->
@@ -8457,7 +8459,8 @@ public abstract class EntityRepository<T extends EntityInterface> {
                       e -> {
                         if (e.getType().equals(TEAM)) {
                           Team team =
-                              Entity.getEntityByName(TEAM, e.getName(), "users", Include.NON_DELETED);
+                              Entity.getEntityByName(
+                                  TEAM, e.getName(), "users", Include.NON_DELETED);
                           return team.getUsers().stream()
                               .anyMatch(
                                   u ->

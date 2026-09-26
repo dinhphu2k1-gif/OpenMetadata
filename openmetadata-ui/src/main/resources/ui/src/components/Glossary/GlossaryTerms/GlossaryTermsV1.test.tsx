@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { useLocation } from 'react-router-dom';
 import { OperationPermission } from '../../../context/PermissionProvider/PermissionProvider.interface';
 import { EntityTabs } from '../../../enums/entity.enum';
@@ -27,9 +27,9 @@ import glossaryTermClassBase from '../../../utils/Glossary/GlossaryTermClassBase
 import { useCustomPages } from '../../../hooks/useCustomPages';
 import { getDetailsTabWithNewLabel } from '../../../utils/CustomizePage/CustomizePageEntityTabUtils';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
+import { getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import GlossaryTerms from './GlossaryTermsV1.component';
-import { getApprovedCDEAuditSnapshots } from '../../../utils/CDEApprovedVersionUtils';
 import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
 
 const mockPush = jest.fn();
@@ -46,8 +46,8 @@ jest.mock('react-router-dom', () => ({
   useLocation: jest.fn().mockReturnValue({ search: '' }),
 }));
 
-jest.mock('../../../utils/CDEApprovedVersionUtils', () => ({
-  getApprovedCDEAuditSnapshots: jest.fn(),
+jest.mock('../../../rest/glossaryAPI', () => ({
+  getGlossaryTermsVersionsList: jest.fn(),
 }));
 
 jest.mock('../../../utils/useRequiredParams', () => ({
@@ -192,14 +192,14 @@ describe('Test Glossary-term component', () => {
     const snapshot = {
       ...mockProps.glossaryTerm,
       entityStatus: EntityStatus.Approved,
-      extension: { cdeVersion: '1.2' },
+      businessVersion: '1.2',
     };
     (useLocation as jest.Mock).mockReturnValue({
       search: '?approvedVersion=1.2',
     });
-    (getApprovedCDEAuditSnapshots as jest.Mock).mockResolvedValue([
-      { snapshot, eventId: 'approved-1-2' },
-    ]);
+    (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
+      versions: [snapshot],
+    });
 
     render(<GlossaryTerms {...mockProps} />);
 
@@ -207,7 +207,7 @@ describe('Test Glossary-term component', () => {
       expect((GenericProvider as jest.Mock).mock.lastCall[0]).toEqual(
         expect.objectContaining({
           isVersionView: true,
-          data: expect.objectContaining({ extension: { cdeVersion: '1.2' } }),
+          data: expect.objectContaining({ businessVersion: '1.2' }),
         })
       );
     });
@@ -229,6 +229,26 @@ describe('Test Glossary-term component', () => {
         expect(tab).not.toHaveAttribute('aria-selected', 'true');
       });
 
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('updates term state without refetching the full term details', async () => {
+    render(<GlossaryTerms {...mockProps} />);
+
+    const onUpdate = (GenericProvider as jest.Mock).mock.lastCall[0].onUpdate;
+    const updatedTerm = {
+      ...mockProps.glossaryTerm,
+      description: 'Updated description',
+    };
+
+    await act(async () => {
+      await onUpdate(updatedTerm);
+    });
+
+    expect(mockProps.handleGlossaryTermUpdate).toHaveBeenCalledWith(
+      updatedTerm
+    );
+    expect(mockProps.refreshActiveGlossaryTerm).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -266,7 +286,7 @@ describe('Test Glossary-term component', () => {
       expect.any(Array),
       [overviewTab],
       EntityTabs.OVERVIEW,
-      undefined
+      false
     );
   });
 
@@ -305,6 +325,7 @@ describe('Test Glossary-term component', () => {
     );
 
     const tabs = await screen.findAllByRole('tab');
+
     expect(tabs).toHaveLength(2);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',
@@ -329,6 +350,7 @@ describe('Test Glossary-term component', () => {
     );
 
     const tabs = await screen.findAllByRole('tab');
+
     expect(tabs).toHaveLength(6);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',
@@ -385,6 +407,7 @@ describe('Test Glossary-term component', () => {
     );
 
     const tabs = await screen.findAllByRole('tab');
+
     expect(tabs).toHaveLength(2);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',

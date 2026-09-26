@@ -305,6 +305,9 @@ public interface CollectionDAO {
   GlossaryTermDAO glossaryTermDAO();
 
   @CreateSqlObject
+  GlossaryVersionDAO glossaryVersionDAO();
+
+  @CreateSqlObject
   BotDAO botDAO();
 
   @CreateSqlObject

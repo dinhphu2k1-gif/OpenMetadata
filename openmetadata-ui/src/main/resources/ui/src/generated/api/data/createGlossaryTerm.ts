@@ -57,6 +57,10 @@ export interface CreateGlossaryTerm {
      * Fully qualified name of  the parent glossary term.
      */
     parent?:   string;
+    /**
+     * Business version of the Data Dictionary scope where this CDE is created.
+     */
+    parentBusinessVersion: string;
     provider?: ProviderType;
     /**
      * Link to a reference from an external glossary.

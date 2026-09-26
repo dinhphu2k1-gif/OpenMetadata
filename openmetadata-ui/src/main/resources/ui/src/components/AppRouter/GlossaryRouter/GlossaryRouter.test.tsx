@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import GlossaryRouter from './GlossaryRouter';
 
@@ -40,14 +40,16 @@ jest.mock('../AdminProtectedRoute', () => ({
 }));
 
 describe('GlossaryRouter', () => {
-  it('should render AddGlossaryPage component for add glossary route', async () => {
+  it('should not render the create form for the legacy add route', async () => {
     render(
       <MemoryRouter initialEntries={['/add']}>
         <GlossaryRouter />
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('AddGlossaryPage')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText('AddGlossaryPage')).not.toBeInTheDocument()
+    );
   });
 
   it('should render GlossaryVersion component for glossary version route', async () => {

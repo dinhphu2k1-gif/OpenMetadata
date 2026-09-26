@@ -12,7 +12,7 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { Operation } from 'fast-json-patch';
+import { applyPatch, Operation } from 'fast-json-patch';
 import { PagingResponse } from 'Models';
 import { CSVExportResponse } from '../components/Entity/EntityExportModalProvider/EntityExportModalProvider.interface';
 import { VotingDataProps } from '../components/Entity/Voting/voting.interface';
@@ -23,6 +23,9 @@ import { SearchIndex } from '../enums/search.enum';
 import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssetsRequest';
 import { CreateGlossary } from '../generated/api/data/createGlossary';
 import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
+import { CDEDraftUpdateRequest as CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
+import { CDEWorkflowTransitionRequest as CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
+import { GlossaryWorkflowTransitionRequest } from '../generated/api/data/glossaryWorkflowTransitionRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
 import { EntityReference, Glossary } from '../generated/entity/data/glossary';
@@ -32,12 +35,17 @@ import { ChangeEvent } from '../generated/type/changeEvent';
 import { EntityHistory } from '../generated/type/entityHistory';
 import { ListParams, ListParamsWithOffset } from '../interface/API.interface';
 import { getEncodedFqn } from '../utils/StringUtils';
+import {
+  normalizeCdeParentBusinessVersion,
+  parseCdeRoute,
+} from '../utils/routing/cdeRoutingHelper';
 import APIClient from './index';
 
-export type ListGlossaryTermsParams = ListParams & {
+export type ListGlossaryTermsParams = ListParamsWithOffset & {
   glossary?: string;
   parent?: string;
   entityStatus?: string;
+  parentBusinessVersion?: string;
 };
 
 export type SearchGlossaryTermsParams = ListParamsWithOffset & {
@@ -47,9 +55,106 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
   parent?: string;
   parentFqn?: string;
   entityStatus?: string;
+  parentBusinessVersion?: string;
+  statuses?: string;
+  domainIds?: string;
+  ownerIds?: string;
+  dataSourceTags?: string;
+  classificationTags?: string;
+  sortField?: 'name' | 'displayName' | 'businessVersion' | 'entityStatus';
+  sortOrder?: 'asc' | 'desc';
 };
 
+export interface DataDictionaryExcelExport {
+  blob: Blob;
+  fileName: string;
+}
+
 const BASE_URL = '/glossaries';
+
+const parentScopeFromRoute = () => {
+  const scope = parseCdeRoute({
+    pathname: globalThis.location?.pathname,
+    search: globalThis.location?.search,
+  }).parentBusinessVersion;
+  if (!scope) {
+    throw new Error('parentBusinessVersion is required for CDE operations');
+  }
+
+  return scope;
+};
+
+export type GlossaryWorkflowAction =
+  | 'createDraft'
+  | 'submit'
+  | 'approve'
+  | 'reject'
+  | 'reopen'
+  | 'revoke';
+
+export interface GlossaryDraftPayload {
+  description: string;
+  owners: Glossary['owners'];
+  reviewers: Glossary['reviewers'];
+  domains: Glossary['domains'];
+  tags: Glossary['tags'];
+  extension?: Glossary['extension'];
+}
+
+export interface GlossaryWorkflowRequest {
+  expectedRevision?: number;
+  businessVersion?: string;
+  payload?: Glossary | GlossaryTerm;
+}
+
+export interface GlossaryPublishPreview {
+  data: NonNullable<Glossary['termRevisions']>;
+  paging: { after?: string };
+  termCount: number;
+  evaluatedAt: number;
+}
+
+export interface GlossaryVersionPermissions {
+  isConsumer?: boolean;
+  canViewWorking: boolean;
+  canViewPublished: boolean;
+  canEditWorking: boolean;
+  canSubmit: boolean;
+  canCreateVersion: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+  canArchive: boolean;
+  canImportCdeDrafts?: boolean;
+}
+
+export interface CdeImportIssue {
+  rowNumber: number;
+  column: string;
+  code: string;
+  message: string;
+}
+
+export interface CdeImportPreviewRow {
+  rowNumber: number;
+  cdeCode: string;
+  action: string;
+  businessVersion?: string;
+  payload?: Record<string, unknown>;
+  warnings: string[];
+  errors: CdeImportIssue[];
+}
+
+export interface CdeImportPreview {
+  importSessionId: string;
+  expiresAt: string;
+  fileHash: string;
+  existingCodePolicy: CdeExistingCodePolicy;
+  summary: Record<string, number>;
+  rows: CdeImportPreviewRow[];
+  canCommit: boolean;
+}
+
+export type CdeExistingCodePolicy = 'SKIP_EXISTING' | 'OVERWRITE_EXISTING';
 
 export const getGlossariesList = async (params?: ListParams) => {
   const response = await APIClient.get<PagingResponse<Glossary[]>>(BASE_URL, {
@@ -66,15 +171,6 @@ export const addGlossaries = async (data: CreateGlossary) => {
     CreateGlossary,
     AxiosResponse<Glossary>
   >(url, data);
-
-  return response.data;
-};
-
-export const patchGlossaries = async (id: string, patch: Operation[]) => {
-  const response = await APIClient.patch<Operation[], AxiosResponse<Glossary>>(
-    `/glossaries/${id}`,
-    patch
-  );
 
   return response.data;
 };
@@ -98,12 +194,185 @@ export const getGlossariesById = async (id: string, params?: ListParams) => {
   return response.data;
 };
 
+export const getLatestPublishedGlossary = async (id: string) => {
+  const response = await APIClient.get<Glossary>(
+    `/glossaries/${id}/published/latest`
+  );
+
+  return response.data;
+};
+
+export const getGlossaryWorkingVersion = async (id: string) => {
+  const response = await APIClient.get<Glossary>(`/glossaries/${id}/working`);
+
+  return response.data;
+};
+
+export const updateGlossaryWorkingVersion = async (
+  id: string,
+  expectedRevision: number,
+  payload: Glossary
+) => {
+  const mutablePayload: GlossaryDraftPayload = {
+    description: payload.description,
+    owners: payload.owners ?? [],
+    domains: payload.domains ?? [],
+    tags: payload.tags ?? [],
+    extension: payload.extension,
+  };
+  const response = await APIClient.patch<
+    { expectedRevision: number; payload: GlossaryDraftPayload },
+    AxiosResponse<Glossary>
+  >(
+    `/glossaries/${id}/working`,
+    { expectedRevision, payload: mutablePayload },
+    {
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  return response.data;
+};
+
+export const patchGlossaries = async (id: string, patch: Operation[]) => {
+  const working = await getGlossaryWorkingVersion(id);
+  const payload = applyPatch(
+    structuredClone(working),
+    patch,
+    true,
+    false
+  ).newDocument;
+
+  return updateGlossaryWorkingVersion(
+    id,
+    working.workingRevision as number,
+    payload
+  );
+};
+
+export const getPublishedGlossaryTerms = async (
+  id: string,
+  businessVersion: string
+) => {
+  const response = await APIClient.get<GlossaryTerm[]>(
+    `/glossaries/${id}/published/${businessVersion}/terms`
+  );
+
+  return response.data;
+};
+
+export const getGlossaryPublishPreview = async (
+  id: string,
+  params?: { limit?: number; after?: string }
+) => {
+  const response = await APIClient.get<GlossaryPublishPreview>(
+    `/glossaries/${id}/working/publish-preview`,
+    { params }
+  );
+
+  return response.data;
+};
+
+export const getGlossaryVersionPermissions = async (id: string) => {
+  const response = await APIClient.get<GlossaryVersionPermissions>(
+    `/glossaries/${id}/permissions`
+  );
+
+  return response.data;
+};
+
+export const transitionGlossaryWorkflow = async (
+  id: string,
+  action: GlossaryWorkflowAction,
+  request: GlossaryWorkflowRequest | GlossaryWorkflowTransitionRequest
+) => {
+  if (action === 'revoke') {
+    const response = await APIClient.post<undefined, AxiosResponse<Glossary>>(
+      `/glossaries/${id}/published/latest/archive`
+    );
+
+    return response.data;
+  }
+  if (action !== 'createDraft') {
+    request = { expectedRevision: request.expectedRevision as number };
+  } else {
+    request = {
+      businessVersion: (request as GlossaryWorkflowRequest)
+        .businessVersion as string,
+    };
+  }
+  const path = action === 'createDraft' ? 'working' : `working/${action}`;
+  const response = await APIClient.post<
+    GlossaryWorkflowRequest,
+    AxiosResponse<Glossary>
+  >(`/glossaries/${id}/${path}`, request);
+
+  return response.data;
+};
+
 export const getGlossaryTerms = async (params: ListGlossaryTermsParams) => {
   const response = await APIClient.get<PagingResponse<GlossaryTerm[]>>(
     '/glossaryTerms',
     {
       params,
     }
+  );
+
+  return response.data;
+};
+
+export const exportDataDictionaryVersion = async (
+  glossaryId: string,
+  parentBusinessVersion: string
+): Promise<DataDictionaryExcelExport> => {
+  const response = await APIClient.get<Blob>('/glossaryTerms/export', {
+    params: { glossary: glossaryId, parentBusinessVersion },
+    responseType: 'blob',
+  });
+  const disposition = response.headers['content-disposition'] as
+    | string
+    | undefined;
+  const match = disposition?.match(/filename="?([^";]+)"?/i);
+
+  return {
+    blob: response.data,
+    fileName:
+      match?.[1] ??
+      `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v${parentBusinessVersion}.xlsx`,
+  };
+};
+
+export const downloadCdeImportTemplate = async (): Promise<Blob> => {
+  const response = await APIClient.get<Blob>('/glossaryTerms/import/template', {
+    responseType: 'blob',
+  });
+
+  return response.data;
+};
+
+export const previewCdeImport = async (
+  glossaryId: string,
+  parentBusinessVersion: string,
+  existingCodePolicy: CdeExistingCodePolicy,
+  file: File
+): Promise<CdeImportPreview> => {
+  const data = new FormData();
+  data.append('file', file);
+  const response = await APIClient.post<FormData, AxiosResponse<CdeImportPreview>>(
+    '/glossaryTerms/import/preview',
+    data,
+    {
+      params: { glossary: glossaryId, parentBusinessVersion, existingCodePolicy },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+
+  return response.data;
+};
+
+export const commitCdeImport = async (importSessionId: string) => {
+  const response = await APIClient.post(
+    `/glossaryTerms/import/${importSessionId}/commit`
   );
 
   return response.data;
@@ -148,6 +417,141 @@ export const getGlossaryTermsById = async (id: string, params?: ListParams) => {
   return response.data;
 };
 
+export const getLatestPublishedGlossaryTerm = async (id: string) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/published/latest`
+  );
+
+  return response.data;
+};
+
+export const getPublishedGlossaryTerm = async (
+  id: string,
+  businessVersion: string,
+  parentBusinessVersion?: string
+) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/published/${encodeURIComponent(businessVersion)}`,
+    { params: { parentBusinessVersion } }
+  );
+
+  return response.data;
+};
+
+export const getGlossaryTermWorkingVersion = async (
+  id: string,
+  parentBusinessVersion?: string
+) => {
+  const response = await APIClient.get<GlossaryTerm>(
+    `/glossaryTerms/${id}/working`,
+    {
+      params: {
+        parentBusinessVersion:
+          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+          parentScopeFromRoute(),
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export const createGlossaryTermWorkingVersion = async (
+  id: string,
+  businessVersion: string,
+  parentBusinessVersion: string
+) => {
+  const response = await APIClient.post<
+    { businessVersion: string },
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/working`, {
+    businessVersion,
+    parentBusinessVersion:
+      normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+      parentBusinessVersion,
+  });
+
+  return response.data;
+};
+
+export const updateGlossaryTermWorkingVersion = async (
+  id: string,
+  expectedRevision: number,
+  payload: GlossaryTerm
+) => {
+  const request: CdeDraftUpdateRequest = {
+    expectedRevision,
+    displayName: payload.displayName ?? null,
+    description: payload.description ?? '',
+    owners: payload.owners ?? [],
+    // Reviewers are not part of the CDE authoring payload.
+    domains: payload.domains ?? [],
+    tags: payload.tags ?? [],
+    extension: (payload.extension as Record<string, unknown>) ?? {},
+  };
+  const response = await APIClient.patch<
+    CdeDraftUpdateRequest,
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/working`, request, {
+    params: { parentBusinessVersion: parentScopeFromRoute() },
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  return response.data;
+};
+
+export const getGlossaryTermVersionPermissions = async (id: string) => {
+  const response = await APIClient.get<GlossaryVersionPermissions>(
+    `/glossaryTerms/${id}/permissions`
+  );
+
+  return response.data;
+};
+
+export async function transitionGlossaryTermWorkflow(
+  id: string,
+  action: 'submit' | 'reject' | 'reopen',
+  request: CdeWorkflowTransitionRequest,
+  parentBusinessVersion?: string
+): Promise<GlossaryTerm>;
+export async function transitionGlossaryTermWorkflow(
+  id: string,
+  action: Exclude<GlossaryWorkflowAction, 'submit' | 'reject' | 'reopen'>,
+  request: GlossaryWorkflowRequest,
+  parentBusinessVersion?: string
+): Promise<GlossaryTerm>;
+export async function transitionGlossaryTermWorkflow(
+  id: string,
+  action: GlossaryWorkflowAction,
+  request: GlossaryWorkflowRequest | CdeWorkflowTransitionRequest,
+  parentBusinessVersion?: string
+) {
+  if (action === 'revoke') {
+    const response = await APIClient.post<
+      undefined,
+      AxiosResponse<GlossaryTerm>
+    >(`/glossaryTerms/${id}/published/latest/archive`);
+
+    return response.data;
+  }
+  const path = action === 'createDraft' ? 'working' : `working/${action}`;
+  const response = await APIClient.post<
+    GlossaryWorkflowRequest,
+    AxiosResponse<GlossaryTerm>
+  >(`/glossaryTerms/${id}/${path}`, request, {
+    params:
+      action === 'createDraft'
+        ? undefined
+        : {
+            parentBusinessVersion:
+              normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+              parentScopeFromRoute(),
+          },
+  });
+
+  return response.data;
+}
+
 // Batch fetch up to 100 glossary terms by Id in a single round-trip.
 // 100 matches the backend MAX_BATCH_BY_IDS cap — going higher would 400
 // (or 431 once the URL clears Jetty's 8 KB header limit). Replaces the
@@ -156,7 +560,7 @@ export const getGlossaryTermsById = async (id: string, params?: ListParams) => {
 // by the backend, so callers should compare response length to input.
 export const getGlossaryTermsByIds = async (
   ids: string[],
-  params?: ListParams
+  params?: ListParams & { parentBusinessVersion?: string }
 ): Promise<GlossaryTerm[]> => {
   if (ids.length === 0) {
     return [];
@@ -191,12 +595,19 @@ export const addGlossaryTerm = async (
 };
 
 export const patchGlossaryTerm = async (id: string, patch: Operation[]) => {
-  const response = await APIClient.patch<
-    Operation[],
-    AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}`, patch);
+  const working = await getGlossaryTermWorkingVersion(id);
+  const payload = applyPatch(
+    structuredClone(working),
+    patch,
+    true,
+    false
+  ).newDocument;
 
-  return response.data;
+  return updateGlossaryTermWorkingVersion(
+    id,
+    working.workingRevision as number,
+    payload
+  );
 };
 
 export const moveGlossaryTerm = async (id: string, parent: EntityReference) => {
@@ -227,32 +638,47 @@ export const exportGlossaryTermsInCSVFormat = async (glossaryName: string) => {
 };
 
 export const getGlossaryVersionsList = async (id: string) => {
-  const url = `/glossaries/${id}/versions`;
+  const response = await APIClient.get<Glossary[]>(
+    `/glossaries/${id}/published`
+  );
+  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
 
-  const response = await APIClient.get<EntityHistory>(url);
-
-  return response.data;
+  return { entityType: 'glossary', versions } as EntityHistory;
 };
 
-export const getGlossaryVersion = async (id: string, version: string) => {
-  const url = `/glossaries/${id}/versions/${version}`;
+export const getGlossaryVersion = async (
+  id: string,
+  businessVersion: string
+) => {
+  const url = `/glossaries/${id}/published/${businessVersion}`;
   const response = await APIClient.get<Glossary>(url);
 
   return response.data;
 };
 
-export const getGlossaryTermsVersionsList = async (id: string) => {
-  const url = `/glossaryTerms/${id}/versions`;
+export const getGlossaryTermsVersionsList = async (
+  id: string,
+  parentBusinessVersion?: string
+) => {
+  const response = await APIClient.get<GlossaryTerm[]>(
+    `/glossaryTerms/${id}/published`,
+    { params: { parentBusinessVersion } }
+  );
+  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
 
-  const response = await APIClient.get<EntityHistory>(url);
-
-  return response.data;
+  return { entityType: 'glossaryTerm', versions } as EntityHistory;
 };
 
-export const getGlossaryTermsVersion = async (id: string, version: string) => {
-  const url = `/glossaryTerms/${id}/versions/${version}`;
+export const getGlossaryTermsVersion = async (
+  id: string,
+  businessVersion: string,
+  parentBusinessVersion?: string
+) => {
+  const url = `/glossaryTerms/${id}/published/${businessVersion}`;
 
-  const response = await APIClient.get<GlossaryTerm>(url);
+  const response = await APIClient.get<GlossaryTerm>(url, {
+    params: { parentBusinessVersion },
+  });
 
   return response.data;
 };
@@ -395,7 +821,9 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   after?: string,
   entityStatus?: string,
   fields?: string[],
-  before?: string
+  before?: string,
+  glossaryId?: string,
+  parentBusinessVersion?: string
 ) => {
   const apiUrl = `/glossaryTerms`;
 
@@ -403,7 +831,9 @@ export const getFirstLevelGlossaryTermsPaginated = async (
     PagingResponse<GlossaryTermWithChildren[]>
   >(apiUrl, {
     params: {
-      directChildrenOf: parentFQN,
+      ...(parentFQN === 'Data Dictionary' || glossaryId
+        ? { glossary: glossaryId ?? parentFQN }
+        : { directChildrenOf: parentFQN }),
       fields: fields ?? [
         TabSpecificField.CHILDREN_COUNT,
         TabSpecificField.OWNERS,
@@ -413,6 +843,7 @@ export const getFirstLevelGlossaryTermsPaginated = async (
       after: after,
       before,
       entityStatus,
+      ...(parentBusinessVersion ? { parentBusinessVersion } : {}),
     },
   });
 

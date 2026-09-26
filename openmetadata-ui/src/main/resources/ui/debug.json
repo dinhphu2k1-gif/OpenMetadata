@@ -1,14 +1,14 @@
 {
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
-  "numPassedTestSuites": 1,
-  "numPassedTests": 4,
+  "numPassedTestSuites": 4,
+  "numPassedTests": 17,
   "numPendingTestSuites": 0,
   "numPendingTests": 0,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
-  "numTotalTestSuites": 1,
-  "numTotalTests": 4,
+  "numTotalTestSuites": 4,
+  "numTotalTests": 17,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1789766314344,
+  "startTime": 1790377443266,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 4,
+      "numPassingTests": 3,
       "numPendingTests": 0,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1789766316140,
-        "runtime": 1388,
-        "slow": false,
-        "start": 1789766314752
+        "end": 1790377448695,
+        "runtime": 5088,
+        "slow": true,
+        "start": 1790377443607
       },
       "skipped": false,
       "snapshot": {
@@ -52,67 +52,424 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTermModal/GlossaryTermModal.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx",
       "testResults": [
         {
           "ancestorTitles": [
-            "GlossaryTermModal"
+            "TagsContainerV2 handleSave"
           ],
-          "duration": 75,
+          "duration": 45,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryTermModal uses the redesigned copy and dimensions for CDE add mode",
+          "fullName": "TagsContainerV2 handleSave preserves appliedBy and appliedAt on existing tag when a new tag is added",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves appliedBy and appliedAt on existing tag when a new tag is added"
+        },
+        {
+          "ancestorTitles": [
+            "TagsContainerV2 handleSave"
+          ],
+          "duration": 7,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TagsContainerV2 handleSave passes every TagLabel schema field through to onSelectionChange",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 15,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "passes every TagLabel schema field through to onSelectionChange"
+        },
+        {
+          "ancestorTitles": [
+            "TagsContainerV2 handleSave"
+          ],
+          "duration": 6,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "TagsContainerV2 handleSave add-one-remove-another in same save keeps surviving tag fields intact",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 7,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "add-one-remove-another in same save keeps surviving tag fields intact"
+        }
+      ],
+      "console": [
+        {
+          "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+          "origin": "    at warn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:26:5)\n    at logV6DeprecationWarnings (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at renderTagsContainer (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:101:16)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:129:5\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:127:94)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+          "origin": "    at warn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:37:5)\n    at logV6DeprecationWarnings (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at renderTagsContainer (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:101:16)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:129:5\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Tag/TagsContainerV2/TagsContainerV2.test.tsx:127:94)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    },
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 5,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1790377449973,
+        "runtime": 1256,
+        "slow": false,
+        "start": 1790377448717
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 126,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary renders Group 1 and Group 2 as structured sections with mapped CDE fields",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 25,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "renders Group 1 and Group 2 as structured sections with mapped CDE fields"
+        },
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 14,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary uses English labels when language is set to English",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 11,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "uses English labels when language is set to English"
+        },
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 20,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary does not offer date editing without permission or in version view (false)",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "does not offer date editing without permission or in version view (false)"
+        },
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 18,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary does not offer date editing without permission or in version view (true)",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 3,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "does not offer date editing without permission or in version view (true)"
+        },
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermSummary"
+          ],
+          "duration": 108,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermSummary allows custom-field editors to clear a date while retaining metadata and status",
           "invocations": 1,
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
           "status": "passed",
-          "title": "uses the redesigned copy and dimensions for CDE add mode"
+          "title": "allows custom-field editors to clear a date while retaining metadata and status"
+        }
+      ],
+      "console": [
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:167:11)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+          "origin": "    at warn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:26:5)\n    at logV6DeprecationWarnings (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:167:11)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+          "origin": "    at warn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:9:13)\n    at warnOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:14:3)\n    at logDeprecation (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/deprecations.ts:37:5)\n    at logV6DeprecationWarnings (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-router/lib/components.tsx:257:25)\n    at commitHookEffectListMount (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:23189:26)\n    at commitPassiveMountOnFiber (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24970:11)\n    at commitPassiveMountEffects_complete (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24930:9)\n    at commitPassiveMountEffects_begin (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24917:7)\n    at commitPassiveMountEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:24905:3)\n    at flushPassiveEffectsImpl (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27078:3)\n    at flushPassiveEffects (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27023:14)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26808:9\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:167:11)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "warn"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:239:11)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:265:13\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-each/build/bind.js:81:13)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:265:13\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-each/build/bind.js:81:13)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at renderRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:180:26)\n    at render (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:271:10)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:300:11\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:289:100)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at updateFunctionComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19617:20)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21640:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performSyncWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26124:20)\n    at flushSyncCallbacks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:12042:22)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at Object.eventWrapper (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:107:28)\n    at fireEvent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/events.js:12:35)\n    at fireEvent.<computed> [as click] (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/events.js:110:36)\n    at fireEvent.<computed> [as click] (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/fire-event.js:15:52)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:305:15\n    at Generator.next (<anonymous>)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:118:75\n    at new Promise (<anonymous>)\n    at Object.__awaiter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/tslib/tslib.js:114:16)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermSummary.test.tsx:289:100)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        },
+        {
+          "message": "Warning: [antd: Modal] `visible` will be removed in next major version, please use `open` instead.",
+          "origin": "    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:43:15)\n    at call (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:64:5)\n    at warningOnce (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/warning.js:71:3)\n    at warning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/_util/warning.js:21:29)\n    at Modal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/modal/Modal.js:65:67)\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at updateFunctionComponent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19617:20)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21640:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performConcurrentWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:25777:74)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at recursivelyFlushAsyncActWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2633:9)\n    at Immediate._onImmediate (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2641:13)\n    at processImmediate (node:internal/timers:504:21)",
+          "type": "error"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    },
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 8,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1790377450301,
+        "runtime": 309,
+        "slow": false,
+        "start": 1790377449992
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEReleaseLevelField.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 5,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField renders CEO as Tổng Giám đốc",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "renders CEO as Tổng Giám đốc"
         },
         {
           "ancestorTitles": [
-            "GlossaryTermModal"
+            "CDEReleaseLevelField"
           ],
-          "duration": 27,
+          "duration": 2,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "GlossaryTermModal keeps the existing CDE edit mode presentation",
+          "fullName": "CDEReleaseLevelField renders TTQLDL as TTQLDL",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "renders TTQLDL as TTQLDL"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 3,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField shows a muted empty state without an always-visible select",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 2,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "shows a muted empty state without an always-visible select"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 39,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField opens the editor on demand for an editable draft",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "opens the editor on demand for an editable draft"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 2,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField is read-only for status Approved and versionView=false",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "is read-only for status Approved and versionView=false"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 1,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField is read-only for status Archived and versionView=false",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "is read-only for status Archived and versionView=false"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 2,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField is read-only for status Draft and versionView=true",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "is read-only for status Draft and versionView=true"
+        },
+        {
+          "ancestorTitles": [
+            "CDEReleaseLevelField"
+          ],
+          "duration": 38,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEReleaseLevelField preserves the existing extension when the release level changes",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 1,
+          "retryReasons": [],
+          "status": "passed",
+          "title": "preserves the existing extension when the release level changes"
+        }
+      ],
+      "console": [
+        {
+          "message": "Warning: findDOMNode is deprecated and will be removed in the next major release. Instead, add a ref directly to the element you want to reference. Learn more about using refs safely here: https://reactjs.org/link/strict-mode-find-node\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/Portal.js:12:25\n    at Trigger (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-trigger/lib/index.js:82:36)\n    at Tooltip (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-tooltip/lib/Tooltip.js:29:32)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/tooltip/index.js:77:33\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/antd/lib/popover/index.js:34:34\n    at div\n    at div\n    at CDEReleaseLevelField (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEReleaseLevelField.tsx:25:3)",
+          "origin": "    at printWarning (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:86:30)\n    at error (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:60:7)\n    at Object.findDOMNode (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:29666:7)\n    at Trigger.getRootDomNode (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-trigger/lib/index.js:255:34)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-trigger/lib/index.js:379:50\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/rc-util/lib/Portal.js:26:28\n    at renderWithHooks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at updateForwardRef (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:19245:20)\n    at beginWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:21675:16)\n    at beginWork$1 (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:27465:14)\n    at performUnitOfWork (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26599:12)\n    at workLoopSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26505:5)\n    at renderRootSync (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26473:7)\n    at performSyncWorkOnRoot (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:26124:20)\n    at flushSyncCallbacks (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react-dom/cjs/react-dom.development.js:12042:22)\n    at flushActQueue (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2667:24)\n    at act (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/react/cjs/react.development.js:2582:11)\n    at /home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/act-compat.js:47:25\n    at Object.eventWrapper (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/pure.js:107:28)\n    at fireEvent (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/events.js:12:35)\n    at fireEvent.<computed> [as click] (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/dom/dist/events.js:110:36)\n    at fireEvent.<computed> [as click] (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/@testing-library/react/dist/fire-event.js:15:52)\n    at Object.<anonymous> (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEReleaseLevelField.test.tsx:74:15)\n    at Promise.then.completed (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/utils.js:231:10)\n    at _callCircusTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:316:40)\n    at _runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:252:3)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:126:9)\n    at _runTestsForDescribeBlock (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:121:9)\n    at run (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/run.js:71:3)\n    at runAndTransformResultsToJestFormat (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapterInit.js:122:21)\n    at jestAdapter (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-circus/build/legacy-code-todo-rewrite/jestAdapter.js:79:19)\n    at runTestInternal (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:367:16)\n    at runTest (/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/node_modules/jest-runner/build/runTest.js:444:34)",
+          "type": "error"
+        }
+      ],
+      "displayName": {
+        "color": "white",
+        "name": "@openmetadata"
+      },
+      "failureMessage": null
+    },
+    {
+      "leaks": false,
+      "numFailingTests": 0,
+      "numPassingTests": 1,
+      "numPendingTests": 0,
+      "numTodoTests": 0,
+      "openHandles": [],
+      "perfStats": {
+        "end": 1790377450374,
+        "runtime": 64,
+        "slow": false,
+        "start": 1790377450310
+      },
+      "skipped": false,
+      "snapshot": {
+        "added": 0,
+        "fileDeleted": false,
+        "matched": 0,
+        "unchecked": 0,
+        "uncheckedKeys": [],
+        "unmatched": 0,
+        "updated": 0
+      },
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/components/Glossary/GlossaryTerms/CDEGlossaryTermOverview.test.tsx",
+      "testResults": [
+        {
+          "ancestorTitles": [
+            "CDEGlossaryTermOverview"
+          ],
+          "duration": 4,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "CDEGlossaryTermOverview renders a focused full-width description and the CDE summary",
           "invocations": 1,
           "location": null,
           "numPassingAsserts": 6,
           "retryReasons": [],
           "status": "passed",
-          "title": "keeps the existing CDE edit mode presentation"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryTermModal"
-          ],
-          "duration": 12,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryTermModal keeps the standard glossary term modal unchanged",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 5,
-          "retryReasons": [],
-          "status": "passed",
-          "title": "keeps the standard glossary term modal unchanged"
-        },
-        {
-          "ancestorTitles": [
-            "GlossaryTermModal"
-          ],
-          "duration": 12,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "GlossaryTermModal renders DQGlossaryTermForm with wide layout when isDQGlossary is true",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 5,
-          "retryReasons": [],
-          "status": "passed",
-          "title": "renders DQGlossaryTermForm with wide layout when isDQGlossary is true"
+          "title": "renders a focused full-width description and the CDE summary"
         }
       ],
       "displayName": {

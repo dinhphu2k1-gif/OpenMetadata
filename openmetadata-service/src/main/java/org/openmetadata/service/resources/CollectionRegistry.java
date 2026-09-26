@@ -164,6 +164,9 @@ public final class CollectionRegistry {
         environment.jersey().register(resource);
         LOG.info("Registering {} with order {}", resourceClass, details.order);
       } catch (Exception ex) {
+        if (resourceClass.endsWith(".GlossaryResource")) {
+          throw new IllegalStateException("Data Dictionary initialization failed", ex);
+        }
         LOG.warn("Failed to create resource for class {} {}", resourceClass, ex.getMessage());
       }
     }
@@ -191,6 +194,9 @@ public final class CollectionRegistry {
         try {
           createResource(jdbi, resourceClass, config, authorizer, authenticatorHandler, limits);
         } catch (Exception ex) {
+          if (resourceClass.endsWith(".GlossaryResource")) {
+            throw new IllegalStateException("Data Dictionary initialization failed", ex);
+          }
           LOG.warn("Failed to create resource for class {} {}", resourceClass, ex);
         }
       }
@@ -302,6 +308,9 @@ public final class CollectionRegistry {
     } catch (NoSuchMethodException ignored) {
       // Method does not exist and initialize is not called
     } catch (Exception ex) {
+      if (clz.getName().endsWith(".GlossaryResource")) {
+        throw new IllegalStateException("Data Dictionary initialization failed", ex);
+      }
       LOG.warn("Encountered exception while initializing resource for {}", clz, ex);
     }
 

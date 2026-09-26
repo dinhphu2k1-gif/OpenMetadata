@@ -13,10 +13,10 @@
 
 import { AxiosError } from 'axios';
 import { compare } from 'fast-json-patch';
-import { isEmpty } from 'lodash';
+import { isEmpty, omit } from 'lodash';
 import { RefObject, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DeleteType } from '../../../components/common/DeleteWidget/DeleteWidget.interface';
 import ErrorPlaceHolder from '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import Loader from '../../../components/common/Loader/Loader';
@@ -34,7 +34,6 @@ import {
   pagingObject,
   ROUTES,
 } from '../../../constants/constants';
-import { GLOSSARIES_DOCS } from '../../../constants/docs.constants';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { observerOptions } from '../../../constants/Mydata.constants';
 import { useAsyncDeleteProvider } from '../../../context/AsyncDeleteProvider/AsyncDeleteProvider';
@@ -48,7 +47,10 @@ import {
   TabSpecificField,
 } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Paging } from '../../../generated/type/paging';
 import { withPageLayout } from '../../../hoc/withPageLayout';
@@ -56,18 +58,33 @@ import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
+  getLatestPublishedGlossary,
+  getGlossaryVersion,
+  getGlossaryVersionPermissions,
+  getGlossaryWorkingVersion,
+  getPublishedGlossaryTerm,
   getGlossaryTermByFQN,
-  patchGlossaries,
-  patchGlossaryTerm,
+  getGlossaryTermsById,
+  getGlossaryTermWorkingVersion,
+  updateGlossaryTermWorkingVersion,
+  updateGlossaryWorkingVersion,
   updateGlossaryTermVotes,
   updateGlossaryVotes,
 } from '../../../rest/glossaryAPI';
+import {
+  compareBusinessVersions,
+  getBusinessVersion,
+} from '../../../utils/BusinessVersionUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import {
+  getCdeDetailPath,
+  parseCdeRoute,
+} from '../../../utils/routing/cdeRoutingHelper';
 import GlossaryLeftPanel from '../GlossaryLeftPanel/GlossaryLeftPanel.component';
 
 const GlossaryPage = () => {
@@ -75,9 +92,22 @@ const GlossaryPage = () => {
   const { fqn: glossaryFqn } = useFqn();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { handleOnAsyncEntityDeleteConfirm } = useAsyncDeleteProvider();
   const { action } = useRequiredParams<{ action: EntityAction }>();
   const [initialised, setInitialised] = useState(false);
+  const cdeRoute = useMemo(
+    () =>
+      parseCdeRoute({
+        fqn: glossaryFqn,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [glossaryFqn, location.pathname, location.search]
+  );
+  const { businessVersion, parentBusinessVersion, termId } = cdeRoute;
+  const [isGlossaryHistorical, setIsGlossaryHistorical] = useState(false);
+  const [isTermHistorical, setIsTermHistorical] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMoreGlossaryLoading, setIsMoreGlossaryLoading] =
@@ -102,6 +132,17 @@ const GlossaryPage = () => {
     updateActiveGlossary,
   } = useGlossaryStore();
 
+  // Entity updates replace the glossary object in the list. Keep route/data
+  // resolution tied to list membership and identity only, so inline metadata
+  // edits do not refetch the working version and flash the full-page loader.
+  const glossaryNavigationKey = useMemo(
+    () =>
+      glossaries
+        .map(({ id, fullyQualifiedName }) => `${id}:${fullyQualifiedName ?? ''}`)
+        .join('|'),
+    [glossaries]
+  );
+
   const isImportAction = useMemo(
     () => action === EntityAction.IMPORT,
     [action]
@@ -115,37 +156,29 @@ const GlossaryPage = () => {
     return true;
   }, [glossaryFqn]);
 
-  const {
-    createGlossaryPermission,
-    viewBasicGlossaryPermission,
-    viewAllGlossaryPermission,
-  } = useMemo(() => {
-    const resourceType = isGlossaryActive
-      ? ResourceEntity.GLOSSARY
-      : ResourceEntity.GLOSSARY_TERM;
+  const isHistoricalView = isGlossaryActive
+    ? isGlossaryHistorical
+    : isTermHistorical;
 
-    return {
-      createGlossaryPermission: checkPermission(
-        Operation.Create,
-        resourceType,
-        permissions
-      ),
-      viewBasicGlossaryPermission: checkPermission(
-        Operation.ViewBasic,
-        resourceType,
-        permissions
-      ),
-      viewAllGlossaryPermission: checkPermission(
-        Operation.ViewAll,
-        resourceType,
-        permissions
-      ),
-    };
-  }, [permissions, isGlossaryActive]);
+  const { viewBasicGlossaryPermission, viewAllGlossaryPermission } =
+    useMemo(() => {
+      const resourceType = isGlossaryActive
+        ? ResourceEntity.GLOSSARY
+        : ResourceEntity.GLOSSARY_TERM;
 
-  const handleAddGlossaryClick = useCallback(() => {
-    navigate(ROUTES.ADD_GLOSSARY);
-  }, [navigate]);
+      return {
+        viewBasicGlossaryPermission: checkPermission(
+          Operation.ViewBasic,
+          resourceType,
+          permissions
+        ),
+        viewAllGlossaryPermission: checkPermission(
+          Operation.ViewAll,
+          resourceType,
+          permissions
+        ),
+      };
+    }, [permissions, isGlossaryActive]);
 
   const fetchGlossaryList = useCallback(async () => {
     try {
@@ -164,6 +197,7 @@ const GlossaryPage = () => {
             TabSpecificField.VOTES,
             TabSpecificField.DOMAINS,
             TabSpecificField.TERM_COUNT,
+            TabSpecificField.EXTENSION,
           ],
           limit: PAGE_SIZE_LARGE,
           ...(nextPage && { after: nextPage }),
@@ -207,6 +241,7 @@ const GlossaryPage = () => {
           TabSpecificField.VOTES,
           TabSpecificField.DOMAINS,
           TabSpecificField.TERM_COUNT,
+          TabSpecificField.EXTENSION,
         ],
         limit: PAGE_SIZE_LARGE,
         after: after,
@@ -237,29 +272,176 @@ const GlossaryPage = () => {
 
   const fetchGlossaryTermDetails = useCallback(async () => {
     setIsRightPanelLoading(true);
+    if (!businessVersion || !parentBusinessVersion) {
+      // Explore's legacy glossary index can return the scoped CDE FQN without
+      // the F12 route metadata. Resolve that stable identity once and replace
+      // the incomplete URL with the canonical versioned CDE URL.
+      const scopedParentVersion = glossaryFqn.match(/@v([1-9]\d*)$/)?.[1];
+      if (scopedParentVersion) {
+        try {
+          const current = await getGlossaryTermByFQN(glossaryFqn);
+          if (current.businessVersion && current.parentBusinessVersion) {
+            navigate(
+              getCdeDetailPath({
+                fqn: current.fullyQualifiedName ?? glossaryFqn,
+                businessVersion: current.businessVersion,
+                parentBusinessVersion: current.parentBusinessVersion,
+                termId: current.id,
+                isWorkingDraft: current.entityStatus !== EntityStatus.Approved,
+              }),
+              { replace: true }
+            );
+
+            return;
+          }
+        } catch (error) {
+          const status = (error as AxiosError)?.response?.status;
+          navigate(
+            status === ClientErrors.FORBIDDEN
+              ? ROUTES.FORBIDDEN
+              : ROUTES.NOT_FOUND,
+            { replace: true }
+          );
+
+          return;
+        } finally {
+          setIsRightPanelLoading(false);
+        }
+      }
+
+      navigate(ROUTES.NOT_FOUND, { replace: true });
+      setIsRightPanelLoading(false);
+
+      return;
+    }
     try {
-      const response = await getGlossaryTermByFQN(glossaryFqn, {
-        fields: [
-          TabSpecificField.RELATED_TERMS,
-          TabSpecificField.REVIEWERS,
-          TabSpecificField.TAGS,
-          TabSpecificField.OWNERS,
-          TabSpecificField.CHILDREN,
-          TabSpecificField.VOTES,
-          TabSpecificField.DOMAINS,
-          TabSpecificField.EXTENSION,
-          TabSpecificField.CHILDREN_COUNT,
-        ],
-      });
-      setActiveGlossary(response as ModifiedGlossary);
+      const termFields = [
+        TabSpecificField.RELATED_TERMS,
+        TabSpecificField.REVIEWERS,
+        TabSpecificField.TAGS,
+        TabSpecificField.OWNERS,
+        TabSpecificField.CHILDREN,
+        TabSpecificField.VOTES,
+        TabSpecificField.DOMAINS,
+        TabSpecificField.EXTENSION,
+        TabSpecificField.CHILDREN_COUNT,
+      ];
+      // Search results already carry the stable term id. Prefer it because a
+      // working CDE may be visible in the search index before the generic FQN
+      // endpoint can resolve that working identity for the current user.
+      const current = termId
+        ? await getGlossaryTermsById(termId, { fields: termFields })
+        : await getGlossaryTermByFQN(glossaryFqn, {
+            fields: termFields,
+          });
+
+      const parentGlossaryId = current.glossary?.id;
+      if (!parentGlossaryId) {
+        navigate(ROUTES.NOT_FOUND, { replace: true });
+
+        return;
+      }
+
+      let liveGlossary: Glossary | null = null;
+      try {
+        const capabilities = await getGlossaryVersionPermissions(parentGlossaryId);
+        if (capabilities.canViewWorking) {
+          try {
+            liveGlossary = await getGlossaryWorkingVersion(parentGlossaryId);
+          } catch (error) {
+            if ((error as AxiosError)?.response?.status === ClientErrors.NOT_FOUND) {
+              liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
+            } else {
+              throw error;
+            }
+          }
+        } else {
+          liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
+        }
+      } catch {
+        const found = glossaries.find((g) => g.id === parentGlossaryId);
+        if (found) {
+          liveGlossary = found;
+        }
+      }
+
+      const liveParentVer = liveGlossary?.businessVersion
+        ? getBusinessVersion(liveGlossary.businessVersion, '')
+        : '';
+      const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
+      const reqCdeVer = getBusinessVersion(businessVersion, '');
+
+      if (
+        liveParentVer &&
+        compareBusinessVersions(liveParentVer, reqParentVer) === 0
+      ) {
+        try {
+          // The FQN endpoint resolves the stable term identity. It must not be
+          // used as the scoped working representation because a CDE can have
+          // independent working rows in different Data Dictionary versions.
+          const working = await getGlossaryTermWorkingVersion(
+            current.id,
+            reqParentVer
+          );
+          const workingVersion = getBusinessVersion(
+            working.businessVersion,
+            ''
+          );
+          if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
+            setIsTermHistorical(false);
+            setActiveGlossary(working as ModifiedGlossary);
+
+            return;
+          }
+        } catch (error) {
+          const status = (error as AxiosError)?.response?.status;
+          // A Consumer cannot read a working version, and a published-only CDE
+          // has no working row. Both cases should continue to snapshot lookup.
+          if (
+            status !== ClientErrors.FORBIDDEN &&
+            status !== ClientErrors.NOT_FOUND
+          ) {
+            throw error;
+          }
+        }
+      }
+
+      try {
+        const response = await getPublishedGlossaryTerm(
+          current.id,
+          reqCdeVer,
+          reqParentVer
+        );
+        if (
+          compareBusinessVersions(
+            getBusinessVersion(response.businessVersion, ''),
+            reqCdeVer
+          ) !== 0
+        ) {
+          navigate(ROUTES.NOT_FOUND, { replace: true });
+
+          return;
+        }
+        // A published response is not necessarily a historical view. The
+        // current Approved head is still the live CDE page and must expose
+        // actions such as "Create new version". Only an archived snapshot is
+        // read-only historical content.
+        setIsTermHistorical(response.entityStatus === EntityStatus.Archived);
+        setActiveGlossary(response as ModifiedGlossary);
+      } catch {
+        navigate(ROUTES.NOT_FOUND, { replace: true });
+      }
     } catch (error) {
-      if ((error as AxiosError)?.response?.status === ClientErrors.FORBIDDEN) {
+      const status = (error as AxiosError)?.response?.status;
+      if (status === ClientErrors.FORBIDDEN) {
         navigate(ROUTES.FORBIDDEN, { replace: true });
+      } else {
+        navigate(ROUTES.NOT_FOUND, { replace: true });
       }
     } finally {
       setIsRightPanelLoading(false);
     }
-  }, [glossaryFqn]);
+  }, [businessVersion, glossaryFqn, parentBusinessVersion, termId, glossaries]);
 
   useEffect(() => {
     setIsRightPanelLoading(true);
@@ -267,41 +449,170 @@ const GlossaryPage = () => {
       if (!isGlossaryActive) {
         fetchGlossaryTermDetails();
       } else {
-        setActiveGlossary(
-          glossaries.find(
-            (glossary) => glossary.fullyQualifiedName === glossaryFqn
-          ) || glossaries[0]
+        const foundGlossary = glossaries.find(
+          (glossary) => glossary.fullyQualifiedName === glossaryFqn
         );
+        if (!foundGlossary && glossaryFqn) {
+          setIsRightPanelLoading(false);
+          navigate(ROUTES.FORBIDDEN, { replace: true });
+
+          return;
+        }
+
+        const current = foundGlossary || glossaries[0];
+        if (businessVersion && current) {
+          setIsRightPanelLoading(true);
+          getGlossaryVersionPermissions(current.id)
+            .then(async (capabilities) => {
+              if (capabilities.canViewWorking) {
+                try {
+                  const working = await getGlossaryWorkingVersion(current.id);
+                  if (
+                    compareBusinessVersions(
+                      getBusinessVersion(working.businessVersion, ''),
+                      getBusinessVersion(businessVersion, '')
+                    ) === 0
+                  ) {
+                    setIsGlossaryHistorical(false);
+                    setActiveGlossary(working);
+
+                    return;
+                  }
+                } catch (error) {
+                  if (
+                    (error as AxiosError)?.response?.status !==
+                    ClientErrors.NOT_FOUND
+                  ) {
+                    throw error;
+                  }
+                }
+              }
+
+              const snapshot = await getGlossaryVersion(
+                current.id,
+                businessVersion
+              );
+              // Authorization for the exact published business version is enforced by
+              // GET /glossaries/{id}/published/{businessVersion}. Consumers are allowed
+              // to read Archived snapshots, so mutation capabilities such as
+              // canViewWorking/canArchive must not be used as a second read gate here.
+              // A business-version deep link can still point at the current
+              // Approved head. Only an Archived Dictionary is historical and
+              // must suppress live workflow actions such as Create New Version.
+              setIsGlossaryHistorical(
+                snapshot.entityStatus === EntityStatus.Archived
+              );
+              setActiveGlossary(snapshot);
+            })
+            .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
+            .finally(() => setIsRightPanelLoading(false));
+
+          return;
+        }
+
+        setIsGlossaryHistorical(false);
+        setIsRightPanelLoading(true);
+        getGlossaryVersionPermissions(current.id)
+          .then(async (capabilities) => {
+            if (!capabilities.canViewWorking) {
+              return current;
+            }
+
+            try {
+              return await getGlossaryWorkingVersion(current.id);
+            } catch (error) {
+              // Approving a Data Dictionary consumes its working record. The
+              // default route must then resolve the published head instead of
+              // treating the expected working 404 as a missing dictionary.
+              if (
+                (error as AxiosError)?.response?.status ===
+                ClientErrors.NOT_FOUND
+              ) {
+                return getLatestPublishedGlossary(current.id);
+              }
+
+              throw error;
+            }
+          })
+          .then((resolved) => setActiveGlossary(resolved))
+          .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
+          .finally(() => setIsRightPanelLoading(false));
 
         if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
           navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
             replace: true,
           });
         }
-
-        setIsRightPanelLoading(false);
       }
+    } else {
+      setIsRightPanelLoading(false);
     }
-  }, [isGlossaryActive, glossaryFqn, glossaries]);
+  }, [
+    businessVersion,
+    isGlossaryActive,
+    glossaryFqn,
+    glossaryNavigationKey,
+  ]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
       const jsonPatch = compare(activeGlossary as Glossary, updatedData);
+      if (isEmpty(jsonPatch)) {
+        return;
+      }
 
       try {
-        const response = await patchGlossaries(activeGlossary?.id, jsonPatch);
+        const working =
+          activeGlossary?.workingRevision != null
+            ? (activeGlossary as Glossary)
+            : await getGlossaryWorkingVersion(activeGlossary?.id);
+        const response = await updateGlossaryWorkingVersion(
+          activeGlossary?.id,
+          working.workingRevision as number,
+          updatedData
+        );
 
-        updateActiveGlossary({ ...updatedData, ...response });
+        updateActiveGlossary(response);
+        setGlossaries(
+          glossaries.map((item) =>
+            item.id === response.id
+              ? {
+                  ...item,
+                  ...response,
+                  extension:
+                    updatedData.extension ??
+                    response.extension ??
+                    item.extension,
+                }
+              : item
+          )
+        );
 
-        if (activeGlossary?.name !== updatedData.name) {
+        // Attribute editors can send a partial entity without `name`. Detect an
+        // actual rename from the authoritative response instead, otherwise a
+        // normal inline update would navigate and reload the whole page.
+        if (
+          activeGlossary?.fullyQualifiedName &&
+          response.fullyQualifiedName &&
+          activeGlossary.fullyQualifiedName !== response.fullyQualifiedName
+        ) {
           navigate(getGlossaryPath(response.fullyQualifiedName));
           fetchGlossaryList();
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+
+        throw error;
       }
     },
-    [activeGlossary, updateActiveGlossary, navigate, fetchGlossaryList]
+    [
+      activeGlossary,
+      updateActiveGlossary,
+      navigate,
+      fetchGlossaryList,
+      glossaries,
+      setGlossaries,
+    ]
   );
 
   const updateVote = useCallback(
@@ -364,26 +675,46 @@ const GlossaryPage = () => {
 
   const handleGlossaryTermUpdate = useCallback(
     async (updatedData: GlossaryTerm) => {
-      const jsonPatch = compare(activeGlossary as GlossaryTerm, updatedData);
+      const normalizedUpdatedData = updatedData;
+
+      // Version/audit snapshots do not contain the same server-computed fields as the
+      // canonical entity. Exclude those fields so restoring a business version never emits
+      // invalid remove operations such as `/childrenCount`.
+      const readOnlyFields: Array<keyof GlossaryTerm> = [
+        'changeDescription',
+        'children',
+        'childrenCount',
+        'href',
+        'incrementalChangeDescription',
+        'updatedAt',
+        'updatedBy',
+        'usageCount',
+        'version',
+        'votes',
+      ];
+      const jsonPatch = compare(
+        omit(activeGlossary as GlossaryTerm, readOnlyFields),
+        omit(normalizedUpdatedData, readOnlyFields)
+      );
       if (isEmpty(jsonPatch)) {
         return;
       }
 
-      const shouldRefreshTerms = jsonPatch.some((patch) =>
-        patch.path.startsWith('/owners')
-      );
-
       try {
-        const response = await patchGlossaryTerm(activeGlossary?.id, jsonPatch);
+        const working =
+          activeGlossary?.workingRevision != null
+            ? (activeGlossary as GlossaryTerm)
+            : await getGlossaryTermWorkingVersion(
+                activeGlossary?.id,
+                parentBusinessVersion
+              );
+        const response = await updateGlossaryTermWorkingVersion(
+          activeGlossary?.id,
+          working.workingRevision as number,
+          normalizedUpdatedData
+        );
         if (response) {
           setActiveGlossary(response as ModifiedGlossary);
-          if (activeGlossary?.name !== updatedData.name) {
-            navigate(getGlossaryPath(response.fullyQualifiedName));
-            fetchGlossaryList();
-          }
-          if (shouldRefreshTerms) {
-            fetchGlossaryTermDetails();
-          }
         } else {
           throw t('server.entity-updating-error', {
             entity: t('label.glossary-term'),
@@ -391,6 +722,7 @@ const GlossaryPage = () => {
         }
       } catch (error) {
         showErrorToast(error as AxiosError);
+
         throw error;
       }
     },
@@ -460,25 +792,12 @@ const GlossaryPage = () => {
     return (
       <div className="full-height">
         <ErrorPlaceHolder
-          buttonId="add-glossary"
           className="mt-0-important border-none"
-          doc={GLOSSARIES_DOCS}
           heading={t('label.glossary')}
-          permission={createGlossaryPermission}
-          permissionValue={
-            createGlossaryPermission
-              ? t('label.create-entity', {
-                  entity: t('label.glossary'),
-                })
-              : ''
-          }
+          permission={false}
+          permissionValue=""
           size={SIZE.X_LARGE}
-          type={
-            createGlossaryPermission
-              ? ERROR_PLACEHOLDER_TYPE.CREATE
-              : ERROR_PLACEHOLDER_TYPE.NO_DATA
-          }
-          onClick={handleAddGlossaryClick}
+          type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
         />
       </div>
     );
@@ -490,7 +809,7 @@ const GlossaryPage = () => {
     <GlossaryV1
       isGlossaryActive={isGlossaryActive}
       isSummaryPanelOpen={Boolean(previewAsset)}
-      isVersionsView={false}
+      isVersionsView={isHistoricalView}
       refreshActiveGlossaryTerm={fetchGlossaryTermDetails}
       refreshGlossaryList={fetchGlossaryList}
       selectedData={activeGlossary as Glossary}
@@ -505,8 +824,8 @@ const GlossaryPage = () => {
 
   const resizableLayout = isGlossaryActive ? (
     <ResizableLeftPanels
-      showLearningIcon
       collapsibleFirstPanel
+      showLearningIcon
       className="content-height-with-resizable-panel"
       firstPanel={{
         className:

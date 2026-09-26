@@ -32,12 +32,76 @@
       "description": "Metadata version of the entity.",
       "$ref": "../../type/entityHistory.json#/definitions/entityVersion"
     },
+    "businessVersion": {
+      "description": "Business-facing version of this glossary working version or published snapshot.",
+      "type": "string"
+    },
+    "workingRevision": {
+      "description": "Optimistic-lock revision of the working business version.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "snapshotId": {
+      "description": "Identifier of the immutable published snapshot represented by this response.",
+      "$ref": "../../type/basic.json#/definitions/uuid"
+    },
+    "publicationSequence": {
+      "description": "Monotonic publication order used to resolve the latest published snapshot.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "publishedAt": {
+      "description": "Time at which this immutable business snapshot was published.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "publishedBy": {
+      "description": "User that published this immutable business snapshot.",
+      "type": "string"
+    },
+    "archivedAt": {
+      "description": "Time at which this published snapshot was archived.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "archivedBy": {
+      "description": "User that archived this published snapshot.",
+      "type": "string"
+    },
+    "versioningMode": {
+      "description": "Versioning model used by the glossary.",
+      "type": "string",
+      "enum": ["BusinessWorkflow"],
+      "default": "BusinessWorkflow"
+    },
     "updatedAt": {
       "description": "Last update time corresponding to the new version of the entity in Unix epoch time milliseconds.",
       "$ref": "../../type/basic.json#/definitions/timestamp"
     },
     "updatedBy": {
       "description": "User who made the update.",
+      "type": "string"
+    },
+    "createdAt": {
+      "description": "Time at which this working business version was created.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "createdBy": {
+      "description": "User who created this working business version.",
+      "type": "string"
+    },
+    "submittedAt": {
+      "description": "Time at which the working version was most recently submitted.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "submittedBy": {
+      "description": "User who most recently submitted the working version.",
+      "type": "string"
+    },
+    "rejectedAt": {
+      "description": "Time at which the working version was most recently rejected.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "rejectedBy": {
+      "description": "User who most recently rejected the working version.",
       "type": "string"
     },
     "impersonatedBy": {
@@ -75,6 +139,14 @@
       "description": "Total number of terms in the glossary. This includes all the children in the hierarchy.",
       "type" : "integer",
       "minimum": 0
+    },
+    "termRevisions": {
+      "description": "Server-owned immutable CDE revisions. Always empty on a working Data Dictionary and populated automatically when published.",
+      "type": "array",
+      "items": {
+        "$ref": "../../type/glossaryTermRevisionReference.json"
+      },
+      "default": []
     },
     "changeDescription": {
       "description": "Change that lead to this version of the entity.",

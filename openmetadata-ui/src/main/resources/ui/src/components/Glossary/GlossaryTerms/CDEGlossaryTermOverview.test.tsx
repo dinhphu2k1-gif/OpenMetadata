@@ -29,7 +29,7 @@ jest.mock('../../../utils/GlossaryTerm/GlossaryTermUtil', () => ({
 }));
 
 describe('CDEGlossaryTermOverview', () => {
-  it('renders the CDE fields with the reviewer widget inside Overview', () => {
+  it('renders a focused full-width description and the CDE summary', () => {
     render(
       <CDEGlossaryTermOverview
         glossaryTerm={{ name: 'CDE1' } as GlossaryTerm}
@@ -37,14 +37,13 @@ describe('CDEGlossaryTermOverview', () => {
     );
 
     expect(screen.getByText('CDEGlossaryTermSummary')).toBeInTheDocument();
-    expect(screen.getByTestId('cde-overview-reviewers')).toBeInTheDocument();
     expect(
       screen.getByText(GlossaryTermDetailPageWidgetKeys.DESCRIPTION)
     ).toBeInTheDocument();
 
-    [
-      GlossaryTermDetailPageWidgetKeys.REVIEWER,
-    ].forEach((widgetKey) => expect(screen.getByText(widgetKey)).toBeInTheDocument());
+    expect(
+      screen.queryByText(GlossaryTermDetailPageWidgetKeys.REVIEWER)
+    ).not.toBeInTheDocument();
 
     expect(getGlossaryTermWidgetFromKey).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -54,6 +53,6 @@ describe('CDEGlossaryTermOverview', () => {
     expect(
       screen.queryByText(GlossaryTermDetailPageWidgetKeys.WORKFLOW_HISTORY)
     ).not.toBeInTheDocument();
-    expect(getGlossaryTermWidgetFromKey).toHaveBeenCalledTimes(2);
+    expect(getGlossaryTermWidgetFromKey).toHaveBeenCalledTimes(1);
   });
 });

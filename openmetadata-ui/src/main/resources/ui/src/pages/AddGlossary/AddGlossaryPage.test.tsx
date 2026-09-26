@@ -25,6 +25,9 @@ jest.mock('../../components/Glossary/AddGlossary/AddGlossary.component', () => {
 
 jest.mock('../../rest/glossaryAPI', () => ({
   addGlossaries: jest.fn().mockImplementation(() => Promise.resolve()),
+  transitionGlossaryWorkflow: jest
+    .fn()
+    .mockImplementation(() => Promise.resolve()),
 }));
 
 jest.mock('../../hoc/withPageLayout', () => ({

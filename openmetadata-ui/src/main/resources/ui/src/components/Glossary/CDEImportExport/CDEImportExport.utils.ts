@@ -29,7 +29,6 @@ import { EntityReference } from '../../../generated/entity/type';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
-import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
 import {
   CDE_TAG_CLASSIFICATIONS,
   CDEExtension,
@@ -49,7 +48,7 @@ export interface CDEImportRowData {
   personalData: string;
   relatedRegulatoryDocuments: string;
   dataQualityRules: string;
-  cdeVersion: string;
+  version: string;
   effectiveDate?: string;
   expirationDate?: string;
   reviewer: string;
@@ -87,7 +86,6 @@ export const CDE_EXPORT_HEADERS = [
   'Ngày hiệu lực',
   'Ngày hết hiệu lực',
   'Người kiểm soát',
-  'Trạng thái',
 ];
 
 export const CDE_TEMPLATE_HEADERS = [
@@ -105,7 +103,6 @@ export const CDE_TEMPLATE_HEADERS = [
   'Phiên bản',
   'Ngày hiệu lực',
   'Ngày hết hiệu lực',
-  'Người kiểm soát',
 ];
 
 export const CDE_COLUMN_WIDTHS = [
@@ -124,7 +121,6 @@ export const CDE_COLUMN_WIDTHS = [
   { wch: 18 }, // Ngày hiệu lực
   { wch: 18 }, // Ngày hết hiệu lực
   { wch: 22 }, // Người kiểm soát
-  { wch: 20 }, // Trạng thái
 ];
 
 /**
@@ -224,11 +220,7 @@ export const exportCDEToExcel = (
       const dqRules = formatQualityRules(
         ext.dataQualityRules ?? ext.quy_dinh_chat_luong_du_lieu
       );
-      const version = ext.cdeVersion ?? ext.phien_ban ?? '1.0';
-      const statusLabel = getEntityStatusLabel(
-        term.entityStatus ?? EntityStatus.Approved
-      );
-
+      const version = term.businessVersion ?? ext.version ?? '1.0';
       return [
         term.name ?? '',
         term.displayName ?? '',
@@ -251,7 +243,6 @@ export const exportCDEToExcel = (
         formatCDEDate(ext.effectiveDate, ''),
         formatCDEDate(ext.expirationDate, ''),
         formatReferences(term.reviewers),
-        statusLabel,
       ];
     });
 
@@ -299,7 +290,6 @@ export const downloadCDEExcelTemplate = () => {
       '1.0',
       '',
       '',
-      'steward_user',
     ],
     [
       'CDE002',
@@ -316,7 +306,6 @@ export const downloadCDEExcelTemplate = () => {
       '1.0',
       '',
       '',
-      'steward_user',
     ],
   ];
 
@@ -397,9 +386,9 @@ const HEADER_KEY_MAPPING: Record<string, string> = {
   chatluongdulieu: 'dataQualityRules',
   dataqualityrules: 'dataQualityRules',
   cldl: 'dataQualityRules',
-  phienban: 'cdeVersion',
-  version: 'cdeVersion',
-  cdeversion: 'cdeVersion',
+  phienban: 'version',
+  version: 'version',
+  cdeversion: 'version',
   nguoikiemsoat: 'reviewer',
   nguoipheduyet: 'reviewer',
   reviewer: 'reviewer',
@@ -1042,7 +1031,7 @@ export const readAndValidateCDEExcel = async (
       personalData: '',
       relatedRegulatoryDocuments: '',
       dataQualityRules: '',
-      cdeVersion: '1.0',
+      version: '1.0',
       reviewer: '',
     };
 
@@ -1194,11 +1183,11 @@ export const readAndValidateCDEExcel = async (
     }
 
     // 10. Thẩm định Phiên bản CDE
-    if (rowData.cdeVersion) {
-      const verRes = validateCDEVersionValue(rowData.cdeVersion);
+    if (rowData.version) {
+      const verRes = validateCDEVersionValue(rowData.version);
       if (!verRes.isValid) {
         errors.push(
-          `Phiên bản '${rowData.cdeVersion}' không đúng định dạng (ví dụ: 1.0, 2.0).`
+          `Phiên bản '${rowData.version}' không đúng định dạng (ví dụ: 1.0, 2.0).`
         );
       }
     }
@@ -1252,7 +1241,7 @@ export const readAndValidateCDEExcel = async (
       personalData: rowData.personalData,
       relatedRegulatoryDocuments: rowData.relatedRegulatoryDocuments,
       dataQualityRules: rowData.dataQualityRules,
-      cdeVersion: rowData.cdeVersion || '1.0',
+      version: rowData.version || '1.0',
       reviewer: rowData.reviewer,
       status: EntityStatus.Draft, // Cố định trạng thái khi import là Draft theo quy định
       isExisting,
@@ -1403,10 +1392,12 @@ export const transformRowToGlossaryTermPayload = (
   const isDqYes = ['CO', 'CÓ', 'YES', 'TRUE', '1'].includes(
     row.dataQualityRules.trim().toUpperCase()
   );
+  const canonicalExtension = Object.fromEntries(
+    Object.entries(existingExtension).filter(([key]) => key !== 'version')
+  );
   const extension = mergeCDEDates(
     {
-      ...existingExtension,
-      cdeVersion: row.cdeVersion || '1.0',
+      ...canonicalExtension,
       ...(row.entityRelationship
         ? { entityRelationship: row.entityRelationship }
         : {}),
@@ -1421,6 +1412,7 @@ export const transformRowToGlossaryTermPayload = (
   );
 
   return {
+    businessVersion: row.version || '1.0',
     name: row.name,
     displayName: row.displayName,
     description: row.description || '',
@@ -1430,8 +1422,8 @@ export const transformRowToGlossaryTermPayload = (
     reviewers,
     tags: tags.length ? tags : undefined,
     extension: isEmpty(extension) ? undefined : extension,
-    // Không gửi entityStatus ở đây vì CreateGlossaryTerm schema của backend
-    // quy định additionalProperties: false. Trạng thái Draft được gán qua patchGlossaryTerm sau khi tạo.
+    // The caller removes businessVersion before creating the identity entity,
+    // then uses it to create the working Draft.
   };
 };
 

@@ -33,14 +33,18 @@ export const useGlossaryStore = create<{
   glossaries: Glossary[];
   activeGlossary: ModifiedGlossary;
   glossaryChildTerms: ModifiedGlossary[];
+  visibleGlossaryTermsCount?: number;
   setGlossaries: (glossaries: Glossary[]) => void;
   setActiveGlossary: (glossary: ModifiedGlossary) => void;
   updateGlossary: (glossary: Glossary) => void;
   updateActiveGlossary: (glossary: Partial<ModifiedGlossary>) => void;
   setGlossaryChildTerms: (glossaryChildTerms: ModifiedGlossary[]) => void;
+  setVisibleGlossaryTermsCount: (count?: number) => void;
   insertNewGlossaryTermToChildTerms: (glossary: GlossaryTerm) => void;
   termsLoading: boolean;
+  termsRefreshVersion: number;
   setTermsLoading: (termsLoading: boolean) => void;
+  requestGlossaryTermsRefresh: () => void;
   onAddGlossaryTerm: (glossaryTerm?: GlossaryTerm) => void;
   onEditGlossaryTerm: (glossaryTerm?: GlossaryTerm) => void;
   refreshGlossaryTerms: () => void;
@@ -50,7 +54,9 @@ export const useGlossaryStore = create<{
   glossaries: [],
   activeGlossary: {} as ModifiedGlossary,
   glossaryChildTerms: [],
+  visibleGlossaryTermsCount: undefined,
   termsLoading: false,
+  termsRefreshVersion: 0,
 
   setGlossaries: (glossaries: Glossary[]) => {
     set({ glossaries });
@@ -65,7 +71,7 @@ export const useGlossaryStore = create<{
     set({ glossaries: newGlossaries });
   },
   setActiveGlossary: (glossary: ModifiedGlossary) => {
-    set({ activeGlossary: glossary });
+    set({ activeGlossary: glossary, visibleGlossaryTermsCount: undefined });
   },
   updateActiveGlossary: (glossary: Partial<ModifiedGlossary>) => {
     const { activeGlossary, glossaries } = get();
@@ -118,8 +124,14 @@ export const useGlossaryStore = create<{
       : [];
     set({ glossaryChildTerms: validTerms });
   },
+  setVisibleGlossaryTermsCount: (visibleGlossaryTermsCount?: number) => {
+    set({ visibleGlossaryTermsCount });
+  },
   setTermsLoading: (termsLoading: boolean) => {
     set({ termsLoading });
+  },
+  requestGlossaryTermsRefresh: () => {
+    set((state) => ({ termsRefreshVersion: state.termsRefreshVersion + 1 }));
   },
   setGlossaryFunctionRef: (glossaryFunctionRef: GlossaryFunctionRef) => {
     set({

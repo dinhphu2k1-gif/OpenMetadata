@@ -10,7 +10,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { EntityType } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
@@ -21,10 +27,19 @@ import {
 import { mockUserData } from '../../../mocks/MyDataPage.mock';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
-import { getGlossaryTermsVersion, getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
+import {
+  getGlossaryTermsVersionsList,
+  getGlossaryVersionPermissions,
+  getGlossaryVersionsList,
+  getGlossaryWorkingVersion,
+  transitionGlossaryTermWorkflow,
+} from '../../../rest/glossaryAPI';
 import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
-import GlossaryHeader, { suggestNextVersion } from './GlossaryHeader.component';
+import GlossaryHeader, {
+  getCreatedDraftSearch,
+  suggestNextVersion,
+} from './GlossaryHeader.component';
 
 const mockGlossaryTermPermission = {
   All: true,
@@ -51,6 +66,10 @@ jest.mock('react-router-dom', () => ({
     action: 'action',
   }),
   useNavigate: jest.fn().mockReturnValue(jest.fn()),
+  useLocation: jest.fn().mockReturnValue({
+    pathname: '/glossary/Data%20Dictionary.Term1',
+    search: '',
+  }),
 }));
 
 jest.mock(
@@ -160,6 +179,10 @@ jest.mock('../../../utils/RouterUtils', () => ({
 }));
 
 jest.mock('../../../rest/glossaryAPI', () => ({
+  exportDataDictionaryVersion: jest.fn().mockResolvedValue({
+    blob: new Blob(['xlsx']),
+    fileName: 'Data_Dictionary_v2.xlsx',
+  }),
   exportGlossaryInCSVFormat: jest
     .fn()
     .mockImplementation(() => Promise.resolve()),
@@ -171,12 +194,73 @@ jest.mock('../../../rest/glossaryAPI', () => ({
     .mockImplementation(() => Promise.resolve({ data: mockedGlossaryTerms })),
   moveGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
   getGlossaryTermsVersionsList: jest.fn(),
-  getGlossaryTermsVersion: jest.fn(),
+  getGlossaryVersionsList: jest.fn(),
+  getGlossaryWorkingVersion: jest
+    .fn()
+    .mockRejectedValue({ response: { status: 404 } }),
+  getGlossaryPublishPreview: jest.fn().mockResolvedValue({
+    data: [],
+    paging: {},
+    termCount: 0,
+    evaluatedAt: 1,
+  }),
+  getGlossaryVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canCreateVersion: true,
+    canApprove: true,
+    canReject: true,
+    canArchive: true,
+    canImportCdeDrafts: true,
+  }),
+  getGlossaryTermVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canCreateVersion: true,
+    canApprove: true,
+    canReject: true,
+    canArchive: true,
+    canImportCdeDrafts: true,
+  }),
+  createGlossaryTermWorkingVersion: jest
+    .fn()
+    .mockImplementation((_id, businessVersion) =>
+      Promise.resolve({
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.Draft,
+        businessVersion,
+      })
+    ),
+  transitionGlossaryTermWorkflow: jest
+    .fn()
+    .mockImplementation((_id, action, request) => {
+      const statuses = {
+        createDraft: EntityStatus.Draft,
+        submit: EntityStatus.InReview,
+        approve: EntityStatus.Approved,
+        reject: EntityStatus.Rejected,
+        reopen: EntityStatus.Draft,
+        revoke: EntityStatus.Rejected,
+      };
+
+      return Promise.resolve({
+        ...mockedGlossaryTerms[0],
+        entityStatus: statuses[action as keyof typeof statuses],
+        businessVersion:
+          request.businessVersion ?? mockedGlossaryTerms[0].businessVersion,
+      });
+    }),
+  transitionGlossaryWorkflow: jest.fn(),
 }));
 
 const mockOnDelete = jest.fn();
 const mockOnUpdateVote = jest.fn();
 const mockOnUpdate = jest.fn();
+const mockOnWorkflowTransition = jest.fn();
 
 const mockContext = {
   data: { displayName: 'glossaryTest' } as Glossary,
@@ -191,6 +275,135 @@ jest.mock('../../Customization/GenericProvider/GenericProvider', () => ({
 }));
 
 describe('GlossaryHeader component', () => {
+  it('lists both the active and archived Data Dictionary versions', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValue({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
+  it('allows a Consumer to select an archived Data Dictionary', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionPermissions as jest.Mock).mockResolvedValueOnce({
+      isConsumer: true,
+      canViewWorking: false,
+      canViewPublished: true,
+      canEditWorking: false,
+      canSubmit: false,
+      canCreateVersion: false,
+      canApprove: false,
+      canReject: false,
+      canArchive: false,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValueOnce({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the newer working Dictionary in the selector while viewing v2', async () => {
+    const approvedV2 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '2',
+      entityStatus: EntityStatus.Approved,
+    };
+    const archivedV1 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '1',
+      entityStatus: EntityStatus.Archived,
+      archivedAt: 2,
+    };
+    const inReviewV3 = {
+      ...MOCK_GLOSSARY,
+      businessVersion: '3',
+      entityStatus: EntityStatus.InReview,
+      workingRevision: 2,
+    };
+    (useGenericContext as jest.Mock).mockReturnValueOnce({
+      ...mockContext,
+      data: approvedV2,
+    });
+    (getGlossaryVersionsList as jest.Mock).mockResolvedValueOnce({
+      versions: [JSON.stringify(approvedV2), JSON.stringify(archivedV1)],
+    });
+    (getGlossaryWorkingVersion as jest.Mock).mockResolvedValueOnce(inReviewV3);
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/label\.version: 3.*label\.in-review/i)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
+      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+    });
+  });
+
   it('should render name of Glossary', () => {
     render(
       <GlossaryHeader
@@ -225,6 +438,38 @@ describe('GlossaryHeader component', () => {
     expect(screen.queryByText('label.style')).not.toBeInTheDocument();
   });
 
+  it('should not render delete action for an approved Data Dictionary', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      ...mockContext,
+      data: {
+        ...MOCK_GLOSSARY,
+        name: 'Data Dictionary',
+        displayName: 'Từ điển dữ liệu dùng chung',
+        fullyQualifiedName: 'Data Dictionary',
+        entityStatus: EntityStatus.Approved,
+        businessVersion: '1',
+      },
+      permissions: { ...DEFAULT_ENTITY_PERMISSION, Delete: true },
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+    expect(screen.queryByText('label.delete')).not.toBeInTheDocument();
+
+    (useGenericContext as jest.Mock).mockImplementation(() => mockContext);
+  });
+
   it('should not render import and export dropdown menu items if no permission', async () => {
     mockGlossaryTermPermission.All = false;
     mockGlossaryTermPermission.EditAll = false;
@@ -237,6 +482,8 @@ describe('GlossaryHeader component', () => {
     );
 
     expect(screen.queryByTestId('manage-button')).not.toBeInTheDocument();
+    expect(screen.queryByText('label.import')).not.toBeInTheDocument();
+    expect(screen.queryByText('label.export')).not.toBeInTheDocument();
   });
 
   it('should render changeParentHierarchy and style dropdown menu items only for glossaryTerm', async () => {
@@ -333,7 +580,7 @@ describe('GlossaryHeader component', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('should render revoke approval menu item for approved glossary term and handle confirm', async () => {
+  it('should render revoke approval action for approved glossary term and handle confirm', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({
       data: {
         ...mockedGlossaryTerms[0],
@@ -353,12 +600,9 @@ describe('GlossaryHeader component', () => {
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
+        onWorkflowTransition={mockOnWorkflowTransition}
       />
     );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
 
     expect(screen.getByText('label.revoke-approval')).toBeInTheDocument();
 
@@ -373,14 +617,15 @@ describe('GlossaryHeader component', () => {
       fireEvent.click(screen.getByTestId('save-button'));
     });
 
-    expect(mockOnUpdate).toHaveBeenCalledWith(
+    expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityStatus: 'Draft',
-      })
+        entityStatus: EntityStatus.Rejected,
+      }),
+      'revoke'
     );
   });
 
-  it('should render Submit for Review button in manage menu when term is Draft and trigger submit', async () => {
+  it('should render Submit for Review action when term is Draft and trigger submit', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({
       data: {
         ...mockedGlossaryTerms[0],
@@ -400,12 +645,9 @@ describe('GlossaryHeader component', () => {
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
+        onWorkflowTransition={mockOnWorkflowTransition}
       />
     );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
 
     expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
 
@@ -420,14 +662,20 @@ describe('GlossaryHeader component', () => {
       fireEvent.click(screen.getByTestId('save-button'));
     });
 
-    expect(mockOnUpdate).toHaveBeenCalledWith(
+    expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
         entityStatus: EntityStatus.InReview,
       })
     );
+    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      mockedGlossaryTerms[0].id,
+      'submit',
+      { expectedRevision: Number(mockedGlossaryTerms[0].version) }
+    );
+    expect(mockOnUpdate).not.toHaveBeenCalled();
   });
 
-  it('should render Approve and Reject buttons in manage menu when term is InReview and trigger approve', async () => {
+  it('should render Approve and Reject actions when term is InReview and trigger approve', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({
       data: {
         ...mockedGlossaryTerms[0],
@@ -448,12 +696,9 @@ describe('GlossaryHeader component', () => {
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
+        onWorkflowTransition={mockOnWorkflowTransition}
       />
     );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
 
     expect(screen.getByText('label.approve')).toBeInTheDocument();
     expect(screen.getByText('label.reject')).toBeInTheDocument();
@@ -468,14 +713,14 @@ describe('GlossaryHeader component', () => {
       fireEvent.click(screen.getByTestId('save-button'));
     });
 
-    expect(mockOnUpdate).toHaveBeenCalledWith(
+    expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
         entityStatus: EntityStatus.Approved,
       })
     );
   });
 
-  it('should trigger reject when reject button is clicked in manage menu', async () => {
+  it('should trigger reject when reject action is clicked', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({
       data: {
         ...mockedGlossaryTerms[0],
@@ -496,12 +741,9 @@ describe('GlossaryHeader component', () => {
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
+        onWorkflowTransition={mockOnWorkflowTransition}
       />
     );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
 
     await act(async () => {
       fireEvent.click(screen.getByText('label.reject'));
@@ -513,9 +755,9 @@ describe('GlossaryHeader component', () => {
       fireEvent.click(screen.getByTestId('save-button'));
     });
 
-    expect(mockOnUpdate).toHaveBeenCalledWith(
+    expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityStatus: EntityStatus.Draft,
+        entityStatus: EntityStatus.Rejected,
       })
     );
   });
@@ -525,9 +767,12 @@ describe('GlossaryHeader component', () => {
       data: {
         ...mockedGlossaryTerms[0],
         fullyQualifiedName: 'Data Dictionary.Term1',
-        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
         entityStatus: EntityStatus.InReview,
-        extension: { cdeVersion: '2.0-Primary' },
+        businessVersion: '2.0-Primary',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true },
@@ -536,7 +781,6 @@ describe('GlossaryHeader component', () => {
 
     render(
       <GlossaryHeader
-        isGlossary={false}
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
@@ -555,10 +799,13 @@ describe('GlossaryHeader component', () => {
       data: {
         ...mockedGlossaryTerms[0],
         fullyQualifiedName: 'Data Dictionary.Term1',
-        glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
         entityStatus: EntityStatus.Draft,
         owners: [{ id: 'mock-user-id', type: 'user' }],
-        extension: { cdeVersion: '1.0' },
+        businessVersion: '1.0',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true },
@@ -567,16 +814,11 @@ describe('GlossaryHeader component', () => {
 
     render(
       <GlossaryHeader
-        isGlossary={false}
         updateVote={mockOnUpdateVote}
         onAddGlossaryTerm={mockOnDelete}
         onDelete={mockOnDelete}
       />
     );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
 
     expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
 
@@ -584,25 +826,16 @@ describe('GlossaryHeader component', () => {
       fireEvent.click(screen.getByText('label.submit-for-review'));
     });
 
-    expect(screen.getByTestId('cde-submit-for-review-modal')).toBeInTheDocument();
-
-    const versionInput = screen.getByTestId('cde-submit-version-input');
-
-    expect(versionInput).toHaveValue('1.0');
-
-    fireEvent.change(versionInput, { target: { value: '1.1-Beta' } });
+    expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(screen.getAllByText('label.submit-for-review')[1]);
+      fireEvent.click(screen.getByTestId('save-button'));
     });
 
-    expect(mockOnUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        entityStatus: EntityStatus.InReview,
-        extension: expect.objectContaining({
-          cdeVersion: '1.1-Beta',
-        }),
-      })
+    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      mockedGlossaryTerms[0].id,
+      'submit',
+      { expectedRevision: Number(mockedGlossaryTerms[0].version) }
     );
   });
 
@@ -639,10 +872,6 @@ describe('GlossaryHeader component', () => {
       />
     );
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('manage-button'));
-    });
-
     expect(screen.queryByText('label.approve')).not.toBeInTheDocument();
     expect(screen.queryByText('label.reject')).not.toBeInTheDocument();
     expect(screen.queryByText('label.revoke-approval')).not.toBeInTheDocument();
@@ -662,6 +891,17 @@ describe('GlossaryHeader component', () => {
     });
   });
 
+  describe('getCreatedDraftSearch', () => {
+    it('updates businessVersion and preserves parentBusinessVersion', () => {
+      expect(
+        getCreatedDraftSearch(
+          '?businessVersion=1.0&parentBusinessVersion=2.3',
+          '1.1',
+        )
+      ).toBe('businessVersion=1.1&parentBusinessVersion=2.3');
+    });
+  });
+
   describe('Create Draft (Tạo bản nháp)', () => {
     it('should show "Tạo bản nháp" for Data Proposer on Approved CDE and create draft on submit', async () => {
       (useApplicationStore as unknown as jest.Mock).mockImplementation(() => ({
@@ -677,9 +917,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { cdeVersion: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -692,12 +935,9 @@ describe('GlossaryHeader component', () => {
           updateVote={mockOnUpdateVote}
           onAddGlossaryTerm={mockOnDelete}
           onDelete={mockOnDelete}
+          onWorkflowTransition={mockOnWorkflowTransition}
         />
       );
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('manage-button'));
-      });
 
       expect(screen.getByText('label.create-draft')).toBeInTheDocument();
 
@@ -715,12 +955,10 @@ describe('GlossaryHeader component', () => {
         fireEvent.click(screen.getAllByText('label.create-draft')[1]);
       });
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(
+      expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
         expect.objectContaining({
           entityStatus: EntityStatus.Draft,
-          extension: expect.objectContaining({
-            cdeVersion: '1.1',
-          }),
+          businessVersion: '1.1',
         })
       );
     });
@@ -739,9 +977,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { cdeVersion: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -756,10 +997,6 @@ describe('GlossaryHeader component', () => {
           onDelete={mockOnDelete}
         />
       );
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('manage-button'));
-      });
 
       expect(screen.getByText('label.create-draft')).toBeInTheDocument();
     });
@@ -778,9 +1015,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Approved,
-          extension: { cdeVersion: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true },
@@ -795,10 +1035,6 @@ describe('GlossaryHeader component', () => {
           onDelete={mockOnDelete}
         />
       );
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('manage-button'));
-      });
 
       expect(screen.queryByText('label.create-draft')).not.toBeInTheDocument();
     });
@@ -817,9 +1053,12 @@ describe('GlossaryHeader component', () => {
         data: {
           ...mockedGlossaryTerms[0],
           fullyQualifiedName: 'Data Dictionary.Term1',
-          glossary: { name: 'Data Dictionary', displayName: 'Từ điển dữ liệu dùng chung' },
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
           entityStatus: EntityStatus.Draft,
-          extension: { cdeVersion: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true, EditAll: true },
@@ -834,10 +1073,6 @@ describe('GlossaryHeader component', () => {
           onDelete={mockOnDelete}
         />
       );
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('manage-button'));
-      });
 
       expect(screen.queryByText('label.create-draft')).not.toBeInTheDocument();
     });
@@ -858,7 +1093,7 @@ describe('GlossaryHeader component', () => {
           fullyQualifiedName: 'Data Quality.DQ1_1',
           glossary: { name: 'Data Quality', displayName: 'Chất lượng dữ liệu' },
           entityStatus: EntityStatus.Approved,
-          extension: { cdeVersion: '1.0' },
+          businessVersion: '1.0',
         },
         onUpdate: mockOnUpdate,
         permissions: { ManageAll: true, EditAll: true },
@@ -879,10 +1114,6 @@ describe('GlossaryHeader component', () => {
       expect(versionBtn).toBeInTheDocument();
       expect(versionBtn).toHaveTextContent('label.version: 1.0');
 
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('manage-button'));
-      });
-
       expect(screen.getByText('label.create-draft')).toBeInTheDocument();
 
       await act(async () => {
@@ -901,22 +1132,29 @@ describe('GlossaryHeader component', () => {
         fullyQualifiedName: 'Data Dictionary.Term1',
         glossary: { name: 'Data Dictionary' },
         entityStatus: EntityStatus.Approved,
-        extension: { cdeVersion: '1.1' },
+        businessVersion: '1.1',
       },
       onUpdate: mockOnUpdate,
       permissions: { ManageAll: true, EditAll: true },
       isVersionView: false,
       type: EntityType.GLOSSARY_TERM,
     }));
+    const approvedV1Snapshot = {
+      version: 1.0,
+      entityStatus: 'Approved',
+      businessVersion: '1.0',
+    };
     (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
       versions: [
-        { version: 1.2, entityStatus: 'Approved', extension: { cdeVersion: '1.1' } },
-        { version: 1.1, entityStatus: 'Draft', extension: { cdeVersion: '1.2' } },
-        { version: 1.0, entityStatus: 'Approved', extension: { cdeVersion: '1.0' } },
+        {
+          version: 1.2,
+          entityStatus: 'Approved',
+          businessVersion: '1.1',
+        },
+        { version: 1.1, entityStatus: 'Draft', businessVersion: '1.2' },
+        approvedV1Snapshot,
       ],
     });
-    const selectedSnapshot = { ...mockedGlossaryTerms[0], extension: { cdeVersion: '1.0' } };
-    (getGlossaryTermsVersion as jest.Mock).mockResolvedValue(selectedSnapshot);
     const onVersionSelect = jest.fn();
 
     render(
@@ -929,15 +1167,63 @@ describe('GlossaryHeader component', () => {
     );
 
     fireEvent.click(screen.getByTestId('version-button'));
-    await waitFor(() => expect(screen.getByText('label.version: 1.0')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('label.version: 1.0')).toBeInTheDocument()
+    );
 
     expect(screen.queryByText('label.version: 1.2')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText('label.version: 1.0'));
 
-    await waitFor(() => expect(onVersionSelect).toHaveBeenCalledWith(selectedSnapshot));
+    await waitFor(() =>
+      expect(onVersionSelect).toHaveBeenCalledWith(approvedV1Snapshot)
+    );
+  });
 
-    expect(getGlossaryTermsVersion).toHaveBeenCalledWith(mockedGlossaryTerms[0].id, '1');
+  it('lists all archived CDE versions when history is available', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { name: 'Data Dictionary' },
+        entityStatus: EntityStatus.Archived,
+        businessVersion: '1.1',
+        archivedAt: 1,
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true, EditAll: true },
+      isVersionView: false,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+    (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
+      versions: [
+        {
+          version: 1.1,
+          entityStatus: EntityStatus.Archived,
+          businessVersion: '1.1',
+        },
+        {
+          version: 1.0,
+          entityStatus: EntityStatus.Archived,
+          businessVersion: '1.0',
+        },
+      ],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() =>
+      expect(screen.getByText('label.version: 1.0')).toBeInTheDocument()
+    );
+    expect(screen.getByText('label.version: 1.1')).toBeInTheDocument();
   });
 
   describe('CDE Import and Export permissions in GlossaryHeader', () => {

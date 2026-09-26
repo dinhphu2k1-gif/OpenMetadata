@@ -72,10 +72,39 @@ public class ListFilter extends Filter<ListFilter> {
     conditions.add(getAgentTypeCondition());
     conditions.add(getProviderCondition(tableName));
     conditions.add(getEntityStatusCondition(tableName));
+    conditions.add(getPublishedSnapshotCondition(tableName));
+    conditions.add(getExtensionCondition());
     conditions.add(getServerIdCondition(tableName));
+    conditions.add(getExactNameCondition(tableName));
     conditions.add(getNameFilterCondition());
     String condition = addCondition(conditions);
     return condition.isEmpty() ? "WHERE TRUE" : "WHERE " + condition;
+  }
+
+  private String getExtensionCondition() {
+    String extension = queryParams.get("extension");
+    return extension == null ? "" : "extension = :extension";
+  }
+
+  private String getExactNameCondition(String tableName) {
+    String exactName = queryParams.get("exactName");
+    if (nullOrEmpty(exactName)) {
+      return "";
+    }
+    String nameColumn = tableName == null || tableName.isBlank() ? "name" : tableName + ".name";
+    return nameColumn + " = :exactName";
+  }
+
+  private String getPublishedSnapshotCondition(String tableName) {
+    String entityType = queryParams.get("publishedSnapshotEntityType");
+    if (entityType == null || entityType.isBlank()) {
+      return "";
+    }
+    String idColumn = tableName == null || tableName.isBlank() ? "id" : tableName + ".id";
+    return "EXISTS (SELECT 1 FROM glossary_published_head published_head "
+        + "WHERE published_head.entityId = "
+        + idColumn
+        + " AND published_head.entityType = :publishedSnapshotEntityType)";
   }
 
   public ResourceContext getResourceContext(String entityType) {

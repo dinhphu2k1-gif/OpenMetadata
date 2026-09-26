@@ -34,35 +34,24 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/lib/table';
-import { Operation } from 'fast-json-patch';
-import { FC, useEffect, useMemo, useState } from 'react';
+import { AxiosError } from 'axios';
+import { FC, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ImportIcon } from '../../../assets/svg/ic-drag-drop.svg';
-import { Tag as ClassificationTag } from '../../../generated/entity/classification/tag';
+import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import {
-  EntityStatus,
-  GlossaryTerm,
-} from '../../../generated/entity/data/glossaryTerm';
-import { EntityReference } from '../../../generated/entity/type';
-import { getDomainList } from '../../../rest/domainAPI';
-import {
-  addGlossaryTerm,
-  getGlossaryTermsById,
-  patchGlossaryTerm,
+  CdeImportPreview,
+  commitCdeImport,
+  downloadCdeImportTemplate,
+  previewCdeImport,
 } from '../../../rest/glossaryAPI';
-import { getTags } from '../../../rest/tagAPI';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import IngestionStepper from '../../Settings/Services/Ingestion/IngestionStepper/IngestionStepper.component';
-import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
 import './cde-import-export.less';
 import {
   CDEImportRowData,
   CDEValidationResult,
-  downloadCDEExcelTemplate,
-  formatCDEImportErrorMessage,
-  readAndValidateCDEExcel,
-  transformRowToGlossaryTermPayload,
 } from './CDEImportExport.utils';
 
 const { Dragger } = Upload;
@@ -71,9 +60,8 @@ interface CDEImportModalProps {
   visible: boolean;
   onCancel: () => void;
   onSuccess: () => void;
-  glossaryFQN: string;
-  existingTerms: (ModifiedGlossaryTerm | GlossaryTerm)[];
-  availableDomains?: EntityReference[];
+  glossaryId: string;
+  parentBusinessVersion: string;
 }
 
 type DuplicateHandling = 'skip' | 'update';
@@ -82,9 +70,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
   visible,
   onCancel,
   onSuccess,
-  glossaryFQN,
-  existingTerms,
-  availableDomains = [],
+  glossaryId,
+  parentBusinessVersion,
 }) => {
   const { t } = useTranslation();
 
@@ -99,8 +86,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     [t]
   );
 
-  const [duplicatePolicy, setDuplicatePolicy] =
-    useState<DuplicateHandling>('skip');
+  const [duplicatePolicy] = useState<DuplicateHandling>('update');
   const [validationResult, setValidationResult] =
     useState<CDEValidationResult | null>(null);
   const [parsing, setParsing] = useState<boolean>(false);
@@ -109,10 +95,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     'all'
   );
 
-  // Dynamic Metadata
-  const [allDomains, setAllDomains] =
-    useState<EntityReference[]>(availableDomains);
-  const [allTags, setAllTags] = useState<ClassificationTag[]>([]);
+  const [serverPreview, setServerPreview] = useState<CdeImportPreview>();
 
   // Import Execution state
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -129,38 +112,6 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
   >([]);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (visible) {
-      getDomainList({ limit: 100 })
-        .then((res) => {
-          if (res?.data?.length) {
-            setAllDomains(
-              res.data.map((d) => ({
-                id: d.id,
-                type: 'domain',
-                name: d.name,
-                displayName: d.displayName,
-                fullyQualifiedName: d.fullyQualifiedName,
-              }))
-            );
-          }
-        })
-        .catch(() => {
-          // Bỏ qua lỗi, dùng availableDomains và fallback maps
-        });
-
-      getTags({ limit: 200 })
-        .then((res) => {
-          if (res?.data?.length) {
-            setAllTags(res.data);
-          }
-        })
-        .catch(() => {
-          // Bỏ qua lỗi, dùng fallback maps
-        });
-    }
-  }, [visible]);
-
   const resetState = () => {
     setActiveStep(0);
     setValidationResult(null);
@@ -172,6 +123,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     setImportStats({ created: 0, updated: 0, skipped: 0, failed: 0 });
     setImportErrors([]);
     setIsCompleted(false);
+    setServerPreview(undefined);
   };
 
   const handleClose = () => {
@@ -197,15 +149,53 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     setParsing(true);
     setSelectedFileName(file.name);
     try {
-      const result = await readAndValidateCDEExcel(file, existingTerms);
+      const preview = await previewCdeImport(
+        glossaryId,
+        parentBusinessVersion,
+        duplicatePolicy === 'skip' ? 'SKIP_EXISTING' : 'OVERWRITE_EXISTING',
+        file
+      );
+      setServerPreview(preview);
+      const rows: CDEImportRowData[] = preview.rows.map((item) => {
+        const payload = item.payload ?? {};
+        const extension = (payload.extension ?? {}) as Record<string, string>;
+        const errors = item.errors.map((error) => `${error.column}: ${error.message}`);
+        return {
+          rowNumber: item.rowNumber,
+          name: item.cdeCode,
+          displayName: String(payload.displayName ?? ''),
+          domain: '',
+          dataSource: '',
+          description: String(payload.description ?? ''),
+          entityRelationship: String(extension.entityRelationship ?? ''),
+          owner: '',
+          dataClassification: '',
+          personalData: '',
+          relatedRegulatoryDocuments: String(extension.relatedRegulatoryDocuments ?? ''),
+          dataQualityRules: String(extension.dataQualityRules ?? ''),
+          version: item.businessVersion ?? '',
+          effectiveDate: extension.effectiveDate,
+          expirationDate: extension.expirationDate,
+          reviewer: '',
+          status: EntityStatus.Draft,
+          isExisting: item.action !== 'CREATE',
+          existingId: undefined,
+          errors,
+          warnings: item.warnings,
+          isValid: errors.length === 0,
+        };
+      });
+      const result: CDEValidationResult = {
+        totalRows: rows.length,
+        validCount: rows.filter((row) => row.isValid && !row.warnings.length).length,
+        warningCount: rows.filter((row) => row.isValid && row.warnings.length > 0).length,
+        errorCount: rows.filter((row) => !row.isValid).length,
+        rows,
+      };
       setValidationResult(result);
       setActiveStep(1); // Chuyển sang bước 2 (Preview & Validate)
     } catch (error) {
-      showErrorToast(
-        error instanceof Error
-          ? error
-          : new Error(t('cde.file-parse-error', 'Lỗi phân tích file Excel'))
-      );
+      showErrorToast(error as AxiosError);
     } finally {
       setParsing(false);
     }
@@ -225,8 +215,16 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     return validationResult.rows;
   }, [validationResult, tableFilter]);
 
+  const inReviewReplacementCount = useMemo(
+    () =>
+      serverPreview?.rows.filter(
+        (row) => row.action === 'REPLACE_IN_REVIEW_AND_REOPEN'
+      ).length ?? 0,
+    [serverPreview]
+  );
+
   const handleStartImport = async () => {
-    if (!validationResult) {
+    if (!validationResult || !serverPreview?.canCommit) {
       return;
     }
 
@@ -234,118 +232,26 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     setIsImporting(true);
     setIsCompleted(false);
 
-    const importableRows = validationResult.rows.filter((r) => r.isValid);
-    const total = importableRows.length;
-    let createdCount = 0;
-    let updatedCount = 0;
-    let skippedCount = 0;
-    let failedCount = 0;
-
-    const errorsList: { row: number; name: string; reason: string }[] = [];
-
-    for (let i = 0; i < total; i++) {
-      const row = importableRows[i];
-      setCurrentImportName(row.name);
-      setImportProgress(Math.round(((i + 1) / total) * 100));
-
-      if (row.isExisting) {
-        if (duplicatePolicy === 'skip') {
-          skippedCount++;
-
-          continue;
-        }
-
-        // Cập nhật bản ghi có sẵn
-        if (row.existingId) {
-          try {
-            const current = await getGlossaryTermsById(row.existingId, {
-              fields: 'extension',
-            });
-            const payload = transformRowToGlossaryTermPayload(
-              row,
-              glossaryFQN,
-              [],
-              [],
-              [],
-              [],
-              current.extension
-            );
-            const patchOps: Operation[] = [
-              { op: 'replace', path: '/displayName', value: row.displayName },
-              {
-                op: 'replace',
-                path: '/description',
-                value: row.description || '',
-              },
-              {
-                op: 'add',
-                path: '/extension',
-                value: payload.extension,
-              },
-              // Luôn đặt về trạng thái Bản nháp (Draft) theo đúng quy tắc nghiệp vụ
-              {
-                op: 'replace',
-                path: '/entityStatus',
-                value: EntityStatus.Draft,
-              },
-            ];
-
-            await patchGlossaryTerm(row.existingId, patchOps);
-            updatedCount++;
-          } catch (error: any) {
-            failedCount++;
-            errorsList.push({
-              row: row.rowNumber,
-              name: row.name,
-              reason: formatCDEImportErrorMessage(error, t, 'update'),
-            });
-          }
-        }
-      } else {
-        // Tạo mới bản ghi
-        try {
-          const payload = transformRowToGlossaryTermPayload(
-            row,
-            glossaryFQN,
-            allDomains.length ? allDomains : availableDomains,
-            allTags
-          );
-
-          const newTerm = await addGlossaryTerm(payload);
-          // Đảm bảo chắc chắn trạng thái là Draft (Bản nháp)
-          if (newTerm && newTerm.entityStatus !== EntityStatus.Draft) {
-            try {
-              await patchGlossaryTerm(newTerm.id, [
-                {
-                  op: 'replace',
-                  path: '/entityStatus',
-                  value: EntityStatus.Draft,
-                },
-              ]);
-            } catch (patchErr) {
-              // Non-blocking: term already created
-            }
-          }
-          createdCount++;
-        } catch (error: any) {
-          failedCount++;
-          errorsList.push({
-            row: row.rowNumber,
-            name: row.name,
-            reason: formatCDEImportErrorMessage(error, t, 'create'),
-          });
-        }
-      }
+    setCurrentImportName(selectedFileName);
+    try {
+      await commitCdeImport(serverPreview.importSessionId);
+      setImportProgress(100);
+      setImportErrors([]);
+      setImportStats({
+        created: Number(serverPreview.summary.CREATE ?? 0),
+        updated:
+          Number(serverPreview.summary.CREATE_VERSION ?? 0) +
+          Number(serverPreview.summary.UPDATE_DRAFT ?? 0) +
+          Number(serverPreview.summary.REPLACE_IN_REVIEW_AND_REOPEN ?? 0) +
+          Number(serverPreview.summary.REPLACE_REJECTED_AND_REOPEN ?? 0),
+        skipped: 0,
+        failed: 0,
+      });
+    } catch (error) {
+      setImportErrors([{ row: 0, name: selectedFileName, reason: 'Preview đã hết hạn hoặc dữ liệu đã thay đổi. Vui lòng thẩm định lại file.' }]);
+      setImportStats({ created: 0, updated: 0, skipped: 0, failed: 1 });
+      showErrorToast(error as AxiosError);
     }
-
-    setImportErrors(errorsList);
-
-    setImportStats({
-      created: createdCount,
-      updated: updatedCount,
-      skipped: skippedCount,
-      failed: failedCount,
-    });
     setIsImporting(false);
     setIsCompleted(true);
   };
@@ -395,8 +301,8 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
     },
     {
       title: t('cde.version'),
-      dataIndex: 'cdeVersion',
-      key: 'cdeVersion',
+      dataIndex: 'version',
+      key: 'version',
       width: 120,
     },
     ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
@@ -501,7 +407,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
           />
 
           <Dragger
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx"
             beforeUpload={(file) => {
               handleFileChange(file);
 
@@ -535,7 +441,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               <Typography.Text style={{ fontSize: 12 }} type="secondary">
                 {t(
                   'cde.upload-hint',
-                  'Hỗ trợ file Microsoft Excel (.xlsx, .xls) hoặc CSV mã hóa UTF-8. Dung lượng tối đa 10MB.'
+                  'Hỗ trợ file Microsoft Excel (.xlsx). Dung lượng tối đa 5MB, tối đa 5.000 dòng.'
                 )}
               </Typography.Text>
             </Space>
@@ -545,14 +451,26 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             <Typography.Text type="secondary">
               {t(
                 'cde.download-template-hint',
-                'Chưa có file mẫu chuẩn 15 cột thuộc tính?'
+                'Chưa có file mẫu import CDE chuẩn?'
               )}
             </Typography.Text>
             <Button
               color="secondary"
               iconLeading={<DownloadOutlined />}
               size="sm"
-              onPress={downloadCDEExcelTemplate}>
+              onPress={async () => {
+                try {
+                  const blob = await downloadCdeImportTemplate();
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'Agribank_CDE_Import_Template.xlsx';
+                  link.click();
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  showErrorToast(error as AxiosError);
+                }
+              }}>
               {t('cde.download-template-btn', 'Tải file mẫu Excel')}
             </Button>
           </div>
@@ -568,20 +486,9 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                   )}
                 </Typography.Text>
               }>
-              <Radio.Group
-                value={duplicatePolicy}
-                onChange={(e) => setDuplicatePolicy(e.target.value)}>
+              <Radio.Group value={duplicatePolicy}>
                 <Space direction="vertical" size="small">
-                  <Radio value="skip">
-                    <Typography.Text>
-                      <strong>{t('label.skip', 'Bỏ qua (Skip)')}</strong> -{' '}
-                      {t(
-                        'cde.skip-desc',
-                        'Giữ nguyên CDE hiện tại, không cập nhật'
-                      )}
-                    </Typography.Text>
-                  </Radio>
-                  <Radio value="update">
+                  <Radio checked value="update">
                     <Typography.Text>
                       <strong>
                         {t('label.update', 'Ghi đè / Cập nhật (Update)')}
@@ -603,6 +510,14 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
       {/* BƯỚC 2: PREVIEW VÀ VALIDATE */}
       {activeStep === 1 && validationResult && (
         <div>
+          {inReviewReplacementCount > 0 && (
+            <Alert
+              showIcon
+              className="m-b-md"
+              message={`${inReviewReplacementCount} CDE đang chờ duyệt sẽ bị hủy duyệt và chuyển về Draft.`}
+              type="warning"
+            />
+          )}
           {/* Thanh thông tin và bộ lọc xem trước */}
           <div className="d-flex justify-between items-center m-b-md">
             <Space size="middle">
@@ -677,7 +592,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
               className="m-t-sm"
               message={t(
                 'cde.error-skip-notice',
-                'Có {{count}} dòng bị lỗi sẽ bị bỏ qua. Hệ thống chỉ nạp {{validCount}} dòng hợp lệ.',
+                'Có {{count}} dòng bị lỗi. Import nguyên tử bị khóa cho đến khi toàn bộ file hợp lệ.',
                 {
                   count: validationResult.errorCount,
                   validCount:
@@ -694,9 +609,10 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
             </Button>
             <Button
               color="primary"
+              data-testid="commit-cde-import"
               isDisabled={
-                validationResult.validCount + validationResult.warningCount ===
-                0
+                validationResult.errorCount > 0 ||
+                validationResult.validCount + validationResult.warningCount === 0
               }
               onPress={handleStartImport}>
               {t(
@@ -801,7 +717,7 @@ const CDEImportModal: FC<CDEImportModalProps> = ({
                                       row: err.row,
                                     })}
                               </strong>
-                              : {formatCDEImportErrorMessage(err.reason, t)}
+                              : {err.reason}
                             </li>
                           ))}
                         </ul>

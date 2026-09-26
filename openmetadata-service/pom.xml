@@ -30,6 +30,7 @@
     <logback-classic.version>1.5.36</logback-classic.version>
     <resilience4j-ratelimiter.version>2.3.0</resilience4j-ratelimiter.version>
     <kubernetes-client.version>24.0.0</kubernetes-client.version>
+    <apache-poi.version>5.4.1</apache-poi.version>
   </properties>
 
   <dependencyManagement>
@@ -52,6 +53,11 @@
   </dependencyManagement>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${apache-poi.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.pac4j</groupId>
       <artifactId>pac4j-core</artifactId>

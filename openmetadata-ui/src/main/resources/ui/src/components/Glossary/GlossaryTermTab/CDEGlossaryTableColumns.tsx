@@ -16,20 +16,26 @@ import { Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
+import { CDE_RELEASE_LEVEL } from '../../../constants/CDEReleaseLevel.constants';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
-import { EntityReference } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityReference,
+  EntityStatus,
+} from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
-import { getGlossaryPath } from '../../../utils/RouterUtils';
+import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
+import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
+import { getCdeDetailPath } from '../../../utils/routing/cdeRoutingHelper';
+import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
-  cdeVersion?: string;
   version?: string;
   effectiveDate?: string;
   expirationDate?: string;
-  phien_ban?: string;
+  releaseLevel?: string | string[];
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
   dataQualityRules?: boolean | string | string[];
@@ -41,6 +47,7 @@ export type CDEExtension = {
 type CDEGlossaryTableColumnsProps = {
   handleLoadMoreChildren: (record: ModifiedGlossaryTerm) => void;
   loadingChildren: Record<string, boolean>;
+  parentBusinessVersion: string;
   t: TFunction;
 };
 
@@ -103,9 +110,34 @@ export const renderCDEQualityRule = (
   );
 };
 
+export const renderCDEReleaseLevel = (
+  value: string | string[] | undefined,
+  t: TFunction
+) => {
+  const releaseLevel = Array.isArray(value) ? value[0] : value;
+
+  if (releaseLevel === CDE_RELEASE_LEVEL.CEO) {
+    return (
+      <Tag className="cde-value-pill cde-value-pill-release">
+        {t('cde.release-level-ceo')}
+      </Tag>
+    );
+  }
+  if (releaseLevel === CDE_RELEASE_LEVEL.TTQLDL) {
+    return (
+      <Tag className="cde-value-pill cde-value-pill-release">
+        {t('cde.release-level-ttqldl')}
+      </Tag>
+    );
+  }
+
+  return NO_DATA_PLACEHOLDER;
+};
+
 export const getCDEGlossaryTableColumns = ({
   handleLoadMoreChildren,
   loadingChildren,
+  parentBusinessVersion,
   t,
 }: CDEGlossaryTableColumnsProps): ColumnsType<ModifiedGlossaryTerm> => [
   {
@@ -136,20 +168,21 @@ export const getCDEGlossaryTableColumns = ({
         );
       }
 
-      const extension = record.extension as
-        | { cdeVersion?: string; version?: string; phien_ban?: string }
-        | undefined;
-      const businessVersion = String(
-        extension?.cdeVersion ??
-          extension?.version ??
-          extension?.phien_ban ??
-          ''
-      ).trim();
+      const businessVersion = getBusinessVersion(record.businessVersion, '');
 
-      const basePath = getGlossaryPath(record.fullyQualifiedName ?? name);
-      const toUrl = businessVersion
-        ? `${basePath}?approvedVersion=${encodeURIComponent(businessVersion)}`
-        : basePath;
+      const toUrl = getCdeDetailPath({
+        fqn: record.fullyQualifiedName ?? name,
+        businessVersion,
+        // A revision carries the authoritative publication scope. The
+        // glossary header value is only a fallback for legacy list payloads.
+        parentBusinessVersion:
+          record.parentBusinessVersion ?? parentBusinessVersion,
+        // The same CDE code can have multiple scoped revisions. Carry the
+        // stable identity from the flat-list response so the detail page does
+        // not resolve a different revision through the generic FQN endpoint.
+        termId: record.termId ?? record.id,
+        isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
+      });
 
       return (
         <Link
@@ -288,10 +321,40 @@ export const getCDEGlossaryTableColumns = ({
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
-        : record.extension?.cdeVersion ??
-          record.extension?.version ??
-          record.extension?.phien_ban ??
-          '1.0',
+        : getBusinessVersion(record.businessVersion),
+  },
+  {
+    title: t('label.status'),
+    dataIndex: 'entityStatus',
+    key: 'entityStatus',
+    width: 150,
+    render: (entityStatus: EntityStatus | undefined, record) => {
+      if (record.isLoadMoreButton) {
+        return null;
+      }
+      const status = entityStatus ?? EntityStatus.Approved;
+
+      return (
+        <div className="d-flex flex-column gap-1">
+          <StatusBadge label={status} status={getEntityStatusClass(status)} />
+          {status === EntityStatus.Draft && (
+            <Tag color="default">Chưa thêm vào gói phát hành</Tag>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    title: t('cde.release-level'),
+    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_LEVEL,
+    width: 170,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : renderCDEReleaseLevel(
+            (record.extension as CDEExtension | undefined)?.releaseLevel,
+            t
+          ),
   },
   ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
     title: String(

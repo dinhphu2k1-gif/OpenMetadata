@@ -16,9 +16,29 @@
  */
 export interface Glossary {
     /**
+     * Time at which this published snapshot was archived.
+     */
+    archivedAt?: number;
+    /**
+     * User that archived this published snapshot.
+     */
+    archivedBy?: string;
+    /**
+     * Business-facing version of this glossary working version or published snapshot.
+     */
+    businessVersion?: string;
+    /**
      * Change that lead to this version of the entity.
      */
     changeDescription?: ChangeDescription;
+    /**
+     * Time at which this working business version was created.
+     */
+    createdAt?: number;
+    /**
+     * User who created this working business version.
+     */
+    createdBy?: string;
     /**
      * Reference to the data contract for this entity.
      */
@@ -91,9 +111,41 @@ export interface Glossary {
     owners?:   EntityReference[];
     provider?: ProviderType;
     /**
+     * Monotonic publication order used to resolve the latest published snapshot.
+     */
+    publicationSequence?: number;
+    /**
+     * Time at which this immutable business snapshot was published.
+     */
+    publishedAt?: number;
+    /**
+     * User that published this immutable business snapshot.
+     */
+    publishedBy?: string;
+    /**
+     * Time at which the working version was most recently rejected.
+     */
+    rejectedAt?: number;
+    /**
+     * User who most recently rejected the working version.
+     */
+    rejectedBy?: string;
+    /**
      * User references of the reviewers for this glossary.
      */
     reviewers?: EntityReference[];
+    /**
+     * Identifier of the immutable published snapshot represented by this response.
+     */
+    snapshotId?: string;
+    /**
+     * Time at which the working version was most recently submitted.
+     */
+    submittedAt?: number;
+    /**
+     * User who most recently submitted the working version.
+     */
+    submittedBy?: string;
     /**
      * Tags for this glossary.
      */
@@ -102,6 +154,11 @@ export interface Glossary {
      * Total number of terms in the glossary. This includes all the children in the hierarchy.
      */
     termCount?: number;
+    /**
+     * Server-owned immutable CDE revisions. Always empty on a working Data Dictionary and
+     * populated automatically when published.
+     */
+    termRevisions?: GlossaryTermRevisionReference[];
     /**
      * Last update time corresponding to the new version of the entity in Unix epoch time
      * milliseconds.
@@ -120,9 +177,17 @@ export interface Glossary {
      */
     version?: number;
     /**
+     * Versioning model used by the glossary.
+     */
+    versioningMode?: VersioningMode;
+    /**
      * Votes on the entity.
      */
     votes?: Votes;
+    /**
+     * Optimistic-lock revision of the working business version.
+     */
+    workingRevision?: number;
 }
 
 /**
@@ -474,6 +539,23 @@ export interface CoverImage {
      * URL of the cover image.
      */
     url?: string;
+}
+
+/**
+ * Immutable glossary term revision included in a published glossary snapshot.
+ */
+export interface GlossaryTermRevisionReference {
+    displayOrder:        number;
+    termBusinessVersion: string;
+    termId:              string;
+    termSnapshotId:      string;
+}
+
+/**
+ * Versioning model used by the glossary.
+ */
+export enum VersioningMode {
+    BusinessWorkflow = "BusinessWorkflow",
 }
 
 /**

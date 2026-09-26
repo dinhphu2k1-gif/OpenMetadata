@@ -15,6 +15,18 @@
  */
 export interface GlossaryTerm {
     /**
+     * Time at which this published snapshot was archived.
+     */
+    archivedAt?: number;
+    /**
+     * User that archived this published snapshot.
+     */
+    archivedBy?: string;
+    /**
+     * Business-facing version of this glossary term working version or published snapshot.
+     */
+    businessVersion?: string;
+    /**
      * Change that lead to this version of the entity.
      */
     changeDescription?: ChangeDescription;
@@ -30,6 +42,14 @@ export interface GlossaryTerm {
      * Optional mappings to external concepts (e.g., SKOS alignments).
      */
     conceptMappings?: ConceptMapping[];
+    /**
+     * Time at which this working business version was created.
+     */
+    createdAt?: number;
+    /**
+     * User who created this working business version.
+     */
+    createdBy?: string;
     /**
      * Reference to the data contract for this entity.
      */
@@ -111,12 +131,36 @@ export interface GlossaryTerm {
      * Parent glossary term that this term is child of. When `null` this term is the root term
      * of the glossary.
      */
-    parent?:   EntityReference;
-    provider?: ProviderType;
+    parent?: EntityReference;
+    /**
+     * Canonical Data Dictionary business version that scopes this CDE version.
+     */
+    parentBusinessVersion?: string;
+    provider?:              ProviderType;
+    /**
+     * Monotonic publication order used to resolve the latest published snapshot.
+     */
+    publicationSequence?: number;
+    /**
+     * Time at which this immutable business snapshot was published.
+     */
+    publishedAt?: number;
+    /**
+     * User that published this immutable business snapshot.
+     */
+    publishedBy?: string;
     /**
      * Link to a reference from an external glossary.
      */
     references?: TermReference[];
+    /**
+     * Time at which the working version was most recently rejected.
+     */
+    rejectedAt?: number;
+    /**
+     * User who most recently rejected the working version.
+     */
+    rejectedBy?: string;
     /**
      * Other glossary terms that are related to this glossary term with typed semantic relations.
      */
@@ -125,7 +169,19 @@ export interface GlossaryTerm {
      * User names of the reviewers for this glossary.
      */
     reviewers?: EntityReference[];
-    style?:     Style;
+    /**
+     * Identifier of the immutable published snapshot represented by this response.
+     */
+    snapshotId?: string;
+    style?:      Style;
+    /**
+     * Time at which the working version was most recently submitted.
+     */
+    submittedAt?: number;
+    /**
+     * User who most recently submitted the working version.
+     */
+    submittedBy?: string;
     /**
      * Alternate names that are synonyms or near-synonyms for the glossary term.
      */
@@ -159,6 +215,10 @@ export interface GlossaryTerm {
      * Votes on the entity.
      */
     votes?: Votes;
+    /**
+     * Optimistic-lock revision of the working business version.
+     */
+    workingRevision?: number;
 }
 
 /**

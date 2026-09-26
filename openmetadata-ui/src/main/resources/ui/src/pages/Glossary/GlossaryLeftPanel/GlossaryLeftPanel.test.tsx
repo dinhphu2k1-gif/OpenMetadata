@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { mockedGlossaries } from '../../../mocks/Glossary.mock';
 import GlossaryLeftPanel from './GlossaryLeftPanel.component';
 
@@ -84,7 +84,7 @@ describe('Test GlossaryLeftPanel component', () => {
     expect(
       await screen.findByTestId('glossary-left-panel-container')
     ).toBeInTheDocument();
-    expect(await screen.findByTestId('add-glossary')).toBeInTheDocument();
+    expect(screen.queryByTestId('add-glossary')).not.toBeInTheDocument();
     expect(
       await screen.findByTestId('glossary-left-panel')
     ).toBeInTheDocument();
@@ -93,20 +93,10 @@ describe('Test GlossaryLeftPanel component', () => {
     ).toBeInTheDocument();
   });
 
-  it('Add Glossary button should work properly', async () => {
-    act(() => {
-      render(<GlossaryLeftPanel glossaries={mockedGlossaries} />);
-    });
+  it('does not render a create Data Dictionary action', () => {
+    render(<GlossaryLeftPanel glossaries={mockedGlossaries} />);
 
-    const addButton = await screen.findByTestId('add-glossary');
-
-    expect(addButton).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(addButton);
-    });
-
-    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('add-glossary')).not.toBeInTheDocument();
   });
 
   it('Menu click should work properly', async () => {

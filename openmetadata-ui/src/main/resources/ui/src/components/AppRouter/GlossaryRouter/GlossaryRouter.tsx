@@ -12,13 +12,13 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { ROUTES } from '../../../constants/constants';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
-import AddGlossaryPageComponent from '../../../pages/AddGlossary/AddGlossaryPage.component';
 import GlossaryPage from '../../../pages/Glossary/GlossaryPage/GlossaryPage.component';
 import { userPermissions } from '../../../utils/PermissionsUtils';
+import { CDE_DETAIL_RELATIVE_ROUTE_PATTERN } from '../../../utils/routing/cdeRoutingHelper';
 import GlossaryVersion from '../../Glossary/GlossaryVersion/GlossaryVersion.component';
 import AdminProtectedRoute from '../AdminProtectedRoute';
 
@@ -34,13 +34,7 @@ const GlossaryRouter = () => {
   return (
     <Routes>
       <Route
-        element={
-          <AddGlossaryPageComponent
-            pageTitle={t('label.add-entity', {
-              entity: t('label.glossary'),
-            })}
-          />
-        }
+        element={<Navigate replace to={ROUTES.DATA_DICTIONARY} />}
         path={ROUTES.ADD_GLOSSARY.replace(ROUTES.GLOSSARY, '')}
       />
       <Route
@@ -61,7 +55,7 @@ const GlossaryRouter = () => {
             <GlossaryPage pageTitle={t('label.glossary')} />
           </AdminProtectedRoute>
         }
-        path={ROUTES.GLOSSARY_DETAILS.replace(ROUTES.GLOSSARY, '')}
+        path={CDE_DETAIL_RELATIVE_ROUTE_PATTERN}
       />
       <Route
         element={

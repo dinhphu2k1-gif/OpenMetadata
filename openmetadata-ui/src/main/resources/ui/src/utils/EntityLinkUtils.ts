@@ -18,7 +18,13 @@ import {
   AlertType,
   type EventSubscription,
 } from '../generated/events/eventSubscription';
-import type { SearchSourceAlias } from '../interface/search.interface';
+import type {
+  GlossaryTermSearchSource,
+  SearchSourceAlias,
+} from '../interface/search.interface';
+import { EntityStatus } from '../generated/entity/data/glossaryTerm';
+import { isDataDictionaryGlossary } from '../constants/Glossary.contant';
+import { getCdeDetailPath } from './routing/cdeRoutingHelper';
 import {
   getApplicationDetailsPath,
   getBotsPath,
@@ -70,8 +76,29 @@ export const getEntityLinkFromType = (
     case EntityType.DATA_PRODUCT:
       return getDataProductDetailsPath(fullyQualifiedName);
     case EntityType.GLOSSARY:
-    case EntityType.GLOSSARY_TERM:
       return getGlossaryTermDetailsPath(fullyQualifiedName);
+    case EntityType.GLOSSARY_TERM: {
+      const glossaryTerm = entity as GlossaryTermSearchSource | undefined;
+      if (
+        glossaryTerm?.businessVersion &&
+        glossaryTerm?.parentBusinessVersion &&
+        isDataDictionaryGlossary(
+          fullyQualifiedName,
+          glossaryTerm.glossary?.name,
+          glossaryTerm.glossary?.displayName
+        )
+      ) {
+        return getCdeDetailPath({
+          fqn: fullyQualifiedName,
+          businessVersion: glossaryTerm.businessVersion,
+          parentBusinessVersion: glossaryTerm.parentBusinessVersion,
+          termId: glossaryTerm.termId ?? glossaryTerm.id,
+          isWorkingDraft: glossaryTerm.entityStatus !== EntityStatus.Approved,
+        });
+      }
+
+      return getGlossaryTermDetailsPath(fullyQualifiedName);
+    }
     case EntityType.TAG:
       return getClassificationTagPath(fullyQualifiedName);
     case EntityType.CLASSIFICATION:

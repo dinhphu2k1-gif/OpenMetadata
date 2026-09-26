@@ -12,7 +12,10 @@
  */
 
 import * as XLSX from 'xlsx';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import {
   downloadDQExcelTemplate,
   exportDQToExcel,
@@ -50,19 +53,25 @@ describe('DQImportExport.utils', () => {
 
       mockClick = jest.fn();
       setAttributeSpy = jest.fn();
-      jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-        if (tagName === 'a') {
-          return {
-            href: '',
-            setAttribute: setAttributeSpy,
-            click: mockClick,
-          } as unknown as HTMLAnchorElement;
-        }
+      jest
+        .spyOn(document, 'createElement')
+        .mockImplementation((tagName: string) => {
+          if (tagName === 'a') {
+            return {
+              href: '',
+              setAttribute: setAttributeSpy,
+              click: mockClick,
+            } as unknown as HTMLAnchorElement;
+          }
 
-        return document.createElement(tagName);
-      });
-      jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
-      jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+          return document.createElement(tagName);
+        });
+      jest
+        .spyOn(document.body, 'appendChild')
+        .mockImplementation((node) => node);
+      jest
+        .spyOn(document.body, 'removeChild')
+        .mockImplementation((node) => node);
     });
 
     afterEach(() => {
@@ -108,7 +117,9 @@ describe('DQImportExport.utils', () => {
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(setAttributeSpy).toHaveBeenCalledWith(
         'download',
-        expect.stringMatching(/^Agribank_DQ_Danh_Muc_Quy_Tac_\d{8}_\d{4}\.xlsx$/)
+        expect.stringMatching(
+          /^Agribank_DQ_Danh_Muc_Quy_Tac_\d{8}_\d{4}\.xlsx$/
+        )
       );
       expect(mockClick).toHaveBeenCalled();
     });
@@ -137,15 +148,23 @@ describe('DQImportExport.utils', () => {
     });
 
     it('validateDQTargetPopulationValue should validate target population', () => {
-      expect(validateDQTargetPopulationValue('Toàn nền khách hàng').isValid).toBe(true);
-      expect(validateDQTargetPopulationValue('Khách hàng cá nhân').isValid).toBe(true);
-      expect(validateDQTargetPopulationValue('Dữ liệu rủi ro tín dụng').isValid).toBe(true);
+      expect(
+        validateDQTargetPopulationValue('Toàn nền khách hàng').isValid
+      ).toBe(true);
+      expect(
+        validateDQTargetPopulationValue('Khách hàng cá nhân').isValid
+      ).toBe(true);
+      expect(
+        validateDQTargetPopulationValue('Dữ liệu rủi ro tín dụng').isValid
+      ).toBe(true);
       expect(validateDQTargetPopulationValue('').isValid).toBe(true);
     });
 
     it('validateDQMethodValue should validate inspection methods', () => {
       expect(validateDQMethodValue('SQL').isValid).toBe(true);
-      expect(validateDQMethodValue('Kiểm tra bằng Quy tắc kỹ thuật (SQL)').isValid).toBe(true);
+      expect(
+        validateDQMethodValue('Kiểm tra bằng Quy tắc kỹ thuật (SQL)').isValid
+      ).toBe(true);
       expect(validateDQMethodValue('Data Profiling').isValid).toBe(true);
       expect(validateDQMethodValue('').isValid).toBe(true);
     });
@@ -248,8 +267,12 @@ describe('DQImportExport.utils', () => {
       const result = await readAndValidateDQExcel(mockFile);
 
       expect(result.totalRows).toBe(3);
-      expect(result.rows[0].errors).toContain('Thiếu Mã quy tắc nghiệp vụ (bắt buộc).');
-      expect(result.rows[2].errors[0]).toContain('bị trùng lặp với dòng khác trong file');
+      expect(result.rows[0].errors).toContain(
+        'Thiếu Mã quy tắc nghiệp vụ (bắt buộc).'
+      );
+      expect(result.rows[2].errors[0]).toContain(
+        'bị trùng lặp với dòng khác trong file'
+      );
     });
   });
 
@@ -294,6 +317,7 @@ describe('DQImportExport.utils', () => {
 
       expect(payload.name).toBe('DQ3.1');
       expect(payload.glossary).toBe('Data Quality');
+      expect(payload.businessVersion).toBe('1.0');
       expect(payload.extension).toEqual({
         cdeCode: 'CDE3',
         cdeName: 'Mã số khách hàng',
@@ -304,7 +328,9 @@ describe('DQImportExport.utils', () => {
       });
       expect(payload.tags).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ tagFQN: 'DataQualityDimension.Completeness' }),
+          expect.objectContaining({
+            tagFQN: 'DataQualityDimension.Completeness',
+          }),
           expect.objectContaining({ tagFQN: 'DataSource.IPCAS' }),
           expect.objectContaining({ tagFQN: 'DataQualityFrequency.Quarterly' }),
         ])
@@ -326,7 +352,8 @@ describe('DQImportExport.utils', () => {
       const err = {
         response: {
           data: {
-            message: "A term with the name 'DQ3.1' already exists in 'Data Quality' glossary.",
+            message:
+              "A term with the name 'DQ3.1' already exists in 'Data Quality' glossary.",
           },
         },
       };

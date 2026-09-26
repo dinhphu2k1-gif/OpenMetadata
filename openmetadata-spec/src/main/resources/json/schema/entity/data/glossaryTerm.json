@@ -83,7 +83,7 @@
       "$ref": "../../type/basic.json#/definitions/style"
     },
     "fullyQualifiedName": {
-      "description": "A unique name that identifies a glossary term. It captures name hierarchy of glossary of terms in the form of `glossaryName.parentTerm.childTerm`.",
+      "description": "A unique technical name that identifies a glossary term. BusinessWorkflow CDE identities include their Data Dictionary scope as `glossaryName.termName@vN`; the user-facing code remains `name`.",
       "$ref": "../../type/basic.json#/definitions/fullyQualifiedEntityName"
     },
     "synonyms": {
@@ -132,12 +132,75 @@
       "description": "Metadata version of the entity.",
       "$ref": "../../type/entityHistory.json#/definitions/entityVersion"
     },
+    "businessVersion": {
+      "description": "Business-facing version of this glossary term working version or published snapshot.",
+      "type": "string"
+    },
+    "parentBusinessVersion": {
+      "description": "Canonical Data Dictionary business version that scopes this CDE version.",
+      "type": "string",
+      "pattern": "^[1-9]\\d*$"
+    },
+    "workingRevision": {
+      "description": "Optimistic-lock revision of the working business version.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "snapshotId": {
+      "description": "Identifier of the immutable published snapshot represented by this response.",
+      "$ref": "../../type/basic.json#/definitions/uuid"
+    },
+    "publicationSequence": {
+      "description": "Monotonic publication order used to resolve the latest published snapshot.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "publishedAt": {
+      "description": "Time at which this immutable business snapshot was published.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "publishedBy": {
+      "description": "User that published this immutable business snapshot.",
+      "type": "string"
+    },
+    "archivedAt": {
+      "description": "Time at which this published snapshot was archived.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "archivedBy": {
+      "description": "User that archived this published snapshot.",
+      "type": "string"
+    },
     "updatedAt": {
       "description": "Last update time corresponding to the new version of the entity in Unix epoch time milliseconds.",
       "$ref": "../../type/basic.json#/definitions/timestamp"
     },
     "updatedBy": {
       "description": "User who made the update.",
+      "type": "string"
+    },
+    "createdAt": {
+      "description": "Time at which this working business version was created.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "createdBy": {
+      "description": "User who created this working business version.",
+      "type": "string"
+    },
+    "submittedAt": {
+      "description": "Time at which the working version was most recently submitted.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "submittedBy": {
+      "description": "User who most recently submitted the working version.",
+      "type": "string"
+    },
+    "rejectedAt": {
+      "description": "Time at which the working version was most recently rejected.",
+      "$ref": "../../type/basic.json#/definitions/timestamp"
+    },
+    "rejectedBy": {
+      "description": "User who most recently rejected the working version.",
       "type": "string"
     },
     "impersonatedBy": {

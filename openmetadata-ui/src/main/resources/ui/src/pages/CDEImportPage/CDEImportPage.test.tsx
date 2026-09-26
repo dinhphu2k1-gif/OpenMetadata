@@ -52,9 +52,7 @@ jest.mock('react-i18next', () => ({
       let str =
         typeof defaultValOrOptions === 'string' ? defaultValOrOptions : key;
       const opts =
-        typeof defaultValOrOptions === 'object'
-          ? defaultValOrOptions
-          : options;
+        typeof defaultValOrOptions === 'object' ? defaultValOrOptions : options;
       if (opts && typeof str === 'string') {
         Object.keys(opts).forEach((k) => {
           str = str.replace(new RegExp(`{{${k}}}`, 'g'), String(opts[k]));
@@ -90,12 +88,14 @@ jest.mock('../../rest/glossaryAPI', () => ({
     id: 'term-1',
     name: 'CDE001',
     entityStatus: 'Draft',
+    version: 0.1,
   }),
   patchGlossaryTerm: jest.fn().mockResolvedValue({
     id: 'term-1',
     name: 'CDE001',
     entityStatus: 'Draft',
   }),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../rest/domainAPI', () => ({
@@ -147,9 +147,7 @@ describe('CDEImportPage', () => {
     expect(screen.getByText(/Duyệt tệp Excel/i)).toBeInTheDocument();
 
     // Check template download button
-    expect(
-      screen.getByText('Tải file Excel mẫu (.xlsx)')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tải file Excel mẫu (.xlsx)')).toBeInTheDocument();
 
     // Check duplicate handling options & descriptions
     expect(screen.getByText('Bỏ qua bản ghi trùng')).toBeInTheDocument();
@@ -158,12 +156,16 @@ describe('CDEImportPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Cập nhật ghi đè bản ghi')).toBeInTheDocument();
     expect(
-      screen.getByText(/Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại/i)
+      screen.getByText(
+        /Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại/i
+      )
     ).toBeInTheDocument();
 
     // Verify NO warning alert / notice exists in Step 1
     expect(
-      screen.queryByText(/Mọi bản ghi CDE nạp mới sẽ được khởi tạo ở trạng thái/i)
+      screen.queryByText(
+        /Mọi bản ghi CDE nạp mới sẽ được khởi tạo ở trạng thái/i
+      )
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Quy định quản trị dữ liệu/i)
@@ -190,7 +192,7 @@ describe('CDEImportPage', () => {
           personalData: 'Có',
           relatedRegulatoryDocuments: 'TT 23',
           dataQualityRules: 'Có',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: 'admin',
           status: 'Draft' as any,
           errors: [],
@@ -237,7 +239,9 @@ describe('CDEImportPage', () => {
     expect(screen.getByTestId('processed-row')).toBeInTheDocument();
     expect(screen.getByTestId('update-button')).toBeInTheDocument();
     expect(screen.getByTestId('status-filter-group')).toBeInTheDocument();
-    expect(screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)
+    ).toBeInTheDocument();
 
     // Initial state: 2 rows in Step 3 (1 valid + 1 added row with missing fields)
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
@@ -335,7 +339,7 @@ describe('CDEImportPage', () => {
           personalData: '',
           relatedRegulatoryDocuments: '',
           dataQualityRules: '',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: '',
           status: 'Draft' as any,
           errors: [],
@@ -378,7 +382,7 @@ describe('CDEImportPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should detect errors for all fixed/referenced columns (dataSource, classification, personalData, owner, reviewer, dqRules, version) during validation', async () => {
+  it('should detect errors for import fields during validation', async () => {
     (domainAPI.getDomainList as jest.Mock).mockResolvedValue({
       data: [
         {
@@ -419,8 +423,6 @@ describe('CDEImportPage', () => {
           personalData: 'GiaTriSai',
           relatedRegulatoryDocuments: 'VB 1',
           dataQualityRules: 'SaiDinhDangBoolean',
-          cdeVersion: 'ban-1.0',
-          reviewer: 'Ghost_Reviewer',
           status: 'Draft' as any,
           errors: [],
           warnings: [],
@@ -457,13 +459,23 @@ describe('CDEImportPage', () => {
     expect(screen.getByTestId('passed-row')).toHaveTextContent('0');
 
     // Verify errors are captured in details
-    expect(screen.getByText(/Nguồn dữ liệu 'Nguon_Khong_Ton_Tai_123' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Phân loại dữ liệu 'PhanLoaiSai' không hợp lệ/)).toBeInTheDocument();
-    expect(screen.getByText(/Dữ liệu cá nhân 'GiaTriSai' không hợp lệ/)).toBeInTheDocument();
-    expect(screen.getByText(/Chủ sở hữu 'Ghost_Owner' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Người kiểm soát 'Ghost_Reviewer' không tồn tại trên hệ thống/)).toBeInTheDocument();
-    expect(screen.getByText(/Quy định chất lượng dữ liệu phải là 'Có' hoặc 'Không'/)).toBeInTheDocument();
-    expect(screen.getByText(/Phiên bản 'ban-1.0' không đúng định dạng/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Nguồn dữ liệu 'Nguon_Khong_Ton_Tai_123' không tồn tại trên hệ thống/
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Phân loại dữ liệu 'PhanLoaiSai' không hợp lệ/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Dữ liệu cá nhân 'GiaTriSai' không hợp lệ/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Chủ sở hữu 'Ghost_Owner' không tồn tại trên hệ thống/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Quy định chất lượng dữ liệu phải là 'Có' hoặc 'Không'/)
+    ).toBeInTheDocument();
   });
 
   it('should render bulk submit button and patch terms to InReview when clicked', async () => {
@@ -497,7 +509,7 @@ describe('CDEImportPage', () => {
           personalData: '',
           relatedRegulatoryDocuments: '',
           dataQualityRules: '',
-          cdeVersion: '1.0',
+          version: '1.0',
           reviewer: '',
           status: 'Draft' as any,
           errors: [],
@@ -544,12 +556,10 @@ describe('CDEImportPage', () => {
     });
 
     const glossaryAPI = require('../../rest/glossaryAPI');
-    expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-1', [
-      {
-        op: 'replace',
-        path: '/entityStatus',
-        value: 'In Review',
-      },
-    ]);
+    expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-1',
+      'submit',
+      { expectedRevision: 0.1 }
+    );
   });
 });

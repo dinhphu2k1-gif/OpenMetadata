@@ -140,6 +140,38 @@
         "`markdownCp:# Sample Markdown Text`",
         "\"\"\"tableCp:row_1_col1_Value,row_1_col2_Value,row_1_col3_Value\"\"\""
       ]
+    },
+    {
+      "name": "businessVersion",
+      "required": false,
+      "description": "Business version of the exported glossary term revision. This column is export metadata and is ignored during import.",
+      "examples": [
+        "`1.0`", "`1.2.3`"
+      ]
+    },
+    {
+      "name": "snapshotStatus",
+      "required": false,
+      "description": "Workflow status of the exported revision. This column is export metadata and is ignored during import.",
+      "examples": [
+        "`Draft`", "`InReview`", "`Approved`", "`Rejected`"
+      ]
+    },
+    {
+      "name": "snapshotSource",
+      "required": false,
+      "description": "Source representation used for export. Published rows are immutable snapshots; Working rows are editable revisions; Current rows are identity projections without a business snapshot.",
+      "examples": [
+        "`Published`", "`Working`", "`Current`"
+      ]
+    },
+    {
+      "name": "snapshotId",
+      "required": false,
+      "description": "Identifier of the immutable published snapshot. Empty for non-published rows. This column is export metadata and is ignored during import.",
+      "examples": [
+        "`550e8400-e29b-41d4-a716-446655440000`"
+      ]
     }
   ]
 }

@@ -45,6 +45,10 @@
         "topic"
       ],
       "operations": [
+        "ViewWorking",
+        "ApproveWorking",
+        "RejectWorking",
+        "ArchivePublished",
         "EditStatus"
       ],
       "effect": "allow"

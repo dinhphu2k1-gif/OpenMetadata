@@ -11,11 +11,23 @@
  *  limitations under the License.
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import ResizableLeftPanels from '../../../components/common/ResizablePanels/ResizableLeftPanels';
 import * as useGlossaryStoreModule from '../../../components/Glossary/useGlossary.store';
 import { MOCK_GLOSSARY } from '../../../mocks/Glossary.mock';
-import { patchGlossaryTerm } from '../../../rest/glossaryAPI';
+import {
+  getGlossariesList,
+  getGlossaryTermByFQN,
+  getGlossaryWorkingVersion,
+  updateGlossaryTermWorkingVersion,
+  updateGlossaryWorkingVersion,
+} from '../../../rest/glossaryAPI';
 import GlossaryPage from './GlossaryPage.component';
 
 const mockNavigate = jest.fn();
@@ -106,6 +118,16 @@ jest.mock('../../../components/Glossary/GlossaryV1.component', () => {
         handleGlossaryTermUpdate
       </button>
       <button
+        data-testid="updateGlossaryTermDescription"
+        onClick={() =>
+          props.onGlossaryTermUpdate({
+            ...MOCK_GLOSSARY,
+            description: 'Updated term description',
+          })
+        }>
+        updateGlossaryTermDescription
+      </button>
+      <button
         data-testid="handleGlossaryDelete"
         onClick={() => props.onGlossaryDelete(MOCK_GLOSSARY.id)}>
         handleGlossaryDelete
@@ -119,6 +141,13 @@ jest.mock('../../../components/Glossary/GlossaryV1.component', () => {
         data-testid="updateGlossary"
         onClick={() => props.updateGlossary(MOCK_GLOSSARY)}>
         updateGlossary
+      </button>
+      <button
+        data-testid="updateGlossaryDescription"
+        onClick={() =>
+          props.updateGlossary({ description: 'Updated description' })
+        }>
+        updateGlossaryDescription
       </button>
     </div>
   ));
@@ -144,12 +173,26 @@ jest.mock('../../../rest/glossaryAPI', () => ({
       paging: { total: 1 },
     })
   ),
-  patchGlossaryTerm: jest
+  getGlossaryVersionsList: jest.fn().mockResolvedValue({ versions: [] }),
+  getGlossaryVersionPermissions: jest.fn().mockResolvedValue({
+    canViewWorking: true,
+    canViewPublished: true,
+  }),
+  getLatestPublishedGlossary: jest
     .fn()
-    .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),
-  patchGlossaries: jest
+    .mockResolvedValue({ ...MOCK_GLOSSARY, entityStatus: 'Approved' }),
+  getGlossaryWorkingVersion: jest
     .fn()
-    .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  getGlossaryTermWorkingVersion: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  updateGlossaryWorkingVersion: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 2 }),
+  updateGlossaryTermWorkingVersion: jest
+    .fn()
+    .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 2 }),
 }));
 
 jest.mock(
@@ -197,6 +240,86 @@ describe('Test GlossaryComponent page', () => {
     fireEvent.click(updateGlossary);
   });
 
+  it('updates an inline attribute without navigating or reloading the glossary list', async () => {
+    render(<GlossaryPage {...mockProps} />);
+
+    const updateDescription = await screen.findByTestId(
+      'updateGlossaryDescription'
+    );
+
+    // Ignore the initial list load; only calls caused by the inline update
+    // matter for this regression.
+    (getGlossariesList as jest.Mock).mockClear();
+    mockNavigate.mockClear();
+
+    fireEvent.click(updateDescription);
+
+    await waitFor(() =>
+      expect(updateGlossaryWorkingVersion).toHaveBeenCalledWith(
+        MOCK_GLOSSARY.id,
+        expect.any(Number),
+        { description: 'Updated description' }
+      )
+    );
+
+    expect(mockUpdateActiveGlossary).toHaveBeenCalledWith(
+      expect.objectContaining({ workingRevision: 2 })
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(getGlossariesList).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch the working version when glossary metadata changes', async () => {
+    const routeGlossary = {
+      ...MOCK_GLOSSARY,
+      fullyQualifiedName: 'Business Glossary',
+    };
+    (
+      useGlossaryStoreModule.useGlossaryStore as unknown as jest.Mock
+    ).mockImplementation(() => ({
+      glossaries: [routeGlossary],
+      setGlossaries: mockSetGlossaries,
+      activeGlossary: routeGlossary,
+      setActiveGlossary: mockSetActiveGlossary,
+      updateActiveGlossary: mockUpdateActiveGlossary,
+    }));
+
+    const view = render(<GlossaryPage {...mockProps} />);
+
+    await screen.findByText(/Glossary.component/i);
+    await waitFor(() => expect(getGlossaryWorkingVersion).toHaveBeenCalled());
+    (getGlossaryWorkingVersion as jest.Mock).mockClear();
+
+    (
+      useGlossaryStoreModule.useGlossaryStore as unknown as jest.Mock
+    ).mockImplementation(() => ({
+      glossaries: [
+        { ...routeGlossary, description: 'Updated description' },
+      ],
+      setGlossaries: mockSetGlossaries,
+      activeGlossary: {
+        ...routeGlossary,
+        description: 'Updated description',
+      },
+      setActiveGlossary: mockSetActiveGlossary,
+      updateActiveGlossary: mockUpdateActiveGlossary,
+    }));
+
+    view.rerender(<GlossaryPage {...mockProps} />);
+
+    expect(getGlossaryWorkingVersion).not.toHaveBeenCalled();
+
+    (
+      useGlossaryStoreModule.useGlossaryStore as unknown as jest.Mock
+    ).mockImplementation(() => ({
+      glossaries: [MOCK_GLOSSARY],
+      setGlossaries: mockSetGlossaries,
+      activeGlossary: MOCK_GLOSSARY,
+      setActiveGlossary: mockSetActiveGlossary,
+      updateActiveGlossary: mockUpdateActiveGlossary,
+    }));
+  });
+
   it('All Function call should work properly - part 2', async () => {
     render(<GlossaryPage {...mockProps} />);
 
@@ -215,11 +338,37 @@ describe('Test GlossaryComponent page', () => {
     fireEvent.click(handleGlossaryTermDelete);
   });
 
+  it('updates a glossary term without refetching page content', async () => {
+    render(<GlossaryPage {...mockProps} />);
+
+    const updateDescription = await screen.findByTestId(
+      'updateGlossaryTermDescription'
+    );
+    (getGlossaryTermByFQN as jest.Mock).mockClear();
+    (getGlossariesList as jest.Mock).mockClear();
+    mockNavigate.mockClear();
+
+    fireEvent.click(updateDescription);
+
+    await waitFor(() =>
+      expect(updateGlossaryTermWorkingVersion).toHaveBeenCalledWith(
+        MOCK_GLOSSARY.id,
+        expect.any(Number),
+        expect.objectContaining({ description: 'Updated term description' })
+      )
+    );
+
+    expect(mockSetActiveGlossary).toHaveBeenCalledWith(
+      expect.objectContaining({ workingRevision: 2 })
+    );
+    expect(getGlossaryTermByFQN).not.toHaveBeenCalled();
+    expect(getGlossariesList).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   describe('Render Sad Paths', () => {
-    it('show error if patchGlossaryTerm API resolves without data', async () => {
-      (patchGlossaryTerm as jest.Mock).mockImplementation(() =>
-        Promise.resolve({ data: '' })
-      );
+    it('shows an error if updating the working term resolves without data', async () => {
+      (updateGlossaryTermWorkingVersion as jest.Mock).mockResolvedValue('');
       render(<GlossaryPage {...mockProps} />);
       const handleGlossaryTermUpdate = await screen.findByTestId(
         'handleGlossaryTermUpdate'

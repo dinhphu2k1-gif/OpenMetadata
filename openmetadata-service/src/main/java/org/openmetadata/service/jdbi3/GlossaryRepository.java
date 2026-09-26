@@ -80,11 +80,13 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.resources.feeds.MessageParser;
 import org.openmetadata.service.resources.glossary.GlossaryResource;
 import org.openmetadata.service.resources.settings.SettingsCache;
 import org.openmetadata.service.security.policyevaluator.PolicyConditionUpdater;
+import org.openmetadata.service.security.policyevaluator.SubjectContext;
 import org.openmetadata.service.util.EntityFieldUtils;
 import org.openmetadata.service.util.EntityUtil.Fields;
 import org.openmetadata.service.util.EntityUtil.RelationIncludes;
@@ -170,7 +172,9 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
   }
 
   @Override
-  public void prepare(Glossary glossary, boolean update) {}
+  public void prepare(Glossary glossary, boolean update) {
+    DataDictionaryResolver.requireDataDictionary(glossary);
+  }
 
   @Override
   protected List<String> getFieldsStrippedFromStorageJson() {
@@ -247,8 +251,34 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
             repository.getFields(
                 "owners,reviewers,tags,relatedTerms,synonyms,extension,parent,domains"),
             glossary.getFullyQualifiedName());
+    if (isConsumerUser(user)) {
+      GlossaryVersionDAO.PublishedSnapshotRecord publishedGlossary =
+          daoCollection.glossaryVersionDAO().findLatestPublished(GLOSSARY, glossary.getId());
+      if (publishedGlossary == null) {
+        throw new jakarta.ws.rs.NotFoundException("No published glossary snapshot exists");
+      }
+      glossary = JsonUtils.readValue(publishedGlossary.payload(), Glossary.class);
+      terms =
+          daoCollection
+              .glossaryVersionDAO()
+              .listSnapshotTerms(publishedGlossary.snapshotId())
+              .stream()
+              .map(snapshot -> JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class))
+              .toList();
+    }
     terms.sort(Comparator.comparing(EntityInterface::getFullyQualifiedName));
     return new GlossaryCsv(glossary, user).exportCsv(terms, callback);
+  }
+
+  private boolean isConsumerUser(String user) {
+    SubjectContext subject = SubjectContext.getSubjectContext(user);
+    boolean elevated =
+        subject.isAdmin()
+            || subject.isBot()
+            || subject.hasAnyRole("DataSteward")
+            || subject.hasAnyRole("DataProposer")
+            || subject.hasAnyRole("Admin");
+    return !elevated && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
   }
 
   /** Load CSV provided for bulk upload */
@@ -540,6 +570,16 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
       addField(recordList, entity.getStyle() != null ? entity.getStyle().getIconURL() : null);
       addDomains(recordList, getDirectDomains(entity.getDomains()));
       addExtension(recordList, entity.getExtension());
+      addField(recordList, entity.getBusinessVersion());
+      addField(
+          recordList, entity.getEntityStatus() == null ? null : entity.getEntityStatus().value());
+      addField(
+          recordList,
+          entity.getSnapshotId() != null
+              ? "Published"
+              : entity.getWorkingRevision() != null ? "Working" : "Current");
+      addField(
+          recordList, entity.getSnapshotId() == null ? null : entity.getSnapshotId().toString());
       addRecord(csvFile, recordList);
     }
 
@@ -653,6 +693,19 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
     public GlossaryUpdater(Glossary original, Glossary updated, Operation operation) {
       super(original, updated, operation);
       renameAllowed = true;
+    }
+
+    @Override
+    protected boolean consolidateChanges(Glossary original, Glossary updated, Operation operation) {
+      if (original.getEntityStatus() != updated.getEntityStatus()
+          || !Objects.equals(getBusinessVersion(original), getBusinessVersion(updated))) {
+        return false;
+      }
+      return super.consolidateChanges(original, updated, operation);
+    }
+
+    private String getBusinessVersion(Glossary glossary) {
+      return glossary.getBusinessVersion();
     }
 
     @Transaction

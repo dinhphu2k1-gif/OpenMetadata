@@ -150,7 +150,10 @@ export interface TagClassSearchSource extends SearchSourceBase, Tag {
 export interface GlossarySearchSource extends SearchSourceBase, Glossary {} // extends EntityInterface
 export interface GlossaryTermSearchSource
   extends SearchSourceBase,
-    GlossaryTerm {} // extends EntityInterface
+    GlossaryTerm {
+  /** Stable identity exposed by the versioned CDE search projection. */
+  termId?: string;
+} // extends EntityInterface
 
 export interface QuerySearchSource extends SearchSourceBase, Query {} // extends EntityInterface
 export interface TestCaseSearchSource

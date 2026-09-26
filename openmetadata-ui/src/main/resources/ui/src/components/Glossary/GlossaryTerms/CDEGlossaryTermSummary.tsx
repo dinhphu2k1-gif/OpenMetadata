@@ -12,7 +12,8 @@
  *  limitations under the License.
  */
 
-import { Col, Form, Modal, Popover, Row, Select, Tag, Typography } from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Button, Popover, Select, Typography } from 'antd';
 import { DateTime } from 'luxon';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import {
@@ -25,28 +26,26 @@ import { showErrorToast } from '../../../utils/ToastUtils';
 import { EntityTags } from 'Models';
 import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
-import { EntityType } from '../../../enums/entity.enum';
-import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { TagSource } from '../../../generated/type/tagLabel';
 import { createTagObject } from '../../../utils/TagsUtils';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
+import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/UserTeamSelectableList.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModalWithMarkdownEditor } from '../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
-import TagsContainerV2 from '../../Tag/TagsContainerV2/TagsContainerV2';
-import {
-  DisplayType,
-  LayoutType,
-} from '../../Tag/TagsViewer/TagsViewer.interface';
+import TagsViewer from '../../Tag/TagsViewer/TagsViewer';
+import { DisplayType } from '../../Tag/TagsViewer/TagsViewer.interface';
 import {
   CDE_TAG_CLASSIFICATIONS,
   renderCDEOwners,
   renderCDEReferences,
 } from '../GlossaryTermTab/CDEGlossaryTableColumns';
+import CDEEnumField from './CDEEnumField';
+import CDEReleaseLevelField from './CDEReleaseLevelField';
 
 interface CDEGlossaryTermSummaryProps {
   glossaryTerm: GlossaryTerm;
@@ -59,21 +58,37 @@ interface CDEFieldProps {
   label: string;
 }
 
+interface CDESectionProps {
+  children: ReactNode;
+  title: string;
+  variant: 'classification' | 'context' | 'management';
+}
+
+const CDESection = ({ children, title, variant }: CDESectionProps) => (
+  <section className={`cde-detail-section cde-detail-section-${variant}`}>
+    <header className="cde-detail-section-header">
+      <span aria-hidden="true" className="cde-detail-section-marker" />
+      <Typography.Title className="cde-detail-section-title" level={5}>
+        {title}
+      </Typography.Title>
+    </header>
+    <div className="cde-detail-section-grid">
+      {children}
+    </div>
+  </section>
+);
+
 const CDEField = ({ action, children, className, label }: CDEFieldProps) => (
-  <Col
+  <div
     aria-label={label}
     className={`cde-detail-field ${className ?? ''}`}
-    lg={12}
-    md={12}
-    role="group"
-    sm={24}
-    xs={24}>
+    role="group">
     <div className="cde-detail-field-label d-flex items-center gap-2">
       <Typography.Text className="text-sm font-medium">{label}</Typography.Text>
       {action}
     </div>
     <div className="cde-detail-field-value">{children}</div>
-  </Col>
+  </div>
 );
 
 interface CDETagFieldProps {
@@ -87,14 +102,20 @@ const CDETagField = ({
   glossaryTerm,
   label,
 }: CDETagFieldProps) => {
+  const { t } = useTranslation();
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const selectedTags = (glossaryTerm.tags ?? []).filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
   );
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditTags || permissions?.EditAll);
-
+    isDraft &&
+    !isVersionView &&
+    Boolean(permissions?.EditTags || permissions?.EditAll);
   const handleTagUpdate = async (updatedTags: EntityTags[]) => {
     const tags = createTagObject(updatedTags) ?? [];
     const currentTags = data?.tags ?? glossaryTerm.tags ?? [];
@@ -107,26 +128,41 @@ const CDETagField = ({
       ...data,
       tags: [...nonClassificationTags, ...tags],
     });
+    setIsEditorOpen(false);
   };
 
   return (
-    <CDEField className={`cde-detail-field-${classification}`} label={label}>
-      <TagsContainerV2
-        showInlineEditButton
-        classificationFilter={classification}
-        columnData={{
-          fqn: glossaryTerm.fullyQualifiedName ?? glossaryTerm.name,
-          name: label,
-        }}
+    <CDEField
+      action={
+        hasEditAccess ? (
+          <TagSelectableList
+            classificationFilter={classification}
+            hasPermission={hasEditAccess}
+            popoverProps={{
+              open: isEditorOpen,
+              overlayClassName: 'cde-tag-select-popover',
+              placement: 'bottomLeft',
+              onOpenChange: setIsEditorOpen,
+            }}
+            searchPlaceholder={t('label.search-for-type', { type: label })}
+            selectedTags={selectedTags}
+            onCancel={() => setIsEditorOpen(false)}
+            onUpdate={handleTagUpdate}>
+            <EditIconButton
+              size="small"
+              title={t('label.edit-entity', { entity: label })}
+            />
+          </TagSelectableList>
+        ) : undefined
+      }
+      className={`cde-detail-field-${classification}`}
+      label={label}>
+      <TagsViewer
         displayType={DisplayType.READ_MORE}
-        entityFqn={glossaryTerm.fullyQualifiedName}
-        entityType={EntityType.GLOSSARY_TERM}
-        layoutType={LayoutType.HORIZONTAL}
-        permission={hasEditAccess}
-        selectedTags={selectedTags}
-        showTaskHandler={false}
+        entityFqn={glossaryTerm.fullyQualifiedName ?? glossaryTerm.name}
+        showNoDataPlaceholder
         tagType={TagSource.Classification}
-        onSelectionChange={handleTagUpdate}
+        tags={selectedTags}
       />
     </CDEField>
   );
@@ -136,8 +172,13 @@ const CDEOwnersField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, entityRules, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditOwners || permissions?.EditAll);
+    isDraft &&
+    !isVersionView &&
+    Boolean(permissions?.EditOwners || permissions?.EditAll);
 
   const handleOwnerUpdate = async (owners?: EntityReference[]) => {
     await onUpdate?.({
@@ -177,7 +218,11 @@ const CDEDomainsField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, entityRules, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
-  const hasEditAccess = !isVersionView && Boolean(permissions?.EditAll);
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
+  const hasEditAccess =
+    isDraft && !isVersionView && Boolean(permissions?.EditAll);
 
   const handleDomainUpdate = async (
     selectedDomain: EntityReference | EntityReference[]
@@ -224,77 +269,74 @@ const CDEQualityRuleField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
+  const currentTerm = data ?? glossaryTerm;
+  const isDraft =
+    !currentTerm.entityStatus ||
+    currentTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
   const rawValue =
-    glossaryTerm.extension?.dataQualityRules ??
-    glossaryTerm.extension?.quy_dinh_chat_luong_du_lieu;
+    currentTerm.extension?.dataQualityRules ??
+    currentTerm.extension?.quy_dinh_chat_luong_du_lieu;
 
-  const isEnabled =
-    rawValue === true ||
-    rawValue === 'true' ||
-    rawValue === 'Y' ||
-    rawValue === 'yes' ||
-    (Array.isArray(rawValue) &&
-      (rawValue.includes('Y') ||
-        rawValue.includes('yes') ||
-        rawValue.includes('true')));
+  const qualityValue = (() => {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    if (
+      values.some(
+        (item) =>
+          item === true || item === 'true' || item === 'Y' || item === 'yes'
+      )
+    ) {
+      return 'true';
+    }
+    if (
+      values.some(
+        (item) =>
+          item === false || item === 'false' || item === 'N' || item === 'no'
+      )
+    ) {
+      return 'false';
+    }
+
+    return undefined;
+  })();
 
   const handleSelect = async (val: string) => {
     const updatedExtension = {
-      ...(glossaryTerm.extension ?? {}),
-      ...(data?.extension ?? {}),
+      ...(currentTerm.extension ?? {}),
       dataQualityRules: val === 'true' ? ['Y'] : ['N'],
     };
     await onUpdate?.(
       {
-        ...glossaryTerm,
-        ...data,
+        ...currentTerm,
         extension: updatedExtension,
       },
       'extension'
     );
-    setIsEditing(false);
   };
 
-  const editAction = hasEditAccess ? (
-    <Popover
-      content={
-        <div style={{ width: 120 }}>
-          <Select
-            defaultValue={isEnabled ? 'true' : 'false'}
-            options={[
-              { label: t('label.yes'), value: 'true' },
-              { label: t('label.no'), value: 'false' },
-            ]}
-            style={{ width: '100%' }}
-            onChange={handleSelect}
-          />
-        </div>
-      }
-      open={isEditing}
-      placement="bottomLeft"
-      trigger="click"
-      onOpenChange={setIsEditing}>
-      <EditIconButton
-        size="small"
-        title={t('label.edit-entity', { entity: t('cde.data-quality-rules') })}
-      />
-    </Popover>
-  ) : undefined;
-
   return (
-    <CDEField
-      action={editAction}
+    <CDEEnumField
+      canEdit={hasEditAccess}
       className="cde-detail-field-quality-rule"
-      label={t('cde.data-quality-rules')}>
-      <div className="d-flex items-center gap-2">
-        <Tag className="enum-key-tag">{isEnabled ? 'Y' : 'N'}</Tag>
-      </div>
-    </CDEField>
+      label={t('cde.data-quality-rules')}
+      options={[
+        { label: t('label.yes'), value: 'true' },
+        { label: t('label.no'), value: 'false' },
+      ]}
+      placement="topRight"
+      placeholder={t('cde.not-set')}
+      value={qualityValue}
+      valueClassName={
+        qualityValue === 'true'
+          ? 'cde-value-pill-quality'
+          : 'cde-value-pill-neutral'
+      }
+      onChange={handleSelect}
+    />
   );
 };
 
@@ -315,7 +357,11 @@ const CDETextCustomField = ({
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
+  const isDraft =
+    !glossaryTerm.entityStatus ||
+    glossaryTerm.entityStatus === EntityStatus.Draft;
   const hasEditAccess =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
@@ -358,7 +404,7 @@ const CDETextCustomField = ({
         {value ? (
           <RichTextEditorPreviewerV1 enableSeeMoreVariant markdown={value} />
         ) : (
-          <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
+          <span className="text-grey-muted">{t('cde.no-information')}</span>
         )}
       </div>
       {isEditing && (
@@ -383,41 +429,55 @@ const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const [editingDate, setEditingDate] = useState<CDEDateField | null>(null);
+  const [draftDate, setDraftDate] = useState<DateTime | null>(null);
+  const [dateError, setDateError] = useState<string>();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm();
-  const extension = data?.extension ?? glossaryTerm.extension ?? {};
+  const currentTerm = data ?? glossaryTerm;
+  const extension = currentTerm.extension ?? {};
+  const isDraft =
+    !currentTerm.entityStatus ||
+    currentTerm.entityStatus === EntityStatus.Draft;
   const canEdit =
+    isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
+
   const openEditor = (key: CDEDateField) => {
-    form.setFieldsValue({
-      [key]: extension[key] ? DateTime.fromISO(extension[key]) : null,
-    });
+    const currentValue = extension[key];
+    setDraftDate(
+      typeof currentValue === 'string' ? DateTime.fromISO(currentValue) : null
+    );
+    setDateError(undefined);
     setEditingDate(key);
+    setIsPickerOpen(true);
   };
-  const save = async () => {
+
+  const closeEditor = () => {
+    setEditingDate(null);
+    setDraftDate(null);
+    setDateError(undefined);
+    setIsPickerOpen(false);
+  };
+
+  const save = async (key: CDEDateField) => {
     try {
-      if (!editingDate) {
-        return;
-      }
-      const values = await form.validateFields();
-      const value = values[editingDate]?.toFormat('yyyy-MM-dd') ?? '';
-      const error = validateCDEDates({ ...extension, [editingDate]: value });
+      const value = draftDate?.toFormat('yyyy-MM-dd') ?? '';
+      const error = validateCDEDates({ ...extension, [key]: value });
       if (error) {
-        form.setFields([{ name: editingDate, errors: [t(error)] }]);
+        setDateError(t(error));
 
         return;
       }
       setSaving(true);
       await onUpdate?.(
         {
-          ...glossaryTerm,
-          ...data,
-          extension: mergeCDEDates(extension, { [editingDate]: value }),
+          ...currentTerm,
+          extension: mergeCDEDates(extension, { [key]: value }),
         },
         'extension'
       );
-      setEditingDate(null);
+      closeEditor();
     } catch (error) {
       if (!(error && typeof error === 'object' && 'errorFields' in error)) {
         showErrorToast(error instanceof Error ? error.message : String(error));
@@ -432,7 +492,7 @@ const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
       {(['effectiveDate', 'expirationDate'] as const).map((key) => (
         <CDEField
           action={
-            canEdit ? (
+            canEdit && editingDate !== key ? (
               <EditIconButton
                 size="small"
                 title={t('label.edit')}
@@ -446,33 +506,52 @@ const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
               ? 'cde.effective-date'
               : 'cde.expiration-date'
           )}>
-          {formatCDEDate(extension[key])}
+          {editingDate === key ? (
+            <div className="cde-inline-date-editor">
+              <DatePicker
+                allowClear
+                autoFocus
+                disabled={saving}
+                format="dd/MM/yyyy"
+                open={isPickerOpen}
+                status={dateError ? 'error' : undefined}
+                value={draftDate}
+                onChange={(value) => {
+                  setDraftDate(value);
+                  setDateError(undefined);
+                }}
+                onOpenChange={setIsPickerOpen}
+              />
+              <Button
+                aria-label={t('label.save')}
+                className="cde-inline-date-action"
+                icon={<CheckOutlined />}
+                loading={saving}
+                size="small"
+                type="primary"
+                onClick={() => save(key)}
+              />
+              <Button
+                aria-label={t('label.cancel')}
+                className="cde-inline-date-action"
+                disabled={saving}
+                icon={<CloseOutlined />}
+                size="small"
+                onClick={closeEditor}
+              />
+              {dateError && (
+                <Typography.Text className="cde-inline-date-error" type="danger">
+                  {dateError}
+                </Typography.Text>
+              )}
+            </div>
+          ) : extension[key] ? (
+            formatCDEDate(extension[key])
+          ) : (
+            <span className="text-grey-muted">{t('cde.not-set')}</span>
+          )}
         </CDEField>
       ))}
-      <Modal
-        confirmLoading={saving}
-        title={t(
-          editingDate === 'expirationDate'
-            ? 'cde.expiration-date'
-            : 'cde.effective-date'
-        )}
-        visible={editingDate !== null}
-        onCancel={() => setEditingDate(null)}
-        onOk={save}>
-        <Form form={form} layout="vertical">
-          {editingDate && (
-            <Form.Item
-              label={t(
-                editingDate === 'effectiveDate'
-                  ? 'cde.effective-date'
-                  : 'cde.expiration-date'
-              )}
-              name={editingDate}>
-              <DatePicker allowClear format="dd/MM/yyyy" />
-            </Form.Item>
-          )}
-        </Form>
-      </Modal>
     </>
   );
 };
@@ -483,19 +562,27 @@ const CDEGlossaryTermSummary = ({
   const { t } = useTranslation();
 
   return (
-    <>
-      {/* CDE metadata and validity dates */}
+    <div className="cde-detail-summary">
       <div
-        className="cde-detail-summary cde-detail-summary-group-1"
+        className="cde-detail-summary-group-1"
         data-testid="cde-glossary-term-summary-group-1">
-        <Row gutter={[0, 0]}>
+        <CDESection
+          title={t('cde.management-information')}
+          variant="management">
           <CDEDomainsField glossaryTerm={glossaryTerm} />
+          <CDEOwnersField glossaryTerm={glossaryTerm} />
+          <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
+          <CDEValidityFields glossaryTerm={glossaryTerm} />
+        </CDESection>
+
+        <CDESection
+          title={t('cde.classification-control')}
+          variant="classification">
           <CDETagField
             classification={CDE_TAG_CLASSIFICATIONS.dataSource}
             glossaryTerm={glossaryTerm}
             label={t('cde.data-source')}
           />
-          <CDEOwnersField glossaryTerm={glossaryTerm} />
           <CDETagField
             classification={CDE_TAG_CLASSIFICATIONS.dataClassification}
             glossaryTerm={glossaryTerm}
@@ -507,15 +594,15 @@ const CDEGlossaryTermSummary = ({
             label={t('cde.personal-data')}
           />
           <CDEQualityRuleField glossaryTerm={glossaryTerm} />
-          <CDEValidityFields glossaryTerm={glossaryTerm} />
-        </Row>
+        </CDESection>
       </div>
 
-      {/* Group 2: Mối quan hệ với thực thể (trái) và Văn bản quy định liên quan (phải) trên cùng 1 hàng */}
       <div
-        className="cde-detail-summary cde-detail-summary-group-2"
+        className="cde-detail-summary-group-2"
         data-testid="cde-glossary-term-summary-group-2">
-        <Row gutter={[0, 0]}>
+        <CDESection
+          title={t('cde.business-context')}
+          variant="context">
           <CDETextCustomField
             fallbackName="moi_quan_he_voi_thuc_the"
             glossaryTerm={glossaryTerm}
@@ -528,9 +615,9 @@ const CDEGlossaryTermSummary = ({
             label={t('cde.related-regulatory-documents')}
             propertyName="relatedRegulatoryDocuments"
           />
-        </Row>
+        </CDESection>
       </div>
-    </>
+    </div>
   );
 };
 

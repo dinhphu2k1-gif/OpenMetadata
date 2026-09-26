@@ -29,6 +29,7 @@ export interface AddGlossaryTermFormProps {
 }
 
 export interface GlossaryTermForm {
+  businessVersion?: string;
   name: string;
   displayName: string;
   description: string;

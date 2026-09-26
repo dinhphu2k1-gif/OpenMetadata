@@ -30,6 +30,8 @@ export interface ResourceDescriptor {
  */
 export enum Operation {
     All = "All",
+    ApproveWorking = "ApproveWorking",
+    ArchivePublished = "ArchivePublished",
     AuditLogs = "AuditLogs",
     BulkCreate = "BulkCreate",
     BulkUpdate = "BulkUpdate",
@@ -37,6 +39,7 @@ export enum Operation {
     CreateIngestionPipelineAutomator = "CreateIngestionPipelineAutomator",
     CreateScim = "CreateScim",
     CreateTests = "CreateTests",
+    CreateVersion = "CreateVersion",
     Delete = "Delete",
     DeleteScim = "DeleteScim",
     DeleteTestCaseFailedRowsSample = "DeleteTestCaseFailedRowsSample",
@@ -70,9 +73,12 @@ export enum Operation {
     EditUsage = "EditUsage",
     EditUserNotificationTemplate = "EditUserNotificationTemplate",
     EditUsers = "EditUsers",
+    EditWorking = "EditWorking",
     GenerateToken = "GenerateToken",
     Impersonate = "Impersonate",
     Kill = "Kill",
+    RejectWorking = "RejectWorking",
+    SubmitWorking = "SubmitWorking",
     Trigger = "Trigger",
     ViewAll = "ViewAll",
     ViewBasic = "ViewBasic",
@@ -86,4 +92,5 @@ export enum Operation {
     ViewTestDefinitionLibrary = "ViewTestDefinitionLibrary",
     ViewTests = "ViewTests",
     ViewUsage = "ViewUsage",
+    ViewWorking = "ViewWorking",
 }

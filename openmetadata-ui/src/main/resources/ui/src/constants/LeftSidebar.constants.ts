@@ -156,9 +156,9 @@ export const SIDEBAR_LIST: Array<LeftSidebarItem> = [
     dataTestId: SidebarItem.GOVERNANCE,
     children: [
       {
-        key: ROUTES.GLOSSARY,
+        key: ROUTES.DATA_DICTIONARY,
         title: 'label.glossary',
-        redirect_url: ROUTES.GLOSSARY,
+        redirect_url: ROUTES.DATA_DICTIONARY,
         icon: GlossaryIcon,
         dataTestId: `app-bar-item-${SidebarItem.GLOSSARY}`,
       },

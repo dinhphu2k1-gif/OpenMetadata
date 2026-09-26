@@ -10,14 +10,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { Glossary } from '../../../generated/entity/data/glossary';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import type { GlossaryWorkflowAction } from '../../../rest/glossaryAPI';
 import { VotingDataProps } from '../../Entity/Voting/voting.interface';
 
 export interface GlossaryHeaderProps {
   supportAddOwner?: boolean;
+  latestData?: Glossary | GlossaryTerm;
   onDelete: (id: string) => Promise<void>;
   onAssetAdd?: () => void;
-  onVersionSelect?: (version: GlossaryTerm) => void;
+  onVersionSelect?: (version: Glossary | GlossaryTerm) => void;
+  onWorkflowTransition?: (
+    entity: Glossary | GlossaryTerm,
+    action?: GlossaryWorkflowAction,
+  ) => void | Promise<void>;
   updateVote?: (data: VotingDataProps) => Promise<void>;
   onAddGlossaryTerm: (glossaryTerm: GlossaryTerm | undefined) => void;
 }

@@ -15,12 +15,19 @@ import { Button } from '@openmetadata/ui-core-components';
 import { Modal, Progress, Space, Typography } from 'antd';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
-import { patchGlossaryTerm } from '../../../../rest/glossaryAPI';
+import {
+  getGlossaryTermWorkingVersion,
+  GlossaryWorkflowAction,
+  transitionGlossaryTermWorkflow,
+} from '../../../../rest/glossaryAPI';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
-export type BulkActionType = 'submitForReview' | 'approve' | 'reject' | 'revoke';
+export type BulkActionType =
+  | 'submitForReview'
+  | 'approve'
+  | 'reject'
+  | 'revoke';
 
 export interface GlossaryBulkActionModalProps {
   actionType: BulkActionType;
@@ -77,7 +84,7 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     ),
     reject: t(
       'message.confirm-bulk-reject-desc',
-      'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.',
+      'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được giữ ở trạng thái Từ chối cho đến khi người đề xuất chọn Chỉnh sửa lại.',
       { count: terms.length }
     ),
     revoke: t(
@@ -91,12 +98,12 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     setIsProcessing(true);
     setProgress(0);
 
-    const targetStatus =
+    const action: GlossaryWorkflowAction =
       actionType === 'submitForReview'
-        ? EntityStatus.InReview
+        ? 'submit'
         : actionType === 'approve'
-        ? EntityStatus.Approved
-        : EntityStatus.Draft;
+        ? 'approve'
+        : actionType;
 
     let successCount = 0;
     let failedCount = 0;
@@ -108,15 +115,18 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         chunk.map(async (term) => {
           try {
             setCurrentTermName(term.displayName || term.name || '');
-            const patch = [
+            const working = await getGlossaryTermWorkingVersion(
+              term.id,
+              term.parentBusinessVersion
+            );
+            await transitionGlossaryTermWorkflow(
+              term.id,
+              action,
               {
-                op: 'replace',
-                path: '/entityStatus',
-                value: targetStatus,
+                expectedRevision: Number(working.workingRevision),
               },
-            ];
-
-            await patchGlossaryTerm(term.id, patch);
+              term.parentBusinessVersion
+            );
             successCount++;
           } catch {
             failedCount++;
@@ -136,10 +146,14 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         : '';
 
     showSuccessToast(
-      t('message.bulk-action-completed', 'Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.', {
-        success: successCount,
-        failedText,
-      })
+      t(
+        'message.bulk-action-completed',
+        'Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.',
+        {
+          success: successCount,
+          failedText,
+        }
+      )
     );
 
     setIsProcessing(false);
@@ -188,17 +202,22 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
       title={modalTitle}
       onCancel={handleModalClose}>
       {isProcessing ? (
-        <Space direction="vertical" size="middle" style={{ width: '100%', padding: '24px 0', textAlign: 'center' }}>
+        <Space
+          direction="vertical"
+          size="middle"
+          style={{ width: '100%', padding: '24px 0', textAlign: 'center' }}>
           <Typography.Text className="font-medium text-md">
-            {t('message.bulk-progress-processing', 'Đang xử lý {{current}} / {{total}} bản ghi...', {
-              current: Math.round((progress / 100) * terms.length),
-              total: terms.length,
-            })}
+            {t(
+              'message.bulk-progress-processing',
+              'Đang xử lý {{current}} / {{total}} bản ghi...',
+              {
+                current: Math.round((progress / 100) * terms.length),
+                total: terms.length,
+              }
+            )}
           </Typography.Text>
           <Progress percent={progress} status="active" />
-          <Typography.Text type="secondary">
-            {currentTermName}
-          </Typography.Text>
+          <Typography.Text type="secondary">{currentTermName}</Typography.Text>
         </Space>
       ) : (
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>

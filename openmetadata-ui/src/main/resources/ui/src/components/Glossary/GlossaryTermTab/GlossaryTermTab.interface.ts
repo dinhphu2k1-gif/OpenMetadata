@@ -29,8 +29,9 @@ export type ModifiedGlossaryTerm = Omit<GlossaryTerm, 'children'> & {
   parentRecord?: ModifiedGlossaryTerm;
   level?: number;
   snapshotVersion?: string;
-  auditBusinessVersion?: string;
   versionRowKey?: string;
+  termId?: string;
+  recordType?: 'working' | 'published' | 'archived';
 };
 
 export type MoveGlossaryTermType = {

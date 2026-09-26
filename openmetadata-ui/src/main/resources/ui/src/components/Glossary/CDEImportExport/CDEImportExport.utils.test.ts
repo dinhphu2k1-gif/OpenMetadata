@@ -108,7 +108,7 @@ describe('CDEImportExport.utils', () => {
             },
           ],
           extension: {
-            cdeVersion: '1.0',
+            version: '1.0',
             effectiveDate: '2026-09-18',
             expirationDate: '2026-12-31',
             entityRelationship: 'Thuộc thực thể Khách hàng',
@@ -122,7 +122,8 @@ describe('CDEImportExport.utils', () => {
 
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(mockClick).toHaveBeenCalled();
-      expect(CDE_EXPORT_HEADERS).toHaveLength(16);
+      expect(CDE_EXPORT_HEADERS).toHaveLength(15);
+      expect(CDE_EXPORT_HEADERS).not.toContain('Trạng thái');
 
       const blob = (URL.createObjectURL as jest.Mock).mock.calls[0][0];
       const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -234,7 +235,7 @@ describe('CDEImportExport.utils', () => {
   });
 
   describe('transformRowToGlossaryTermPayload', () => {
-    it('should correctly format tags, extension, and always set entityStatus to Draft', () => {
+    it('should correctly format tags, extension, and the canonical business version', () => {
       const row = {
         rowNumber: 2,
         name: 'CDE001',
@@ -248,7 +249,7 @@ describe('CDEImportExport.utils', () => {
         personalData: 'Có',
         relatedRegulatoryDocuments: 'Văn bản 123',
         dataQualityRules: 'Có',
-        cdeVersion: '1.0',
+        version: '1.0',
         reviewer: 'steward',
         status: EntityStatus.Draft,
         errors: [],
@@ -262,8 +263,8 @@ describe('CDEImportExport.utils', () => {
       expect(payload.displayName).toBe('Mã số khách hàng');
       expect(payload.glossary).toBe('Data Dictionary');
       expect((payload as any).entityStatus).toBeUndefined(); // Không gửi entityStatus trong CreateGlossaryTerm payload
+      expect(payload.businessVersion).toBe('1.0');
       expect(payload.extension).toEqual({
-        cdeVersion: '1.0',
         entityRelationship: 'Quan hệ thực thể',
         relatedRegulatoryDocuments: 'Văn bản 123',
         dataQualityRules: ['Y'],
@@ -292,7 +293,7 @@ describe('CDEImportExport.utils', () => {
         personalData: 'Không',
         relatedRegulatoryDocuments: '<p>okela</p>',
         dataQualityRules: 'Có',
-        cdeVersion: '1.3',
+        version: '1.3',
         reviewer: 'KDVT',
         status: EntityStatus.Draft,
         errors: [],
@@ -323,8 +324,8 @@ describe('CDEImportExport.utils', () => {
       expect(
         payload.tags?.find((t) => t.tagFQN.startsWith('PersonalData.'))
       ).toBeUndefined();
+      expect(payload.businessVersion).toBe('1.3');
       expect(payload.extension).toEqual({
-        cdeVersion: '1.3',
         entityRelationship: '<p>test 1 tý</p>',
         relatedRegulatoryDocuments: '<p>okela</p>',
         dataQualityRules: ['Y'],

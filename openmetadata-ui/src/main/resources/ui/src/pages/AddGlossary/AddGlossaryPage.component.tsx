@@ -29,7 +29,10 @@ import { ResourceEntity } from '../../context/PermissionProvider/PermissionProvi
 import { CreateGlossary } from '../../generated/api/data/createGlossary';
 import { Operation } from '../../generated/entity/policies/policy';
 import { withPageLayout } from '../../hoc/withPageLayout';
-import { addGlossaries } from '../../rest/glossaryAPI';
+import {
+  addGlossaries,
+  transitionGlossaryWorkflow,
+} from '../../rest/glossaryAPI';
 import { getIsErrorMatch } from '../../utils/APIUtils';
 import { checkPermission } from '../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../utils/RouterUtils';
@@ -72,7 +75,11 @@ const AddGlossaryPage: FunctionComponent = () => {
     setIsLoading(true);
     try {
       const res = await addGlossaries(data);
-      goToGlossary(res.fullyQualifiedName ?? '');
+      const working = await transitionGlossaryWorkflow(res.id, 'createDraft', {
+        businessVersion: '1',
+        payload: res,
+      });
+      goToGlossary(working.fullyQualifiedName ?? '');
     } catch (error) {
       handleSaveFailure(
         getIsErrorMatch(error as AxiosError, ERROR_MESSAGE.alreadyExist)

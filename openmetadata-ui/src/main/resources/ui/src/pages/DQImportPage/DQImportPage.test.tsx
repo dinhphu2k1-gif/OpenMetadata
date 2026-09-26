@@ -50,9 +50,7 @@ jest.mock('react-i18next', () => ({
       let str =
         typeof defaultValOrOptions === 'string' ? defaultValOrOptions : key;
       const opts =
-        typeof defaultValOrOptions === 'object'
-          ? defaultValOrOptions
-          : options;
+        typeof defaultValOrOptions === 'object' ? defaultValOrOptions : options;
       if (opts && typeof str === 'string') {
         Object.keys(opts).forEach((k) => {
           str = str.replace(new RegExp(`{{${k}}}`, 'g'), String(opts[k]));
@@ -89,12 +87,14 @@ jest.mock('../../rest/glossaryAPI', () => ({
     id: 'term-dq-1',
     name: 'DQ3.1',
     status: 'Draft',
+    version: 0.1,
   }),
   patchGlossaryTerm: jest.fn().mockResolvedValue({
     id: 'term-dq-1',
     name: 'DQ3.1',
     status: 'Draft',
   }),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../rest/tagAPI', () => ({
@@ -134,14 +134,10 @@ describe('DQImportPage', () => {
     expect(screen.getByText('Cập nhật')).toBeInTheDocument();
 
     // Check upload hint
-    expect(
-      screen.getByText(/Kéo thả tệp Excel/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Kéo thả tệp Excel/i)).toBeInTheDocument();
 
     // Check template button
-    expect(
-      screen.getByText('Tải file mẫu Excel (.xlsx)')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tải file mẫu Excel (.xlsx)')).toBeInTheDocument();
   });
 
   it('should transition to Step 2 (Xem Trước Sửa) with DataGrid, add row, and navigation buttons', async () => {
@@ -323,7 +319,6 @@ describe('DQImportPage', () => {
     expect(glossaryAPI.addGlossaryTerm).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'DQ3.1',
-        status: 'Draft',
       })
     );
 
@@ -339,12 +334,10 @@ describe('DQImportPage', () => {
       fireEvent.click(submitAllBtn);
     });
 
-    expect(glossaryAPI.patchGlossaryTerm).toHaveBeenCalledWith('term-dq-1', [
-      {
-        op: 'replace',
-        path: '/entityStatus',
-        value: 'In Review',
-      },
-    ]);
+    expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-dq-1',
+      'submit',
+      { expectedRevision: 0.1 }
+    );
   });
 });

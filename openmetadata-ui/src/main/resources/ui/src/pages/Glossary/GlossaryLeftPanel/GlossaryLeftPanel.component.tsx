@@ -11,46 +11,33 @@
  *  limitations under the License.
  */
 
-import { Button } from '@openmetadata/ui-core-components';
 import { Col, Menu, MenuProps, Row } from 'antd';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ReactComponent as GlossaryIcon } from '../../../assets/svg/glossary.svg';
-import { ReactComponent as PlusIcon } from '../../../assets/svg/plus-primary.svg';
 import LeftPanelCard from '../../../components/common/LeftPanelCard/LeftPanelCard';
 import GlossaryV1Skeleton from '../../../components/common/Skeleton/GlossaryV1/GlossaryV1LeftPanelSkeleton.component';
-import { ROUTES } from '../../../constants/constants';
-import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
-import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
-import { Operation } from '../../../generated/entity/policies/policy';
 import { useFqn } from '../../../hooks/useFqn';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
-import { checkPermission } from '../../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { GlossaryLeftPanelProps } from './GlossaryLeftPanel.interface';
 
 const GlossaryLeftPanel = ({ glossaries }: GlossaryLeftPanelProps) => {
   const { t } = useTranslation();
-  const { permissions } = usePermissionProvider();
   const { fqn: glossaryFqn } = useFqn();
   const navigate = useNavigate();
   const menuRef = useRef<Menu>(null);
 
-  const createGlossaryPermission = useMemo(
-    () =>
-      checkPermission(Operation.Create, ResourceEntity.GLOSSARY, permissions),
-    [permissions]
-  );
   const selectedKey = useMemo(() => {
     if (glossaryFqn) {
       return Fqn.split(glossaryFqn)[0];
     }
 
-    return glossaries[0].fullyQualifiedName;
-  }, [glossaryFqn]);
+    return glossaries[0]?.fullyQualifiedName;
+  }, [glossaryFqn, glossaries]);
 
   const menuItems: ItemType[] = useMemo(() => {
     return glossaries.reduce((acc, glossary) => {
@@ -65,9 +52,6 @@ const GlossaryLeftPanel = ({ glossaries }: GlossaryLeftPanelProps) => {
     }, [] as ItemType[]);
   }, [glossaries]);
 
-  const handleAddGlossaryClick = () => {
-    navigate(ROUTES.ADD_GLOSSARY);
-  };
   const handleMenuClick: MenuProps['onClick'] = (event) => {
     navigate(getGlossaryPath(event.key));
   };
@@ -113,21 +97,6 @@ const GlossaryLeftPanel = ({ glossaries }: GlossaryLeftPanelProps) => {
     <LeftPanelCard id="glossary">
       <GlossaryV1Skeleton loading={glossaries.length === 0}>
         <Row gutter={[0, 16]}>
-          {createGlossaryPermission && (
-            <Col className="p-x-sm" span={24}>
-              <Button
-                className="tw:w-full"
-                color="secondary"
-                data-testid="add-glossary"
-                onPress={handleAddGlossaryClick}>
-                <div className="flex-center">
-                  <PlusIcon className="anticon m-r-xss" />
-                  {t('label.add')}
-                </div>
-              </Button>
-            </Col>
-          )}
-
           <Col span={24}>
             {menuItems.length ? (
               <Menu

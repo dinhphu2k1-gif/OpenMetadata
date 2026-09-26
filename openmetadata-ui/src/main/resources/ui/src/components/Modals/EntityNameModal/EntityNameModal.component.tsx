@@ -36,10 +36,13 @@ const EntityNameModal = <T extends EntityName>({
 
   const handleSave: FormProps['onFinish'] = async (obj) => {
     setIsLoading(true);
-    await form.validateFields();
-    // Error must be handled by the parent component
-    await onSave(obj);
-    setIsLoading(false);
+    try {
+      await form.validateFields();
+      // Error must be handled by the parent component
+      await onSave(obj);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {

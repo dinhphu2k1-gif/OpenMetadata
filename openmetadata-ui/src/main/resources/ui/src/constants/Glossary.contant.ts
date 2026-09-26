@@ -51,8 +51,6 @@ export const CDE_GLOSSARY_TERM_FIELDS = [
 ];
 
 export const DATA_DICTIONARY_GLOSSARY_NAME = 'Data Dictionary';
-export const DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME =
-  'Từ điển dữ liệu dùng chung';
 
 export const isDataDictionaryGlossary = (
   ...identifiers: Array<string | undefined>
@@ -70,13 +68,9 @@ export const isDataDictionaryGlossary = (
 
     return (
       identifier === DATA_DICTIONARY_GLOSSARY_NAME ||
-      identifier === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
       decoded === DATA_DICTIONARY_GLOSSARY_NAME ||
-      decoded === DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME ||
       identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
-      identifier?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`) ||
-      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`) ||
-      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_DISPLAY_NAME}.`)
+      decoded?.startsWith(`${DATA_DICTIONARY_GLOSSARY_NAME}.`)
     );
   });
 
@@ -169,7 +163,8 @@ export const CDE_GLOSSARY_TABLE_COLUMNS_KEYS = {
   PERSONAL_DATA: 'cdePersonalData',
   RELATED_REGULATION: 'cdeRelatedRegulation',
   DATA_QUALITY_RULE: 'cdeDataQualityRule',
-  VERSION: 'cdeVersion',
+  VERSION: 'version',
+  RELEASE_LEVEL: 'releaseLevel',
   EFFECTIVE_DATE: 'effectiveDate',
   EXPIRATION_DATE: 'expirationDate',
 };
@@ -186,7 +181,8 @@ export const CDE_STATIC_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
 ];
 
-export const CDE_GLOSSARY_TABLE_PREFERENCE_KEY = 'cdeGlossaryTermDatesV1';
+export const CDE_GLOSSARY_TABLE_PREFERENCE_KEY =
+  'cdeGlossaryTermReleaseLevelV2';
 
 export const DEFAULT_VISIBLE_COLUMNS = [
   GLOSSARY_TERM_TABLE_COLUMNS_KEYS.DESCRIPTION,
