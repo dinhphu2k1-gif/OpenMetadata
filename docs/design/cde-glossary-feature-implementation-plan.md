@@ -49,6 +49,7 @@ Mỗi chức năng nên là một PR; chức năng lớn có thể tách PR back
 | F14 | Import vào Draft | F03, F04, F06, F07, F11 | Import |
 | F15 | CDE Overview và Assets | F02, F05 | Chi tiết CDE |
 | F16 | Archive/delete, audit và vận hành | F05, F09 | Production-ready |
+| F17 | Thay Reviewers bằng thuộc tính Cấp phát hành | F03, F04, F05, F13, F14, F15 | Release metadata |
 
 **Quyết định thay đổi:** F08 (thêm/bớt CDE revision thủ công) đã bị loại khỏi phạm vi. Giữ nguyên mã các chức năng còn lại để không làm mất truy vết lịch sử; F09 tự động tổng hợp các CDE `Approved` có tiền tố version đúng bằng Data Dictionary đang publish. Tuyệt đối không copy, fallback hoặc kế thừa CDE từ Data Dictionary version trước.
 
@@ -76,6 +77,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 | F14 | §4.2–4.3 quyền Import; §6.2; §8 Import; §9.3.6 API template/preview/commit |
 | F15 | §7.1 Overview, custom properties và Assets; §9.5–9.6 |
 | F16 | §4.3 Delete/thu hồi; §6.2–7.1 action; §8 optimistic locking; §9.7 |
+| F17 | §2.5 Cấp phát hành; §4 authorization; §7.1 CDE Overview; §9.7 định tuyến phê duyệt |
 
 ## 4. Chi tiết từng chức năng
 
@@ -607,7 +609,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Dữ liệu được đọc trực tiếp từ business snapshot/working stores và archive manifest giống F11, không dùng OpenSearch, native `GlossaryTerm` projection hoặc `GlossaryCsv`. Mỗi row `(termId, parentBusinessVersion, businessVersion)` là một dòng và dùng stable default order của F11. Backend đọc theo batch/keyset và bulk-hydrate, không N+1 hoặc giữ toàn bộ dataset trong heap.
 - API riêng là `GET /v1/glossaryTerms/export?glossary={glossaryId}&parentBusinessVersion={N}`; chỉ nhận đúng hai query parameter bắt buộc và từ chối search, filter, pagination hoặc danh sách cột. Response thành công trả trực tiếp file attachment với media type `.xlsx`; không tạo export job, không có status/download API và không dùng WebSocket.
 - File đầu ra là Excel `.xlsx`, tên `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`; một sheet tên `Data Dictionary v{N}`, freeze header, bật autofilter, wrap text và đặt độ rộng cột phù hợp. Nếu vượt giới hạn số dòng của một Excel sheet thì tự chia nhiều sheet và lặp lại header. Backend đọc dữ liệu theo batch/keyset và ghi workbook bằng streaming API vào file tạm giới hạn trong thư mục temp chuyên biệt, không giữ toàn bộ dataset/workbook trong heap. Chỉ sau khi workbook đóng và validate thành công mới trả attachment; file tạm luôn được xóa ở success, client disconnect và exception.
-- Excel chứa đúng các cột presentation theo thứ tự: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Không xuất cột `Trạng thái` và không xuất field lưu trữ/kỹ thuật như `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`.
+- Excel chứa đúng 15 cột presentation theo thứ tự: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Cấp phát hành`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Không xuất cột `Trạng thái`, `Người xem xét` hoặc field lưu trữ/kỹ thuật như `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`.
 - Giá trị trong Excel theo presentation semantics của UI: reference/tag dùng display label; nhiều giá trị xuống dòng trong cùng ô; Markdown chuyển thành text đọc được và giữ line break, không xuất HTML; quy định chất lượng hiển thị `Có/Không`; `Ngày hiệu lực` và `Ngày hết hiệu lực` dùng thống nhất định dạng `dd/MM/yyyy`; giá trị thiếu để ô trống, không ghi placeholder UI. Mọi text có thể bị Excel diễn giải thành công thức (`=`, `+`, `-`, `@`, tab, CR/LF prefix) phải được ghi an toàn dưới dạng text.
 - Backend authorize scope trước khi đọc và mở một read-only consistent database snapshot dùng chung cho mọi batch để workflow mutation/cutover đồng thời không làm file trộn hai thời điểm. Lỗi query/generate trước lúc trả attachment phải dừng export và xóa file tạm; không gửi header thành công hoặc file hợp lệ một phần.
 - UX giữ nguyên thao tác một lần bấm: người dùng chọn `Xuất Excel`, UI gọi API với Data Dictionary version đang xem và trình duyệt tải file khi response hoàn tất. Không mở modal, không hiển thị job/progress và không yêu cầu bấm nút tải lần hai; trong thời gian chờ chỉ disable action/hiển thị loading chống double-click, lỗi thì toast và cho phép thử lại.
@@ -619,7 +621,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - F11/export parity test chứng minh file chứa toàn bộ authorized rows của scope theo cùng stable order, không chỉ page đang hiển thị; mỗi CDE business version là một dòng, không trùng/mất dòng.
 - Test active, working và archived scope cho Consumer-only, working actor và partial Manager; unauthorized/nonexistent scope trả `404`. Consumer export active chỉ có Approved, export Archived chỉ có frozen archived published rows, không thể export working và không bao giờ nhận non-Approved.
 - Test mutation/cutover giữa các batch chứng minh mọi dòng cùng một database snapshot; lỗi query/generate, client disconnect và download exception không làm lộ payload trái quyền, không tạo workbook được coi là hoàn chỉnh giả và luôn cleanup file tạm.
-- Test chính xác 14 header, thứ tự cột, không có `Trạng thái`, filename `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`, sheet split/header repeat, Unicode tiếng Việt, nhiều reference/tag, Markdown đa dòng, ngày, `Có/Không`, null/empty và không có field kỹ thuật.
+- Test chính xác 15 header, thứ tự cột, ánh xạ `CEO` thành `Tổng Giám đốc`, không có `Trạng thái`/`Người xem xét`, filename `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`, sheet split/header repeat, Unicode tiếng Việt, nhiều reference/tag, Markdown đa dòng, ngày, `Có/Không`, null/empty và không có field kỹ thuật.
 - Test chống Excel formula injection với `=`, `+`, `-`, `@`, tab và CR/LF prefix; workbook mở được bằng Excel/LibreOffice mà không thực thi dữ liệu như công thức.
 - Query-count/performance test trên dataset lớn chứng minh batch/keyset, không N+1, streaming workbook không giữ toàn bộ dataset trong heap và file tạm bị giới hạn/cleanup.
 - Frontend test chứng minh một click gọi đúng scope hiện tại, action loading/disabled khi chờ, response tự tải `.xlsx`, double-click không tạo request thứ hai và lỗi hiển thị toast; không mở modal/job/progress hoặc yêu cầu tải lần hai.
@@ -630,8 +632,8 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Phạm vi**
 
 - Cho phép import trong đúng một Data Dictionary scope đang mở: `Approved` active `N` hoặc working `Draft` `N+1`. Không import vào `InReview`, `Rejected` hoặc `Archived` Data Dictionary. Import không sửa business payload/revision của Data Dictionary và không sửa trực tiếp bất kỳ CDE snapshot `Approved`/`Archived` nào.
-- F14 dùng workbook `.xlsx` theo template riêng, không dùng file Export F13 làm round-trip vì Export có thể chứa nhiều business version của cùng mã. Template có một sheet dữ liệu và đúng 13 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Import không có cột `Người xem xét`/reviewer và không nhận version, status, UUID, FQN kỹ thuật, revision hoặc raw `extension` từ file.
-- Frontend ánh xạ 13 trường import theo tên header, không theo vị trí cột. DataGrid xem trước/chỉnh sửa không hiển thị, không tạo state và không validate cột `Phiên bản`. Khi người dùng chọn file Export F13, cột presentation `Phiên bản` được bỏ qua và hai cột ngày vẫn được đọc đúng; các header bắt buộc thiếu thì dừng ngay với lỗi schema. Backend preview luôn nhận workbook chuẩn hóa 13 cột. Việc chấp nhận cấu trúc Export không thay đổi quy tắc duplicate: nếu Export chứa nhiều business version của cùng `Mã CDE`, preview vẫn chặn duplicate theo F14.
+- F14 dùng workbook `.xlsx` theo template riêng, không dùng file Export F13 làm round-trip vì Export có thể chứa nhiều business version của cùng mã. Template có một sheet dữ liệu và đúng 14 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Cấp phát hành`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. `Cấp phát hành` bắt buộc và chỉ nhận `Tổng Giám đốc` hoặc `TTQLDL`. Import không có cột `Người xem xét`/reviewer và không nhận version, status, UUID, FQN kỹ thuật, revision hoặc raw `extension` từ file.
+- Frontend ánh xạ 14 trường import theo tên header, không theo vị trí cột. DataGrid xem trước/chỉnh sửa không hiển thị, không tạo state và không validate cột `Phiên bản`. Khi người dùng chọn file Export F13, cột presentation `Phiên bản` được bỏ qua, còn `Cấp phát hành` và hai cột ngày vẫn được đọc đúng; các header bắt buộc thiếu thì dừng ngay với lỗi schema. Backend preview luôn nhận workbook chuẩn hóa 14 cột. Việc chấp nhận cấu trúc Export không thay đổi quy tắc duplicate: nếu Export chứa nhiều business version của cùng `Mã CDE`, preview vẫn chặn duplicate theo F14.
 - Cung cấp `GET /v1/glossaryTerms/import/template` để tải template. Workbook import tối đa 5 MB, 5.000 data rows và 32.000 ký tự mỗi ô; từ chối macro, formula, external link, embedded object, sheet/header trùng hoặc ngoài schema và workbook malformed/zip bomb. File tạm/import session phải có quota, TTL và luôn cleanup.
 - Một row được match duy nhất bằng `(glossaryId, parentBusinessVersion, normalizedName)`, trong đó `Mã CDE` là `name` bất biến. Không match bằng display label, không rename và không tìm/reuse identity cùng mã ở scope khác. Duplicate mã trong file, kể cả duplicate sau trim/Unicode/case normalization dùng chung với unique key F03, là lỗi chặn cả file.
 - Người dùng bắt buộc chọn một chính sách xử lý mã đã tồn tại trước khi preview: `SKIP_EXISTING` (**Bỏ qua bản ghi trùng**, mặc định và an toàn) hoặc `OVERWRITE_EXISTING` (**Cập nhật ghi đè bản ghi**). Chính sách chỉ áp dụng khi mã đã tồn tại trong đúng Dictionary scope; không áp dụng cho duplicate giữa các dòng trong cùng workbook. Preview phải bind chính sách đã chọn vào import session, hiển thị chính sách và số row `SKIP`/update tương ứng; muốn đổi chính sách phải preview lại.
@@ -663,7 +665,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 **Phạm vi**
 
-- Overview gồm basic fields, owners, reviewers, domains, tags và 5 custom properties.
+- Overview gồm basic fields, owners, domains, tags và các custom properties. Sau F17, Panel bên phải hiển thị `releaseLevel` thay cho Reviewers.
 - Chỉ ẩn restricted tabs với CDE thuộc Data Dictionary.
 - Assets dùng đúng CDE identity; chốt mapping là hiện hành hay snapshot-aware.
 
@@ -693,6 +695,46 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - Diễn tập rollback bản triển khai và restore; không làm mất snapshot.
 - Có UAT sign-off, dashboard, alert và rollback runbook.
 
+### F17 — Thay Reviewers bằng thuộc tính Cấp phát hành
+
+**Phạm vi và contract**
+
+- Thêm Custom Property `releaseLevel` cho `glossaryTerm`, kiểu enum đơn trị với mã `CEO` và `TTQLDL`; nhãn UI tương ứng là `Tổng Giám đốc` và `TTQLDL`.
+- Chỉ áp dụng contract này cho CDE trực thuộc Data Dictionary. Native/DQ GlossaryTerm giữ nguyên trường và widget Reviewers hiện hữu.
+- `releaseLevel` là business content trong `extension`, được lưu trong working payload, published snapshot, history, flat row, search/filter projection và audit diff. Cập nhật phải bảo toàn các key `extension` khác.
+- `releaseLevel` là thuộc tính tùy chọn; giá trị trống không chặn transition `submit`. Approved/Archived snapshot cũ không backfill và hiển thị `--`.
+- Client CDE không được tạo, sửa hoặc xóa technical `reviewers`. Typed create/save/import contract loại `reviewers` khỏi mutable allowlist CDE; backend không dùng technical reviewers cho Data Dictionary/CDE.
+
+**Authorization**
+
+- `releaseLevel` là metadata nghiệp vụ độc lập và không tham gia tính quyền. Không có cấu hình hoặc resolver ánh xạ `CEO`/`TTQLDL` sang Team, Reviewer hay Role.
+- Endpoint permissions, `submit`, `approve` và `reject` tiếp tục tính capability từ policy hiệu lực; frontend chỉ dùng `canViewWorking`, `canApprove`, `canReject` và `canEditWorking` do backend trả.
+- Request tự gửi `reviewers`, release level ngoài allowlist hoặc sửa release level khi `InReview`/`Approved` bị từ chối. CDE `Rejected` phải `reopen` về Draft trước khi đổi cấp phát hành.
+- Technical `reviewers` không được trả thành field nghiệp vụ, render trên CDE UI hoặc dùng làm nguồn quyền cho Data Dictionary/CDE.
+
+**Frontend**
+
+- Thay `ReviewerLabelV2` đang hard-code trong `CDEGlossaryTermOverview` bằng component chuyên biệt `CDEReleaseLevelField`.
+- Draft có `canEditWorking` hiển thị Select đúng hai lựa chọn; trạng thái hoặc người dùng read-only hiển thị label; null hiển thị `--`. Không suy quyền từ role hoặc release level ở client.
+- Loại Reviewers khỏi mọi form tạo/sửa CDE, summary, bảng, column chooser và loading fields chuyên biệt cho Data Dictionary. Không thay đổi widget Reviewers toàn cục.
+- Save sử dụng optimistic locking hiện hữu, có loading/error/409 handling và không optimistic-update trạng thái workflow.
+
+**Import, Export và migration**
+
+- F13 thêm cột presentation `Cấp phát hành`, xuất `CEO` thành `Tổng Giám đốc`; tổng số cột trở thành 15. Không xuất `Người xem xét`.
+- F14 thêm cột `Cấp phát hành`, tổng số cột editable trở thành 14; ô trống được chấp nhận, giá trị có dữ liệu chỉ nhận chính xác `Tổng Giám đốc` hoặc `TTQLDL` sau trim và normalize về enum kỹ thuật. Preview và commit dùng cùng validator.
+- Bootstrap/custom-property script tạo idempotent `releaseLevel`; không đổi hoặc tạo lại property nếu đã tồn tại đúng schema, và fail rõ ràng nếu cùng tên nhưng sai type/config.
+- Không rewrite Approved/Archived snapshot. Working Draft/InReview/Rejected cũ giữ nguyên payload; InReview thiếu release level không được approve và phải reject/reopen để bổ sung. Không suy đoán hoặc tự gán mặc định.
+
+**Test/DoD**
+
+- Unit/component test chứng minh CDE không còn widget/text/control Reviewers; Draft editor có đúng hai lựa chọn và các trạng thái còn lại read-only. Native/DQ GlossaryTerm vẫn có Reviewers.
+- Backend contract test create/save/submit cho enum hợp lệ, giá trị trống, giá trị lạ, field `reviewers` trái phép, optimistic conflict và bảo toàn extension sibling keys.
+- Authorization integration test chứng minh hai release level cho kết quả capability giống nhau khi policy giống nhau; Admin/policy override hoạt động và UI/API không tự suy quyền từ cấp phát hành.
+- Snapshot/history test chứng minh release level bất biến sau Approve, version mới bắt đầu trống và legacy snapshot null vẫn đọc được.
+- Import/export test đúng 14/15 header, mapping nhãn–mã hai chiều, missing/unknown value, round-trip presentation và không có cột Reviewers.
+- Regression suite F03–F06, F11–F15 và workflow Maker–Checker chạy xanh trên PostgreSQL/MySQL; không thay đổi hành vi GlossaryTerm ngoài Data Dictionary.
+
 ## 5. Quy trình cho mỗi chức năng
 
 1. Chốt acceptance criteria và API contract.
@@ -721,6 +763,6 @@ Checklist bắt buộc cho mỗi PR:
 - **Milestone B — Vòng đời CDE:** F03–F06.
 - **Milestone C — Bản phát hành Từ điển dữ liệu dùng chung:** F07, F09–F10.
 - **Milestone D — Khai thác dữ liệu:** F11–F15.
-- **Milestone E — Production-ready:** F16 và full regression/security/performance suite.
+- **Milestone E — Production-ready:** F16–F17 và full regression/security/performance suite.
 
 Không cần chờ Milestone D mới pilot Milestone A. Đây là lợi ích chính của triển khai theo từng chức năng.

@@ -33,10 +33,19 @@ const convertEntityReferencesToTags = (refs: EntityReference[]): TagLabel[] => {
   return convertEntityReferencesToTagLabels(refs, TagSource.Classification);
 };
 
-const fetchTagOptions = async (searchText: string, after?: string) => {
+const fetchTagOptions = async (
+  searchText: string,
+  after?: string,
+  classificationFilter?: string
+) => {
   try {
     const afterPage = after ? Number.parseInt(after, 10) : 1;
-    const response = await tagClassBase.getTags(searchText, afterPage);
+    const response = await tagClassBase.getTags(
+      searchText,
+      afterPage,
+      false,
+      classificationFilter
+    );
     const tags = response.data || [];
 
     const entityRefs: EntityReference[] = tags.map((tag) => ({
@@ -64,11 +73,13 @@ const fetchTagOptions = async (searchText: string, after?: string) => {
 };
 
 export const TagSelectableList = ({
+  classificationFilter,
   onCancel,
   selectedTags = [],
   onUpdate,
   children,
   popoverProps,
+  searchPlaceholder,
   listHeight = ADD_USER_CONTAINER_HEIGHT,
 }: TagSelectableListProps & { listHeight?: number }) => {
   const { t } = useTranslation();
@@ -77,15 +88,18 @@ export const TagSelectableList = ({
     () => ({
       toEntityReference: convertTagsToEntityReferences,
       fromEntityReference: convertEntityReferencesToTags,
-      fetchOptions: fetchTagOptions,
+      fetchOptions: (searchText, after) =>
+        fetchTagOptions(searchText, after, classificationFilter),
       customTagRenderer: TagListItemRenderer,
-      searchPlaceholder: t('label.search-for-type', {
-        type: t('label.tag'),
-      }),
+      searchPlaceholder:
+        searchPlaceholder ??
+        t('label.search-for-type', {
+          type: t('label.tag'),
+        }),
       searchBarDataTestId: 'tag-select-search-bar',
       overlayClassName: 'tag-select-popover',
     }),
-    [t]
+    [classificationFilter, searchPlaceholder, t]
   );
 
   return (

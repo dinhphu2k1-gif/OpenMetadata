@@ -438,6 +438,38 @@ describe('GlossaryHeader component', () => {
     expect(screen.queryByText('label.style')).not.toBeInTheDocument();
   });
 
+  it('should not render delete action for an approved Data Dictionary', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      ...mockContext,
+      data: {
+        ...MOCK_GLOSSARY,
+        name: 'Data Dictionary',
+        displayName: 'Từ điển dữ liệu dùng chung',
+        fullyQualifiedName: 'Data Dictionary',
+        entityStatus: EntityStatus.Approved,
+        businessVersion: '1',
+      },
+      permissions: { ...DEFAULT_ENTITY_PERMISSION, Delete: true },
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId('manage-button'));
+    });
+
+    expect(screen.getByText('cde.export-excel')).toBeInTheDocument();
+    expect(screen.queryByText('label.delete')).not.toBeInTheDocument();
+
+    (useGenericContext as jest.Mock).mockImplementation(() => mockContext);
+  });
+
   it('should not render import and export dropdown menu items if no permission', async () => {
     mockGlossaryTermPermission.All = false;
     mockGlossaryTermPermission.EditAll = false;
@@ -1146,6 +1178,52 @@ describe('GlossaryHeader component', () => {
     await waitFor(() =>
       expect(onVersionSelect).toHaveBeenCalledWith(approvedV1Snapshot)
     );
+  });
+
+  it('lists all archived CDE versions when history is available', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { name: 'Data Dictionary' },
+        entityStatus: EntityStatus.Archived,
+        businessVersion: '1.1',
+        archivedAt: 1,
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true, EditAll: true },
+      isVersionView: false,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+    (getGlossaryTermsVersionsList as jest.Mock).mockResolvedValue({
+      versions: [
+        {
+          version: 1.1,
+          entityStatus: EntityStatus.Archived,
+          businessVersion: '1.1',
+        },
+        {
+          version: 1.0,
+          entityStatus: EntityStatus.Archived,
+          businessVersion: '1.0',
+        },
+      ],
+    });
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('version-button'));
+
+    await waitFor(() =>
+      expect(screen.getByText('label.version: 1.0')).toBeInTheDocument()
+    );
+    expect(screen.getByText('label.version: 1.1')).toBeInTheDocument();
   });
 
   describe('CDE Import and Export permissions in GlossaryHeader', () => {

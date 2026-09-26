@@ -68,30 +68,24 @@ jest.mock(
 );
 
 jest.mock(
-  '../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component',
-  () =>
-    jest.fn().mockImplementation(({ onUpdate }) => (
-      <div data-testid="mock-user-team-picker">
-        <button
-          data-testid="mock-set-owner"
-          type="button"
-          onClick={() =>
-            onUpdate([{ id: 'owner-1', name: 'Data Team', type: 'team' }])
-          }>
-          Set Owner
-        </button>
-        <button
-          data-testid="mock-set-reviewer"
-          type="button"
-          onClick={() =>
-            onUpdate([
-              { id: 'reviewer-1', name: 'Reviewer User', type: 'user' },
-            ])
-          }>
-          Set Reviewer
-        </button>
-      </div>
-    ))
+  '../../common/UserTeamSelectableList/UserTeamSelectableList.component',
+  () => ({
+    UserTeamSelectableList: jest.fn().mockImplementation(
+      ({ children, onUpdate }) => (
+        <div data-testid="mock-user-team-picker">
+          {children}
+          <button
+            data-testid="mock-set-owner"
+            type="button"
+            onClick={() =>
+              onUpdate([{ id: 'owner-1', name: 'Data Team', type: 'team' }])
+            }>
+            Set Owner
+          </button>
+        </div>
+      )
+    ),
+  })
 );
 
 jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
@@ -106,27 +100,35 @@ jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
     ))
 );
 
-jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
-  jest.fn().mockImplementation(({ classificationFilter, onChange }) => (
-    <div data-testid={`mock-tag-suggestion-${classificationFilter}`}>
-      <button
-        data-testid={`mock-add-tag-${classificationFilter}`}
-        type="button"
-        onClick={() =>
-          onChange?.([
-            {
-              tagFQN: `${classificationFilter}.Tag1`,
-              name: 'Tag1',
-              source: TagSource.Classification,
-              labelType: LabelType.Manual,
-              state: State.Confirmed,
-            },
-          ])
-        }>
-        Add Tag {classificationFilter}
-      </button>
-    </div>
-  ))
+jest.mock(
+  '../../common/TagSelectableList/TagSelectableList.component',
+  () => ({
+    TagSelectableList: jest
+      .fn()
+      .mockImplementation(
+        ({ children, classificationFilter, onUpdate }) => (
+          <div data-testid={`mock-tag-suggestion-${classificationFilter}`}>
+            {children}
+            <button
+              data-testid={`mock-add-tag-${classificationFilter}`}
+              type="button"
+              onClick={() =>
+                onUpdate?.([
+                  {
+                    tagFQN: `${classificationFilter}.Tag1`,
+                    name: 'Tag1',
+                    source: TagSource.Classification,
+                    labelType: LabelType.Manual,
+                    state: State.Confirmed,
+                  },
+                ])
+              }>
+              Add Tag {classificationFilter}
+            </button>
+          </div>
+        )
+      ),
+  })
 );
 
 const mockGlossaryTerm: GlossaryTerm = {
@@ -144,7 +146,6 @@ const mockGlossaryTerm: GlossaryTerm = {
     },
   ],
   owners: [{ id: 'team-1', name: 'Ban QLDL', type: 'team' }],
-  reviewers: [{ id: 'user-2', name: 'Steward User', type: 'user' }],
   tags: [
     {
       tagFQN: 'DataSource.CoreBanking',
@@ -167,6 +168,7 @@ const mockGlossaryTerm: GlossaryTerm = {
   ],
   extension: {
     version: '1.0',
+    releaseLevel: ['TTQLDL'],
     entityRelationship: '1 KH - N TK',
     dataQualityRules: ['Y'],
     relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
@@ -217,7 +219,7 @@ describe('CDEGlossaryTermForm', () => {
     );
     expect(container.querySelectorAll('.ant-form-item')).toHaveLength(15);
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
-      0
+      4
     );
   });
 
@@ -243,8 +245,7 @@ describe('CDEGlossaryTermForm', () => {
       fireEvent.click(
         screen.getByTestId(`mock-add-tag-${CDE_TAG_CLASSIFICATIONS.dataSource}`)
       );
-      fireEvent.click(screen.getAllByTestId('mock-set-owner')[0]);
-      fireEvent.click(screen.getAllByTestId('mock-set-reviewer')[1]);
+      fireEvent.click(screen.getByTestId('mock-set-owner'));
       fireEvent.click(screen.getByTestId('submit-btn'));
     });
 
@@ -255,7 +256,6 @@ describe('CDEGlossaryTermForm', () => {
         description: 'Meaning for the new CDE',
         domains: [expect.objectContaining({ fullyQualifiedName: 'KhachHang' })],
         owners: [expect.objectContaining({ id: 'owner-1' })],
-        reviewers: [expect.objectContaining({ id: 'reviewer-1' })],
         tags: [
           expect.objectContaining({
             tagFQN: `${CDE_TAG_CLASSIFICATIONS.dataSource}.Tag1`,
@@ -294,7 +294,7 @@ describe('CDEGlossaryTermForm', () => {
       'cde-glossary-term-form--edit'
     );
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
-      0
+      4
     );
   });
 
@@ -330,10 +330,6 @@ describe('CDEGlossaryTermForm', () => {
     expect(savedData.owners).toEqual([
       { id: 'team-1', name: 'Ban QLDL', type: 'team' },
     ]);
-    expect(savedData.reviewers).toEqual([
-      { id: 'user-2', name: 'Steward User', type: 'user' },
-    ]);
-
     // Should contain both CDE tags and non-CDE tags (Tier.Tier1)
     const tagFqns = (savedData as GlossaryTermForm).tags.map(
       (tag) => tag.tagFQN
@@ -347,6 +343,7 @@ describe('CDEGlossaryTermForm', () => {
     expect(savedData.extension).toEqual({
       entityRelationship: '1 KH - N TK',
       dataQualityRules: ['Y'],
+      releaseLevel: ['TTQLDL'],
       relatedRegulatoryDocuments: 'Quyết định 123/QĐ-NHNo',
     });
   });

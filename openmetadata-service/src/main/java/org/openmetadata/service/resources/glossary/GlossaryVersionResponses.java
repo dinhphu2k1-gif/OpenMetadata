@@ -10,12 +10,14 @@ import java.util.Map;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
+import org.openmetadata.service.util.FullyQualifiedName;
 
 final class GlossaryVersionResponses {
   private GlossaryVersionResponses() {}
 
   static Map<String, Object> working(WorkingVersionRecord record) {
     Map<String, Object> payload = payload(record.payload());
+    normalizeScopedTermFqn(payload, record.parentBusinessVersion());
     payload.put("businessVersion", record.businessVersion());
     putIfPresent(payload, "parentBusinessVersion", record.parentBusinessVersion());
     payload.put("workingRevision", record.revision());
@@ -39,6 +41,7 @@ final class GlossaryVersionResponses {
 
   static Map<String, Object> published(PublishedSnapshotRecord record) {
     Map<String, Object> payload = payload(record.payload());
+    normalizeScopedTermFqn(payload, record.parentBusinessVersion());
     payload.put("businessVersion", record.businessVersion());
     putIfPresent(payload, "parentBusinessVersion", record.parentBusinessVersion());
     if (record.archivedAt() != null) {
@@ -58,5 +61,26 @@ final class GlossaryVersionResponses {
     Map<String, Object> result = new LinkedHashMap<>();
     values.forEach((key, value) -> result.put(String.valueOf(key), value));
     return result;
+  }
+
+  private static void normalizeScopedTermFqn(
+      Map<String, Object> payload, String parentBusinessVersion) {
+    if (parentBusinessVersion == null || parentBusinessVersion.isBlank()) {
+      return;
+    }
+    Object name = payload.get("name");
+    Object glossary = payload.get("glossary");
+    if (!(name instanceof String termName)
+        || !(glossary instanceof Map<?, ?> glossaryValues)) {
+      return;
+    }
+    Object glossaryFqn = glossaryValues.get("fullyQualifiedName");
+    if (!(glossaryFqn instanceof String parentFqn) || parentFqn.isBlank()) {
+      return;
+    }
+    payload.put(
+        "fullyQualifiedName",
+        FullyQualifiedName.build(
+            parentFqn, termName + "@v" + parentBusinessVersion));
   }
 }

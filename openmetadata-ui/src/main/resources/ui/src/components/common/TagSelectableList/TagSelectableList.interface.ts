@@ -14,8 +14,10 @@ import { PopoverProps } from 'antd';
 import { TagLabel } from '../../../generated/type/tagLabel';
 
 export interface TagSelectableListProps {
+  classificationFilter?: string;
   onCancel: () => void;
   hasPermission: boolean;
+  searchPlaceholder?: string;
   selectedTags?: TagLabel[];
   onUpdate: (tags: TagLabel[]) => Promise<void>;
   children?: React.ReactNode;

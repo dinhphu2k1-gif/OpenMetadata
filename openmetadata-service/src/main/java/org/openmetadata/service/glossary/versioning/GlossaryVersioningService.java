@@ -37,6 +37,7 @@ import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotOutboxRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.search.SearchRepository;
+import org.openmetadata.service.util.FullyQualifiedName;
 import org.openmetadata.service.util.GlossaryBusinessVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1110,6 +1111,18 @@ public class GlossaryVersioningService {
     Map<String, Object> payload = new LinkedHashMap<>();
     raw.forEach((key, value) -> payload.put(String.valueOf(key), value));
     payload.put("parentBusinessVersion", parentBusinessVersion);
+    Object name = payload.get("name");
+    Object glossary = payload.get("glossary");
+    if (name instanceof String termName
+        && glossary instanceof Map<?, ?> glossaryValues) {
+      Object glossaryFqn = glossaryValues.get("fullyQualifiedName");
+      if (glossaryFqn instanceof String parentFqn && !parentFqn.isBlank()) {
+        payload.put(
+            "fullyQualifiedName",
+            FullyQualifiedName.build(
+                parentFqn, termName + "@v" + parentBusinessVersion));
+      }
+    }
     return payload;
   }
 

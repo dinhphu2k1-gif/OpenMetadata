@@ -191,7 +191,7 @@ const GlossaryTermModal: FC<Props> = ({
         isCustomModal ? 'cde-glossary-term-modal' : ''
       } ${
         isCustomModal && !editMode ? 'cde-glossary-term-modal--add' : ''
-      }`}
+      } ${isCDEGlossary ? 'cde-glossary-term-modal--cde' : ''}`}
       closable={isCustomModal}
       data-testid="edit-glossary-modal"
       footer={[
@@ -221,7 +221,15 @@ const GlossaryTermModal: FC<Props> = ({
       okText={t('label.save')}
       open={visible}
       title={dialogTitle}
-      width={isDQGlossary && !editMode ? 1240 : isCustomModal ? 1000 : 800}
+      width={
+        isDQGlossary && !editMode
+          ? 1240
+          : isCDEGlossary
+          ? 1080
+          : isCustomModal
+          ? 1000
+          : 800
+      }
       onCancel={onCancel}>
       <EntityAttachmentProvider
         entityFqn={glossaryTermFQN}

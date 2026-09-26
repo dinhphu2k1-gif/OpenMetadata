@@ -46,6 +46,7 @@ public final class CdeExcelExporter {
     "Ý nghĩa nghiệp vụ",
     "Mối quan hệ với thực thể",
     "Chủ sở hữu dữ liệu",
+    "Cấp phát hành",
     "Phân loại dữ liệu",
     "Dữ liệu cá nhân",
     "Văn bản quy định liên quan",
@@ -55,7 +56,7 @@ public final class CdeExcelExporter {
     "Ngày hết hiệu lực"
   };
   private static final int[] COLUMN_WIDTHS = {
-    20, 28, 36, 28, 55, 50, 32, 28, 22, 50, 26, 16, 18, 18
+    20, 28, 36, 28, 55, 50, 32, 22, 28, 22, 50, 26, 16, 18, 18
   };
 
   private CdeExcelExporter() {}
@@ -138,6 +139,7 @@ public final class CdeExcelExporter {
             markdown(term.getDescription()),
             markdown(extensionValue(extension, "entityRelationship", "moi_quan_he_voi_thuc_the")),
             references(term.getOwners()),
+            releaseLevel(extension.get("releaseLevel")),
             tags(term.getTags(), "DataClassification"),
             tags(term.getTags(), "PersonalData"),
             markdown(
@@ -231,6 +233,18 @@ public final class CdeExcelExporter {
     return List.of("TRUE", "1", "Y", "YES", "CO", "CÓ").contains(normalized)
         ? "Có"
         : "Không";
+  }
+
+  private static String releaseLevel(Object value) {
+    Object candidate = value;
+    if (value instanceof List<?> list && !list.isEmpty()) {
+      candidate = list.get(0);
+    }
+    return switch (text(candidate).trim()) {
+      case "CEO" -> "Tổng Giám đốc";
+      case "TTQLDL" -> "TTQLDL";
+      default -> "";
+    };
   }
 
   private static String date(Object value) {

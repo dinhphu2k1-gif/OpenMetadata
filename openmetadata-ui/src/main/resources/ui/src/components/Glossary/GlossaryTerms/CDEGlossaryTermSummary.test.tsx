@@ -115,6 +115,12 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.data-quality-rules': 'Data Quality Rules',
     'cde.related-regulatory-documents': 'Related Regulatory Documents',
     'cde.entity-relationship': 'Entity Relationship',
+    'cde.management-information': 'Management information',
+    'cde.classification-control': 'Classification & control',
+    'cde.business-context': 'Business context',
+    'cde.release-level': 'Release level',
+    'cde.not-set': 'Not set',
+    'cde.no-information': 'No information',
     'label.yes': 'Yes',
     'label.no': 'No',
   },
@@ -130,6 +136,12 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
     'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
     'cde.entity-relationship': 'Mối quan hệ với thực thể',
+    'cde.management-information': 'Thông tin quản trị',
+    'cde.classification-control': 'Phân loại & kiểm soát',
+    'cde.business-context': 'Ngữ cảnh nghiệp vụ',
+    'cde.release-level': 'Cấp phát hành',
+    'cde.not-set': 'Chưa thiết lập',
+    'cde.no-information': 'Chưa có thông tin',
     'label.yes': 'Có',
     'label.no': 'Không',
   },
@@ -167,6 +179,7 @@ describe('CDEGlossaryTermSummary', () => {
 
     [
       'Nhóm theo nghiệp vụ',
+      'Cấp phát hành',
       'Nguồn dữ liệu',
       'Chủ sở hữu dữ liệu',
       'Phân loại dữ liệu',
@@ -174,9 +187,12 @@ describe('CDEGlossaryTermSummary', () => {
       'Quy định về chất lượng dữ liệu',
       'Mối quan hệ với thực thể',
       'Văn bản quy định liên quan',
+      'Thông tin quản trị',
+      'Phân loại & kiểm soát',
+      'Ngữ cảnh nghiệp vụ',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
 
-    expect(screen.getAllByRole('group')).toHaveLength(10);
+    expect(screen.getAllByRole('group')).toHaveLength(11);
     expect(
       screen.queryByRole('group', { name: 'Phiên bản' })
     ).not.toBeInTheDocument();
@@ -191,11 +207,30 @@ describe('CDEGlossaryTermSummary', () => {
     expect(screen.getByText('Khách hàng')).toBeInTheDocument();
     expect(screen.getByText('CRM')).toBeInTheDocument();
     expect(screen.getByText('Nội bộ')).toBeInTheDocument();
-    expect(screen.getByText('Y')).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole('group', {
+          name: 'Quy định về chất lượng dữ liệu',
+        })
+      ).getByText('Có')
+    ).toBeInTheDocument();
     expect(
       screen.getByText('Quan hệ khách hàng với tài khoản')
     ).toBeInTheDocument();
     expect(screen.getByText('Quy chế quản lý khách hàng')).toBeInTheDocument();
+
+    const relationship = screen.getByRole('group', {
+      name: 'Mối quan hệ với thực thể',
+    });
+    const regulatoryDocuments = screen.getByRole('group', {
+      name: 'Văn bản quy định liên quan',
+    });
+
+    expect(
+      relationship.compareDocumentPosition(regulatoryDocuments) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(relationship.parentElement).toBe(regulatoryDocuments.parentElement);
   });
 
   it('uses English labels when language is set to English', () => {
@@ -216,6 +251,9 @@ describe('CDEGlossaryTermSummary', () => {
       'Data Quality Rules',
       'Entity Relationship',
       'Related Regulatory Documents',
+      'Management information',
+      'Classification & control',
+      'Business context',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
   });
 
@@ -269,19 +307,19 @@ describe('CDEGlossaryTermSummary', () => {
         screen.getByRole('group', { name: 'Ngày hết hiệu lực' })
       ).getByRole('button')
     );
-    const dialog = screen.getByRole('dialog');
+    const expirationField = screen.getByRole('group', {
+      name: 'Ngày hết hiệu lực',
+    });
 
-    expect(
-      within(dialog).queryByLabelText('Ngày hiệu lực')
-    ).not.toBeInTheDocument();
+    expect(document.querySelector('.ant-modal')).not.toBeInTheDocument();
 
-    const expiration = within(dialog)
-      .getByLabelText('Ngày hết hiệu lực')
-      .closest('.ant-picker');
+    const expiration = expirationField.querySelector('.ant-picker');
     await act(async () => {
       fireEvent.mouseUp(expiration!.querySelector('.ant-picker-clear')!);
     });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    fireEvent.click(
+      within(expirationField).getByRole('button', { name: 'label.save' })
+    );
     await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
     const [updated, field] = mockUpdate.mock.calls[0];
 

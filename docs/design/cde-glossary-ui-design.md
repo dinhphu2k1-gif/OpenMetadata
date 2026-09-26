@@ -42,6 +42,17 @@ Quy tắc:
 - Cơ chế native metadata version của OpenMetadata vẫn tồn tại hoàn toàn ở tầng kỹ thuật nội bộ để bảo toàn framework; tính năng này không xóa hoặc thay đổi cơ chế đó.
 - Quá trình lưu nháp (Save Draft) chỉ cập nhật working record tại chỗ và không dùng native metadata version làm business version.
 
+### 2.5. Cấp phát hành
+
+- Mỗi CDE có một thuộc tính nghiệp vụ **Cấp phát hành** lưu tại Custom Property `extension.releaseLevel`.
+- `releaseLevel` là enum đơn trị với hai mã ổn định: `CEO` (hiển thị **Tổng Giám đốc**) và `TTQLDL` (hiển thị **TTQLDL**). API, snapshot và database lưu mã; UI/Excel chịu trách nhiệm ánh xạ sang nhãn tiếng Việt.
+- `releaseLevel` là thuộc tính tùy chọn. Giá trị trống được đọc và hiển thị `--`; không sửa ngược snapshot bất biến.
+- Trường OpenMetadata `reviewers` không còn là trường nghiệp vụ của Data Dictionary/CDE: UI không hiển thị widget, form hoặc cột Reviewers; API authoring CDE không cho client tự sửa reviewer assignment; Import/Export không nhận hoặc xuất Reviewers.
+- `reviewers` vẫn tồn tại trong schema dùng chung `GlossaryTerm` để phục vụ các Glossary khác, nhưng Data Dictionary/CDE không sử dụng field này để lưu dữ liệu hoặc xác định quyền.
+- `releaseLevel` là thuộc tính nghiệp vụ độc lập, không ánh xạ sang Team, Reviewer, Role hoặc quyền phê duyệt.
+- Capability `canApprove`, `canReject` và `canViewWorking` tiếp tục là nguồn sự thật cho frontend. Backend tính capability từ policy hiệu lực; frontend không suy quyền trực tiếp từ `releaseLevel`, tên role hoặc technical `reviewers`.
+- Thay đổi `releaseLevel` chỉ hợp lệ khi working record ở `Draft`. Việc lưu phải dùng optimistic locking và không được làm mất các key khác trong `extension`.
+
 ### 2.4. Working version và published version
 
 - **Working version**: bản đang soạn thảo hoặc đang chờ duyệt. Chỉ người có quyền quản trị nội dung được nhìn thấy.
@@ -79,18 +90,18 @@ Quy tắc:
 | Admin | Quản trị toàn bộ, xử lý ngoại lệ và cấu hình hệ thống. |
 | Organization | Role hệ thống có quyền theo policy; không mặc định là Consumer. |
 | Data Steward | Theo policy mặc định: kiểm soát chất lượng; phê duyệt, từ chối và hủy phê duyệt, không tạo hoặc chỉnh sửa nội dung. Capability thực tế luôn lấy từ policy hiệu lực. |
-| Reviewer | Người được gán trực tiếp vào Glossary/CDE để duyệt. Đây có thể là assignment, không nhất thiết là một Role hệ thống riêng. |
+| Reviewer | Người được policy hiệu lực cấp quyền duyệt; không được suy ra từ `releaseLevel` và không được gán thủ công qua trường Reviewers trên UI CDE. |
 | Data Proposer | Tạo Draft, chỉnh sửa và gửi duyệt. |
 | Data Consumer | Khai thác nội dung đã được phê duyệt. |
 | Basic Consumer | Chỉ đọc nội dung đã được phê duyệt với tập chức năng tối thiểu. |
 
-Quyền thực tế phải được backend xác định từ Role, policy, quyền trên entity và reviewer assignment. Frontend chỉ dùng kết quả quyền từ backend để điều khiển giao diện.
+Quyền thực tế phải được backend xác định từ Role, policy và quyền trên entity, hoàn toàn độc lập với `releaseLevel`. Frontend chỉ dùng kết quả quyền từ backend để điều khiển giao diện.
 
-Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BasicConsumer` hoặc `DataConsumer`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc Reviewer được gán có quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
+Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BasicConsumer` hoặc `DataConsumer`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc người được policy cấp quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
 
 ### 4.2. Ma trận nội dung được nhìn thấy
 
-| Nội dung | Admin | Data Steward | Reviewer được gán | Data Proposer | Data Consumer | Basic Consumer |
+| Nội dung | Admin | Data Steward | Người có quyền duyệt | Data Proposer | Data Consumer | Basic Consumer |
 | --- | --- | --- | --- | --- | --- | --- |
 | Glossary Draft | Có | Có trong phạm vi quản lý | Có khi được gán duyệt | Có khi là owner/người tạo hoặc có quyền edit | Không | Không |
 | Glossary In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
@@ -343,7 +354,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
   - **Mã CDE (`name`):** Mã nghiệp vụ chỉ duy nhất trong Data Dictionary version đang xem; cùng mã ở version khác là identity độc lập.
   - **Tên CDE (`displayName`):** Tên nghiệp vụ tiếng Việt có dấu và là business content độc lập theo identity/scope; `alo1` ở v1 và v2 có thể có `displayName` khác nhau.
   - **Ý nghĩa nghiệp vụ (`description`):** Mô tả chi tiết nội dung nghiệp vụ của CDE (hỗ trợ RichText/Markdown).
-  - **Người kiểm duyệt (`reviewers`):** Danh sách cá nhân/nhóm được chỉ định phê duyệt CDE (hiển thị tại Panel bên phải).
+  - **Cấp phát hành (`extension.releaseLevel`):** Hiển thị tại Panel bên phải thay cho Reviewers. `Draft` hiển thị Select gồm **Tổng Giám đốc** và **TTQLDL** khi người dùng có `canEditWorking`; các trạng thái khác chỉ đọc. Giá trị trống hiển thị `--` và không chặn workflow.
   - **Chủ sở hữu dữ liệu (`owners`):** Phòng ban/Team chịu trách nhiệm quản lý CDE (`CDEOwnersField`).
   - **Miền nghiệp vụ (`domains`):** Nhóm nghiệp vụ trực thuộc (`CDEDomainsField`).
 - **Nhãn phân loại dữ liệu (Classification Tags):**
@@ -351,6 +362,7 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
   - **Phân loại dữ liệu (`DataClassification` tags):** Cấp độ bảo mật dữ liệu (Công khai, Nội bộ, Bảo mật, Tối mật...).
   - **Dữ liệu cá nhân (`PersonalData` tags):** Xác định dữ liệu có chứa thông tin cá nhân hay không.
 - **Thuộc tính mở rộng chuyên biệt của CDE (Custom Properties trong `extension`):**
+  - **Cấp phát hành (`releaseLevel`):** Enum đơn trị tùy chọn `CEO` / `TTQLDL`, không tham gia xác định Team, Reviewer hoặc quyền phê duyệt.
   - **Quy định về chất lượng dữ liệu (`dataQualityRules`):** Kiểu Enum (`Y` / `N`), xác định CDE đã có quy định chất lượng hay chưa.
   - **Ngày hiệu lực (`effectiveDate`):** Ngày bắt đầu có hiệu lực áp dụng của CDE (định dạng `yyyy-MM-dd`).
   - **Ngày hết hiệu lực (`expirationDate`):** Ngày hết hiệu lực của CDE (định dạng `yyyy-MM-dd`).
@@ -490,7 +502,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * **Scope và nguồn dữ liệu:** Export toàn bộ authorized rows của đúng `glossaryId + parentBusinessVersion` đang xem, không áp dụng search/filter/page hiện tại. Backend dùng F11 authoritative database read path và stable order; không dùng OpenSearch, native `GlossaryTerm` projection hoặc `GlossaryCsv`. Sau khi authorize, backend dùng một read-only consistent database snapshot cho mọi batch; mutation/cutover đồng thời không được làm file trộn dữ liệu từ hai thời điểm.
 * **Quyền:** Consumer-only được export published `Approved` rows của active scope và các published archived rows thuộc frozen manifest khi đang xem Data Dictionary Archived; không bao giờ export working/non-Approved. Người có quyền working export published/working rows theo effective capability. Scope không tồn tại hoặc không được phép xem trả `404`.
 * **Định dạng:** Backend đọc batch/keyset và ghi workbook bằng streaming API vào file tạm giới hạn trong thư mục temp chuyên biệt để không giữ toàn bộ dataset/workbook trong heap. Chỉ sau khi workbook đóng/validate thành công mới trả attachment; file tạm luôn cleanup khi thành công, client disconnect hoặc lỗi. Tên file `Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v{N}_YYYYMMDD_HHmm.xlsx`; một sheet tên `Data Dictionary v{N}`, freeze header, autofilter, wrap text và tự chia sheet khi vượt giới hạn dòng của Excel.
-* **Cột presentation theo đúng thứ tự bảng:** `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. File Export không có cột `Trạng thái`.
+* **Cột presentation theo đúng thứ tự bảng:** `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Cấp phát hành`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Phiên bản`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. File Export không có cột `Trạng thái` hoặc `Người xem xét`; `CEO` được xuất thành `Tổng Giám đốc`, `TTQLDL` giữ nguyên nhãn.
 * **Không xuất field kỹ thuật:** Không có `termId`, FQN, `parentBusinessVersion`, `recordType`, `rowKey`, UUID, tag FQN hoặc JSON `extension`. Reference/tag dùng display label; nhiều giá trị xuống dòng trong ô; Markdown chuyển thành text giữ line break; chất lượng dữ liệu hiển thị `Có/Không`; ngày và trạng thái theo presentation của UI; thiếu dữ liệu để ô trống.
 * **An toàn và vận hành:** Neutralize text có prefix công thức Excel (`=`, `+`, `-`, `@`, tab, CR/LF). Audit lưu actor, scope, thời điểm, kết quả và row count nhưng không lưu nội dung file.
 * **UX:** Giữ thao tác một lần bấm như hiện tại: chọn `Xuất Excel`, action loading/disabled trong lúc chờ và trình duyệt tự tải file khi response hoàn tất. Không mở modal, không hiển thị job/progress, không yêu cầu bấm tải lần hai; lỗi hiển thị toast và cho thử lại.
@@ -498,8 +510,8 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 #### 6. Nhập CDE vào Draft (Import):
 * **Scope hỗ trợ:** Import vào đúng Data Dictionary `Approved` active `N` hoặc Data Dictionary working `Draft` `N+1` đang mở, định danh bằng `glossaryId + parentBusinessVersion`. Không import vào Data Dictionary `InReview`, `Rejected` hoặc `Archived`; không sửa business payload/revision của Data Dictionary hay CDE snapshot `Approved`/`Archived`.
 * **Capability:** Backend trả `canImportCdeDrafts` từ policy hiệu lực, ownership và scope; không hard-code tên role. Mặc định Admin có quyền, Data Proposer theo policy, Data Steward/Reviewer/Consumer-only không có. Action Import chỉ xuất hiện ở Header của Dictionary `Approved` active hoặc `Draft` khi capability này bằng true.
-* **Template:** `GET /v1/glossaryTerms/import/template` tải workbook `.xlsx` riêng cho import. Template có một sheet dữ liệu với 13 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. Import không hiển thị hoặc nhận cột `Người xem xét`/reviewer. File Export F13 không phải import template vì có thể chứa nhiều version của cùng mã; client không gửi version, status, UUID, FQN kỹ thuật, revision hoặc raw `extension`.
-* **Header mapping:** Trang Import đọc dữ liệu theo tên header thay vì vị trí. DataGrid Import không hiển thị hoặc duy trì field `Phiên bản`. Nếu chọn file Export F13, UI bỏ qua cột `Phiên bản`, giữ đúng mapping hai cột ngày và dựng lại workbook 13 cột trước khi preview. Thiếu bất kỳ header import bắt buộc nào thì từ chối file; nhiều version cùng mã trong file Export vẫn bị xem là duplicate.
+* **Template:** `GET /v1/glossaryTerms/import/template` tải workbook `.xlsx` riêng cho import. Template có một sheet dữ liệu với 14 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Cấp phát hành`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. `Cấp phát hành` bắt buộc và chỉ nhận đúng `Tổng Giám đốc` hoặc `TTQLDL`, sau đó normalize thành `CEO`/`TTQLDL`. Import không hiển thị hoặc nhận cột `Người xem xét`/reviewer. File Export F13 không phải import template vì có thể chứa nhiều version của cùng mã; client không gửi version, status, UUID, FQN kỹ thuật, revision hoặc raw `extension`.
+* **Header mapping:** Trang Import đọc dữ liệu theo tên header thay vì vị trí. DataGrid Import không hiển thị hoặc duy trì field `Phiên bản`. Nếu chọn file Export F13, UI bỏ qua cột `Phiên bản`, giữ đúng mapping `Cấp phát hành` và hai cột ngày, rồi dựng lại workbook 14 cột trước khi preview. Thiếu bất kỳ header import bắt buộc nào thì từ chối file; nhiều version cùng mã trong file Export vẫn bị xem là duplicate.
 * **Chính sách mã đã tồn tại:** Trước preview, người dùng chọn một trong hai radio: `SKIP_EXISTING` — **Bỏ qua bản ghi trùng** (mặc định), hoặc `OVERWRITE_EXISTING` — **Cập nhật ghi đè bản ghi**. Chính sách chỉ áp dụng cho mã đã tồn tại trong đúng Dictionary scope; duplicate giữa các dòng trong workbook vẫn là lỗi chặn. Đổi lựa chọn sau preview bắt buộc hủy kết quả/session hiện tại và preview lại.
 * **Preview endpoint:** `POST /v1/glossaryTerms/import/preview?glossary={glossaryId}&parentBusinessVersion={N}&existingCodePolicy={SKIP_EXISTING|OVERWRITE_EXISTING}`, `multipart/form-data`. UI luôn gửi policy tường minh; thiếu/sai policy trả `400`. Backend authorize scope, parse/validate file, resolve reference và dựng normalized import plan nhưng không mutation/outbox. Import session server-side bind với actor, scope, policy, SHA-256 file, parent state và expected revision của từng row sẽ mutation; TTL 30 phút, single-use. Response gồm `importSessionId`, `expiresAt`, `fileHash`, scope, policy, summary `create/createVersion/update/skip/warning/error`, kết quả từng dòng và `canCommit`.
 * **Commit endpoint:** `POST /v1/glossaryTerms/import/{importSessionId}/commit`; không nhận lại workbook hoặc normalized payload. Backend re-authorize và xác nhận session còn hạn/chưa dùng, parent chưa cutover/archive, expected revision/state/unique key/reference chưa đổi. Stale preview, concurrent mutation, permission/reference/scope change trả `409`, không tự merge/retry và không ghi một phần.
@@ -615,9 +627,13 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 
 1. **Phân quyền và biểu diễn dữ liệu ở tầng Backend (Server-side Enforcement):**
    * Backend xác định Role từ JWT Token và Policy để trả về đúng dữ liệu đại diện (`representation`).
-   * Phân loại Consumer-only theo quyền hiệu lực trên entity: `canViewPublished = true` và `canViewWorking = false`. Owner/Reviewer assignment và policy có thể nâng quyền xem working; không được lọc published-only chỉ vì người dùng đồng thời mang role Consumer.
+   * Phân loại Consumer-only theo quyền hiệu lực trên entity: `canViewPublished = true` và `canViewWorking = false`. Ownership và policy có thể nâng quyền xem working; không được lọc published-only chỉ vì người dùng đồng thời mang role Consumer.
    * Tuyệt đối không trả toàn bộ danh sách/lịch sử về Frontend để Frontend tự ẩn/hiện bằng JavaScript.
 2. **Khóa lạc quan (Optimistic Locking):**
    * Mọi request chỉnh sửa (`PATCH /working`) phải gửi kèm `expectedRevision`. Nếu bản ghi đã bị thay đổi bởi người khác, Backend trả lỗi `409 Conflict` để UI thông báo người dùng tải lại trang.
 3. **Bảo toàn chuẩn OpenMetadata:**
    * Không tự ý tạo thêm endpoint riêng ngoài chuẩn `/glossaries` và `/glossaryTerms`. Mọi thông tin mở rộng của CDE được lưu trữ và truy xuất chuẩn hóa qua trường `extension` (Custom Properties).
+4. **Cấp phát hành độc lập với phân quyền:**
+   * `CEO` và `TTQLDL` chỉ là hai giá trị của Custom Property `extension.releaseLevel`; backend không ánh xạ chúng sang Team, Reviewer hoặc Role.
+   * `submit`, `approve`, `reject` và endpoint permissions sử dụng policy/capability hiện có; không tin technical reviewers do client gửi và không suy quyền từ `releaseLevel`.
+   * Thay đổi cấp phát hành sau khi đã `InReview` bị từ chối. Nếu CDE bị reject, Proposer phải `reopen` về Draft rồi mới được đổi cấp phát hành và submit lại.

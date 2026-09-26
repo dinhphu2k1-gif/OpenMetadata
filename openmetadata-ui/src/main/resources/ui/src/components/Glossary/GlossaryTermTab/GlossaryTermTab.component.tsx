@@ -375,6 +375,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     glossaryChildTerms,
     setGlossaryChildTerms,
     setVisibleGlossaryTermsCount,
+    termsRefreshVersion,
     onAddGlossaryTerm,
     onEditGlossaryTerm,
     refreshGlossaryTerms,
@@ -747,6 +748,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const previousGlossaryFQNRef = useRef<string>();
   const previousCdeScopeRef = useRef<string>();
   const lastFetchKeyRef = useRef('');
+  const lastTermsRefreshVersionRef = useRef(termsRefreshVersion);
   const termsWorkflowKeyRef = useRef('');
   const termsRequestGenerationRef = useRef(0);
   const searchInputValueRef = useRef('');
@@ -3116,6 +3118,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         isDQGlossary ? selectedDqOwners.join(',') : '',
         isDQGlossary ? selectedDqMethods.join(',') : '',
         isDQGlossary ? selectedDqTargetPopulations.join(',') : '',
+        termsRefreshVersion,
       ].join('|'),
     [
       activeGlossary?.fullyQualifiedName,
@@ -3140,6 +3143,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       selectedDqOwners,
       selectedDqMethods,
       selectedDqTargetPopulations,
+      termsRefreshVersion,
     ]
   );
 
@@ -3151,6 +3155,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       toggleExpandBtn
     ) {
       return;
+    }
+
+    if (lastTermsRefreshVersionRef.current !== termsRefreshVersion) {
+      lastTermsRefreshVersionRef.current = termsRefreshVersion;
+      lastFetchKeyRef.current = '';
+      if (currentPage !== INITIAL_PAGING_VALUE) {
+        handlePageChange(INITIAL_PAGING_VALUE, {
+          cursorType: null,
+          cursorValue: undefined,
+        });
+
+        return;
+      }
     }
 
     const cdeScopeKey = isCDEGlossary

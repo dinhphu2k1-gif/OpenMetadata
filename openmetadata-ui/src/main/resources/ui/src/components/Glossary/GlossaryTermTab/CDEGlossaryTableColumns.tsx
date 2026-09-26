@@ -16,6 +16,7 @@ import { Tag } from 'antd';
 import { ColumnsType } from 'antd/lib/table/interface';
 import { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
+import { CDE_RELEASE_LEVEL } from '../../../constants/CDEReleaseLevel.constants';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { CDE_GLOSSARY_TABLE_COLUMNS_KEYS } from '../../../constants/Glossary.contant';
 import {
@@ -34,6 +35,7 @@ export type CDEExtension = {
   version?: string;
   effectiveDate?: string;
   expirationDate?: string;
+  releaseLevel?: string | string[];
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
   dataQualityRules?: boolean | string | string[];
@@ -108,6 +110,30 @@ export const renderCDEQualityRule = (
   );
 };
 
+export const renderCDEReleaseLevel = (
+  value: string | string[] | undefined,
+  t: TFunction
+) => {
+  const releaseLevel = Array.isArray(value) ? value[0] : value;
+
+  if (releaseLevel === CDE_RELEASE_LEVEL.CEO) {
+    return (
+      <Tag className="cde-value-pill cde-value-pill-release">
+        {t('cde.release-level-ceo')}
+      </Tag>
+    );
+  }
+  if (releaseLevel === CDE_RELEASE_LEVEL.TTQLDL) {
+    return (
+      <Tag className="cde-value-pill cde-value-pill-release">
+        {t('cde.release-level-ttqldl')}
+      </Tag>
+    );
+  }
+
+  return NO_DATA_PLACEHOLDER;
+};
+
 export const getCDEGlossaryTableColumns = ({
   handleLoadMoreChildren,
   loadingChildren,
@@ -151,6 +177,10 @@ export const getCDEGlossaryTableColumns = ({
         // glossary header value is only a fallback for legacy list payloads.
         parentBusinessVersion:
           record.parentBusinessVersion ?? parentBusinessVersion,
+        // The same CDE code can have multiple scoped revisions. Carry the
+        // stable identity from the flat-list response so the detail page does
+        // not resolve a different revision through the generic FQN endpoint.
+        termId: record.termId ?? record.id,
         isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
       });
 
@@ -313,6 +343,18 @@ export const getCDEGlossaryTableColumns = ({
         </div>
       );
     },
+  },
+  {
+    title: t('cde.release-level'),
+    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_LEVEL,
+    width: 170,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : renderCDEReleaseLevel(
+            (record.extension as CDEExtension | undefined)?.releaseLevel,
+            t
+          ),
   },
   ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
     title: String(

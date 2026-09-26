@@ -116,6 +116,7 @@ const GlossaryV1 = ({
     glossaryChildTerms,
     setGlossaryChildTerms,
     insertNewGlossaryTermToChildTerms,
+    requestGlossaryTermsRefresh,
     termsLoading,
     setTermsLoading,
   } = useGlossaryStore();
@@ -303,6 +304,10 @@ const GlossaryV1 = ({
       setTermsLoading(true);
       // Update store with newly created term
       insertNewGlossaryTermToChildTerms(term);
+      // GlossaryTermTab owns the version-aware CDE query. Incrementing its
+      // refresh token makes it reload with the current version and filters
+      // instead of relying only on the optimistic shared-store insertion.
+      requestGlossaryTermsRefresh();
       // Close the controlled modal before navigating to the newly-created CDE. Glossary routes
       // reuse this component, so navigating first can preserve the open state on the next view.
       setIsEditModalOpen(false);
@@ -340,6 +345,7 @@ const GlossaryV1 = ({
       tab,
       selectedData,
       refreshGlossaryList,
+      requestGlossaryTermsRefresh,
       navigate,
     ]
   );
@@ -350,7 +356,6 @@ const GlossaryV1 = ({
       displayName: formData.displayName,
       description: formData.description,
       owners: formData.owners,
-      reviewers: formData.reviewers,
       tags: formData.tags,
       extension: formData.extension,
       domains: formData.domains?.map(

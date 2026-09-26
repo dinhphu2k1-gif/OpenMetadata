@@ -4,24 +4,35 @@
  */
 
 import { DownOutlined } from '@ant-design/icons';
-import { Button, Form, FormInstance, Input, Select } from 'antd';
+import { Form, FormInstance, Input, Select, Tag } from 'antd';
 import { isEmpty } from 'lodash';
 import { DateTime } from 'luxon';
-import DatePicker from '../../common/DatePicker/DatePicker';
-import { mergeCDEDates, validateCDEDates } from '../../../utils/CDEDateUtils';
-import { useEffect } from 'react';
+import {
+  forwardRef,
+  HTMLAttributes,
+  ReactNode,
+  useEffect,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+import { getCDEReleaseLevelValue } from '../../../constants/CDEReleaseLevel.constants';
 import { EntityType } from '../../../enums/entity.enum';
 import { TagLabel } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useEntityRules } from '../../../hooks/useEntityRules';
-import TagSuggestion from '../../../pages/TasksPage/shared/TagSuggestion';
+import { mergeCDEDates, validateCDEDates } from '../../../utils/CDEDateUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
+import DatePicker from '../../common/DatePicker/DatePicker';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
 import RichTextEditor from '../../common/RichTextEditor/RichTextEditor';
-import UserTeamSelectableListSearchInput from '../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component';
-import { CDE_TAG_CLASSIFICATIONS } from '../GlossaryTermTab/CDEGlossaryTableColumns';
+import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
+import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/UserTeamSelectableList.component';
+import {
+  CDE_TAG_CLASSIFICATIONS,
+  renderCDEClassificationTags,
+  renderCDEOwners,
+} from '../GlossaryTermTab/CDEGlossaryTableColumns';
 import {
   AddGlossaryTermFormProps,
   GlossaryTermForm,
@@ -36,7 +47,7 @@ export interface CDEGlossaryTermFormValues {
   expirationDate?: DateTime | null;
   domains?: EntityReference[];
   owners?: EntityReference[];
-  reviewers?: EntityReference[];
+  releaseLevel?: string;
   dataSourceTags?: TagLabel[];
   dataClassificationTags?: TagLabel[];
   personalDataTags?: TagLabel[];
@@ -47,6 +58,147 @@ export interface CDEGlossaryTermFormValues {
   van_ban_quy_dinh_lien_quan?: string;
   moi_quan_he_voi_thuc_the?: string;
 }
+
+interface CDEFormSectionProps {
+  children: ReactNode;
+  className?: string;
+  title: string;
+}
+
+const CDEFormSection = ({
+  children,
+  className = '',
+  title,
+}: CDEFormSectionProps) => (
+  <section className={`cde-form-section ${className}`}>
+    <header className="cde-form-section-header">
+      <span aria-hidden="true" className="cde-form-section-marker" />
+      <h3 className="cde-form-section-title">{title}</h3>
+    </header>
+    <div className="cde-form-grid">{children}</div>
+  </section>
+);
+
+type CDEFormSelectTriggerProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  'children'
+> & {
+  content?: ReactNode;
+  placeholder: string;
+  values?: string[];
+};
+
+const CDEFormSelectTrigger = forwardRef<
+  HTMLDivElement,
+  CDEFormSelectTriggerProps
+>(
+  (
+    { className, content, onKeyDown, placeholder, values = [], ...props },
+    ref
+  ) => {
+    const displayValue = values.filter(Boolean).join(', ');
+    const hasValue = Boolean(content || displayValue);
+
+    return (
+      <div
+        {...props}
+        className={`cde-form-select-trigger ${
+          hasValue ? 'cde-form-select-trigger--populated' : ''
+        } ${className ?? ''}`}
+        ref={ref}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          onKeyDown?.(event);
+          if (!event.defaultPrevented && ['Enter', ' '].includes(event.key)) {
+            event.preventDefault();
+            event.currentTarget.click();
+          }
+        }}>
+        <span className="cde-form-select-trigger-value">
+          {content || displayValue || placeholder}
+        </span>
+        <DownOutlined />
+      </div>
+    );
+  }
+);
+
+CDEFormSelectTrigger.displayName = 'CDEFormSelectTrigger';
+
+interface CDETagSelectorProps {
+  classification: string;
+  placeholder: string;
+  searchPlaceholder: string;
+  variant: 'classification' | 'personal' | 'source';
+  value?: TagLabel[];
+  onChange?: (tags: TagLabel[]) => void;
+}
+
+const CDETagSelector = ({
+  classification,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  variant,
+  value = [],
+}: CDETagSelectorProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <TagSelectableList
+      classificationFilter={classification}
+      hasPermission
+      popoverProps={{
+        open: isOpen,
+        overlayClassName: 'cde-tag-select-popover',
+        placement: 'bottomLeft',
+        onOpenChange: setIsOpen,
+      }}
+      searchPlaceholder={searchPlaceholder}
+      selectedTags={value}
+      onCancel={() => setIsOpen(false)}
+      onUpdate={async (tags) => {
+        onChange?.(tags);
+        setIsOpen(false);
+      }}>
+      <CDEFormSelectTrigger
+        content={
+          value.length
+            ? renderCDEClassificationTags(value, classification, variant)
+            : undefined
+        }
+        placeholder={placeholder}
+      />
+    </TagSelectableList>
+  );
+};
+
+interface CDEOwnerSelectorProps {
+  multiple: { team: boolean; user: boolean };
+  placeholder: string;
+  value?: EntityReference[];
+  onChange?: (owners?: EntityReference[]) => void;
+}
+
+const CDEOwnerSelector = ({
+  multiple,
+  onChange,
+  placeholder,
+  value = [],
+}: CDEOwnerSelectorProps) => (
+  <UserTeamSelectableList
+    hasPermission
+    listHeight={200}
+    multiple={multiple}
+    owner={value}
+    onUpdate={async (owners) => onChange?.(owners)}>
+    <CDEFormSelectTrigger
+      content={value.length ? renderCDEOwners(value) : undefined}
+      placeholder={placeholder}
+    />
+  </UserTeamSelectableList>
+);
 
 const CDEGlossaryTermForm = ({
   editMode,
@@ -60,7 +212,6 @@ const CDEGlossaryTermForm = ({
   const { entityRules } = useEntityRules(EntityType.GLOSSARY_TERM);
   const domains = Form.useWatch<EntityReference[]>('domains', form) ?? [];
   const owners = Form.useWatch<EntityReference[]>('owners', form) ?? [];
-  const reviewers = Form.useWatch<EntityReference[]>('reviewers', form) ?? [];
   const domainLabel = domains.length
     ? domains
         .filter(Boolean)
@@ -69,8 +220,8 @@ const CDEGlossaryTermForm = ({
         )
         .filter(Boolean)
         .join(', ') ||
-      t('label.select-entity', { entity: t('label.domain-plural') })
-    : t('label.select-entity', { entity: t('label.domain-plural') });
+      t('cde.select-business-group')
+    : t('cde.select-business-group');
 
   useEffect(() => {
     if (editMode && glossaryTerm) {
@@ -81,7 +232,9 @@ const CDEGlossaryTermForm = ({
         description: glossaryTerm.description,
         domains: glossaryTerm.domains,
         owners: glossaryTerm.owners,
-        reviewers: glossaryTerm.reviewers,
+        releaseLevel: getCDEReleaseLevelValue(
+          glossaryTerm.extension?.releaseLevel
+        ),
         dataSourceTags: tags.filter(
           (tag) =>
             tag.tagFQN.split('.')[0] === CDE_TAG_CLASSIFICATIONS.dataSource
@@ -148,7 +301,6 @@ const CDEGlossaryTermForm = ({
   const onFinish = async (values: CDEGlossaryTermFormValues) => {
     const currentOwners = (owners ?? []).filter(Boolean);
     const currentDomains = (domains ?? []).filter(Boolean);
-    const currentReviewers = (reviewers ?? []).filter(Boolean);
 
     const formTags = [
       values.dataSourceTags,
@@ -178,6 +330,7 @@ const CDEGlossaryTermForm = ({
       'entityRelationship',
       'relatedRegulatoryDocuments',
       'dataQualityRules',
+      'releaseLevel',
       'moi_quan_he_voi_thuc_the',
       'van_ban_quy_dinh_lien_quan',
       'quy_dinh_chat_luong_du_lieu',
@@ -185,6 +338,9 @@ const CDEGlossaryTermForm = ({
     const extension = mergeCDEDates(
       {
         ...preservedExtension,
+        ...(values.releaseLevel
+          ? { releaseLevel: [values.releaseLevel] }
+          : {}),
         ...(entityRelationshipVal
           ? {
               entityRelationship: entityRelationshipVal,
@@ -217,7 +373,6 @@ const CDEGlossaryTermForm = ({
       owners: currentOwners.length
         ? currentOwners
         : [{ id: currentUser?.id ?? '', type: 'user' }],
-      reviewers: currentReviewers,
       tags: allTags,
       extension: isEmpty(extension) ? undefined : extension,
     } as GlossaryTermForm);
@@ -227,10 +382,16 @@ const CDEGlossaryTermForm = ({
     name: string,
     label: string,
     classification: string,
-    tone: string
+    tone: 'classification' | 'personal' | 'source',
+    placeholder: string
   ) => (
     <Form.Item className={`cde-form-tag-${tone}`} label={label} name={name}>
-      <TagSuggestion classificationFilter={classification} />
+      <CDETagSelector
+        classification={classification}
+        placeholder={placeholder}
+        searchPlaceholder={t('label.search-for-type', { type: label })}
+        variant={tone}
+      />
     </Form.Item>
   );
 
@@ -243,7 +404,9 @@ const CDEGlossaryTermForm = ({
       initialValues={{ version: '1.0' }}
       layout="vertical"
       onFinish={onFinish}>
-      <div className="cde-form-grid">
+      <CDEFormSection
+        className="cde-form-section-basic"
+        title={t('cde.basic-information')}>
         <Form.Item
           required
           label={t('cde.term-code')}
@@ -266,10 +429,92 @@ const CDEGlossaryTermForm = ({
         </Form.Item>
         <Form.Item
           required
+          className="cde-form-version"
           label={t('cde.version')}
           name="version"
           rules={[{ required: true, whitespace: true }]}>
-          <Input data-testid="cde-version" disabled placeholder="1.0" />
+          <Input disabled data-testid="cde-version" placeholder="1.0" />
+        </Form.Item>
+        <Form.Item
+          required
+          className="cde-form-business-meaning cde-form-field-full"
+          initialValue={glossaryTerm?.description ?? ''}
+          label={t('cde.business-meaning')}
+          name="description"
+          rules={[{ required: true, whitespace: true }]}
+          trigger="onTextChange">
+          <RichTextEditor
+            data-testid="cde-business-meaning"
+            initialValue={glossaryTerm?.description ?? ''}
+            placeHolder={t('cde.business-meaning-placeholder')}
+          />
+        </Form.Item>
+      </CDEFormSection>
+
+      <CDEFormSection
+        className="cde-form-section-management"
+        title={t('cde.management-information')}>
+        <Form.Item label={t('cde.business-group')} name="domains">
+          <DomainSelectableList
+            hasPermission
+            isClearable
+            showAllDomains
+            multiple={entityRules.canAddMultipleDomains}
+            selectedDomain={domains}
+            wrapInButton={false}
+            onUpdate={async (value) =>
+              form.setFieldValue(
+                'domains',
+                value ? (Array.isArray(value) ? value : [value]) : []
+              )
+            }>
+            <div data-testid="cde-business-group">
+              <CDEFormSelectTrigger
+                placeholder={t('cde.select-business-group')}
+                values={domains.length ? [domainLabel] : []}
+              />
+            </div>
+          </DomainSelectableList>
+        </Form.Item>
+        <Form.Item label={t('cde.data-owner')} name="owners">
+          <CDEOwnerSelector
+            multiple={{
+              user: entityRules.canAddMultipleUserOwners,
+              team: entityRules.canAddMultipleTeamOwner,
+            }}
+            placeholder={t('cde.select-data-owner')}
+          />
+        </Form.Item>
+        <Form.Item label={t('cde.release-level')} name="releaseLevel">
+          <Select
+            allowClear
+            className="cde-form-enum-select"
+            data-testid="cde-release-level"
+            dropdownClassName="cde-enum-field-dropdown"
+            getPopupContainer={() => document.body}
+            options={[
+              {
+                displayLabel: (
+                  <Tag className="cde-value-pill cde-value-pill-release">
+                    {t('cde.release-level-ceo')}
+                  </Tag>
+                ),
+                label: t('cde.release-level-ceo'),
+                value: 'CEO',
+              },
+              {
+                displayLabel: (
+                  <Tag className="cde-value-pill cde-value-pill-release">
+                    {t('cde.release-level-ttqldl')}
+                  </Tag>
+                ),
+                label: t('cde.release-level-ttqldl'),
+                value: 'TTQLDL',
+              },
+            ]}
+            optionLabelProp="displayLabel"
+            placeholder={t('cde.select-release-level')}
+          />
         </Form.Item>
         {(['effectiveDate', 'expirationDate'] as const).map((key) => (
           <Form.Item
@@ -304,102 +549,73 @@ const CDEGlossaryTermForm = ({
               allowClear
               data-testid={`cde-${key}`}
               format="dd/MM/yyyy"
+              placeholder={t('cde.select-date')}
             />
           </Form.Item>
         ))}
-        <Form.Item label={t('cde.business-group')} name="domains">
-          <DomainSelectableList
-            hasPermission
-            showAllDomains
-            multiple={entityRules.canAddMultipleDomains}
-            selectedDomain={domains}
-            wrapInButton={false}
-            onUpdate={async (value) =>
-              form.setFieldValue(
-                'domains',
-                value ? (Array.isArray(value) ? value : [value]) : []
-              )
-            }>
-            <Button
-              className="cde-form-select-trigger"
-              data-testid="cde-business-group">
-              <span className="cde-form-select-trigger-value">
-                {domainLabel}
-              </span>
-              <DownOutlined />
-            </Button>
-          </DomainSelectableList>
-        </Form.Item>
-        <Form.Item
-          required
-          className="cde-form-business-meaning cde-form-field-full"
-          initialValue={glossaryTerm?.description ?? ''}
-          label={t('cde.business-meaning')}
-          name="description"
-          rules={[{ required: true, whitespace: true }]}
-          trigger="onTextChange">
-          <RichTextEditor
-            data-testid="cde-business-meaning"
-            initialValue={glossaryTerm?.description ?? ''}
-          />
-        </Form.Item>
+      </CDEFormSection>
+
+      <CDEFormSection
+        className="cde-form-section-classification"
+        title={t('cde.classification-control')}>
         {tagField(
           'dataSourceTags',
           t('cde.data-source'),
           CDE_TAG_CLASSIFICATIONS.dataSource,
-          'source'
+          'source',
+          t('cde.select-data-source')
         )}
         {tagField(
           'dataClassificationTags',
           t('cde.data-classification'),
           CDE_TAG_CLASSIFICATIONS.dataClassification,
-          'classification'
+          'classification',
+          t('cde.select-data-classification')
         )}
         {tagField(
           'personalDataTags',
           t('cde.personal-data'),
           CDE_TAG_CLASSIFICATIONS.personalData,
-          'personal'
+          'personal',
+          t('cde.select-personal-data')
         )}
         <Form.Item label={t('cde.data-quality-rules')} name="dataQualityRules">
           <Select
             allowClear
+            className="cde-form-enum-select"
+            dropdownClassName="cde-enum-field-dropdown"
+            getPopupContainer={() => document.body}
             options={[
-              { label: t('label.yes'), value: 'true' },
-              { label: t('label.no'), value: 'false' },
+              {
+                displayLabel: (
+                  <Tag className="cde-value-pill cde-value-pill-quality">
+                    {t('label.yes')}
+                  </Tag>
+                ),
+                label: t('label.yes'),
+                value: 'true',
+              },
+              {
+                displayLabel: (
+                  <Tag className="cde-value-pill cde-value-pill-neutral">
+                    {t('label.no')}
+                  </Tag>
+                ),
+                label: t('label.no'),
+                value: 'false',
+              },
             ]}
-            placeholder={t('label.select')}
+            optionLabelProp="displayLabel"
+            placeholder={t('cde.select-data-quality-rules')}
           />
         </Form.Item>
-        <Form.Item label={t('cde.data-owner')} name="owners">
-          <UserTeamSelectableListSearchInput
-            hasPermission
-            multiple={{
-              user: entityRules.canAddMultipleUserOwners,
-              team: entityRules.canAddMultipleTeamOwner,
-            }}
-            owner={owners}
-            placeholder={t('label.select')}
-            popoverProps={{
-              placement: 'topLeft',
-            }}
-            onUpdate={async (value) => form.setFieldValue('owners', value)}
-          />
-        </Form.Item>
-        <Form.Item label={t('label.reviewer-plural')} name="reviewers">
-          <UserTeamSelectableListSearchInput
-            hasPermission
-            multiple={{ user: true, team: true }}
-            owner={reviewers}
-            placeholder={t('label.select')}
-            popoverProps={{
-              placement: 'topLeft',
-            }}
-            onUpdate={async (value) => form.setFieldValue('reviewers', value)}
-          />
-        </Form.Item>
+      </CDEFormSection>
+
+      <CDEFormSection
+        className="cde-form-section-context"
+        title={t('cde.business-context')}>
         <Form.Item
-          className="cde-form-markdown-editor"
+          className="cde-form-markdown-editor cde-form-field-full"
           initialValue={
             glossaryTerm?.extension?.entityRelationship ??
             glossaryTerm?.extension?.moi_quan_he_voi_thuc_the ??
@@ -415,14 +631,11 @@ const CDEGlossaryTermForm = ({
               glossaryTerm?.extension?.moi_quan_he_voi_thuc_the ??
               ''
             }
-            placeHolder={t(
-              'cde.entity-relationship-placeholder',
-              'Mô tả mối quan hệ với thực thể...'
-            )}
+            placeHolder={t('cde.entity-relationship-placeholder')}
           />
         </Form.Item>
         <Form.Item
-          className="cde-form-markdown-editor"
+          className="cde-form-markdown-editor cde-form-field-full"
           initialValue={
             glossaryTerm?.extension?.relatedRegulatoryDocuments ??
             glossaryTerm?.extension?.van_ban_quy_dinh_lien_quan ??
@@ -438,13 +651,10 @@ const CDEGlossaryTermForm = ({
               glossaryTerm?.extension?.van_ban_quy_dinh_lien_quan ??
               ''
             }
-            placeHolder={t(
-              'cde.related-regulatory-documents-placeholder',
-              'Nhập văn bản quy định liên quan...'
-            )}
+            placeHolder={t('cde.related-regulatory-documents-placeholder')}
           />
         </Form.Item>
-      </div>
+      </CDEFormSection>
     </Form>
   );
 };

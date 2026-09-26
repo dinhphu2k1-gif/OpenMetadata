@@ -22,9 +22,10 @@ class CdeImportServiceTest {
     CdeImportService service = new CdeImportService();
     try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.template()))) {
       assertEquals("Import CDE", workbook.getSheetAt(0).getSheetName());
-      assertEquals(13, workbook.getSheetAt(0).getRow(0).getLastCellNum());
+      assertEquals(14, workbook.getSheetAt(0).getRow(0).getLastCellNum());
       assertEquals("Mã CDE", workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
-      assertEquals("Ngày hết hiệu lực", workbook.getSheetAt(0).getRow(0).getCell(12).getStringCellValue());
+      assertEquals("Cấp phát hành", workbook.getSheetAt(0).getRow(0).getCell(7).getStringCellValue());
+      assertEquals("Ngày hết hiệu lực", workbook.getSheetAt(0).getRow(0).getCell(13).getStringCellValue());
     }
   }
 

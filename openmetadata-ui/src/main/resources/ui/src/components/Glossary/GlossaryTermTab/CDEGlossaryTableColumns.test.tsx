@@ -4,6 +4,8 @@
  */
 import { ColumnType } from 'antd/lib/table';
 import { TFunction } from 'i18next';
+import { isValidElement } from 'react';
+import { Link } from 'react-router-dom';
 import { getCDEGlossaryTableColumns } from './CDEGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
@@ -26,15 +28,38 @@ const renderCell = (key: string, extension = {}, isLoadMoreButton = false) => {
 };
 
 describe('CDE version and date columns', () => {
-  it('appends version, status, and date columns in order', () => {
-    expect(columns.slice(-4).map((column) => column.key)).toEqual([
+  it('includes the stable term id in a working-revision detail link', () => {
+    const nameColumn = columns.find((column) => column.key === 'name');
+    const rendered = nameColumn?.render?.(
+      'CDE1',
+      {
+        id: 'cde-identity-id',
+        termId: 'cde-term-id',
+        fullyQualifiedName: 'Data Dictionary.CDE1',
+        businessVersion: '1.1',
+        parentBusinessVersion: '1',
+        entityStatus: 'Draft',
+      } as ModifiedGlossaryTerm,
+      0
+    );
+
+    expect(isValidElement(rendered)).toBe(true);
+    expect((rendered as React.ReactElement<React.ComponentProps<typeof Link>>).props.to)
+      .toBe(
+        '/glossary/Data%20Dictionary.CDE1?businessVersion=1.1&parentBusinessVersion=1&termId=cde-term-id&view=working'
+      );
+  });
+
+  it('appends version, status, dates, and release level in order', () => {
+    expect(columns.slice(-5).map((column) => column.key)).toEqual([
       'version',
       'entityStatus',
+      'releaseLevel',
       'effectiveDate',
       'expirationDate',
     ]);
-    expect(columns.slice(-4).map((column) => column.width)).toEqual([
-      120, 150, 160, 160,
+    expect(columns.slice(-5).map((column) => column.width)).toEqual([
+      120, 150, 170, 160, 160,
     ]);
   });
 
@@ -75,7 +100,22 @@ describe('CDE version and date columns', () => {
     expect(renderCell('effectiveDate')).toBe('--');
   });
 
-  it.each(['version', 'effectiveDate', 'expirationDate'])(
+  it('renders the release-level label before the effective date', () => {
+    expect(
+      (renderCell('releaseLevel', { releaseLevel: ['CEO'] }) as React.ReactElement)
+        .props.children
+    ).toBe('cde.release-level-ceo');
+    expect(
+      (
+        renderCell('releaseLevel', {
+          releaseLevel: ['TTQLDL'],
+        }) as React.ReactElement
+      ).props.children
+    ).toBe('cde.release-level-ttqldl');
+    expect(renderCell('releaseLevel')).toBe('--');
+  });
+
+  it.each(['version', 'effectiveDate', 'expirationDate', 'releaseLevel'])(
     'leaves load-more row empty in %s',
     (key) => {
       expect(renderCell(key, {}, true)).toBeNull();

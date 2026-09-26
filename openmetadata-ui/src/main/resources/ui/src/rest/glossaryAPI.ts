@@ -216,7 +216,6 @@ export const updateGlossaryWorkingVersion = async (
   const mutablePayload: GlossaryDraftPayload = {
     description: payload.description,
     owners: payload.owners ?? [],
-    reviewers: payload.reviewers ?? [],
     domains: payload.domains ?? [],
     tags: payload.tags ?? [],
     extension: payload.extension,
@@ -483,9 +482,9 @@ export const updateGlossaryTermWorkingVersion = async (
   const request: CdeDraftUpdateRequest = {
     expectedRevision,
     displayName: payload.displayName ?? null,
-    description: payload.description,
+    description: payload.description ?? '',
     owners: payload.owners ?? [],
-    reviewers: payload.reviewers ?? [],
+    // Reviewers are not part of the CDE authoring payload.
     domains: payload.domains ?? [],
     tags: payload.tags ?? [],
     extension: (payload.extension as Record<string, unknown>) ?? {},

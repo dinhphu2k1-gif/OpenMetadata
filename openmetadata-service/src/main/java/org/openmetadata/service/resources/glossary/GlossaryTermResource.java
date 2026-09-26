@@ -658,6 +658,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationTerm(
       SecurityContext securityContext, GlossaryTerm authorizationTerm) {
+    // CDE approval is policy-driven. The legacy reviewers relationship must not grant CDE access.
+    authorizationTerm.setReviewers(List.of());
     return GlossaryAuthorizationResolver.fromPolicy(
         policyAllows(securityContext, authorizationTerm, MetadataOperation.VIEW_WORKING),
         policyAllows(securityContext, authorizationTerm, MetadataOperation.EDIT_WORKING),
@@ -1282,12 +1284,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
     List<EntityReference> owners =
         EntityRepository.validateOwners(new ArrayList<>(request.getOwners()));
-    EntityRepository.validateReviewers(request.getReviewers());
     List<EntityReference> domains =
         request.getDomains().stream()
             .map(reference -> Entity.getEntityReference(reference, Include.NON_DELETED))
             .toList();
-    return new GlossaryTerm()
+    GlossaryTerm payload = new GlossaryTerm()
         .withId(identity.getId())
         .withName(identity.getName())
         .withFullyQualifiedName(identity.getFullyQualifiedName())
@@ -1295,12 +1296,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         .withDisplayName(request.getDisplayName())
         .withDescription(request.getDescription())
         .withOwners(owners)
-        .withReviewers(request.getReviewers())
+        .withReviewers(List.of())
         .withDomains(domains)
         .withTags(request.getTags())
         .withExtension(request.getExtension())
         .withEntityStatus(EntityStatus.DRAFT)
         .withVersion(identity.getVersion());
+    return payload;
   }
 
   @GET
@@ -1714,6 +1716,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context SecurityContext securityContext,
       @Valid CreateGlossaryTerm create) {
     DataDictionaryResolver.requireDirectCdeCreate(create);
+    if (create.getReviewers() != null && !create.getReviewers().isEmpty()) {
+      throw new BadRequestException(
+          "reviewers is not supported for a Data Dictionary CDE");
+    }
     GlossaryTerm term = mapper.createToEntity(create, securityContext.getUserPrincipal().getName());
     Glossary glossary =
         DataDictionaryResolver.requireDataDictionary(
@@ -1963,7 +1969,6 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               .withEntityStatus(EntityStatus.DRAFT)
               .withDomains(referenceResolver.resolve(row.value(1), Entity.DOMAIN))
               .withOwners(referenceResolver.resolveParties(row.value(6)))
-              .withReviewers(List.of())
               .withTags(resolveImportTags(row, referenceResolver))
               .withExtension(importExtension(row));
       if (existing != null && existing.get("fullyQualifiedName") != null) {
@@ -2018,19 +2023,31 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   }
 
   private static Map<String, Object> importExtension(RowData row) {
-    String quality = row.value(10).trim();
+    String releaseLevelLabel = row.value(7).trim();
+    String releaseLevel =
+        switch (releaseLevelLabel) {
+          case "" -> "";
+          case "Tổng Giám đốc" -> "CEO";
+          case "TTQLDL" -> "TTQLDL";
+          default -> throw new BadRequestException(
+              "Cấp phát hành chỉ nhận Tổng Giám đốc hoặc TTQLDL");
+        };
+    String quality = row.value(11).trim();
     if (!quality.isBlank() && !List.of("Có", "Không").contains(quality)) {
       throw new BadRequestException("Quy định chất lượng dữ liệu chỉ nhận Có hoặc Không");
     }
-    String effective = requireImportDate(row.value(11), "Ngày hiệu lực");
-    String expiration = requireImportDate(row.value(12), "Ngày hết hiệu lực");
+    String effective = requireImportDate(row.value(12), "Ngày hiệu lực");
+    String expiration = requireImportDate(row.value(13), "Ngày hết hiệu lực");
     if (!effective.isBlank() && !expiration.isBlank()
         && java.time.LocalDate.parse(expiration).isBefore(java.time.LocalDate.parse(effective))) {
       throw new BadRequestException("Ngày hết hiệu lực không được trước ngày hiệu lực");
     }
     Map<String, Object> extension = new LinkedHashMap<>();
+    if (!releaseLevel.isBlank()) {
+      extension.put("releaseLevel", List.of(releaseLevel));
+    }
     putImportString(extension, "entityRelationship", row.value(5));
-    putImportString(extension, "relatedRegulatoryDocuments", row.value(9));
+    putImportString(extension, "relatedRegulatoryDocuments", row.value(10));
     if (!quality.isBlank()) {
       extension.put("dataQualityRules", List.of("Có".equals(quality) ? "Y" : "N"));
     }
@@ -2062,8 +2079,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       RowData row, DisplayNameReferenceResolver referenceResolver) {
     List<TagLabel> tags = new ArrayList<>();
     addImportTags(tags, row.value(3), "DataSource", referenceResolver);
-    addImportTags(tags, row.value(7), "DataClassification", referenceResolver);
-    addImportTags(tags, row.value(8), "PersonalData", referenceResolver);
+    addImportTags(tags, row.value(8), "DataClassification", referenceResolver);
+    addImportTags(tags, row.value(9), "PersonalData", referenceResolver);
     return tags;
   }
 

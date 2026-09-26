@@ -73,6 +73,21 @@ export const normalizeCdeParentBusinessVersion = (
   return legacyDictionaryVersion?.[1] ?? normalized;
 };
 
+/** Return the technical FQN of a CDE identity inside one Dictionary scope. */
+export const getScopedCdeFqn = (
+  fqn: string,
+  parentBusinessVersion: string
+): string => {
+  const normalizedParentVersion = normalizeCdeParentBusinessVersion(
+    parentBusinessVersion
+  );
+  if (!normalizedParentVersion) {
+    throw new Error('parentBusinessVersion is required for a scoped CDE FQN');
+  }
+
+  return `${fqn.trim().replace(/@v[1-9]\d*$/, '')}@v${normalizedParentVersion}`;
+};
+
 const getFqnFromPathname = (pathname?: string) => {
   if (!pathname) {
     return undefined;

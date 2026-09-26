@@ -61,6 +61,7 @@ import { getTermQuery } from '../../../utils/SearchUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import {
   getCdeDetailPath,
+  getScopedCdeFqn,
   parseCdeRoute,
 } from '../../../utils/routing/cdeRoutingHelper';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
@@ -181,12 +182,21 @@ const GlossaryTermsV1 = ({
       if (parentBusinessVersion) {
         navigate(
           getCdeDetailPath({
-            fqn:
-              snapshot.fullyQualifiedName ??
-              currentGlossaryTerm.fullyQualifiedName ??
-              glossaryFqn,
+            fqn: getScopedCdeFqn(
+              // A business-version snapshot can contain a legacy, unscoped
+              // FQN. Version selection stays on the same CDE identity, so
+              // rebuild its technical FQN from the authoritative parent scope.
+              glossaryFqn ||
+                currentGlossaryTerm.fullyQualifiedName ||
+                snapshot.fullyQualifiedName ||
+                currentGlossaryTerm.name,
+              parentBusinessVersion,
+            ),
             businessVersion: snapshotBusinessVersion,
             parentBusinessVersion,
+            // Keep the stable identity as well as the scoped FQN so the same
+            // CDE code in another Dictionary scope can never be selected.
+            termId: snapshot.id ?? currentGlossaryTerm.id,
             isWorkingDraft:
               snapshot.entityStatus !== EntityStatus.Approved,
           }),
@@ -515,10 +525,15 @@ const GlossaryTermsV1 = ({
     setTimeout(() => {
       fetchGlossaryTermAssets();
     }, 500);
-    if (!isVersionView) {
+    // Data Dictionary CDEs do not expose the Activity Feed tab. Their scoped
+    // working revisions are resolved by stable term id, while the generic
+    // feed endpoint resolves an entity link by FQN. Calling it for a CDE
+    // revision therefore produces a misleading "glossaryTerm instance ...
+    // not found" toast even though the revision itself loaded successfully.
+    if (!isVersionView && !isCDEGlossaryTerm) {
       getEntityFeedCount();
     }
-  }, [glossaryFqn, isVersionView]);
+  }, [glossaryFqn, isVersionView, isCDEGlossaryTerm]);
 
   const updatedGlossaryTerm = useMemo(() => {
     const name = isViewingVersion

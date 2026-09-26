@@ -10,7 +10,6 @@
     "displayName": { "type": ["string", "null"] },
     "description": { "$ref": "../../type/basic.json#/definitions/markdown" },
     "owners": { "$ref": "../../type/entityReferenceList.json" },
-    "reviewers": { "$ref": "../../type/entityReferenceList.json" },
     "domains": { "$ref": "../../type/entityReferenceList.json" },
     "tags": {
       "type": "array",
@@ -27,7 +26,6 @@
     "expectedRevision",
     "description",
     "owners",
-    "reviewers",
     "domains",
     "tags"
   ],

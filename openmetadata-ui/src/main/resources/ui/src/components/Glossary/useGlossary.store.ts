@@ -42,7 +42,9 @@ export const useGlossaryStore = create<{
   setVisibleGlossaryTermsCount: (count?: number) => void;
   insertNewGlossaryTermToChildTerms: (glossary: GlossaryTerm) => void;
   termsLoading: boolean;
+  termsRefreshVersion: number;
   setTermsLoading: (termsLoading: boolean) => void;
+  requestGlossaryTermsRefresh: () => void;
   onAddGlossaryTerm: (glossaryTerm?: GlossaryTerm) => void;
   onEditGlossaryTerm: (glossaryTerm?: GlossaryTerm) => void;
   refreshGlossaryTerms: () => void;
@@ -54,6 +56,7 @@ export const useGlossaryStore = create<{
   glossaryChildTerms: [],
   visibleGlossaryTermsCount: undefined,
   termsLoading: false,
+  termsRefreshVersion: 0,
 
   setGlossaries: (glossaries: Glossary[]) => {
     set({ glossaries });
@@ -126,6 +129,9 @@ export const useGlossaryStore = create<{
   },
   setTermsLoading: (termsLoading: boolean) => {
     set({ termsLoading });
+  },
+  requestGlossaryTermsRefresh: () => {
+    set((state) => ({ termsRefreshVersion: state.termsRefreshVersion + 1 }));
   },
   setGlossaryFunctionRef: (glossaryFunctionRef: GlossaryFunctionRef) => {
     set({

@@ -66,6 +66,7 @@ public final class CdeImportService {
           "Ý nghĩa nghiệp vụ",
           "Mối quan hệ với thực thể",
           "Chủ sở hữu dữ liệu",
+          "Cấp phát hành",
           "Phân loại dữ liệu",
           "Dữ liệu cá nhân",
           "Văn bản quy định liên quan",
@@ -255,7 +256,7 @@ public final class CdeImportService {
 
   private static void requireHeaders(Row row) {
     if (row == null || row.getLastCellNum() != HEADERS.size()) {
-      throw new BadRequestException("Import template must contain exactly 13 columns");
+      throw new BadRequestException("Import template must contain exactly 14 columns");
     }
     for (int index = 0; index < HEADERS.size(); index++) {
       if (!HEADERS.get(index).equals(row.getCell(index).toString().trim())) {

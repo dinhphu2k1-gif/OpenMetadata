@@ -287,6 +287,7 @@ jest.mock('../../../utils/TableColumn.util', () => ({
 const mockUseGlossaryStore = {
   activeGlossary: mockedGlossaryTerms[0],
   glossaryChildTerms: [] as ModifiedGlossaryTerm[],
+  termsRefreshVersion: 0,
   updateActiveGlossary: jest.fn(),
   onAddGlossaryTerm: mockOnAddGlossaryTerm,
   onEditGlossaryTerm: mockOnEditGlossaryTerm,
@@ -415,6 +416,7 @@ describe('Test GlossaryTermTab component', () => {
     Object.assign(mockUseGlossaryStore, {
       activeGlossary: mockedGlossaryTerms[0],
       glossaryChildTerms: [] as ModifiedGlossaryTerm[],
+      termsRefreshVersion: 0,
       updateActiveGlossary: jest.fn(),
       onAddGlossaryTerm: mockOnAddGlossaryTerm,
       onEditGlossaryTerm: mockOnEditGlossaryTerm,

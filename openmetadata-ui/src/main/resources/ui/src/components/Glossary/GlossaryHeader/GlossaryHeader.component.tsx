@@ -465,6 +465,9 @@ const GlossaryHeader = ({
   const canManageBusinessContent =
     !isImmutableApprovedTerm &&
     (!isCustomManaged || Boolean(workflowPermissions?.canEditWorking));
+  const canDeleteBusinessContent =
+    canManageBusinessContent &&
+    !(isCDEGlossary && glossaryTermStatus === EntityStatus.Approved);
   const canCreateGlossaryTerm =
     canRenderMutationActions &&
     glossaryTermStatus !== EntityStatus.Archived &&
@@ -599,10 +602,10 @@ const GlossaryHeader = ({
                 ? EntityStatus.Archived
                 : EntityStatus.Approved);
 
-            return isGlossary
-              ? status === EntityStatus.Approved ||
-                  (status === EntityStatus.Archived && canViewHistory)
-              : status === EntityStatus.Approved;
+            return (
+              status === EntityStatus.Approved ||
+              (status === EntityStatus.Archived && canViewHistory)
+            );
           },
         )
         .sort(
@@ -1267,7 +1270,7 @@ const GlossaryHeader = ({
         ] as ItemType[])
       : []),
 
-    ...(permissions.Delete && canManageBusinessContent
+    ...(permissions.Delete && canDeleteBusinessContent
       ? ([
           {
             label: (
