@@ -4,560 +4,374 @@
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *  http://www.apache.org/licenses/LICENSE-2.0
- *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-import { Col, Input, Popover, Row, Select, Spin, Typography } from 'antd';
+import { Input, Popover, Space, Tag, Typography } from 'antd';
 import { EntityTags } from 'Models';
-import { ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../../constants/Glossary.contant';
-import { EntityType } from '../../../enums/entity.enum';
 import {
+  EntityStatus,
   GlossaryTerm,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
-import { EntityReference } from '../../../generated/entity/type';
-import { TagSource } from '../../../generated/type/tagLabel';
 import {
-  getFirstLevelGlossaryTermsPaginated,
-  searchGlossaryTermsPaginated,
+  getGlossaryTermsById,
+  getGlossaryTermsVersion,
 } from '../../../rest/glossaryAPI';
+import { TagSource } from '../../../generated/type/tagLabel';
 import { createTagObject } from '../../../utils/TagsUtils';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
+import CDESelector from '../CDESelector/CDESelector.component';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
-import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/UserTeamSelectableList.component';
+import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModalWithMarkdownEditor } from '../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
-import TagsContainerV2 from '../../Tag/TagsContainerV2/TagsContainerV2';
-import { DisplayType, LayoutType } from '../../Tag/TagsViewer/TagsViewer.interface';
+import TagsViewer from '../../Tag/TagsViewer/TagsViewer';
+import { DisplayType } from '../../Tag/TagsViewer/TagsViewer.interface';
 import {
-  DQ_TAG_CLASSIFICATIONS,
   DQExtension,
-  renderDQCdeCode,
-  renderDQOwners,
+  DQ_TAG_CLASSIFICATIONS,
   renderDQQualityThreshold,
 } from '../GlossaryTermTab/DQGlossaryTableColumns';
+import {
+  GovernedGlossaryField,
+  GovernedGlossarySection,
+} from './GovernedGlossaryDetailLayout';
+import CDEReleaseLevelField from './CDEReleaseLevelField';
+import { CDEValidityFields } from './CDEGlossaryTermSummary';
 
-interface DQGlossaryTermSummaryProps {
+interface SummaryProps {
   glossaryTerm: GlossaryTerm;
 }
 
-interface DQFieldProps {
-  action?: ReactNode;
-  children: ReactNode;
-  className?: string;
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  label: string;
-  span?: number;
-}
-
-const DQField = ({
-  action,
-  children,
-  className,
-  isLastRow,
-  isLeft,
-  label,
-  span = 12,
-}: DQFieldProps) => {
-  const isFullWidth = span === 24;
-  const leftClass = isLeft ? 'dq-detail-field-left' : '';
-  const fullClass = isFullWidth ? 'dq-detail-field-full' : '';
-  const lastRowClass = isLastRow ? 'dq-detail-field-last-row' : '';
-
-  return (
-    <Col
-      aria-label={label}
-      className={`dq-detail-field ${leftClass} ${fullClass} ${lastRowClass} ${className ?? ''}`}
-      lg={span}
-      md={span}
-      role="group"
-      sm={24}
-      xs={24}>
-      <div className="dq-detail-field-label d-flex items-center gap-2">
-        <Typography.Text className="text-sm font-medium">{label}</Typography.Text>
-        {action}
-      </div>
-      <div className="dq-detail-field-value">{children}</div>
-    </Col>
-  );
-};
-
-interface DQCdeCodeFieldProps extends DQGlossaryTermSummaryProps {
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  span?: number;
-}
-
-const DQCdeCodeField = ({
-  glossaryTerm,
-  isLastRow,
-  isLeft = true,
-  span = 12,
-}: DQCdeCodeFieldProps) => {
+const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [cdeOptions, setCdeOptions] = useState<GlossaryTerm[]>([]);
-  const ext = (data?.extension ?? glossaryTerm.extension) as DQExtension | undefined;
-  const [selectedValue, setSelectedValue] = useState<string | undefined>(
-    ext?.cdeCode || undefined
+  const currentTerm = data ?? glossaryTerm;
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSavingCde, setIsSavingCde] = useState(false);
+  const [resolvedCde, setResolvedCde] = useState<GlossaryTerm>();
+  const relation = currentTerm.relatedTerms?.find((item) =>
+    item.term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME)
   );
-
-  const hasEditAccess =
+  const selectedCde = relation?.term;
+  const displayedCde = resolvedCde ?? selectedCde;
+  const isHistoricalCde =
+    resolvedCde?.entityStatus &&
+    resolvedCde.entityStatus !== EntityStatus.Approved;
+  const canEdit =
     !isVersionView &&
-    Boolean(permissions?.EditAll || permissions?.EditCustomFields);
-
-  const fetchCdeTerms = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getFirstLevelGlossaryTermsPaginated(
-        DATA_DICTIONARY_GLOSSARY_NAME,
-        1000,
-        undefined,
-        undefined,
-        ['displayName', 'name', 'fullyQualifiedName', 'id', 'description']
-      );
-      if (response.data && response.data.length > 0) {
-        setCdeOptions(response.data as GlossaryTerm[]);
-      } else {
-        const fallback = await searchGlossaryTermsPaginated({
-          glossaryFqn: DATA_DICTIONARY_GLOSSARY_NAME,
-          limit: 1000,
-        });
-        setCdeOptions(fallback.data ?? []);
-      }
-    } catch {
-      try {
-        const fallback = await searchGlossaryTermsPaginated({
-          glossaryFqn: DATA_DICTIONARY_GLOSSARY_NAME,
-          limit: 1000,
-        });
-        setCdeOptions(fallback.data ?? []);
-      } catch {
-        setCdeOptions([]);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    currentTerm.entityStatus === EntityStatus.Draft &&
+    Boolean(permissions?.EditAll || permissions?.EditGlossaryTerms);
 
   useEffect(() => {
-    fetchCdeTerms();
-  }, []);
+    if (!selectedCde?.id) {
+      setResolvedCde(undefined);
 
-  const handleOpenChange = (visible: boolean) => {
-    setIsEditing(visible);
-    if (visible) {
-      setSelectedValue(ext?.cdeCode || undefined);
-      if (cdeOptions.length === 0) {
-        fetchCdeTerms();
-      }
+      return;
     }
-  };
+    const versionContext = relation?.versionContext;
+    const request = versionContext
+      ? getGlossaryTermsVersion(
+          selectedCde.id,
+          versionContext.businessVersion,
+          versionContext.parentBusinessVersion
+        )
+      : getGlossaryTermsById(selectedCde.id, { fields: ['displayName'] });
+    request
+      .then(setResolvedCde)
+      .catch(() => setResolvedCde(undefined));
+  }, [relation?.versionContext, selectedCde?.id]);
 
-  const handleSave = async () => {
-    const matchedTerm = cdeOptions.find(
-      (term) =>
-        term.name?.toLowerCase() === selectedValue?.toLowerCase() ||
-        term.fullyQualifiedName?.toLowerCase() === selectedValue?.toLowerCase()
+  const handleSelect = async (_id?: string, selected?: GlossaryTerm) => {
+    if (isSavingCde) {
+      return;
+    }
+    const selectedKey = selected?.snapshotId;
+    const currentKey = relation?.versionContext?.snapshotId;
+    if (
+      selected?.id === selectedCde?.id &&
+      ((!selectedKey && !currentKey) || selectedKey === currentKey)
+    ) {
+      setIsEditorOpen(false);
+
+      return;
+    }
+    const nonCdeRelations = (currentTerm.relatedTerms ?? []).filter(
+      (item) =>
+        !item.term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME)
     );
-
-    const currentExtension = {
-      ...(glossaryTerm.extension ?? {}),
-      ...(data?.extension ?? {}),
-    };
-
-    const updatedExtension: DQExtension = {
-      ...currentExtension,
-      cdeCode: matchedTerm ? matchedTerm.name : (selectedValue ?? ''),
-      cdeName: matchedTerm
-        ? (matchedTerm.displayName || matchedTerm.name)
-        : '',
-    };
-
-    const currentRelatedTerms = (data?.relatedTerms ??
-      glossaryTerm.relatedTerms ??
-      []) as TermRelation[];
-    const nonCdeRelatedTerms = currentRelatedTerms.filter((rel) => {
-      const term = rel.term ?? (rel as unknown as EntityReference);
-
-      return !term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME);
-    });
-
-    const updatedRelatedTerms: TermRelation[] = [...nonCdeRelatedTerms];
-    if (matchedTerm) {
-      updatedRelatedTerms.push({
-        relationType: 'relatedTo',
-        term: {
-          id: matchedTerm.id,
-          type: EntityType.GLOSSARY_TERM,
-          name: matchedTerm.name,
-          displayName: matchedTerm.displayName,
-          fullyQualifiedName: matchedTerm.fullyQualifiedName,
-        },
+    const updatedRelation: TermRelation[] = selected?.id
+      ? [
+          {
+            relationType: 'relatedTo',
+            term: {
+              id: selected.id,
+              type: 'glossaryTerm',
+              name: selected.name,
+              displayName: selected.displayName,
+              fullyQualifiedName: selected.fullyQualifiedName,
+            },
+            versionContext:
+              selected.snapshotId &&
+              selected.parentBusinessVersion &&
+              selected.businessVersion
+                ? {
+                    snapshotId: selected.snapshotId,
+                    parentBusinessVersion: selected.parentBusinessVersion,
+                    businessVersion: selected.businessVersion,
+                  }
+                : undefined,
+          },
+        ]
+      : [];
+    setIsSavingCde(true);
+    try {
+      await onUpdate?.({
+        ...glossaryTerm,
+        ...data,
+        relatedTerms: [...nonCdeRelations, ...updatedRelation],
       });
+      setResolvedCde(selected);
+      setIsEditorOpen(false);
+    } finally {
+      setIsSavingCde(false);
     }
-
-    await onUpdate?.({
-      ...glossaryTerm,
-      ...data,
-      extension: updatedExtension,
-      relatedTerms: updatedRelatedTerms,
-    });
-    setIsEditing(false);
   };
-
-  const editAction = hasEditAccess ? (
-    <Popover
-      content={
-        <div className="d-flex flex-column gap-2" style={{ width: 320 }}>
-          <Select
-            allowClear
-            showSearch
-            filterOption={(input, option) => {
-              const label = String(option?.label ?? '').toLowerCase();
-              const val = String(option?.value ?? '').toLowerCase();
-              const q = input.toLowerCase();
-
-              return label.includes(q) || val.includes(q);
-            }}
-            loading={isLoading}
-            notFoundContent={isLoading ? <Spin size="small" /> : undefined}
-            options={cdeOptions.map((term) => ({
-              label: `${term.name}${term.displayName ? ` - ${term.displayName}` : ''}`,
-              value: term.name,
-            }))}
-            placeholder={t('label.select-field', { field: t('dq.cde-code') })}
-            size="small"
-            style={{ width: '100%' }}
-            value={selectedValue}
-            onChange={(val) => setSelectedValue(val)}
-          />
-          <div className="d-flex justify-end gap-2">
-            <button
-              className="ant-btn ant-btn-default ant-btn-sm"
-              onClick={() => setIsEditing(false)}>
-              {t('label.cancel')}
-            </button>
-            <button
-              className="ant-btn ant-btn-primary ant-btn-sm"
-              onClick={handleSave}>
-              {t('label.save')}
-            </button>
-          </div>
-        </div>
-      }
-      open={isEditing}
-      placement="bottomLeft"
-      trigger="click"
-      onOpenChange={handleOpenChange}>
-      <EditIconButton
-        size="small"
-        title={t('label.edit-entity', { entity: t('dq.cde-code') })}
-      />
-    </Popover>
-  ) : undefined;
 
   return (
-    <DQField
-      action={editAction}
-      isLastRow={isLastRow}
-      isLeft={isLeft}
-      label={t('dq.cde-code')}
-      span={span}>
-      {renderDQCdeCode(glossaryTerm, ext)}
-    </DQField>
+    <GovernedGlossarySection
+      className="dq-detail-section-cde-relation"
+      title={t('dq.cde-link', 'Liên kết CDE')}
+      variant="management">
+      <GovernedGlossaryField
+        action={
+          canEdit ? (
+            <Popover
+              content={
+                <CDESelector
+                  disabled={isSavingCde}
+                  parentBusinessVersion={
+                    currentTerm.parentBusinessVersion ??
+                    relation?.versionContext?.parentBusinessVersion
+                  }
+                  selectedCde={resolvedCde ?? selectedCde}
+                  selectedVersionContext={relation?.versionContext}
+                  width={520}
+                  onChange={handleSelect}
+                />
+              }
+              open={isEditorOpen}
+              placement="bottomLeft"
+              trigger="click"
+              onOpenChange={setIsEditorOpen}>
+              <EditIconButton
+                size="small"
+                title={t('label.edit-entity', { entity: t('dq.cde-code') })}
+              />
+            </Popover>
+          ) : undefined
+      }
+      label={t('dq.cde-code')}>
+        {displayedCde ? (
+          <Space size={6}>
+            <Typography.Text>{displayedCde.name}</Typography.Text>
+            {(resolvedCde?.businessVersion ||
+              resolvedCde?.parentBusinessVersion) && (
+              <Typography.Text type="secondary">
+                v
+                {resolvedCde.businessVersion ??
+                  resolvedCde.parentBusinessVersion}
+              </Typography.Text>
+            )}
+            {isHistoricalCde && <Tag>Archived</Tag>}
+          </Space>
+        ) : (
+          NO_DATA_PLACEHOLDER
+        )}
+      </GovernedGlossaryField>
+      <GovernedGlossaryField label={t('dq.cde-name')}>
+        {resolvedCde?.displayName ??
+          selectedCde?.displayName ??
+          NO_DATA_PLACEHOLDER}
+      </GovernedGlossaryField>
+    </GovernedGlossarySection>
   );
 };
-
-interface DQTagFieldProps {
-  classification: string;
-  glossaryTerm: GlossaryTerm;
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  label: string;
-  span?: number;
-}
 
 const DQTagField = ({
   classification,
   glossaryTerm,
-  isLastRow,
-  isLeft,
   label,
-  span = 12,
-}: DQTagFieldProps) => {
+}: SummaryProps & { classification: string; label: string }) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
+  const { t } = useTranslation();
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const selectedTags = (glossaryTerm.tags ?? []).filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
   );
-  const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditTags || permissions?.EditAll);
-
-  const handleTagUpdate = async (updatedTags: EntityTags[]) => {
-    const tags = createTagObject(updatedTags) ?? [];
-    const currentTags = data?.tags ?? glossaryTerm.tags ?? [];
-    const nonClassificationTags = currentTags.filter(
-      (tag) => tag.tagFQN.split('.')[0] !== classification
-    );
-
-    await onUpdate?.({
-      ...glossaryTerm,
-      ...data,
-      tags: [...nonClassificationTags, ...tags],
-    });
-  };
+  const canEdit =
+    !isVersionView &&
+    (data?.entityStatus ?? glossaryTerm.entityStatus) === EntityStatus.Draft &&
+    Boolean(permissions?.EditTags || permissions?.EditAll);
 
   return (
-    <DQField
-      className={`dq-detail-field-${classification}`}
-      isLastRow={isLastRow}
-      isLeft={isLeft}
-      label={label}
-      span={span}>
-      <TagsContainerV2
-        showInlineEditButton
-        classificationFilter={classification}
-        columnData={{
-          fqn: glossaryTerm.fullyQualifiedName ?? glossaryTerm.name,
-          name: label,
-        }}
+    <GovernedGlossaryField
+      action={
+        canEdit ? (
+          <TagSelectableList
+            classificationFilter={classification}
+            hasPermission={canEdit}
+            popoverProps={{
+              open: isEditorOpen,
+              overlayClassName: 'cde-tag-select-popover',
+              placement: 'bottomLeft',
+              onOpenChange: setIsEditorOpen,
+            }}
+            searchPlaceholder={t('label.search-for-type', { type: label })}
+            selectedTags={selectedTags}
+            onCancel={() => setIsEditorOpen(false)}
+            onUpdate={async (updatedTags: EntityTags[]) => {
+              const currentTags = data?.tags ?? glossaryTerm.tags ?? [];
+              const otherTags = currentTags.filter(
+                (tag) => tag.tagFQN.split('.')[0] !== classification
+              );
+              await onUpdate?.({
+                ...glossaryTerm,
+                ...data,
+                tags: [...otherTags, ...(createTagObject(updatedTags) ?? [])],
+              });
+              setIsEditorOpen(false);
+            }}>
+            <EditIconButton
+              size="small"
+              title={t('label.edit-entity', { entity: label })}
+            />
+          </TagSelectableList>
+        ) : undefined
+      }
+      label={label}>
+      <TagsViewer
+        showNoDataPlaceholder
         displayType={DisplayType.READ_MORE}
-        entityFqn={glossaryTerm.fullyQualifiedName}
-        entityType={EntityType.GLOSSARY_TERM}
-        layoutType={LayoutType.HORIZONTAL}
-        permission={hasEditAccess}
-        selectedTags={selectedTags}
-        showTaskHandler={false}
+        entityFqn={glossaryTerm.fullyQualifiedName ?? glossaryTerm.name}
         tagType={TagSource.Classification}
-        onSelectionChange={handleTagUpdate}
+        tags={selectedTags}
       />
-    </DQField>
+    </GovernedGlossaryField>
   );
 };
 
-interface DQOwnersFieldProps extends DQGlossaryTermSummaryProps {
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  span?: number;
-}
-
-const DQOwnersField = ({
-  glossaryTerm,
-  isLastRow,
-  isLeft,
-  span = 12,
-}: DQOwnersFieldProps) => {
-  const { data, entityRules, isVersionView, onUpdate, permissions } =
-    useGenericContext<GlossaryTerm>();
-  const { t } = useTranslation();
-  const hasEditAccess =
-    !isVersionView && Boolean(permissions?.EditOwners || permissions?.EditAll);
-
-  const handleOwnerUpdate = async (owners?: EntityReference[]) => {
-    await onUpdate?.({
-      ...glossaryTerm,
-      ...data,
-      owners,
-    });
-  };
-
-  const editAction = hasEditAccess ? (
-    <UserTeamSelectableList
-      hasPermission={hasEditAccess}
-      listHeight={200}
-      multiple={{
-        team: entityRules?.canAddMultipleTeamOwner ?? false,
-        user: entityRules?.canAddMultipleUserOwners ?? false,
-      }}
-      owner={glossaryTerm.owners}
-      onUpdate={handleOwnerUpdate}>
-      <EditIconButton
-        size="small"
-        title={t('label.edit-entity', { entity: t('label.owner-plural') })}
-      />
-    </UserTeamSelectableList>
-  ) : undefined;
-
-  return (
-    <DQField
-      action={editAction}
-      isLastRow={isLastRow}
-      isLeft={isLeft}
-      label={t('dq.owners')}
-      span={span}>
-      <div className="dq-owner-field-value">
-        {renderDQOwners(glossaryTerm.owners as EntityReference[])}
-      </div>
-    </DQField>
-  );
-};
-
-interface DQQualityThresholdFieldProps extends DQGlossaryTermSummaryProps {
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  span?: number;
-}
-
-const DQQualityThresholdField = ({
-  glossaryTerm,
-  isLastRow,
-  isLeft,
-  span = 24,
-}: DQQualityThresholdFieldProps) => {
+const DQQualityThresholdField = ({ glossaryTerm }: SummaryProps) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
+  const value =
+    (glossaryTerm.extension as DQExtension | undefined)?.qualityThreshold ?? '';
   const [isEditing, setIsEditing] = useState(false);
-  const [thresholdValue, setThresholdValue] = useState(
-    (glossaryTerm.extension as DQExtension | undefined)?.qualityThreshold ?? ''
-  );
-  const hasEditAccess =
+  const [draftValue, setDraftValue] = useState(value);
+  const canEdit =
     !isVersionView &&
+    (data?.entityStatus ?? glossaryTerm.entityStatus) === EntityStatus.Draft &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
-  const handleSave = async () => {
-    const updatedExtension = {
-      ...(glossaryTerm.extension ?? {}),
-      ...(data?.extension ?? {}),
-      qualityThreshold: thresholdValue,
-    };
+  const save = async () => {
     await onUpdate?.(
       {
         ...glossaryTerm,
         ...data,
-        extension: updatedExtension,
+        extension: {
+          ...(glossaryTerm.extension ?? {}),
+          ...(data?.extension ?? {}),
+          qualityThreshold: draftValue,
+        },
       },
       'extension'
     );
     setIsEditing(false);
   };
 
-  const editAction = hasEditAccess ? (
-    <Popover
-      content={
-        <div className="d-flex flex-column gap-2" style={{ width: 180 }}>
-          <Input
-            placeholder="Ví dụ: 100%, 99%..."
-            size="small"
-            value={thresholdValue}
-            onChange={(e) => setThresholdValue(e.target.value)}
-            onPressEnter={handleSave}
-          />
-          <button
-            className="ant-btn ant-btn-primary ant-btn-sm"
-            onClick={handleSave}>
-            {t('label.save')}
-          </button>
-        </div>
-      }
-      open={isEditing}
-      placement="bottomLeft"
-      trigger="click"
-      onOpenChange={setIsEditing}>
-      <EditIconButton
-        size="small"
-        title={t('label.edit-entity', { entity: t('dq.quality-threshold') })}
-      />
-    </Popover>
-  ) : undefined;
-
   return (
-    <DQField
-      action={editAction}
+    <GovernedGlossaryField
+      action={
+        canEdit ? (
+          <Popover
+            content={
+              <div className="d-flex flex-column gap-2" style={{ width: 180 }}>
+                <Input
+                  placeholder={t('dq.quality-threshold-example')}
+                  size="small"
+                  value={draftValue}
+                  onChange={(event) => setDraftValue(event.target.value)}
+                  onPressEnter={save}
+                />
+                <button
+                  className="ant-btn ant-btn-primary ant-btn-sm"
+                  onClick={save}>
+                  {t('label.save')}
+                </button>
+              </div>
+            }
+            open={isEditing}
+            placement="bottomLeft"
+            trigger="click"
+            onOpenChange={setIsEditing}>
+            <EditIconButton
+              size="small"
+              title={t('label.edit-entity', {
+                entity: t('dq.quality-threshold'),
+              })}
+            />
+          </Popover>
+        ) : undefined
+      }
       className="dq-detail-field-threshold"
-      isLastRow={isLastRow}
-      isLeft={isLeft}
-      label={t('dq.quality-threshold')}
-      span={span}>
-      <div className="d-flex items-center gap-2">
-        {renderDQQualityThreshold(
-          (glossaryTerm.extension as DQExtension | undefined)?.qualityThreshold
-        )}
-      </div>
-    </DQField>
+      label={t('dq.quality-threshold')}>
+      {value ? renderDQQualityThreshold(value) : NO_DATA_PLACEHOLDER}
+    </GovernedGlossaryField>
   );
 };
 
-interface DQTextCustomFieldProps {
-  glossaryTerm: GlossaryTerm;
-  isLastRow?: boolean;
-  isLeft?: boolean;
-  label: string;
-  propertyName: string;
-  span?: number;
-}
-
-const DQTextCustomField = ({
+const DQTextField = ({
   glossaryTerm,
-  isLastRow,
-  isLeft,
   label,
   propertyName,
-  span = 12,
-}: DQTextCustomFieldProps) => {
+}: SummaryProps & { label: string; propertyName: string }) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
-  const hasEditAccess =
+  const value = (glossaryTerm.extension?.[propertyName] as string) ?? '';
+  const canEdit =
     !isVersionView &&
+    (data?.entityStatus ?? glossaryTerm.entityStatus) === EntityStatus.Draft &&
     Boolean(permissions?.EditAll || permissions?.EditCustomFields);
 
-  const value =
-    (glossaryTerm.extension?.[propertyName] as string) ?? '';
-
-  const handleSave = async (markdown: string) => {
-    const updatedExtension = {
-      ...(glossaryTerm.extension ?? {}),
-      ...(data?.extension ?? {}),
-      [propertyName]: markdown,
-    };
-    await onUpdate?.(
-      {
-        ...glossaryTerm,
-        ...data,
-        extension: updatedExtension,
-      },
-      'extension'
-    );
-    setIsEditing(false);
-  };
-
-  const editAction = hasEditAccess ? (
-    <EditIconButton
-      size="small"
-      title={t('label.edit-entity', { entity: label })}
-      onClick={() => setIsEditing(true)}
-    />
-  ) : undefined;
-
   return (
-    <DQField
-      action={editAction}
+    <GovernedGlossaryField
+      action={
+        canEdit ? (
+          <EditIconButton
+            size="small"
+            title={t('label.edit-entity', { entity: label })}
+            onClick={() => setIsEditing(true)}
+          />
+        ) : undefined
+      }
       className={`dq-detail-field-${propertyName}`}
-      isLastRow={isLastRow}
-      isLeft={isLeft}
-      label={label}
-      span={span}>
+      label={label}>
       <div className="dq-detail-field-markdown-content">
         {value ? (
-          <RichTextEditorPreviewerV1
-            enableSeeMoreVariant
-            markdown={value}
-          />
+          <RichTextEditorPreviewerV1 enableSeeMoreVariant markdown={value} />
         ) : (
           <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
         )}
@@ -572,61 +386,52 @@ const DQTextCustomField = ({
           value={value}
           visible={isEditing}
           onCancel={() => setIsEditing(false)}
-          onSave={handleSave}
+          onSave={async (markdown) => {
+            await onUpdate?.(
+              {
+                ...glossaryTerm,
+                ...data,
+                extension: {
+                  ...(glossaryTerm.extension ?? {}),
+                  ...(data?.extension ?? {}),
+                  [propertyName]: markdown,
+                },
+              },
+              'extension'
+            );
+            setIsEditing(false);
+          }}
         />
       )}
-    </DQField>
+    </GovernedGlossaryField>
   );
 };
 
-const DQGlossaryTermSummary = ({
-  glossaryTerm,
-}: DQGlossaryTermSummaryProps) => {
+const DQGlossaryTermSummary = ({ glossaryTerm }: SummaryProps) => {
   const { t } = useTranslation();
-  const ext = glossaryTerm.extension as DQExtension | undefined;
 
   return (
     <div
-      className="dq-detail-summary"
+      className="cde-detail-summary dq-detail-summary"
       data-testid="dq-glossary-term-summary">
-      <Row gutter={[0, 0]}>
-        <DQCdeCodeField isLeft glossaryTerm={glossaryTerm} />
-        <DQField label={t('dq.cde-name')}>
-          <span className="font-medium text-grey-muted">
-            {ext?.cdeName || NO_DATA_PLACEHOLDER}
-          </span>
-        </DQField>
+      <DQCdeRelationFields glossaryTerm={glossaryTerm} />
+
+      <GovernedGlossarySection
+        className="dq-detail-section-management"
+        title={t('cde.management-information')}
+        variant="management">
+        <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
+        <CDEValidityFields glossaryTerm={glossaryTerm} />
+      </GovernedGlossarySection>
+
+      <GovernedGlossarySection
+        className="dq-detail-section-classification"
+        title={t('cde.classification-control')}
+        variant="classification">
         <DQTagField
-          isLeft
           classification={DQ_TAG_CLASSIFICATIONS.dimension}
           glossaryTerm={glossaryTerm}
           label={t('dq.dimension')}
-        />
-        <DQOwnersField glossaryTerm={glossaryTerm} />
-        <DQTextCustomField
-          glossaryTerm={glossaryTerm}
-          label={t('dq.rule-explanation')}
-          propertyName="ruleExplanation"
-          span={24}
-        />
-        <DQTextCustomField
-          isLeft
-          glossaryTerm={glossaryTerm}
-          label={t('dq.other-constraints')}
-          propertyName="otherConstraints"
-          span={12}
-        />
-        <DQTextCustomField
-          glossaryTerm={glossaryTerm}
-          label={t('dq.exceptions')}
-          propertyName="exceptions"
-          span={12}
-        />
-        <DQTagField
-          isLeft
-          classification={DQ_TAG_CLASSIFICATIONS.dataSource}
-          glossaryTerm={glossaryTerm}
-          label={t('dq.data-source')}
         />
         <DQTagField
           classification={DQ_TAG_CLASSIFICATIONS.targetPopulation}
@@ -634,7 +439,6 @@ const DQGlossaryTermSummary = ({
           label={t('dq.target-population')}
         />
         <DQTagField
-          isLeft
           classification={DQ_TAG_CLASSIFICATIONS.method}
           glossaryTerm={glossaryTerm}
           label={t('dq.method')}
@@ -644,12 +448,30 @@ const DQGlossaryTermSummary = ({
           glossaryTerm={glossaryTerm}
           label={t('dq.frequency')}
         />
-        <DQQualityThresholdField isLastRow glossaryTerm={glossaryTerm} span={24} />
-      </Row>
+        <DQQualityThresholdField glossaryTerm={glossaryTerm} />
+      </GovernedGlossarySection>
+
+      <GovernedGlossarySection
+        title={t('cde.business-context')}
+        variant="context">
+        <DQTextField
+          glossaryTerm={glossaryTerm}
+          label={t('dq.rule-explanation')}
+          propertyName="ruleExplanation"
+        />
+        <DQTextField
+          glossaryTerm={glossaryTerm}
+          label={t('dq.other-constraints')}
+          propertyName="otherConstraints"
+        />
+        <DQTextField
+          glossaryTerm={glossaryTerm}
+          label={t('cde.related-regulatory-documents')}
+          propertyName="relatedRegulatoryDocuments"
+        />
+      </GovernedGlossarySection>
     </div>
   );
 };
 
 export default DQGlossaryTermSummary;
-
-

@@ -35,6 +35,7 @@ interface Props {
   editMode: boolean;
   isCDEGlossary?: boolean;
   isDQGlossary?: boolean;
+  parentBusinessVersion?: string;
 }
 
 const GlossaryTermModal: FC<Props> = ({
@@ -45,6 +46,7 @@ const GlossaryTermModal: FC<Props> = ({
   onCancel,
   isCDEGlossary = false,
   isDQGlossary = false,
+  parentBusinessVersion,
 }) => {
   const { t } = useTranslation();
   const [form] = useForm();
@@ -64,7 +66,7 @@ const GlossaryTermModal: FC<Props> = ({
             {editMode
               ? t('label.edit-entity', { entity: t('dq.rule', 'Quy tắc CLDL') })
               : t('label.add-entity', {
-                  entity: t('dq.rule', 'Quy tắc CLDL'),
+                  entity: t('label.term'),
                 })}
           </div>
           <div className="cde-glossary-modal-subtitle">
@@ -189,9 +191,9 @@ const GlossaryTermModal: FC<Props> = ({
       cancelText={t('label.cancel')}
       className={`edit-glossary-modal ${
         isCustomModal ? 'cde-glossary-term-modal' : ''
-      } ${
-        isCustomModal && !editMode ? 'cde-glossary-term-modal--add' : ''
-      } ${isCDEGlossary ? 'cde-glossary-term-modal--cde' : ''}`}
+      } ${isCustomModal && !editMode ? 'cde-glossary-term-modal--add' : ''} ${
+        isCDEGlossary ? 'cde-glossary-term-modal--cde' : ''
+      }`}
       closable={isCustomModal}
       data-testid="edit-glossary-modal"
       footer={[
@@ -210,9 +212,7 @@ const GlossaryTermModal: FC<Props> = ({
           onPress={form.submit}>
           {isCustomModal && !editMode
             ? t('label.create-entity', {
-                entity: isDQGlossary
-                  ? t('dq.rule', 'Quy tắc')
-                  : t('label.term'),
+                entity: t('label.term'),
               })
             : t('label.save')}
         </Button>,
@@ -223,7 +223,7 @@ const GlossaryTermModal: FC<Props> = ({
       title={dialogTitle}
       width={
         isDQGlossary && !editMode
-          ? 1240
+          ? 1080
           : isCDEGlossary
           ? 1080
           : isCustomModal
@@ -279,6 +279,7 @@ const GlossaryTermModal: FC<Props> = ({
             editMode={editMode}
             formRef={form}
             glossaryTerm={glossaryTerm}
+            parentBusinessVersion={parentBusinessVersion}
             onCancel={onCancel}
             onSave={handleSave}
           />

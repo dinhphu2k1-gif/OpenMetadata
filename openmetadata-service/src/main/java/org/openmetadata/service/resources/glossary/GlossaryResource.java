@@ -70,6 +70,8 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.DataQualityBootstrap;
+import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -109,6 +111,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   public void initialize(OpenMetadataApplicationConfig config) throws IOException {
     super.initialize(config);
     DataDictionaryBootstrap.initialize();
+    DataQualityBootstrap.initialize();
     versioningService.processPendingOutbox();
   }
 
@@ -168,7 +171,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, FIELDS, Include.NON_DELETED, null);
     GlossaryAuthorizationResolver.requireCreateVersion(capabilities(securityContext, glossary));
-    DataDictionaryResolver.requireDataDictionary(glossary);
+    GovernedGlossaryProfileRegistry.require(glossary);
     WorkingVersionRecord working =
         versioningService.createWorking(
             GlossaryVersioningService.GLOSSARY,
@@ -337,7 +340,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id) {
-    DataDictionaryResolver.requireDataDictionary(
+    GovernedGlossaryProfileRegistry.require(
         getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
     return versioningService.listPublished(GlossaryVersioningService.GLOSSARY, id).stream()
         .map(GlossaryVersionResponses::published)
@@ -355,8 +358,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
     Glossary glossary =
-        DataDictionaryResolver.requireDataDictionary(
-            getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
+        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord snapshot =
         versioningService.getPublished(
             GlossaryVersioningService.GLOSSARY, id, businessVersion);
@@ -384,8 +387,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
     Glossary glossary =
-        DataDictionaryResolver.requireDataDictionary(
-            getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
+        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord glossarySnapshot =
         versioningService.getPublished(
             GlossaryVersioningService.GLOSSARY, id, businessVersion);
@@ -446,7 +449,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
 
   private GlossaryAuthorizationResolver.Capabilities capabilities(
       SecurityContext securityContext, Glossary glossary) {
-    DataDictionaryResolver.requireDataDictionary(glossary);
+    GovernedGlossaryProfileRegistry.require(glossary);
     try {
       return withoutCreateVersion(
           capabilitiesForWorking(
@@ -583,7 +586,11 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           Include include) {
     ListFilter filter =
         new ListFilter(include)
-            .addQueryParam("exactName", DataDictionaryResolver.DATA_DICTIONARY_NAME);
+            .addQueryParam(
+                "exactNames",
+                GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY.glossaryName()
+                    + ","
+                    + GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY.glossaryName());
     ResultList<Glossary> result =
         super.listInternal(
             uriInfo, securityContext, fieldsParam, filter, limitParam, before, after);
@@ -680,7 +687,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           String includeRelations) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, fieldsParam, include, includeRelations);
-    DataDictionaryResolver.requireDataDictionary(glossary);
+    GovernedGlossaryProfileRegistry.require(glossary);
     if (isConsumer(securityContext, glossary)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY, id);
@@ -712,7 +719,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id) {
-    DataDictionaryResolver.requireDataDictionary(
+    GovernedGlossaryProfileRegistry.require(
         getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null));
     PublishedSnapshotRecord snapshot =
         versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY, id);
@@ -772,9 +779,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
           @QueryParam("include")
           @DefaultValue("non-deleted")
           Include include) {
-    Glossary glossary =
-        DataDictionaryResolver.requireDataDictionary(
-            getByNameInternal(uriInfo, securityContext, name, fieldsParam, include));
+    Glossary glossary = getByNameInternal(uriInfo, securityContext, name, fieldsParam, include);
+    GovernedGlossaryProfileRegistry.require(glossary);
     if (isConsumer(securityContext, glossary)) {
       PublishedSnapshotRecord snapshot =
           versioningService.getLatestPublished(

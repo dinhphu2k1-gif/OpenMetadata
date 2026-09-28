@@ -25,6 +25,10 @@ import {
 } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import {
+  getCDEReleaseVersionType,
+  getCDEReleaseVersionTypeClassName,
+} from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { getCdeDetailPath } from '../../../utils/routing/cdeRoutingHelper';
@@ -36,6 +40,7 @@ export type CDEExtension = {
   effectiveDate?: string;
   expirationDate?: string;
   releaseLevel?: string | string[];
+  releaseVersionType?: string;
   entityRelationship?: string;
   relatedRegulatoryDocuments?: string;
   dataQualityRules?: boolean | string | string[];
@@ -132,6 +137,22 @@ export const renderCDEReleaseLevel = (
   }
 
   return NO_DATA_PLACEHOLDER;
+};
+
+export const renderCDEReleaseVersionType = (
+  storedValue: unknown,
+  businessVersion?: string
+) => {
+  const value = getCDEReleaseVersionType(storedValue, businessVersion);
+
+  return value ? (
+    <Tag
+      className={`cde-value-pill ${getCDEReleaseVersionTypeClassName(value)}`}>
+      {value}
+    </Tag>
+  ) : (
+    NO_DATA_PLACEHOLDER
+  );
 };
 
 export const getCDEGlossaryTableColumns = ({
@@ -324,25 +345,16 @@ export const getCDEGlossaryTableColumns = ({
         : getBusinessVersion(record.businessVersion),
   },
   {
-    title: t('label.status'),
-    dataIndex: 'entityStatus',
-    key: 'entityStatus',
-    width: 150,
-    render: (entityStatus: EntityStatus | undefined, record) => {
-      if (record.isLoadMoreButton) {
-        return null;
-      }
-      const status = entityStatus ?? EntityStatus.Approved;
-
-      return (
-        <div className="d-flex flex-column gap-1">
-          <StatusBadge label={status} status={getEntityStatusClass(status)} />
-          {status === EntityStatus.Draft && (
-            <Tag color="default">Chưa thêm vào gói phát hành</Tag>
-          )}
-        </div>
-      );
-    },
+    title: t('cde.release-version-type'),
+    key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
+    width: 190,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : renderCDEReleaseVersionType(
+            (record.extension as CDEExtension | undefined)?.releaseVersionType,
+            record.businessVersion
+          ),
   },
   {
     title: t('cde.release-level'),
@@ -365,4 +377,25 @@ export const getCDEGlossaryTableColumns = ({
     render: (_: unknown, record: ModifiedGlossaryTerm) =>
       record.isLoadMoreButton ? null : formatCDEDate(record.extension?.[key]),
   })),
+  {
+    title: t('label.status'),
+    dataIndex: 'entityStatus',
+    key: 'entityStatus',
+    width: 150,
+    render: (entityStatus: EntityStatus | undefined, record) => {
+      if (record.isLoadMoreButton) {
+        return null;
+      }
+      const status = entityStatus ?? EntityStatus.Approved;
+
+      return (
+        <div className="d-flex flex-column gap-1">
+          <StatusBadge label={status} status={getEntityStatusClass(status)} />
+          {status === EntityStatus.Draft && (
+            <Tag color="default">Chưa thêm vào gói phát hành</Tag>
+          )}
+        </div>
+      );
+    },
+  },
 ];

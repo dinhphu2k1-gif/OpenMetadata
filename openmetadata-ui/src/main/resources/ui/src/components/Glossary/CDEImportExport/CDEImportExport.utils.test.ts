@@ -122,7 +122,7 @@ describe('CDEImportExport.utils', () => {
 
       expect(URL.createObjectURL).toHaveBeenCalled();
       expect(mockClick).toHaveBeenCalled();
-      expect(CDE_EXPORT_HEADERS).toHaveLength(15);
+      expect(CDE_EXPORT_HEADERS).toHaveLength(16);
       expect(CDE_EXPORT_HEADERS).not.toContain('Trạng thái');
 
       const blob = (URL.createObjectURL as jest.Mock).mock.calls[0][0];
@@ -132,14 +132,15 @@ describe('CDEImportExport.utils', () => {
         reader.onerror = () => reject(reader.error);
         reader.readAsArrayBuffer(blob);
       });
-      const parsed = await readAndValidateCDEExcel({
-        arrayBuffer: async () => bytes,
-      } as File);
+      const workbook = XLSX.read(bytes, { type: 'array' });
+      const exportedRows = XLSX.utils.sheet_to_json<string[]>(
+        workbook.Sheets[workbook.SheetNames[0]],
+        { header: 1 }
+      );
 
-      expect(parsed.rows[0]).toMatchObject({
-        effectiveDate: '2026-09-18',
-        expirationDate: '2026-12-31',
-      });
+      expect(exportedRows[1][12]).toBe('Bản chính');
+      expect(exportedRows[1][14]).toBe('18/09/2026');
+      expect(exportedRows[1][15]).toBe('31/12/2026');
     });
 
     it('should download template file Agribank_CDE_Mau_Nhap_Lieu.xlsx', () => {
@@ -390,6 +391,19 @@ describe('CDEImportExport.utils', () => {
 
       expect(invalidRes.isValid).toBe(false);
       expect(invalidRes.invalidSources).toEqual(['UnknownSource_123']);
+    });
+
+    it('validateDataSourceValues should accept newline-separated sources', () => {
+      const result = validateDataSourceValues(
+        'Thẻ\nPhân loại khách hàng - MIS'
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.invalidSources).toEqual([]);
+      expect(result.resolvedFQNs).toEqual([
+        'DataSource.Card',
+        'DataSource.CustomerClassification_MIS',
+      ]);
     });
 
     it('validateDataClassificationValue should validate 4 standard levels', () => {
@@ -719,8 +733,10 @@ describe('CDE validity dates in Excel', () => {
       effectiveDate: '2026-09-18',
       expirationDate: '2026-12-31',
     });
-    expect(CDE_EXPORT_HEADERS.slice(11, 14)).toEqual([
+    expect(CDE_EXPORT_HEADERS.slice(11, 16)).toEqual([
       'Phiên bản',
+      'Loại phiên bản phát hành',
+      'Cấp phát hành',
       'Ngày hiệu lực',
       'Ngày hết hiệu lực',
     ]);

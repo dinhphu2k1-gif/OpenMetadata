@@ -24,7 +24,11 @@ public final class DataDictionaryResolver {
   private DataDictionaryResolver() {}
 
   public static boolean isDataDictionary(Glossary glossary) {
-    return glossary != null && DATA_DICTIONARY_NAME.equals(glossary.getName());
+    return GovernedGlossaryProfileRegistry.find(glossary)
+        .filter(
+            profile ->
+                profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY)
+        .isPresent();
   }
 
   public static Glossary requireDataDictionary(Glossary glossary) {
@@ -106,6 +110,10 @@ public final class DataDictionaryResolver {
         "synonyms", create.getSynonyms() != null && !create.getSynonyms().isEmpty());
     rejectUnsupportedCreateField(
         "relatedTerms", create.getRelatedTerms() != null && !create.getRelatedTerms().isEmpty());
+    rejectUnsupportedCreateField(
+        "versionedRelatedTerms",
+        create.getVersionedRelatedTerms() != null
+            && !create.getVersionedRelatedTerms().isEmpty());
     rejectUnsupportedCreateField(
         "references", create.getReferences() != null && !create.getReferences().isEmpty());
     rejectUnsupportedCreateField(

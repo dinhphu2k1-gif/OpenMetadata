@@ -13,6 +13,7 @@
 
 import { PLACEHOLDER_ROUTE_FQN, ROUTES } from '../../constants/constants';
 import { getEncodedFqn } from '../StringUtils';
+import Fqn from '../Fqn';
 
 export const CDE_DETAIL_ROUTE_PATTERN = ROUTES.GLOSSARY_DETAILS;
 export const CDE_DETAIL_RELATIVE_ROUTE_PATTERN =
@@ -73,8 +74,8 @@ export const normalizeCdeParentBusinessVersion = (
   return legacyDictionaryVersion?.[1] ?? normalized;
 };
 
-/** Return the technical FQN of a CDE identity inside one Dictionary scope. */
-export const getScopedCdeFqn = (
+/** Return the technical FQN of a governed term identity inside one catalog scope. */
+export const getScopedGovernedTermFqn = (
   fqn: string,
   parentBusinessVersion: string
 ): string => {
@@ -82,11 +83,28 @@ export const getScopedCdeFqn = (
     parentBusinessVersion
   );
   if (!normalizedParentVersion) {
-    throw new Error('parentBusinessVersion is required for a scoped CDE FQN');
+    throw new Error(
+      'parentBusinessVersion is required for a scoped governed term FQN'
+    );
   }
 
-  return `${fqn.trim().replace(/@v[1-9]\d*$/, '')}@v${normalizedParentVersion}`;
+  // Fqn.split intentionally preserves the quote syntax (for example
+  // `"DQ1.1"`). Passing those tokens back to Fqn.build would quote the quote
+  // characters again on every redirect. Decode each component first so this
+  // operation is idempotent.
+  const parts = Fqn.split(fqn.trim()).map((part) => Fqn.unquoteName(part));
+  const termName = parts.pop();
+  if (!termName) {
+    throw new Error('Term FQN is required');
+  }
+
+  return Fqn.build(
+    ...parts,
+    `${termName.replace(/@v[1-9]\d*$/, '')}@v${normalizedParentVersion}`
+  );
 };
+
+export const getScopedCdeFqn = getScopedGovernedTermFqn;
 
 const getFqnFromPathname = (pathname?: string) => {
   if (!pathname) {
@@ -134,6 +152,42 @@ export const getCdeDetailPath = ({
     throw new Error('parentBusinessVersion is required for a CDE route');
   }
 
+  const pathname = CDE_DETAIL_ROUTE_PATTERN.replace(
+    PLACEHOLDER_ROUTE_FQN,
+    getEncodedFqn(normalizedFqn)
+  );
+  const search = new URLSearchParams();
+  search.set(CDE_ROUTE_QUERY.businessVersion, normalizedBusinessVersion);
+  search.set(CDE_ROUTE_QUERY.parentBusinessVersion, normalizedParentVersion);
+  const normalizedTermId = nonEmpty(termId);
+  if (normalizedTermId) {
+    search.set(CDE_ROUTE_QUERY.termId, normalizedTermId);
+  }
+  if (isWorkingDraft) {
+    search.set(CDE_ROUTE_QUERY.view, CDE_WORKING_VIEW);
+  }
+
+  return `${pathname}?${search.toString()}`;
+};
+
+/** Build the canonical detail route shared by governed glossary terms. */
+export const getGovernedTermDetailPath = ({
+  fqn,
+  businessVersion,
+  parentBusinessVersion,
+  termId,
+  isWorkingDraft = false,
+}: CdeRouteParams): string => {
+  const normalizedFqn = nonEmpty(fqn);
+  const normalizedBusinessVersion = nonEmpty(businessVersion);
+  const normalizedParentVersion = normalizeCdeParentBusinessVersion(
+    parentBusinessVersion
+  );
+  if (!normalizedFqn || !normalizedBusinessVersion || !normalizedParentVersion) {
+    throw new Error(
+      'fqn, businessVersion and parentBusinessVersion are required for a governed term route'
+    );
+  }
   const pathname = CDE_DETAIL_ROUTE_PATTERN.replace(
     PLACEHOLDER_ROUTE_FQN,
     getEncodedFqn(normalizedFqn)

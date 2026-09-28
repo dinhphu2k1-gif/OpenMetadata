@@ -50,17 +50,68 @@ describe('CDE version and date columns', () => {
       );
   });
 
-  it('appends version, status, dates, and release level in order', () => {
-    expect(columns.slice(-5).map((column) => column.key)).toEqual([
+  it('appends version metadata and keeps status last', () => {
+    expect(columns.slice(-6).map((column) => column.key)).toEqual([
       'version',
-      'entityStatus',
+      'releaseVersionType',
       'releaseLevel',
       'effectiveDate',
       'expirationDate',
+      'entityStatus',
     ]);
-    expect(columns.slice(-5).map((column) => column.width)).toEqual([
-      120, 150, 170, 160, 160,
+    expect(columns.slice(-6).map((column) => column.width)).toEqual([
+      120, 190, 170, 160, 160, 150,
     ]);
+  });
+
+  it('uses the stored release type and derives it only for legacy rows', () => {
+    const column = columns.find(
+      (candidate) => candidate.key === 'releaseVersionType'
+    );
+
+    expect(
+      (
+        column?.render?.(
+          undefined,
+          {
+            businessVersion: '2.0',
+            extension: { releaseVersionType: 'Bản chính' },
+          } as ModifiedGlossaryTerm,
+          0
+        ) as React.ReactElement
+      ).props.children
+    ).toBe('Bản chính');
+    expect(
+      (
+        column?.render?.(
+          undefined,
+          { businessVersion: '2.1', extension: {} } as ModifiedGlossaryTerm,
+          0
+        ) as React.ReactElement
+      ).props.children
+    ).toBe('Bản phụ');
+  });
+
+  it('uses distinct colors for main and secondary release versions', () => {
+    const column = columns.find(
+      (candidate) => candidate.key === 'releaseVersionType'
+    );
+    const main = column?.render?.(
+      undefined,
+      {
+        businessVersion: '2.0',
+        extension: { releaseVersionType: 'Bản chính' },
+      } as ModifiedGlossaryTerm,
+      0
+    ) as React.ReactElement;
+    const secondary = column?.render?.(
+      undefined,
+      { businessVersion: '2.1', extension: {} } as ModifiedGlossaryTerm,
+      0
+    ) as React.ReactElement;
+
+    expect(main.props.className).toContain('release-version-main');
+    expect(secondary.props.className).toContain('release-version-secondary');
   });
 
   it('uses only the canonical business version field', () => {
@@ -115,7 +166,13 @@ describe('CDE version and date columns', () => {
     expect(renderCell('releaseLevel')).toBe('--');
   });
 
-  it.each(['version', 'effectiveDate', 'expirationDate', 'releaseLevel'])(
+  it.each([
+    'version',
+    'releaseVersionType',
+    'effectiveDate',
+    'expirationDate',
+    'releaseLevel',
+  ])(
     'leaves load-more row empty in %s',
     (key) => {
       expect(renderCell(key, {}, true)).toBeNull();

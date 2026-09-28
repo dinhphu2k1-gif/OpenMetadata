@@ -20,7 +20,9 @@ import GlossaryTermModal from './GlossaryTermModal.component';
 
 jest.mock('@openmetadata/ui-core-components', () => ({
   Button: ({ children, isLoading, onPress, ...props }: any) => (
-    <button disabled={isLoading} {...props} onClick={onPress}>{children}</button>
+    <button disabled={isLoading} {...props} onClick={onPress}>
+      {children}
+    </button>
   ),
 }));
 
@@ -78,9 +80,7 @@ describe('GlossaryTermModal', () => {
   it('uses the redesigned copy and dimensions for CDE add mode', async () => {
     render(<GlossaryTermModal {...defaultProps} />);
 
-    expect(
-      screen.getByText('label.add-entity:label.term')
-    ).toBeInTheDocument();
+    expect(screen.getByText('label.add-entity:label.term')).toBeInTheDocument();
     expect(screen.getByText('cde.data-dictionary')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -134,27 +134,23 @@ describe('GlossaryTermModal', () => {
     expect(modal).toHaveStyle({ width: '800px' });
   });
 
-  it('renders DQGlossaryTermForm with wide layout when isDQGlossary is true', async () => {
+  it('renders DQGlossaryTermForm with the CDE reference width', async () => {
     render(
-      <GlossaryTermModal
-        {...defaultProps}
-        isCDEGlossary={false}
-        isDQGlossary
-      />
+      <GlossaryTermModal {...defaultProps} isCDEGlossary={false} isDQGlossary />
     );
 
     expect(await screen.findByTestId('dq-term-form')).toBeInTheDocument();
     expect(screen.getByText('dq.data-quality')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
-        name: 'label.create-entity:dq.rule',
+        name: 'label.create-entity:label.term',
       })
     ).toBeInTheDocument();
 
     const modal = document.querySelector('.ant-modal');
 
     expect(modal).toHaveClass('cde-glossary-term-modal--add');
-    expect(modal).toHaveStyle({ width: '1240px' });
+    expect(modal).toHaveStyle({ width: '1080px' });
   });
 
   it('keeps the modal open and blocks a second submit while Create is pending', async () => {

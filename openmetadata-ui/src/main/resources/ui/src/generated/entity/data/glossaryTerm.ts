@@ -440,6 +440,19 @@ export interface TermRelation {
      * Reference to the related glossary term.
      */
     term: EntityReference;
+    /**
+     * Optional immutable business snapshot selected for the related term.
+     */
+    versionContext?: EntityVersionContext;
+}
+
+/**
+ * Pins an entity reference to an immutable governed business snapshot.
+ */
+export interface EntityVersionContext {
+    businessVersion: string;
+    parentBusinessVersion: string;
+    snapshotId: string;
 }
 
 /**

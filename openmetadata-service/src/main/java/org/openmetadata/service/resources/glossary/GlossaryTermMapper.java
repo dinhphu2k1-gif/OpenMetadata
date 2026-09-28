@@ -25,7 +25,10 @@ public class GlossaryTermMapper implements EntityMapper<GlossaryTerm, CreateGlos
         .withGlossary(getEntityReferenceByName(Entity.GLOSSARY, create.getGlossary()))
         .withParent(getEntityReference(Entity.GLOSSARY_TERM, create.getParent()))
         .withRelatedTerms(
-            toTermRelations(getEntityReferences(Entity.GLOSSARY_TERM, create.getRelatedTerms())))
+            create.getVersionedRelatedTerms() != null
+                ? create.getVersionedRelatedTerms()
+                : toTermRelations(
+                    getEntityReferences(Entity.GLOSSARY_TERM, create.getRelatedTerms())))
         .withReferences(create.getReferences())
         .withProvider(create.getProvider())
         .withMutuallyExclusive(create.getMutuallyExclusive());

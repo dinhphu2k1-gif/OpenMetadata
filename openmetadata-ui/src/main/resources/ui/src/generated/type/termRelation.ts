@@ -24,6 +24,22 @@ export interface TermRelation {
      * Reference to the related glossary term.
      */
     term: EntityReference;
+    /**
+     * Optional immutable business snapshot selected for the related term.
+     */
+    versionContext?: EntityVersionContext;
+}
+
+/**
+ * Pins an entity reference to an immutable governed business snapshot.
+ */
+export interface EntityVersionContext {
+    /** Business version of the referenced entity snapshot. */
+    businessVersion: string;
+    /** Business version of the parent governed glossary scope. */
+    parentBusinessVersion: string;
+    /** Identifier of the immutable referenced snapshot. */
+    snapshotId: string;
 }
 
 /**

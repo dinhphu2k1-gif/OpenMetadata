@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 
+import { EditOutlined } from '@ant-design/icons';
 import { Col, Form, Input, Modal, Row, Select } from 'antd';
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,202 +130,273 @@ export const TechnicalDictionaryEditModal: React.FC<
   return (
     <Modal
       bodyStyle={{ overflowY: 'auto' }}
+      cancelButtonProps={{ className: 'technical-edit-modal-cancel' }}
       cancelText={t('label.cancel', { defaultValue: 'Hủy' })}
       className="technical-dictionary-edit-modal"
       confirmLoading={isSubmitting}
       data-testid="technical-dictionary-edit-modal"
       okButtonProps={{
+        className: 'technical-edit-modal-save',
         type: 'primary',
-        style: { backgroundColor: '#AE1C3F', borderColor: '#AE1C3F' },
       }}
       okText={t('label.save', { defaultValue: 'Lưu' })}
       open={visible}
       title={
-        <div>
-          <span className="font-semibold">
-            {t('label.edit-technical-field', {
-              defaultValue: 'Chỉnh sửa trường kỹ thuật',
-            })}
+        <div className="technical-edit-modal-title">
+          <span aria-hidden="true" className="technical-edit-modal-title-icon">
+            <EditOutlined />
           </span>
-          {fieldItem && (
-            <div className="text-grey-muted text-xs mt-1">
-              {fieldItem.tableName} &gt; {fieldItem.columnName}
-            </div>
-          )}
+          <div className="technical-edit-modal-title-content">
+            <span className="technical-edit-modal-title-text">
+              {t('label.edit-technical-field', {
+                defaultValue: 'Chỉnh sửa trường kỹ thuật',
+              })}
+            </span>
+            {fieldItem && (
+              <div
+                className="technical-edit-modal-path"
+                title={fieldItem.columnFqn}>
+                {[
+                  fieldItem.databaseDisplayName || fieldItem.databaseName,
+                  fieldItem.schemaDisplayName || fieldItem.schemaName,
+                  fieldItem.tableDisplayName || fieldItem.tableName,
+                  fieldItem.columnDisplayName || fieldItem.columnName,
+                ]
+                  .filter(Boolean)
+                  .join(' / ')}
+              </div>
+            )}
+          </div>
         </div>
       }
-      width={680}
+      width={720}
       onCancel={onCancel}
       onOk={handleSubmit}>
-      <Form form={form} layout="vertical">
-        <Row gutter={[16, 0]}>
-          <Col span={12}>
-            <Form.Item
-              label={t('label.table-name', { defaultValue: 'Tên Bảng' })}
-              name="tableName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              label={t('label.column-name', { defaultValue: 'Tên cột' })}
-              name="columnName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
+      <Form
+        className="technical-dictionary-edit-form"
+        form={form}
+        layout="vertical">
+        <section className="technical-edit-form-section technical-edit-form-section-readonly">
+          <header className="technical-edit-form-section-header">
+            <span
+              aria-hidden="true"
+              className="technical-edit-form-section-marker"
+            />
+            <div>
+              <h3 className="technical-edit-form-section-title">
+                {t('label.technical-field-information', {
+                  defaultValue: 'Thông tin trường kỹ thuật',
+                })}
+              </h3>
+              <p className="technical-edit-form-section-description">
+                {t('message.technical-field-information-description', {
+                  defaultValue:
+                    'Thông tin định danh được đồng bộ từ hệ thống nguồn.',
+                })}
+              </p>
+            </div>
+          </header>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.cde-code-ref', {
-                defaultValue: 'Mã CDE quy chiếu',
-              })}
-              name="cdeCode">
-              <Select
-                allowClear
-                showSearch
-                className="w-full"
-                filterOption={(input, option) =>
-                  (option?.children as unknown as string)
-                    ?.toLowerCase()
-                    ?.includes(input.toLowerCase())
-                }
-                placeholder={t('label.select-cde', {
-                  defaultValue: 'Chọn mã CDE quy chiếu',
-                })}>
-                {cdeOptions.map((opt) => (
-                  <Option key={opt.value} value={opt.value}>
-                    {opt.label}
+          <Row gutter={[16, 0]}>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.table-name', { defaultValue: 'Tên Bảng' })}
+                name="tableName">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.column-name', { defaultValue: 'Tên cột' })}
+                name="columnName">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+        </section>
+
+        <section className="technical-edit-form-section">
+          <header className="technical-edit-form-section-header">
+            <span
+              aria-hidden="true"
+              className="technical-edit-form-section-marker"
+            />
+            <div>
+              <h3 className="technical-edit-form-section-title">
+                {t('label.technical-specification-and-reference', {
+                  defaultValue: 'Thông tin đặc tả và quy chiếu',
+                })}
+              </h3>
+              <p className="technical-edit-form-section-description">
+                {t(
+                  'message.technical-specification-and-reference-description',
+                  {
+                    defaultValue:
+                      'Cập nhật các thuộc tính kỹ thuật và CDE quy chiếu của trường.',
+                  }
+                )}
+              </p>
+            </div>
+          </header>
+
+          <Row gutter={[16, 0]}>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.cde-code-ref', {
+                  defaultValue: 'Mã CDE quy chiếu',
+                })}
+                name="cdeCode">
+                <Select
+                  allowClear
+                  showSearch
+                  className="w-full"
+                  filterOption={(input, option) =>
+                    (option?.children as unknown as string)
+                      ?.toLowerCase()
+                      ?.includes(input.toLowerCase())
+                  }
+                  placeholder={t('label.select-cde', {
+                    defaultValue: 'Chọn mã CDE quy chiếu',
+                  })}>
+                  {cdeOptions.map((opt) => (
+                    <Option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.survivorship-rank', {
+                  defaultValue: 'Thứ hạng sinh tồn',
+                })}
+                name="survivorshipRank">
+                <Select
+                  allowClear
+                  showSearch
+                  className="w-full"
+                  placeholder={t('label.unranked', {
+                    defaultValue: 'Chưa gán thứ hạng',
+                  })}>
+                  <Option value={1}>
+                    🥇{' '}
+                    {t('label.rank-n', {
+                      defaultValue: 'Hạng {{rank}}',
+                      rank: 1,
+                    })}
                   </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
+                  <Option value={2}>
+                    🥈 {t('label.rank-2', { defaultValue: 'Hạng 2' })}
+                  </Option>
+                  <Option value={3}>
+                    🥉 {t('label.rank-3', { defaultValue: 'Hạng 3' })}
+                  </Option>
+                  <Option value={4}>
+                    🏷️ {t('label.rank-4', { defaultValue: 'Hạng 4' })}
+                  </Option>
+                  <Option value={5}>
+                    🏷️ {t('label.rank-5', { defaultValue: 'Hạng 5' })}
+                  </Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.survivorship-rank', {
-                defaultValue: 'Thứ hạng sinh tồn',
-              })}
-              name="survivorshipRank">
-              <Select
-                allowClear
-                showSearch
-                className="w-full"
-                placeholder={t('label.unranked', {
-                  defaultValue: 'Chưa gán thứ hạng',
-                })}>
-                <Option value={1}>
-                  🥇 {t('label.rank-n', { defaultValue: 'Hạng {{rank}}', rank: 1 })}
-                </Option>
-                <Option value={2}>
-                  🥈 {t('label.rank-2', { defaultValue: 'Hạng 2' })}
-                </Option>
-                <Option value={3}>
-                  🥉 {t('label.rank-3', { defaultValue: 'Hạng 3' })}
-                </Option>
-                <Option value={4}>
-                  🏷️ {t('label.rank-4', { defaultValue: 'Hạng 4' })}
-                </Option>
-                <Option value={5}>
-                  🏷️ {t('label.rank-5', { defaultValue: 'Hạng 5' })}
-                </Option>
-              </Select>
-            </Form.Item>
-          </Col>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.data-element-type', {
+                  defaultValue: 'Loại thành tố',
+                })}
+                name="elementType"
+                rules={[{ required: true }]}>
+                <Select className="w-full">
+                  <Option value="AtomicDataElement">
+                    {t('label.atomic-data-element', {
+                      defaultValue: 'Dữ liệu nguyên tố',
+                    })}
+                  </Option>
+                  <Option value="TransformedDataElement">
+                    {t('label.transformed-data-element', {
+                      defaultValue: 'Dữ liệu chuyển đổi',
+                    })}
+                  </Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.data-element-type', {
-                defaultValue: 'Loại thành tố',
-              })}
-              name="elementType"
-              rules={[{ required: true }]}>
-              <Select className="w-full">
-                <Option value="AtomicDataElement">
-                  {t('label.atomic-data-element', {
-                    defaultValue: 'Dữ liệu nguyên tố',
-                  })}
-                </Option>
-                <Option value="TransformedDataElement">
-                  {t('label.transformed-data-element', {
-                    defaultValue: 'Dữ liệu chuyển đổi',
-                  })}
-                </Option>
-              </Select>
-            </Form.Item>
-          </Col>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.field-generation-type', {
+                  defaultValue: 'Loại trường dữ liệu',
+                })}
+                name="generationType"
+                rules={[{ required: true }]}>
+                <Select className="w-full">
+                  <Option value="ManualInput">
+                    {t('label.manual-input', {
+                      defaultValue: 'Nhập thủ công',
+                    })}
+                  </Option>
+                  <Option value="SystemGenerated">
+                    {t('label.system-generated', {
+                      defaultValue: 'Hệ thống tự sinh',
+                    })}
+                  </Option>
+                  <Option value="SystemDerived">
+                    {t('label.system-derived', {
+                      defaultValue: 'Hệ thống tính toán',
+                    })}
+                  </Option>
+                  <Option value="FileUpload">
+                    {t('label.file-upload', {
+                      defaultValue: 'Tải lên',
+                    })}
+                  </Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.field-generation-type', {
-                defaultValue: 'Loại trường dữ liệu',
-              })}
-              name="generationType"
-              rules={[{ required: true }]}>
-              <Select className="w-full">
-                <Option value="ManualInput">
-                  {t('label.manual-input', {
-                    defaultValue: 'Nhập thủ công',
-                  })}
-                </Option>
-                <Option value="SystemGenerated">
-                  {t('label.system-generated', {
-                    defaultValue: 'Hệ thống tự sinh',
-                  })}
-                </Option>
-                <Option value="SystemDerived">
-                  {t('label.system-derived', {
-                    defaultValue: 'Hệ thống tính toán',
-                  })}
-                </Option>
-                <Option value="FileUpload">
-                  {t('label.file-upload', {
-                    defaultValue: 'Tải lên',
-                  })}
-                </Option>
-              </Select>
-            </Form.Item>
-          </Col>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.data-creation-method', {
+                  defaultValue: 'Phương thức tạo',
+                })}
+                name="creationMethod"
+                rules={[{ required: true }]}>
+                <Select className="w-full">
+                  <Option value="Parameterised">
+                    {t('label.parameterised', { defaultValue: 'Tham số' })}
+                  </Option>
+                  <Option value="Hardcoded">
+                    {t('label.hardcoded', { defaultValue: 'Mã cứng' })}
+                  </Option>
+                  <Option value="NotApplicable">
+                    {t('label.not-applicable', { defaultValue: 'N/A' })}
+                  </Option>
+                </Select>
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.data-creation-method', {
-                defaultValue: 'Phương thức tạo',
-              })}
-              name="creationMethod"
-              rules={[{ required: true }]}>
-              <Select className="w-full">
-                <Option value="Parameterised">
-                  {t('label.parameterised', { defaultValue: 'Tham số' })}
-                </Option>
-                <Option value="Hardcoded">
-                  {t('label.hardcoded', { defaultValue: 'Mã cứng' })}
-                </Option>
-                <Option value="NotApplicable">
-                  {t('label.not-applicable', { defaultValue: 'N/A' })}
-                </Option>
-              </Select>
-            </Form.Item>
-          </Col>
+            <Col md={12} xs={24}>
+              <Form.Item
+                label={t('label.timeliness', { defaultValue: 'Thời gian' })}
+                name="timeliness">
+                <Input placeholder="T, T+1, T+2..." />
+              </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item
-              label={t('label.timeliness', { defaultValue: 'Thời gian' })}
-              name="timeliness">
-              <Input placeholder="T, T+1, T+2..." />
-            </Form.Item>
-          </Col>
-
-          <Col span={24}>
-            <Form.Item
-              label={t('label.system-owner', {
-                defaultValue: 'Chủ sở hữu hệ thống',
-              })}
-              name="systemOwner">
-              <Input placeholder="VD: Trung tâm Quản lý dữ liệu..." />
-            </Form.Item>
-          </Col>
-        </Row>
+            <Col xs={24}>
+              <Form.Item
+                label={t('label.system-owner', {
+                  defaultValue: 'Chủ sở hữu hệ thống',
+                })}
+                name="systemOwner">
+                <Input placeholder="VD: Trung tâm Quản lý dữ liệu..." />
+              </Form.Item>
+            </Col>
+          </Row>
+        </section>
       </Form>
     </Modal>
   );

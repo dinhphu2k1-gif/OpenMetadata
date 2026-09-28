@@ -12,7 +12,8 @@
  *  limitations under the License.
  */
 
-import { Col, Row } from 'antd';
+import classNames from 'classnames';
+import { useTranslation } from 'react-i18next';
 import { GlossaryTermDetailPageWidgetKeys } from '../../../enums/CustomizeDetailPage.enum';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { WidgetConfig } from '../../../pages/CustomizablePage/CustomizablePage.interface';
@@ -23,44 +24,36 @@ interface DQGlossaryTermOverviewProps {
   glossaryTerm: GlossaryTerm;
 }
 
-const DQ_RIGHT_PANEL_WIDGETS = [
-  GlossaryTermDetailPageWidgetKeys.REVIEWER,
-] as const;
-
 const DQ_BUSINESS_MEANING_WIDGET = {
   i: GlossaryTermDetailPageWidgetKeys.DESCRIPTION,
 } as WidgetConfig;
 
 const DQGlossaryTermOverview = ({
   glossaryTerm,
-}: DQGlossaryTermOverviewProps) => (
-  <section
-    className="dq-glossary-term-overview"
-    data-testid="dq-glossary-term-overview">
-    <Row gutter={[16, 16]}>
-      <Col lg={14} md={14} sm={24} xs={24}>
-        <div className="dq-glossary-term-overview-panel dq-glossary-term-description">
-          {getGlossaryTermWidgetFromKey(DQ_BUSINESS_MEANING_WIDGET)}
-        </div>
-      </Col>
-      <Col lg={10} md={10} sm={24} xs={24}>
-        <aside
-          className="dq-glossary-term-overview-panel dq-glossary-term-overview-reviewers"
-          data-testid="dq-overview-reviewers">
-          {DQ_RIGHT_PANEL_WIDGETS.map((widgetKey) => (
-            <div data-testid={`dq-overview-${widgetKey}`} key={widgetKey}>
-              {getGlossaryTermWidgetFromKey({
-                i: widgetKey,
-              } as WidgetConfig)}
-            </div>
-          ))}
-        </aside>
-      </Col>
-    </Row>
-    <div className="dq-glossary-term-overview-summary">
-      <DQGlossaryTermSummary glossaryTerm={glossaryTerm} />
-    </div>
-  </section>
-);
+}: DQGlossaryTermOverviewProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <section
+      className="cde-glossary-term-overview dq-glossary-term-overview"
+      data-testid="dq-glossary-term-overview">
+      <div
+        className={classNames(
+          'cde-glossary-term-description dq-glossary-term-description',
+          {
+            'cde-glossary-term-description-empty': !glossaryTerm.description,
+          }
+        )}>
+        {getGlossaryTermWidgetFromKey(
+          DQ_BUSINESS_MEANING_WIDGET,
+          t('dq.business-rule')
+        )}
+      </div>
+      <div className="cde-glossary-term-overview-summary dq-glossary-term-overview-summary">
+        <DQGlossaryTermSummary glossaryTerm={glossaryTerm} />
+      </div>
+    </section>
+  );
+};
 
 export default DQGlossaryTermOverview;

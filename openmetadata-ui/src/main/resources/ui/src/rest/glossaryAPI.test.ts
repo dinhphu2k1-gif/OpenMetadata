@@ -96,7 +96,7 @@ describe('F03 CDE draft API', () => {
       reviewers: [],
       domains: [],
       tags: [],
-      extension: undefined,
+      extension: { releaseVersionType: 'Bản phụ' },
     } as never);
 
     expect(client.patch).toHaveBeenCalledWith(

@@ -23,10 +23,18 @@ import {
 } from '../../../constants/Glossary.contant';
 import {
   EntityReference,
+  EntityStatus,
+  GlossaryTerm,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
+import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import Fqn from '../../../utils/Fqn';
+import {
+  getGovernedTermDetailPath,
+  getScopedGovernedTermFqn,
+} from '../../../utils/routing/cdeRoutingHelper';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
@@ -35,8 +43,12 @@ export type DQExtension = {
   cdeName?: string;
   ruleExplanation?: string;
   otherConstraints?: string;
-  exceptions?: string;
+  relatedRegulatoryDocuments?: string;
   qualityThreshold?: string;
+  releaseVersionType?: string;
+  releaseLevel?: string | string[];
+  effectiveDate?: string;
+  expirationDate?: string;
 };
 
 type DQGlossaryTableColumnsProps = {
@@ -50,7 +62,6 @@ export const DQ_TAG_CLASSIFICATIONS = {
   targetPopulation: 'DataQualityTargetPopulation',
   method: 'DataQualityMethod',
   frequency: 'DataQualityFrequency',
-  dataSource: 'DataSource',
 };
 
 import {
@@ -60,6 +71,10 @@ import {
   renderDictionaryClassificationTags,
   getDictionaryTagLabel,
 } from './DictionaryCellRenderers';
+import {
+  renderCDEReleaseLevel,
+  renderCDEReleaseVersionType,
+} from './CDEGlossaryTableColumns';
 
 export const getDQReferenceLabel = getDictionaryReferenceLabel;
 
@@ -107,7 +122,12 @@ export const renderDQDimensionTags = (tags: TagLabel[] = []) => {
 export const renderDQClassificationTags = (
   tags: TagLabel[] = [],
   classification: string,
-  variant: 'source' | 'population' | 'method' | 'frequency' | 'neutral' = 'neutral'
+  variant:
+    | 'source'
+    | 'population'
+    | 'method'
+    | 'frequency'
+    | 'neutral' = 'neutral'
 ) => renderDictionaryClassificationTags(tags, classification, variant);
 
 export const renderDQMarkdown = renderDictionaryMarkdown;
@@ -117,9 +137,9 @@ export const renderDQCdeCode = (
   extension?: DQExtension
 ) => {
   const cdeCode = extension?.cdeCode;
-  const relatedTerms = record.relatedTerms as Array<
-    TermRelation | EntityReference
-  > | undefined;
+  const relatedTerms = record.relatedTerms as
+    | Array<TermRelation | EntityReference>
+    | undefined;
   const relatedCdeRelation = relatedTerms?.find((rel) => {
     const term = (rel as TermRelation)?.term ?? (rel as EntityReference);
 
@@ -153,6 +173,22 @@ export const renderDQCdeCode = (
   return NO_DATA_PLACEHOLDER;
 };
 
+export const getDQCdeName = (record: ModifiedGlossaryTerm | GlossaryTerm) => {
+  const relatedTerms = record.relatedTerms as
+    | Array<TermRelation | EntityReference>
+    | undefined;
+  const relation = relatedTerms?.find((item) => {
+    const term = (item as TermRelation)?.term ?? (item as EntityReference);
+
+    return term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME);
+  });
+  const term =
+    (relation as TermRelation | undefined)?.term ??
+    (relation as EntityReference | undefined);
+
+  return getEntityName(term) || NO_DATA_PLACEHOLDER;
+};
+
 export const renderDQQualityThreshold = (threshold?: string) => {
   if (!threshold?.trim()) {
     return NO_DATA_PLACEHOLDER;
@@ -172,11 +208,11 @@ export const getDQGlossaryTableColumns = ({
 }: DQGlossaryTableColumnsProps): ColumnsType<ModifiedGlossaryTerm> => [
   {
     title: t('dq.rule-code'),
-    dataIndex: 'name',
-    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.NAME,
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RULE_CODE,
     fixed: 'left',
     width: 110,
-    render: (name: string, record) => {
+    render: (_: unknown, record) => {
+      const name = record.name;
       if (record.isLoadMoreButton) {
         const parentRecord = record.parentRecord;
         const loadedCount = parentRecord?.children?.length ?? 0;
@@ -198,18 +234,46 @@ export const getDQGlossaryTableColumns = ({
         );
       }
 
-      // Lấy mã quy tắc từ extension hoặc tên chuẩn (bỏ suffix _2, _3 nếu có)
-      const displayRuleCode = name?.split('_')[0] || name;
+      const displayRuleCode = name;
+      const glossaryFqn =
+        record.glossary?.fullyQualifiedName ?? record.glossary?.name;
+      const canonicalFqn = glossaryFqn
+        ? Fqn.build(glossaryFqn, name)
+        : record.fullyQualifiedName ?? name;
+      const businessVersion = record.businessVersion ?? '1.0';
+      const parentBusinessVersion =
+        record.parentBusinessVersion ?? String(businessVersion).split('.')[0];
+      const detailPath = getGovernedTermDetailPath({
+        fqn: getScopedGovernedTermFqn(
+          canonicalFqn,
+          parentBusinessVersion
+        ),
+        businessVersion,
+        parentBusinessVersion,
+        termId: record.id,
+        isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
+      });
 
       return (
         <Link
           className="dq-code-link font-semibold cursor-pointer"
           data-testid={`dq-code-${name}`}
-          to={getGlossaryPath(record.fullyQualifiedName ?? name)}>
+          to={detailPath}>
           {displayRuleCode}
         </Link>
       );
     },
+  },
+  {
+    title: t('dq.rule-name', 'Tên quy tắc'),
+    dataIndex: 'displayName',
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RULE_NAME,
+    fixed: 'left',
+    width: 220,
+    render: (displayName: string | undefined, record) =>
+      record.isLoadMoreButton
+        ? null
+        : displayName?.trim() || NO_DATA_PLACEHOLDER,
   },
   {
     title: t('dq.cde-code'),
@@ -229,9 +293,7 @@ export const getDQGlossaryTableColumns = ({
       if (record.isLoadMoreButton) {
         return null;
       }
-      const ext = record.extension as DQExtension | undefined;
-
-      return ext?.cdeName || NO_DATA_PLACEHOLDER;
+      return getDQCdeName(record);
     },
   },
   {
@@ -270,17 +332,6 @@ export const getDQGlossaryTableColumns = ({
         ? null
         : renderDQMarkdown(
             (record.extension as DQExtension | undefined)?.otherConstraints
-          ),
-  },
-  {
-    title: t('dq.exceptions'),
-    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.EXCEPTIONS,
-    width: 220,
-    render: (_, record) =>
-      record.isLoadMoreButton
-        ? null
-        : renderDQMarkdown(
-            (record.extension as DQExtension | undefined)?.exceptions
           ),
   },
   {
@@ -337,17 +388,57 @@ export const getDQGlossaryTableColumns = ({
           ),
   },
   {
-    title: t('dq.data-source'),
-    dataIndex: 'tags',
-    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.DATA_SOURCE,
-    width: 140,
-    render: (tags: TagLabel[] = [], record) =>
+    title: t('cde.related-regulatory-documents'),
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RELATED_REGULATORY_DOCUMENTS,
+    width: 240,
+    render: (_, record) =>
       record.isLoadMoreButton
         ? null
-        : renderDQClassificationTags(
-            tags,
-            DQ_TAG_CLASSIFICATIONS.dataSource,
-            'source'
+        : renderDQMarkdown(
+            (record.extension as DQExtension | undefined)
+              ?.relatedRegulatoryDocuments
           ),
   },
+  {
+    title: t('label.version'),
+    dataIndex: 'businessVersion',
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.BUSINESS_VERSION,
+    width: 110,
+    render: (businessVersion: string | undefined, record) =>
+      record.isLoadMoreButton ? null : businessVersion || NO_DATA_PLACEHOLDER,
+  },
+  {
+    title: t('dq.release-version-type', 'Loại phiên bản phát hành'),
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
+    width: 190,
+    render: (_, record) =>
+      record.isLoadMoreButton
+        ? null
+        : renderCDEReleaseVersionType(
+            (record.extension as DQExtension | undefined)?.releaseVersionType,
+            record.businessVersion
+          ),
+  },
+  {
+    title: t('cde.release-level'),
+    key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_LEVEL,
+    width: 170,
+    render: (_, record) =>
+      renderCDEReleaseLevel(
+        (record.extension as DQExtension | undefined)?.releaseLevel,
+        t
+      ),
+  },
+  ...(['effectiveDate', 'expirationDate'] as const).map((key) => ({
+    title: String(
+      t(key === 'effectiveDate' ? 'cde.effective-date' : 'cde.expiration-date')
+    ),
+    key:
+      key === 'effectiveDate'
+        ? DQ_GLOSSARY_TABLE_COLUMNS_KEYS.EFFECTIVE_DATE
+        : DQ_GLOSSARY_TABLE_COLUMNS_KEYS.EXPIRATION_DATE,
+    width: 160,
+    render: (_: unknown, record: ModifiedGlossaryTerm) =>
+      formatCDEDate((record.extension as DQExtension | undefined)?.[key]),
+  })),
 ];

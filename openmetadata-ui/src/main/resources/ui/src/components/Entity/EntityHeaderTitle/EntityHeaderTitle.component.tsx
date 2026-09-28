@@ -33,6 +33,7 @@ import { EntityHeaderTitleProps } from './EntityHeaderTitle.interface';
 const EntityHeaderTitle = ({
   icon,
   name,
+  nameNode,
   displayName,
   link,
   openEntityInNewPage,
@@ -43,6 +44,7 @@ const EntityHeaderTitle = ({
   isDisabled,
   className,
   showName = true,
+  showNameRow = true,
   showOnlyDisplayName = false,
   excludeEntityService,
   isFollowing,
@@ -151,9 +153,10 @@ const EntityHeaderTitle = ({
           </div>
         ) : null}
 
-        <div
-          className="d-flex gap-3 items-center"
-          data-testid="entity-header-title">
+        {showNameRow && (
+          <div
+            className="d-flex gap-3 items-center"
+            data-testid="entity-header-title">
           <Tooltip placement="bottom" title={entityName}>
             <Typography.Text
               ellipsis
@@ -162,7 +165,7 @@ const EntityHeaderTitle = ({
                 'text-md entity-header-display-name font-medium': displayName,
               })}
               data-testid="entity-header-name">
-              {entityName}
+              {nameNode ?? entityName}
               {openEntityInNewPage && (
                 <IconExternalLink
                   className="anticon vertical-middle m-l-xss"
@@ -208,7 +211,8 @@ const EntityHeaderTitle = ({
                 </Button>
               </Tooltip>
             )}
-        </div>
+          </div>
+        )}
       </Col>
 
       {isEmpty(displayName) ? badges : null}

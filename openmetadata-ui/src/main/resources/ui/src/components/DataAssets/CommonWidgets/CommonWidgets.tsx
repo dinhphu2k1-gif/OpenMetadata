@@ -85,12 +85,14 @@ interface CommonWidgetsProps {
   widgetConfig: WidgetConfig;
   entityType: EntityType;
   showTaskHandler?: boolean;
+  descriptionLabel?: string;
 }
 
 export const CommonWidgets = ({
   widgetConfig,
   entityType,
   showTaskHandler = true,
+  descriptionLabel,
 }: CommonWidgetsProps) => {
   const { data, type, entityRules, onUpdate, permissions, isVersionView } =
     useGenericContext<GenericEntity>();
@@ -350,6 +352,7 @@ export const CommonWidgets = ({
         showSuggestions
         wrapInCard
         description={description}
+        headerLabel={descriptionLabel}
         entityFullyQualifiedName={data?.fullyQualifiedName ?? ''}
         entityName={entityName}
         entityType={type}
@@ -379,6 +382,7 @@ export const CommonWidgets = ({
     deleted,
     owners,
     isDescriptionExpanded,
+    descriptionLabel,
   ]);
 
   const widget = useMemo(() => {

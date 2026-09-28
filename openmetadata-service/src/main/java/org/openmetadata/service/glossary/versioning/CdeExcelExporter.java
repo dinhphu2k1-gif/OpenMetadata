@@ -46,17 +46,18 @@ public final class CdeExcelExporter {
     "Ý nghĩa nghiệp vụ",
     "Mối quan hệ với thực thể",
     "Chủ sở hữu dữ liệu",
-    "Cấp phát hành",
     "Phân loại dữ liệu",
     "Dữ liệu cá nhân",
     "Văn bản quy định liên quan",
     "Quy định chất lượng dữ liệu",
     "Phiên bản",
+    "Loại phiên bản phát hành",
+    "Cấp phát hành",
     "Ngày hiệu lực",
     "Ngày hết hiệu lực"
   };
   private static final int[] COLUMN_WIDTHS = {
-    20, 28, 36, 28, 55, 50, 32, 22, 28, 22, 50, 26, 16, 18, 18
+    20, 28, 36, 28, 55, 50, 32, 28, 22, 50, 26, 16, 24, 22, 18, 18
   };
 
   private CdeExcelExporter() {}
@@ -139,7 +140,6 @@ public final class CdeExcelExporter {
             markdown(term.getDescription()),
             markdown(extensionValue(extension, "entityRelationship", "moi_quan_he_voi_thuc_the")),
             references(term.getOwners()),
-            releaseLevel(extension.get("releaseLevel")),
             tags(term.getTags(), "DataClassification"),
             tags(term.getTags(), "PersonalData"),
             markdown(
@@ -151,6 +151,9 @@ public final class CdeExcelExporter {
                 extensionValue(
                     extension, "dataQualityRules", "quy_dinh_chat_luong_du_lieu")),
             text(source.get("businessVersion")),
+            CdeReleaseVersionType.fromBusinessVersion(
+                String.valueOf(source.get("businessVersion"))),
+            releaseLevel(extension.get("releaseLevel")),
             date(extension.get("effectiveDate")),
             date(extension.get("expirationDate")));
     Row row = sheet.createRow(rowIndex);

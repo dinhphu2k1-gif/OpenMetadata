@@ -7,10 +7,11 @@ COMPOSE_FILE="$SCRIPT_DIR/docker-compose.dev.yml"
 
 echo "Chon thanh phan can build:"
 echo "1) Frontend (Chi build va recreate container UI)"
-echo "2) Backend (Chi build va recreate container Server)"
-echo "3) Ca hai (Frontend & Backend)"
+echo "2) Backend (Build backend, tu dong migrate DB va recreate Server)"
+echo "3) Ca hai (Frontend & Backend + tu dong migrate DB)"
 echo "4) Khong build (Chi khoi dong lai toan bo)"
-read -rp "Lua chon [1-4] (mac dinh 1): " choice
+echo "5) Chi chay DB Migration (execute_migrate_all)"
+read -rp "Lua chon [1-5] (mac dinh 1): " choice
 choice=${choice:-1}
 
 # 1. Build va recreate Frontend (Chi tac dong container openmetadata_ui)
@@ -27,9 +28,9 @@ if [ "$choice" = "1" ]; then
     cd "$SCRIPT_DIR"
     docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate openmetadata-ui
 
-# 2. Build va recreate Backend (Chi tac dong container openmetadata_server)
+# 2. Build va recreate Backend (Build image -> tu dong migrate DB -> recreate Server)
 elif [ "$choice" = "2" ]; then
-    echo ">> [1/2] Dang build Backend Java qua Maven..."
+    echo ">> [1/3] Dang build Backend Java qua Maven..."
     cd "$PROJECT_ROOT"
     export MAVEN_OPTS="-Xmx4096m -XX:+UseG1GC"
     mvn install \
@@ -50,11 +51,14 @@ elif [ "$choice" = "2" ]; then
 
     docker build -f "$SCRIPT_DIR/Dockerfile.backend" -t openmetadata/server:custom-1.13.3 .
 
-    echo ">> [2/2] Dang cap nhat lai container Backend..."
+    echo ">> [2/3] Dang tu dong thuc hien DB Migration (execute_migrate_all)..."
     cd "$SCRIPT_DIR"
+    docker compose -f "$COMPOSE_FILE" up --force-recreate execute-migrate-all
+
+    echo ">> [3/3] Dang cap nhat lai container Backend (openmetadata_server)..."
     docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate openmetadata-server
 
-# 3. Build ca hai va recreate ca hai
+# 3. Build ca hai va recreate ca hai (+ tu dong migrate DB)
 elif [ "$choice" = "3" ]; then
     echo ">> [1/4] Dang build Backend..."
     cd "$PROJECT_ROOT"
@@ -85,8 +89,11 @@ elif [ "$choice" = "3" ]; then
     cd "$PROJECT_ROOT"
     docker build -f "$SCRIPT_DIR/Dockerfile.frontend" -t openmetadata/frontend:custom-1.13.3 .
 
-    echo ">> [3/4] Dang cap nhat lai ca hai container..."
+    echo ">> [3/4] Dang tu dong thuc hien DB Migration (execute_migrate_all)..."
     cd "$SCRIPT_DIR"
+    docker compose -f "$COMPOSE_FILE" up --force-recreate execute-migrate-all
+
+    echo ">> [4/4] Dang cap nhat lai ca hai container (Server & UI)..."
     docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate openmetadata-server openmetadata-ui
 
 # 4. Khoi dong lai toan bo
@@ -94,6 +101,15 @@ elif [ "$choice" = "4" ]; then
     echo ">> Dang khoi dong toan bo he thong..."
     cd "$SCRIPT_DIR"
     docker compose -f "$COMPOSE_FILE" up -d
+
+# 5. Chi chay DB Migration (execute_migrate_all) roi khoi dong lai server
+elif [ "$choice" = "5" ]; then
+    echo ">> [1/2] Dang thuc hien DB Migration (execute_migrate_all)..."
+    cd "$SCRIPT_DIR"
+    docker compose -f "$COMPOSE_FILE" up --force-recreate execute-migrate-all
+
+    echo ">> [2/2] Dang khoi dong lai Backend server..."
+    docker compose -f "$COMPOSE_FILE" restart openmetadata-server
 fi
 
 echo ""

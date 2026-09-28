@@ -940,6 +940,15 @@ describe('GlossaryHeader component', () => {
       );
 
       expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('cde-header-release-version-type')
+      ).toHaveTextContent('Bản chính');
+      expect(
+        screen.getByTestId('cde-header-release-version-type')
+      ).toHaveClass(
+        'cde-header-release-version-type',
+        'cde-value-pill-release-version-main'
+      );
 
       await act(async () => {
         fireEvent.click(screen.getByText('label.create-draft'));

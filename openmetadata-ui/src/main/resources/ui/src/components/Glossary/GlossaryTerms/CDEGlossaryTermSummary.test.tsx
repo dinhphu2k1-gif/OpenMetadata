@@ -119,6 +119,7 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.classification-control': 'Classification & control',
     'cde.business-context': 'Business context',
     'cde.release-level': 'Release level',
+    'cde.release-version-type': 'Release version type',
     'cde.not-set': 'Not set',
     'cde.no-information': 'No information',
     'label.yes': 'Yes',
@@ -140,6 +141,7 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.classification-control': 'Phân loại & kiểm soát',
     'cde.business-context': 'Ngữ cảnh nghiệp vụ',
     'cde.release-level': 'Cấp phát hành',
+    'cde.release-version-type': 'Loại phiên bản phát hành',
     'cde.not-set': 'Chưa thiết lập',
     'cde.no-information': 'Chưa có thông tin',
     'label.yes': 'Có',
@@ -179,6 +181,7 @@ describe('CDEGlossaryTermSummary', () => {
 
     [
       'Nhóm theo nghiệp vụ',
+      'Loại phiên bản phát hành',
       'Cấp phát hành',
       'Nguồn dữ liệu',
       'Chủ sở hữu dữ liệu',
@@ -192,7 +195,10 @@ describe('CDEGlossaryTermSummary', () => {
       'Ngữ cảnh nghiệp vụ',
     ].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
 
-    expect(screen.getAllByRole('group')).toHaveLength(11);
+    expect(screen.getAllByRole('group')).toHaveLength(12);
+    expect(screen.getByText('Bản chính')).toHaveClass(
+      'cde-value-pill-release-version-main'
+    );
     expect(
       screen.queryByRole('group', { name: 'Phiên bản' })
     ).not.toBeInTheDocument();

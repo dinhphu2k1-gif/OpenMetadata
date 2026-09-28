@@ -13,7 +13,7 @@
  */
 
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Popover, Select, Typography } from 'antd';
+import { Button, Popover, Select } from 'antd';
 import { DateTime } from 'luxon';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import {
@@ -24,7 +24,7 @@ import {
 } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { EntityTags } from 'Models';
-import { ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
@@ -46,50 +46,14 @@ import {
 } from '../GlossaryTermTab/CDEGlossaryTableColumns';
 import CDEEnumField from './CDEEnumField';
 import CDEReleaseLevelField from './CDEReleaseLevelField';
+import {
+  GovernedGlossaryField as CDEField,
+  GovernedGlossarySection as CDESection,
+} from './GovernedGlossaryDetailLayout';
 
 interface CDEGlossaryTermSummaryProps {
   glossaryTerm: GlossaryTerm;
 }
-
-interface CDEFieldProps {
-  action?: ReactNode;
-  children: ReactNode;
-  className?: string;
-  label: string;
-}
-
-interface CDESectionProps {
-  children: ReactNode;
-  title: string;
-  variant: 'classification' | 'context' | 'management';
-}
-
-const CDESection = ({ children, title, variant }: CDESectionProps) => (
-  <section className={`cde-detail-section cde-detail-section-${variant}`}>
-    <header className="cde-detail-section-header">
-      <span aria-hidden="true" className="cde-detail-section-marker" />
-      <Typography.Title className="cde-detail-section-title" level={5}>
-        {title}
-      </Typography.Title>
-    </header>
-    <div className="cde-detail-section-grid">
-      {children}
-    </div>
-  </section>
-);
-
-const CDEField = ({ action, children, className, label }: CDEFieldProps) => (
-  <div
-    aria-label={label}
-    className={`cde-detail-field ${className ?? ''}`}
-    role="group">
-    <div className="cde-detail-field-label d-flex items-center gap-2">
-      <Typography.Text className="text-sm font-medium">{label}</Typography.Text>
-      {action}
-    </div>
-    <div className="cde-detail-field-value">{children}</div>
-  </div>
-);
 
 interface CDETagFieldProps {
   classification: string;
@@ -424,7 +388,9 @@ const CDETextCustomField = ({
   );
 };
 
-const CDEValidityFields = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
+export const CDEValidityFields = ({
+  glossaryTerm,
+}: CDEGlossaryTermSummaryProps) => {
   const { t } = useTranslation();
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();

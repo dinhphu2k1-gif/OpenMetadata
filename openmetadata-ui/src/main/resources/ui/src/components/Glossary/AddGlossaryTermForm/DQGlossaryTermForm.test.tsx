@@ -43,41 +43,45 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   }),
 }));
 
-jest.mock('../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component', () =>
-  jest.fn().mockImplementation(({ onUpdate }) => (
-    <div data-testid="mock-user-team-picker">
-      <button
-        data-testid="mock-set-owner"
-        type="button"
-        onClick={() =>
-          onUpdate([
-            { id: 'owner-1', name: 'Data Team', type: 'team' },
-          ])
-        }>
-        Set Owner
-      </button>
-      <button
-        data-testid="mock-set-reviewer"
-        type="button"
-        onClick={() =>
-          onUpdate([
-            { id: 'reviewer-1', name: 'Reviewer User', type: 'user' },
-          ])
-        }>
-        Set Reviewer
-      </button>
-    </div>
-  ))
+jest.mock(
+  '../../common/UserTeamSelectableListSearchInput/UserTeamSelectableListSearchInput.component',
+  () =>
+    jest.fn().mockImplementation(({ onUpdate }) => (
+      <div data-testid="mock-user-team-picker">
+        <button
+          data-testid="mock-set-owner"
+          type="button"
+          onClick={() =>
+            onUpdate([{ id: 'owner-1', name: 'Data Team', type: 'team' }])
+          }>
+          Set Owner
+        </button>
+        <button
+          data-testid="mock-set-reviewer"
+          type="button"
+          onClick={() =>
+            onUpdate([
+              { id: 'reviewer-1', name: 'Reviewer User', type: 'user' },
+            ])
+          }>
+          Set Reviewer
+        </button>
+      </div>
+    ))
 );
 
 jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
-  jest.fn().mockImplementation(({ initialValue, onTextChange }) => (
-    <textarea
-      data-testid="dq-rule-statement"
-      defaultValue={initialValue}
-      onChange={(e) => onTextChange?.(e.target.value)}
-    />
-  ))
+  jest
+    .fn()
+    .mockImplementation(
+      ({ initialValue, onTextChange, 'data-testid': dataTestId }) => (
+        <textarea
+          data-testid={dataTestId}
+          defaultValue={initialValue}
+          onChange={(e) => onTextChange?.(e.target.value)}
+        />
+      )
+    )
 );
 
 jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
@@ -156,7 +160,10 @@ const FormWrapper = ({
         onCancel={jest.fn()}
         onSave={onSave}
       />
-      <button data-testid="submit-form" type="button" onClick={() => form.submit()}>
+      <button
+        data-testid="submit-form"
+        type="button"
+        onClick={() => form.submit()}>
         Submit
       </button>
     </div>
@@ -174,7 +181,14 @@ describe('DQGlossaryTermForm', () => {
     expect(screen.getByTestId('dq-quality-threshold')).toBeInTheDocument();
     expect(screen.getByTestId('dq-rule-explanation')).toBeInTheDocument();
     expect(screen.getByTestId('dq-other-constraints')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('dq-related-regulatory-documents')
+    ).toBeInTheDocument();
     expect(screen.getByTestId('dq-exceptions')).toBeInTheDocument();
+    expect(screen.getByTestId('dq-release-version-type')).toBeInTheDocument();
+    expect(screen.getByTestId('dq-effectiveDate')).toBeInTheDocument();
+    expect(screen.getByTestId('dq-expirationDate')).toBeInTheDocument();
+    expect(screen.queryByText('Người kiểm duyệt')).not.toBeInTheDocument();
   });
 
   it('populates fields in edit mode from glossaryTerm', () => {

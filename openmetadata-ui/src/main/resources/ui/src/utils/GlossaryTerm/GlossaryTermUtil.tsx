@@ -34,7 +34,10 @@ import {
   convertTagLabelsToEntityReferences,
 } from '../EntityReferenceUtils';
 
-export const getGlossaryTermWidgetFromKey = (widgetConfig: WidgetConfig) => {
+export const getGlossaryTermWidgetFromKey = (
+  widgetConfig: WidgetConfig,
+  descriptionLabel?: string
+) => {
   if (
     widgetConfig.i.startsWith(GlossaryTermDetailPageWidgetKeys.WORKFLOW_HISTORY)
   ) {
@@ -67,6 +70,7 @@ export const getGlossaryTermWidgetFromKey = (widgetConfig: WidgetConfig) => {
 
   return (
     <CommonWidgets
+      descriptionLabel={descriptionLabel}
       entityType={EntityType.GLOSSARY_TERM}
       widgetConfig={widgetConfig}
     />

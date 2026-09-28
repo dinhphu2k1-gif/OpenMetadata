@@ -212,12 +212,15 @@ describe('CDEGlossaryTermForm', () => {
     expect(screen.getByTestId('cde-term-code')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-term-name')).toBeInTheDocument();
     expect(screen.getByTestId('cde-version')).toBeInTheDocument();
+    expect(screen.getByTestId('cde-release-version-type')).toHaveValue(
+      'Bản chính'
+    );
     expect(screen.getByTestId('cde-business-meaning')).toBeInTheDocument();
     expect(screen.getByTestId('cde-business-group')).toBeInTheDocument();
     expect(container.querySelector('.cde-glossary-term-form')).toHaveClass(
       'cde-glossary-term-form--add'
     );
-    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(15);
+    expect(container.querySelectorAll('.ant-form-item')).toHaveLength(16);
     expect(container.querySelectorAll('.cde-form-section-title')).toHaveLength(
       4
     );
@@ -284,6 +287,9 @@ describe('CDEGlossaryTermForm', () => {
       'Mã khách hàng'
     );
     expect(screen.getByTestId('cde-version')).toHaveValue('1.0');
+    expect(screen.getByTestId('cde-release-version-type')).toHaveValue(
+      'Bản chính'
+    );
     expect(screen.getByTestId('cde-business-meaning')).toHaveValue(
       'Mã định danh duy nhất của khách hàng'
     );

@@ -191,6 +191,7 @@ public class GlossaryVersioningService {
                         normalizeWorkingPayload(
                             payload, canonicalVersion, EntityStatus.DRAFT.value());
                     if (GLOSSARY_TERM.equals(entityType)) {
+                      payload = CdeReleaseVersionType.apply(payload, canonicalVersion);
                       payload = withParentBusinessVersion(payload, parentBusinessVersion);
                     }
                     long now = System.currentTimeMillis();
@@ -260,8 +261,17 @@ public class GlossaryVersioningService {
                           nativeVersion,
                           JsonUtils.pojoToJson(
                               withAudit(
-                                  normalizeWorkingPayload(
-                                      payload, working.businessVersion(), working.entityStatus()),
+                                  GLOSSARY_TERM.equals(entityType)
+                                      ? CdeReleaseVersionType.apply(
+                                          normalizeWorkingPayload(
+                                              payload,
+                                              working.businessVersion(),
+                                              working.entityStatus()),
+                                          working.businessVersion())
+                                      : normalizeWorkingPayload(
+                                          payload,
+                                          working.businessVersion(),
+                                          working.entityStatus()),
                                   actor,
                                   now)),
                           now,
@@ -450,6 +460,11 @@ public class GlossaryVersioningService {
                       termRevisions =
                           buildActiveTermRevisions(dao, entityId, working.businessVersion());
                       publicationPayload = withTermRevisions(working.payload(), termRevisions);
+                    } else if (GLOSSARY_TERM.equals(entityType)) {
+                      PublishedSnapshotRecord latestTerm =
+                          dao.findLatestPublished(entityType, entityId);
+                      publicationPayload =
+                          restoreMissingTermRelations(working.payload(), latestTerm);
                     }
                     String approvedPayload =
                         withPublishedMetadata(
@@ -541,6 +556,38 @@ public class GlossaryVersioningService {
       throw new NotFoundException("No published snapshot exists");
     }
     return record;
+  }
+
+  /**
+   * Returns the newest Approved representation inside one governed glossary scope. Active
+   * snapshots take precedence over revoked ones. If the whole parent scope has been frozen, the
+   * newest archived snapshot remains its latest Approved representation.
+   */
+  public PublishedSnapshotRecord getLatestPublishedInScope(
+      String entityType, UUID entityId, String parentBusinessVersion) {
+    String requiredScope = requireParentScope(parentBusinessVersion);
+    return selectLatestPublishedInScope(
+        Entity.getJdbi().onDemand(GlossaryVersionDAO.class).listPublished(entityType, entityId),
+        requiredScope);
+  }
+
+  static PublishedSnapshotRecord selectLatestPublishedInScope(
+      List<PublishedSnapshotRecord> published, String requiredScope) {
+    List<PublishedSnapshotRecord> scoped =
+        published.stream()
+            .filter(record -> requiredScope.equals(record.parentBusinessVersion()))
+            .toList();
+    if (scoped.isEmpty()) {
+      throw new NotFoundException("No Approved version exists in scope " + requiredScope);
+    }
+    List<PublishedSnapshotRecord> active =
+        scoped.stream().filter(record -> record.archivedAt() == null).toList();
+    return (active.isEmpty() ? scoped : active)
+        .stream()
+        .max(
+            Comparator.comparing(
+                PublishedSnapshotRecord::businessVersion, GlossaryBusinessVersion::compare))
+        .orElseThrow();
   }
 
   public PublishedSnapshotRecord getPublished(
@@ -683,6 +730,9 @@ public class GlossaryVersioningService {
                               : latest.payload(),
                           nextVersion,
                           EntityStatus.REJECTED.value());
+                  if (GLOSSARY_TERM.equals(entityType)) {
+                    payload = CdeReleaseVersionType.apply(payload, nextVersion);
+                  }
                   dao.insertWorking(
                       UUID.randomUUID(),
                       entityType,
@@ -1080,8 +1130,56 @@ public class GlossaryVersioningService {
       blank.put("owners", List.of());
       blank.put("reviewers", List.of());
       blank.put("domains", List.of());
+      // The canonical CDE selection is structural identity for a Data Quality
+      // rule, not editable content. Preserve it when creating the next blank
+      // working version so clients never have to reconstruct the relation from
+      // the DQ term itself.
+      Object relatedTerms = snapshot.get("relatedTerms");
+      if (relatedTerms != null) {
+        blank.put("relatedTerms", relatedTerms);
+      }
     }
     return blank;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Object restoreMissingTermRelations(
+      Object sourcePayload, PublishedSnapshotRecord latest) {
+    if (latest == null) {
+      return sourcePayload;
+    }
+    Object parsed =
+        sourcePayload instanceof String
+            ? JsonUtils.readValue((String) sourcePayload, Object.class)
+            : JsonUtils.readValue(JsonUtils.pojoToJson(sourcePayload), Object.class);
+    if (!(parsed instanceof Map<?, ?> raw)) {
+      return sourcePayload;
+    }
+    Map<String, Object> payload = new LinkedHashMap<>();
+    raw.forEach((key, value) -> payload.put(String.valueOf(key), value));
+    Object relations = payload.get("relatedTerms");
+    boolean missing = !(relations instanceof List<?> relationList) || relationList.isEmpty();
+    boolean selfReference = false;
+    if (!missing && relations instanceof List<?> relationList && relationList.size() == 1
+        && relationList.get(0) instanceof Map<?, ?> relation
+        && relation.get("term") instanceof Map<?, ?> term) {
+      selfReference = java.util.Objects.equals(payload.get("id"), term.get("id"));
+      selfReference =
+          selfReference
+              || java.util.Objects.equals(
+                  payload.get("fullyQualifiedName"), term.get("fullyQualifiedName"))
+              || java.util.Objects.equals(payload.get("name"), term.get("name"));
+    }
+    if (!missing && !selfReference) {
+      return payload;
+    }
+    Object published = JsonUtils.readValue(latest.payload(), Object.class);
+    if (published instanceof Map<?, ?> publishedValues
+        && publishedValues.get("relatedTerms") instanceof List<?> publishedRelations
+        && publishedRelations.size() == 1) {
+      payload.put("relatedTerms", publishedRelations);
+    }
+    return payload;
   }
 
   private static Object withEmptyTermRevisions(Object sourcePayload) {
@@ -1106,7 +1204,7 @@ public class GlossaryVersioningService {
             ? JsonUtils.readValue((String) sourcePayload, Object.class)
             : JsonUtils.readValue(JsonUtils.pojoToJson(sourcePayload), Object.class);
     if (!(parsed instanceof Map<?, ?> raw)) {
-      throw new BadRequestException("CDE working payload must be a JSON object");
+      throw new BadRequestException("Glossary term working payload must be a JSON object");
     }
     Map<String, Object> payload = new LinkedHashMap<>();
     raw.forEach((key, value) -> payload.put(String.valueOf(key), value));
@@ -1116,7 +1214,8 @@ public class GlossaryVersioningService {
     if (name instanceof String termName
         && glossary instanceof Map<?, ?> glossaryValues) {
       Object glossaryFqn = glossaryValues.get("fullyQualifiedName");
-      if (glossaryFqn instanceof String parentFqn && !parentFqn.isBlank()) {
+      if (glossaryFqn instanceof String parentFqn
+          && !parentFqn.isBlank()) {
         payload.put(
             "fullyQualifiedName",
             FullyQualifiedName.build(
@@ -1154,7 +1253,7 @@ public class GlossaryVersioningService {
     for (int index = 0; index < snapshots.size(); index++) {
       PublishedSnapshotRecord snapshot = snapshots.get(index);
       if (!termIds.add(snapshot.entityId()) || !snapshotIds.add(snapshot.snapshotId())) {
-        throw new IllegalStateException("Duplicate active CDE published head");
+        throw new IllegalStateException("Duplicate active glossary term published head");
       }
       revisions.add(
           new TermRevision(

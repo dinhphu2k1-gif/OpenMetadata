@@ -7,13 +7,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { Form, FormInstance, Input, Select, Tag } from 'antd';
 import { isEmpty } from 'lodash';
 import { DateTime } from 'luxon';
-import {
-  forwardRef,
-  HTMLAttributes,
-  ReactNode,
-  useEffect,
-  useState,
-} from 'react';
+import { forwardRef, HTMLAttributes, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCDEReleaseLevelValue } from '../../../constants/CDEReleaseLevel.constants';
 import { EntityType } from '../../../enums/entity.enum';
@@ -22,6 +16,7 @@ import { EntityReference } from '../../../generated/entity/type';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useEntityRules } from '../../../hooks/useEntityRules';
 import { mergeCDEDates, validateCDEDates } from '../../../utils/CDEDateUtils';
+import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
@@ -37,12 +32,14 @@ import {
   AddGlossaryTermFormProps,
   GlossaryTermForm,
 } from './AddGlossaryTermForm.interface';
+import GlossaryTermFormSection from './GlossaryTermFormSection.component';
 
 export interface CDEGlossaryTermFormValues {
   name?: string;
   displayName?: string;
   description?: string;
   version?: string;
+  releaseVersionType?: string;
   effectiveDate?: DateTime | null;
   expirationDate?: DateTime | null;
   domains?: EntityReference[];
@@ -58,26 +55,6 @@ export interface CDEGlossaryTermFormValues {
   van_ban_quy_dinh_lien_quan?: string;
   moi_quan_he_voi_thuc_the?: string;
 }
-
-interface CDEFormSectionProps {
-  children: ReactNode;
-  className?: string;
-  title: string;
-}
-
-const CDEFormSection = ({
-  children,
-  className = '',
-  title,
-}: CDEFormSectionProps) => (
-  <section className={`cde-form-section ${className}`}>
-    <header className="cde-form-section-header">
-      <span aria-hidden="true" className="cde-form-section-marker" />
-      <h3 className="cde-form-section-title">{title}</h3>
-    </header>
-    <div className="cde-form-grid">{children}</div>
-  </section>
-);
 
 type CDEFormSelectTriggerProps = Omit<
   HTMLAttributes<HTMLDivElement>,
@@ -135,7 +112,7 @@ interface CDETagSelectorProps {
   onChange?: (tags: TagLabel[]) => void;
 }
 
-const CDETagSelector = ({
+export const CDETagSelector = ({
   classification,
   onChange,
   placeholder,
@@ -219,8 +196,7 @@ const CDEGlossaryTermForm = ({
           (domain) => getEntityName(domain) || domain.fullyQualifiedName || ''
         )
         .filter(Boolean)
-        .join(', ') ||
-      t('cde.select-business-group')
+        .join(', ') || t('cde.select-business-group')
     : t('cde.select-business-group');
 
   useEffect(() => {
@@ -294,6 +270,10 @@ const CDEGlossaryTermForm = ({
           ? DateTime.fromISO(glossaryTerm.extension.expirationDate)
           : null,
         version: glossaryTerm.businessVersion ?? '1.0',
+        releaseVersionType: getCDEReleaseVersionType(
+          glossaryTerm.extension?.releaseVersionType,
+          glossaryTerm.businessVersion
+        ),
       });
     }
   }, [editMode, form, glossaryTerm]);
@@ -327,6 +307,7 @@ const CDEGlossaryTermForm = ({
     const preservedExtension = { ...glossaryTerm?.extension };
     [
       'version',
+      'releaseVersionType',
       'entityRelationship',
       'relatedRegulatoryDocuments',
       'dataQualityRules',
@@ -338,9 +319,7 @@ const CDEGlossaryTermForm = ({
     const extension = mergeCDEDates(
       {
         ...preservedExtension,
-        ...(values.releaseLevel
-          ? { releaseLevel: [values.releaseLevel] }
-          : {}),
+        ...(values.releaseLevel ? { releaseLevel: [values.releaseLevel] } : {}),
         ...(entityRelationshipVal
           ? {
               entityRelationship: entityRelationshipVal,
@@ -401,10 +380,13 @@ const CDEGlossaryTermForm = ({
         editMode ? 'edit' : 'add'
       }`}
       form={form}
-      initialValues={{ version: '1.0' }}
+      initialValues={{
+        version: '1.0',
+        releaseVersionType: getCDEReleaseVersionType(undefined, '1.0'),
+      }}
       layout="vertical"
       onFinish={onFinish}>
-      <CDEFormSection
+      <GlossaryTermFormSection
         className="cde-form-section-basic"
         title={t('cde.basic-information')}>
         <Form.Item
@@ -436,6 +418,12 @@ const CDEGlossaryTermForm = ({
           <Input disabled data-testid="cde-version" placeholder="1.0" />
         </Form.Item>
         <Form.Item
+          className="cde-form-release-version-type"
+          label={t('cde.release-version-type')}
+          name="releaseVersionType">
+          <Input disabled data-testid="cde-release-version-type" />
+        </Form.Item>
+        <Form.Item
           required
           className="cde-form-business-meaning cde-form-field-full"
           initialValue={glossaryTerm?.description ?? ''}
@@ -449,9 +437,9 @@ const CDEGlossaryTermForm = ({
             placeHolder={t('cde.business-meaning-placeholder')}
           />
         </Form.Item>
-      </CDEFormSection>
+      </GlossaryTermFormSection>
 
-      <CDEFormSection
+      <GlossaryTermFormSection
         className="cde-form-section-management"
         title={t('cde.management-information')}>
         <Form.Item label={t('cde.business-group')} name="domains">
@@ -553,9 +541,9 @@ const CDEGlossaryTermForm = ({
             />
           </Form.Item>
         ))}
-      </CDEFormSection>
+      </GlossaryTermFormSection>
 
-      <CDEFormSection
+      <GlossaryTermFormSection
         className="cde-form-section-classification"
         title={t('cde.classification-control')}>
         {tagField(
@@ -609,9 +597,9 @@ const CDEGlossaryTermForm = ({
             placeholder={t('cde.select-data-quality-rules')}
           />
         </Form.Item>
-      </CDEFormSection>
+      </GlossaryTermFormSection>
 
-      <CDEFormSection
+      <GlossaryTermFormSection
         className="cde-form-section-context"
         title={t('cde.business-context')}>
         <Form.Item
@@ -654,7 +642,7 @@ const CDEGlossaryTermForm = ({
             placeHolder={t('cde.related-regulatory-documents-placeholder')}
           />
         </Form.Item>
-      </CDEFormSection>
+      </GlossaryTermFormSection>
     </Form>
   );
 };

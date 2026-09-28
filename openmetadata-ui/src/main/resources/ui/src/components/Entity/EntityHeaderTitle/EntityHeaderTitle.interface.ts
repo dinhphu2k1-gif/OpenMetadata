@@ -18,6 +18,7 @@ export interface EntityHeaderTitleProps {
   icon: React.ReactNode;
   showOnlyDisplayName?: boolean;
   name: string;
+  nameNode?: React.ReactNode;
   displayName?: string;
   link?: string;
   color?: string;
@@ -28,6 +29,7 @@ export interface EntityHeaderTitleProps {
   suffix?: React.ReactNode;
   isDisabled?: boolean;
   showName?: boolean;
+  showNameRow?: boolean;
   excludeEntityService?: boolean;
   isFollowing?: boolean;
   isFollowingLoading?: boolean;

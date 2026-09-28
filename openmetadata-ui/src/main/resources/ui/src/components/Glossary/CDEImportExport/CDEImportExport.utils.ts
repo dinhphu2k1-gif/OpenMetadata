@@ -29,6 +29,7 @@ import { EntityReference } from '../../../generated/entity/type';
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
+import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
 import {
   CDE_TAG_CLASSIFICATIONS,
   CDEExtension,
@@ -83,9 +84,10 @@ export const CDE_EXPORT_HEADERS = [
   'Văn bản quy định liên quan',
   'Quy định chất lượng dữ liệu',
   'Phiên bản',
+  'Loại phiên bản phát hành',
+  'Cấp phát hành',
   'Ngày hiệu lực',
   'Ngày hết hiệu lực',
-  'Người kiểm soát',
 ];
 
 export const CDE_TEMPLATE_HEADERS = [
@@ -118,9 +120,16 @@ export const CDE_COLUMN_WIDTHS = [
   { wch: 35 }, // Văn bản quy định liên quan
   { wch: 24 }, // Quy định chất lượng dữ liệu
   { wch: 14 }, // Phiên bản
+  { wch: 24 }, // Loại phiên bản phát hành
+  { wch: 20 }, // Cấp phát hành
   { wch: 18 }, // Ngày hiệu lực
   { wch: 18 }, // Ngày hết hiệu lực
-  { wch: 22 }, // Người kiểm soát
+];
+
+const CDE_TEMPLATE_COLUMN_WIDTHS = [
+  ...CDE_COLUMN_WIDTHS.slice(0, 12),
+  CDE_COLUMN_WIDTHS[14],
+  CDE_COLUMN_WIDTHS[15],
 ];
 
 /**
@@ -240,9 +249,19 @@ export const exportCDEToExcel = (
         regDocs,
         dqRules,
         version,
+        getCDEReleaseVersionType(ext.releaseVersionType, version) ?? '',
+        ((value) =>
+          value === 'CEO'
+            ? 'Tổng Giám đốc'
+            : value === 'TTQLDL'
+            ? 'TTQLDL'
+            : '')(
+          Array.isArray(ext.releaseLevel)
+            ? ext.releaseLevel[0]
+            : ext.releaseLevel
+        ),
         formatCDEDate(ext.effectiveDate, ''),
         formatCDEDate(ext.expirationDate, ''),
-        formatReferences(term.reviewers),
       ];
     });
 
@@ -311,7 +330,7 @@ export const downloadCDEExcelTemplate = () => {
 
   const worksheetData = [CDE_TEMPLATE_HEADERS, ...sampleRows];
   const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-  worksheet['!cols'] = CDE_COLUMN_WIDTHS.slice(0, CDE_TEMPLATE_HEADERS.length);
+  worksheet['!cols'] = CDE_TEMPLATE_COLUMN_WIDTHS;
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, CDE_EXCEL_SHEET_NAME);
@@ -599,7 +618,9 @@ export const validateDataSourceValues = (
   }
 
   const items = clean
-    .split(/[,;]+/)
+    // Exported tag labels are separated by new lines. Keep accepting comma and
+    // semicolon separated values for manually prepared workbooks as well.
+    .split(/[,;\r\n]+/)
     .map((s) => s.trim())
     .filter(Boolean);
   const invalidSources: string[] = [];

@@ -4,7 +4,9 @@
  */
 package org.openmetadata.service.glossary.versioning;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -14,6 +16,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import jakarta.ws.rs.NotFoundException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,60 @@ import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 
 class GlossaryVersioningServiceTest {
+
+  @Test
+  void latestApprovedRelationStaysInScopeAndUsesNumericVersionOrder() {
+    UUID entityId = UUID.randomUUID();
+    PublishedSnapshotRecord otherScope = snapshot("glossaryTerm", entityId, "3", "3.9");
+    PublishedSnapshotRecord v29 = snapshot("glossaryTerm", entityId, "2", "2.9");
+    PublishedSnapshotRecord v210 = snapshot("glossaryTerm", entityId, "2", "2.10");
+
+    PublishedSnapshotRecord selected =
+        GlossaryVersioningService.selectLatestPublishedInScope(
+            List.of(otherScope, v29, v210), "2");
+
+    assertEquals(v210.snapshotId(), selected.snapshotId());
+  }
+
+  @Test
+  void latestApprovedRelationNeverFallsBackToAnotherScope() {
+    UUID entityId = UUID.randomUUID();
+    PublishedSnapshotRecord otherScope = snapshot("glossaryTerm", entityId, "3", "3.0");
+
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            GlossaryVersioningService.selectLatestPublishedInScope(
+                List.of(otherScope), "2"));
+  }
+
+  @Test
+  void latestApprovedRelationPrefersActivePredecessorOverRevokedSnapshot() {
+    UUID entityId = UUID.randomUUID();
+    PublishedSnapshotRecord active = snapshot("glossaryTerm", entityId, "2", "2.1");
+    PublishedSnapshotRecord revoked =
+        archivedSnapshot("glossaryTerm", entityId, "2", "2.2");
+
+    PublishedSnapshotRecord selected =
+        GlossaryVersioningService.selectLatestPublishedInScope(
+            List.of(active, revoked), "2");
+
+    assertEquals(active.snapshotId(), selected.snapshotId());
+  }
+
+  @Test
+  void latestApprovedRelationUsesNewestArchivedSnapshotForFrozenScope() {
+    UUID entityId = UUID.randomUUID();
+    PublishedSnapshotRecord v20 =
+        archivedSnapshot("glossaryTerm", entityId, "2", "2.0");
+    PublishedSnapshotRecord v21 =
+        archivedSnapshot("glossaryTerm", entityId, "2", "2.1");
+
+    PublishedSnapshotRecord selected =
+        GlossaryVersioningService.selectLatestPublishedInScope(List.of(v20, v21), "2");
+
+    assertEquals(v21.snapshotId(), selected.snapshotId());
+  }
 
   @Test
   void repairArchivesPredecessorAndRebuildsActiveMembershipFromItsOwnScope() {

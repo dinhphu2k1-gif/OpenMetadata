@@ -50,6 +50,20 @@ class ListFilterTest {
   }
 
   @Test
+  void exactNamesBuildsBoundGovernedProfileAllowlist() {
+    ListFilter filter =
+        new ListFilter().addQueryParam("exactNames", "Data Dictionary,Data Quality");
+
+    String condition = filter.getCondition("glossary_entity");
+
+    assertTrue(
+        condition.contains(
+            "glossary_entity.name IN (:exactName_0,:exactName_1)"));
+    assertEquals("Data Dictionary", filter.getQueryParams().get("exactName_0"));
+    assertEquals("Data Quality", filter.getQueryParams().get("exactName_1"));
+  }
+
+  @Test
   void test_getAgentTypeCondition_singleAgentType() {
     ListFilter filter = new ListFilter();
 

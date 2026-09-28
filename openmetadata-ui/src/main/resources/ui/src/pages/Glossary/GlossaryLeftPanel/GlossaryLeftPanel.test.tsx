@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { Glossary } from '../../../generated/entity/data/glossary';
 import { mockedGlossaries } from '../../../mocks/Glossary.mock';
 import GlossaryLeftPanel from './GlossaryLeftPanel.component';
 
@@ -97,6 +98,21 @@ describe('Test GlossaryLeftPanel component', () => {
     render(<GlossaryLeftPanel glossaries={mockedGlossaries} />);
 
     expect(screen.queryByTestId('add-glossary')).not.toBeInTheDocument();
+  });
+
+  it('renders Data Quality when the governed API returns it', async () => {
+    const dataQuality = {
+      id: 'data-quality-id',
+      name: 'Data Quality',
+      displayName: 'Chất lượng dữ liệu',
+      fullyQualifiedName: 'Data Quality',
+    } as Glossary;
+
+    render(
+      <GlossaryLeftPanel glossaries={[mockedGlossaries[0], dataQuality]} />
+    );
+
+    expect(await screen.findByText('Chất lượng dữ liệu')).toBeInTheDocument();
   });
 
   it('Menu click should work properly', async () => {

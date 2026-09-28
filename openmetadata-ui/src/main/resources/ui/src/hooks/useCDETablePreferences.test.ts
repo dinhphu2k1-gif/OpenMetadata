@@ -15,6 +15,7 @@ describe('CDE column preference migration', () => {
     expect(result[key]).toEqual([
       'cdeDomains',
       'version',
+      'releaseVersionType',
       'releaseLevel',
       'effectiveDate',
       'expirationDate',
@@ -32,11 +33,19 @@ describe('CDE column preference migration', () => {
   it('handles hidden-all legacy preferences and new users', () => {
     expect(
       migrateCDETablePreferences({ cdeGlossaryTerm: [] })[key]
-    ).toHaveLength(4);
+    ).toHaveLength(5);
 
     const empty = {};
 
     expect(migrateCDETablePreferences(empty)).toBe(empty);
+  });
+
+  it('migrates V2 preferences without restoring previously hidden columns', () => {
+    expect(
+      migrateCDETablePreferences({
+        cdeGlossaryTermReleaseLevelV2: ['version', 'expirationDate'],
+      })[key]
+    ).toEqual(['version', 'expirationDate', 'releaseVersionType']);
   });
 
   it('migrates saved date-column preferences to include release level', () => {

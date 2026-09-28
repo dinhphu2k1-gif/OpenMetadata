@@ -1,0 +1,24 @@
+{
+  "$id": "https://open-metadata.org/schema/type/entityVersionContext.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EntityVersionContext",
+  "description": "Pins an entity reference to an immutable governed business snapshot.",
+  "javaType": "org.openmetadata.schema.type.EntityVersionContext",
+  "type": "object",
+  "properties": {
+    "parentBusinessVersion": {
+      "description": "Business version of the parent governed glossary scope.",
+      "type": "string"
+    },
+    "businessVersion": {
+      "description": "Business version of the referenced entity snapshot.",
+      "type": "string"
+    },
+    "snapshotId": {
+      "description": "Identifier of the immutable referenced snapshot.",
+      "$ref": "basic.json#/definitions/uuid"
+    }
+  },
+  "required": ["parentBusinessVersion", "businessVersion", "snapshotId"],
+  "additionalProperties": false
+}

@@ -18,6 +18,8 @@ import {
 } from '../../../generated/entity/data/glossaryTerm';
 import {
   downloadDQExcelTemplate,
+  DQ_EXPORT_HEADERS,
+  DQ_TEMPLATE_HEADERS,
   exportDQToExcel,
   formatDQImportErrorMessage,
   getDQExportFileName,
@@ -31,6 +33,19 @@ import {
 } from './DQImportExport.utils';
 
 describe('DQImportExport.utils', () => {
+  it('keeps the governed DQ workbook schema at exactly 18 ordered fields', () => {
+    expect(DQ_EXPORT_HEADERS).toHaveLength(18);
+    expect(DQ_TEMPLATE_HEADERS).toEqual(DQ_EXPORT_HEADERS);
+    expect(DQ_EXPORT_HEADERS.at(-1)).toBe('Ngày hết hiệu lực');
+    expect(DQ_EXPORT_HEADERS.slice(13)).toEqual([
+      'Trạng thái',
+      'Loại phiên bản phát hành',
+      'Cấp phát hành',
+      'Ngày hiệu lực',
+      'Ngày hết hiệu lực',
+    ]);
+  });
+
   describe('getDQExportFileName', () => {
     it('should generate Agribank_DQ_Danh_Muc_Quy_Tac_YYYYMMDD_HHmm.xlsx', () => {
       const fixedDate = new Date(2026, 8, 9, 14, 30);

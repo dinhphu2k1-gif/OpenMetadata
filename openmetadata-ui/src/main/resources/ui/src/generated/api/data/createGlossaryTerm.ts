@@ -71,6 +71,10 @@ export interface CreateGlossaryTerm {
      */
     relatedTerms?: string[];
     /**
+     * Typed related-term references that optionally pin an immutable governed business snapshot.
+     */
+    versionedRelatedTerms?: TermRelation[];
+    /**
      * User or Team references of the reviewers for this glossary.
      */
     reviewers?: EntityReference[];
@@ -105,6 +109,24 @@ export interface ConceptMapping {
      * Optional source label or catalog for the external concept.
      */
     source?: string;
+}
+
+/**
+ * Typed semantic relation to a glossary term.
+ */
+export interface TermRelation {
+    relationType?: string;
+    term: EntityReference;
+    versionContext?: EntityVersionContext;
+}
+
+/**
+ * Pins an entity reference to an immutable governed business snapshot.
+ */
+export interface EntityVersionContext {
+    businessVersion: string;
+    parentBusinessVersion: string;
+    snapshotId: string;
 }
 
 /**

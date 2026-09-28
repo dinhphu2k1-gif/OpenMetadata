@@ -15,6 +15,11 @@
       "type": "array",
       "items": { "$ref": "../../type/tagLabel.json" }
     },
+    "relatedTerms": {
+      "description": "Read-only related terms carried forward while saving a governed working Draft.",
+      "type": "array",
+      "items": { "$ref": "../../type/termRelation.json" }
+    },
     "extension": {
       "oneOf": [
         { "$ref": "../../type/basic.json#/definitions/entityExtension" },

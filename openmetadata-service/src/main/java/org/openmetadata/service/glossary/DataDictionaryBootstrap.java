@@ -12,13 +12,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.openmetadata.schema.entity.Type;
 import org.openmetadata.schema.entity.data.Glossary;
+import org.openmetadata.schema.entity.type.CustomProperty;
+import org.openmetadata.schema.type.CustomPropertyConfig;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.ProviderType;
+import org.openmetadata.schema.type.customProperties.EnumConfig;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.TypeRegistry;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
@@ -34,11 +40,13 @@ public final class DataDictionaryBootstrap {
   private DataDictionaryBootstrap() {}
 
   public static void initialize() {
+    ensureReleaseVersionTypeProperty();
     Entity.getJdbi()
         .useTransaction(
             handle -> {
               CollectionDAO collectionDAO = handle.attach(CollectionDAO.class);
               GlossaryVersionDAO versionDAO = handle.attach(GlossaryVersionDAO.class);
+              backfillWorkingReleaseVersionTypes(versionDAO);
               Glossary identity = findIdentity(collectionDAO);
               WorkingVersionRecord working = findDataDictionaryWorking(versionDAO);
               PublishedSnapshotRecord published =
@@ -110,6 +118,71 @@ public final class DataDictionaryBootstrap {
                   now,
                   ADMIN_USER_NAME);
             });
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void backfillWorkingReleaseVersionTypes(GlossaryVersionDAO dao) {
+    for (WorkingVersionRecord working : dao.listWorking("glossaryTerm")) {
+      Map<String, Object> payload = JsonUtils.readValue(working.payload(), Map.class);
+      Object extensionValue = payload.get("extension");
+      Map<String, Object> extension =
+          extensionValue instanceof Map<?, ?> values
+              ? (Map<String, Object>) values
+              : Map.of();
+      String expected = CdeReleaseVersionType.fromBusinessVersion(working.businessVersion());
+      if (List.of(expected).equals(extension.get(CdeReleaseVersionType.PROPERTY))) {
+        continue;
+      }
+      Object normalized = CdeReleaseVersionType.apply(payload, working.businessVersion());
+      int updated =
+          dao.updateWorking(
+              working.entityType(),
+              working.entityId(),
+              working.parentBusinessVersion(),
+              working.revision(),
+              working.entityStatus(),
+              working.nativeVersion(),
+              JsonUtils.pojoToJson(normalized),
+              System.currentTimeMillis(),
+              ADMIN_USER_NAME);
+      if (updated != 1) {
+        throw inconsistent("working CDE release version type changed concurrently");
+      }
+    }
+  }
+
+  private static void ensureReleaseVersionTypeProperty() {
+    final String propertyName = "releaseVersionType";
+    final List<String> expectedValues = List.of("Bản chính", "Bản phụ");
+    try {
+      String propertyType = TypeRegistry.getCustomPropertyType(Entity.GLOSSARY_TERM, propertyName);
+      String config = TypeRegistry.getCustomPropertyConfig(Entity.GLOSSARY_TERM, propertyName);
+      EnumConfig enumConfig = JsonUtils.readValue(config, EnumConfig.class);
+      if (!"enum".equals(propertyType)
+          || Boolean.TRUE.equals(enumConfig.getMultiSelect())
+          || !expectedValues.equals(enumConfig.getValues())) {
+        throw inconsistent("custom property " + propertyName + " has schema drift");
+      }
+      return;
+    } catch (EntityNotFoundException ignored) {
+      // Created once below. Existing definitions are validated above instead of silently changed.
+    }
+
+    Type glossaryTermType =
+        Entity.getTypeRepository().findByName(Entity.GLOSSARY_TERM, Include.NON_DELETED);
+    CustomProperty property =
+        new CustomProperty()
+            .withName(propertyName)
+            .withDisplayName("Loại phiên bản phát hành")
+            .withDescription("Phân loại phiên bản CDE do hệ thống xác định")
+            .withPropertyType(
+                Entity.getEntityReferenceByName(Entity.TYPE, "enum", Include.NON_DELETED))
+            .withCustomPropertyConfig(
+                new CustomPropertyConfig()
+                    .withConfig(
+                        new EnumConfig().withMultiSelect(false).withValues(expectedValues)));
+    Entity.getTypeRepository()
+        .addCustomProperty(null, ADMIN_USER_NAME, glossaryTermType.getId(), property);
   }
 
   private static Glossary findIdentity(CollectionDAO dao) {

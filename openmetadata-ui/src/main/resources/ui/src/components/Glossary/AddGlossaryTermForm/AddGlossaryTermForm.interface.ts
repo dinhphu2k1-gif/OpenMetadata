@@ -16,6 +16,7 @@ import { CreateGlossaryTerm } from '../../../generated/api/data/createGlossaryTe
 import {
   GlossaryTerm,
   TagLabel,
+  TermRelation,
   TermReference,
 } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/type/entityLineage';
@@ -35,6 +36,7 @@ export interface GlossaryTermForm {
   description: string;
   reviewers: EntityReference[];
   relatedTerms: string[] | undefined;
+  versionedRelatedTerms?: TermRelation[];
   references: TermReference[] | undefined;
   synonyms: string[];
   mutuallyExclusive: boolean;

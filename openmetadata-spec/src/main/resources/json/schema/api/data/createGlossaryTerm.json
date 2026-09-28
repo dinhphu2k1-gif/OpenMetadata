@@ -51,6 +51,13 @@
         "$ref" : "../../type/basic.json#/definitions/fullyQualifiedEntityName"
       }
     },
+    "versionedRelatedTerms": {
+      "description": "Typed related-term references that optionally pin an immutable governed business snapshot.",
+      "type": "array",
+      "items": {
+        "$ref": "../../type/termRelation.json"
+      }
+    },
     "references": {
       "description": "Link to a reference from an external glossary.",
       "type": "array",

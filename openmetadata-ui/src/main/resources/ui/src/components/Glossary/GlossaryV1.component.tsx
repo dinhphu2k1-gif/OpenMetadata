@@ -122,9 +122,20 @@ const GlossaryV1 = ({
   } = useGlossaryStore();
 
   const { id, fullyQualifiedName } = activeGlossary ?? {};
+  const selectedTermGlossaryId = (selectedData as GlossaryTerm).glossary?.id;
+  const isSelectedEntityReady = isGlossaryActive
+    ? !selectedTermGlossaryId
+    : Boolean(selectedTermGlossaryId);
   const isCDEGlossaryTerm =
     !isGlossaryActive &&
     isDataDictionaryGlossary(
+      selectedData.fullyQualifiedName,
+      (selectedData as GlossaryTerm).glossary?.name,
+      (selectedData as GlossaryTerm).glossary?.displayName
+    );
+  const isDQGlossaryTerm =
+    !isGlossaryActive &&
+    isDataQualityGlossary(
       selectedData.fullyQualifiedName,
       (selectedData as GlossaryTerm).glossary?.name,
       (selectedData as GlossaryTerm).glossary?.displayName
@@ -358,6 +369,7 @@ const GlossaryV1 = ({
       owners: formData.owners,
       tags: formData.tags,
       extension: formData.extension,
+      versionedRelatedTerms: formData.versionedRelatedTerms,
       domains: formData.domains?.map(
         (domain) => domain.fullyQualifiedName ?? domain.name ?? ''
       ),
@@ -397,10 +409,15 @@ const GlossaryV1 = ({
         newTermData.reviewers = reviewers;
         newTermData.owners = owners;
         newTermData.references = references;
-        newTermData.relatedTerms = relatedTerms?.map((term) => ({
-          id: term,
-          type: 'glossaryTerm',
-        }));
+        newTermData.relatedTerms =
+          formData.versionedRelatedTerms ??
+          relatedTerms?.map((term) => ({
+            relationType: 'relatedTo',
+            term: {
+              id: term,
+              type: 'glossaryTerm',
+            },
+          }));
         newTermData.domains = domains;
         newTermData.extension = extension;
         await updateGlossaryTerm(activeGlossaryTerm, newTermData);
@@ -440,12 +457,14 @@ const GlossaryV1 = ({
       } else {
         const permission = await permissionFetch();
         let isConsumer = true;
+        let canEditWorking = false;
         try {
           const workflowPermission = await workflowPermissionFetch(
             selectedData.id
           );
           isConsumer =
             workflowPermission.isConsumer ?? !workflowPermission.canViewWorking;
+          canEditWorking = workflowPermission.canEditWorking;
         } catch {
           // Fail closed: mutation controls stay hidden when workflow authorization is unknown.
         }
@@ -469,6 +488,26 @@ const GlossaryV1 = ({
           return readOnlyPermission;
         }
 
+        if (
+          !isGlossaryActive &&
+          selectedData.entityStatus === EntityStatus.Draft &&
+          canEditWorking
+        ) {
+          const workingEditPermission = {
+            ...permission,
+            EditAll: true,
+            EditCustomFields: true,
+            EditDescription: true,
+            EditDisplayName: true,
+            EditGlossaryTerms: true,
+            EditOwners: true,
+            EditTags: true,
+          };
+          setGlossaryTermPermission(workingEditPermission);
+
+          return workingEditPermission;
+        }
+
         return permission;
       }
     } finally {
@@ -481,7 +520,10 @@ const GlossaryV1 = ({
     if (permission?.ViewAll || permission?.ViewBasic) {
       // Only load terms if we're viewing a glossary term, not a glossary
       // GlossaryTermTab handles pagination for glossaries
-      if (!isGlossaryActive && !isCDEGlossaryTerm) {
+      // Governed CDE/DQ identities are always direct glossary children. Their
+      // versioned FQN is a read-model address, not a native parent-term FQN;
+      // querying directChildrenOf with it produces a false 404 on detail pages.
+      if (!isGlossaryActive && !isCDEGlossaryTerm && !isDQGlossaryTerm) {
         loadGlossaryTerms();
       } else {
         setIsLoading(false);
@@ -492,7 +534,7 @@ const GlossaryV1 = ({
   };
 
   useEffect(() => {
-    if (id && !action) {
+    if (id && !action && isSelectedEntityReady) {
       // Clear terms and reset pagination when switching entities
       setGlossaryChildTerms([]);
       setAfterCursor(undefined);
@@ -510,6 +552,8 @@ const GlossaryV1 = ({
     isGlossaryActive,
     isVersionsView,
     action,
+    isSelectedEntityReady,
+    selectedData.id,
     selectedData.entityStatus,
   ]);
 
@@ -569,37 +613,41 @@ const GlossaryV1 = ({
     <>
       {(isLoading || isPermissionLoading) && <Loader />}
 
-      <GenericProvider<Glossary | GlossaryTerm>
-        currentVersionData={selectedData}
-        customizedPage={customizedPage}
-        data={selectedData}
-        isTabExpanded={isTabExpanded}
-        isVersionView={isVersionsView}
-        permissions={
-          isGlossaryActive ? glossaryPermission : glossaryTermPermission
-        }
-        type={isGlossaryActive ? EntityType.GLOSSARY : EntityType.GLOSSARY_TERM}
-        onUpdate={handleGlossaryUpdate}>
-        {!isLoading &&
-          !isPermissionLoading &&
-          !isEmpty(selectedData) &&
-          (isGlossaryActive ? (
-            glossaryContent
-          ) : (
-            <GlossaryTermsV1
-              glossaryTerm={selectedData as GlossaryTerm}
-              handleGlossaryTermDelete={onGlossaryTermDelete}
-              handleGlossaryTermUpdate={onGlossaryTermUpdate}
-              isSummaryPanelOpen={isSummaryPanelOpen}
-              isTabExpanded={isTabExpanded}
-              isVersionView={isVersionsView}
-              refreshActiveGlossaryTerm={refreshActiveGlossaryTerm}
-              toggleTabExpanded={toggleTabExpanded}
-              updateVote={updateVote}
-              onAssetClick={onAssetClick}
-            />
-          ))}
-      </GenericProvider>
+      {isSelectedEntityReady && (
+        <GenericProvider<Glossary | GlossaryTerm>
+          currentVersionData={selectedData}
+          customizedPage={customizedPage}
+          data={selectedData}
+          isTabExpanded={isTabExpanded}
+          isVersionView={isVersionsView}
+          permissions={
+            isGlossaryActive ? glossaryPermission : glossaryTermPermission
+          }
+          type={
+            isGlossaryActive ? EntityType.GLOSSARY : EntityType.GLOSSARY_TERM
+          }
+          onUpdate={handleGlossaryUpdate}>
+          {!isLoading &&
+            !isPermissionLoading &&
+            !isEmpty(selectedData) &&
+            (isGlossaryActive ? (
+              glossaryContent
+            ) : (
+              <GlossaryTermsV1
+                glossaryTerm={selectedData as GlossaryTerm}
+                handleGlossaryTermDelete={onGlossaryTermDelete}
+                handleGlossaryTermUpdate={onGlossaryTermUpdate}
+                isSummaryPanelOpen={isSummaryPanelOpen}
+                isTabExpanded={isTabExpanded}
+                isVersionView={isVersionsView}
+                refreshActiveGlossaryTerm={refreshActiveGlossaryTerm}
+                toggleTabExpanded={toggleTabExpanded}
+                updateVote={updateVote}
+                onAssetClick={onAssetClick}
+              />
+            ))}
+        </GenericProvider>
+      )}
 
       {selectedData && (
         <EntityDeleteModal
@@ -625,6 +673,7 @@ const GlossaryV1 = ({
             activeGlossary?.displayName,
             activeGlossary?.fullyQualifiedName
           )}
+          parentBusinessVersion={selectedData.businessVersion}
           visible={isEditModalOpen}
           onCancel={() => setIsEditModalOpen(false)}
           onSave={handleGlossaryTermSave}

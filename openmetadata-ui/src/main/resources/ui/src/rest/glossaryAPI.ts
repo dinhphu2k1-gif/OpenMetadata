@@ -18,6 +18,7 @@ import { CSVExportResponse } from '../components/Entity/EntityExportModalProvide
 import { VotingDataProps } from '../components/Entity/Voting/voting.interface';
 import { MoveGlossaryTermWebsocketResponse } from '../components/Modals/ChangeParentHierarchy/ChangeParentHierarchy.interface';
 import { ES_MAX_PAGE_SIZE, PAGE_SIZE_MEDIUM } from '../constants/constants';
+import { DATA_QUALITY_GLOSSARY_NAME } from '../constants/Glossary.contant';
 import { TabSpecificField } from '../enums/entity.enum';
 import { SearchIndex } from '../enums/search.enum';
 import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssetsRequest';
@@ -78,7 +79,9 @@ const parentScopeFromRoute = () => {
     search: globalThis.location?.search,
   }).parentBusinessVersion;
   if (!scope) {
-    throw new Error('parentBusinessVersion is required for CDE operations');
+    throw new Error(
+      'parentBusinessVersion is required for governed glossary term operations'
+    );
   }
 
   return scope;
@@ -477,8 +480,13 @@ export const createGlossaryTermWorkingVersion = async (
 export const updateGlossaryTermWorkingVersion = async (
   id: string,
   expectedRevision: number,
-  payload: GlossaryTerm
+  payload: GlossaryTerm,
+  parentBusinessVersion?: string
 ) => {
+  const extension = {
+    ...((payload.extension as Record<string, unknown>) ?? {}),
+  };
+  delete extension.releaseVersionType;
   const request: CdeDraftUpdateRequest = {
     expectedRevision,
     displayName: payload.displayName ?? null,
@@ -486,14 +494,22 @@ export const updateGlossaryTermWorkingVersion = async (
     owners: payload.owners ?? [],
     // Reviewers are not part of the CDE authoring payload.
     domains: payload.domains ?? [],
+    // The canonical CDE relation is read-only, but must survive a complete
+    // working-payload replacement.
+    relatedTerms: payload.relatedTerms ?? [],
     tags: payload.tags ?? [],
-    extension: (payload.extension as Record<string, unknown>) ?? {},
+    extension,
   };
   const response = await APIClient.patch<
     CdeDraftUpdateRequest,
     AxiosResponse<GlossaryTerm>
   >(`/glossaryTerms/${id}/working`, request, {
-    params: { parentBusinessVersion: parentScopeFromRoute() },
+    params: {
+      parentBusinessVersion:
+        normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+        normalizeCdeParentBusinessVersion(payload.parentBusinessVersion) ??
+        parentScopeFromRoute(),
+    },
     headers: { 'Content-Type': 'application/json' },
   });
 
@@ -535,17 +551,26 @@ export async function transitionGlossaryTermWorkflow(
     return response.data;
   }
   const path = action === 'createDraft' ? 'working' : `working/${action}`;
+  const resolvedParentBusinessVersion =
+    normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+    parentScopeFromRoute();
+  const requestBody =
+    action === 'createDraft'
+      ? {
+          ...request,
+          parentBusinessVersion: resolvedParentBusinessVersion,
+        }
+      : request;
   const response = await APIClient.post<
     GlossaryWorkflowRequest,
     AxiosResponse<GlossaryTerm>
-  >(`/glossaryTerms/${id}/${path}`, request, {
+  >(`/glossaryTerms/${id}/${path}`, requestBody, {
     params:
       action === 'createDraft'
         ? undefined
         : {
             parentBusinessVersion:
-              normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
-              parentScopeFromRoute(),
+              resolvedParentBusinessVersion,
           },
   });
 
@@ -637,11 +662,18 @@ export const exportGlossaryTermsInCSVFormat = async (glossaryName: string) => {
   return response.data;
 };
 
-export const getGlossaryVersionsList = async (id: string) => {
+/** Returns the immutable glossary snapshots without converting them to EntityHistory. */
+export const getPublishedGlossaryVersions = async (id: string) => {
   const response = await APIClient.get<Glossary[]>(
     `/glossaries/${id}/published`
   );
-  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
+
+  return response.data;
+};
+
+export const getGlossaryVersionsList = async (id: string) => {
+  const snapshots = await getPublishedGlossaryVersions(id);
+  const versions = snapshots.map((snapshot) => JSON.stringify(snapshot));
 
   return { entityType: 'glossary', versions } as EntityHistory;
 };
@@ -660,11 +692,22 @@ export const getGlossaryTermsVersionsList = async (
   id: string,
   parentBusinessVersion?: string
 ) => {
-  const response = await APIClient.get<GlossaryTerm[]>(
+  const response = await APIClient.get<
+    GlossaryTerm[] | { data?: GlossaryTerm[] }
+  >(
     `/glossaryTerms/${id}/published`,
     { params: { parentBusinessVersion } }
   );
-  const versions = response.data.map((snapshot) => JSON.stringify(snapshot));
+  // Depending on the backend/proxy version, collection responses can be
+  // returned either as a bare array or in the standard `{ data: [...] }`
+  // envelope. Keep the version selector compatible with both contracts.
+  const responseBody = response.data;
+  const snapshots = Array.isArray(responseBody)
+    ? responseBody
+    : Array.isArray(responseBody?.data)
+    ? responseBody.data
+    : [];
+  const versions = snapshots.map((snapshot) => JSON.stringify(snapshot));
 
   return { entityType: 'glossaryTerm', versions } as EntityHistory;
 };
@@ -831,7 +874,9 @@ export const getFirstLevelGlossaryTermsPaginated = async (
     PagingResponse<GlossaryTermWithChildren[]>
   >(apiUrl, {
     params: {
-      ...(parentFQN === 'Data Dictionary' || glossaryId
+      ...(parentFQN === 'Data Dictionary' ||
+        parentFQN === DATA_QUALITY_GLOSSARY_NAME ||
+        glossaryId
         ? { glossary: glossaryId ?? parentFQN }
         : { directChildrenOf: parentFQN }),
       fields: fields ?? [

@@ -723,6 +723,7 @@ const DQImportPage: FC = () => {
       id: string;
       name: string;
       workingRevision: number;
+      parentBusinessVersion: string;
     }[] = [];
 
     const total = rowsToProcess.length;
@@ -781,13 +782,15 @@ const DQImportPage: FC = () => {
               'createDraft',
               {
                 businessVersion: payload.businessVersion,
-              }
+              },
+              editable.parentBusinessVersion
             );
           } else if (editable.entityStatus === EntityStatus.Rejected) {
             editable = await transitionGlossaryTermWorkflow(
               editable.id,
               'reopen',
-              { expectedRevision: Number(editable.workingRevision) }
+              { expectedRevision: Number(editable.workingRevision) },
+              editable.parentBusinessVersion
             );
           }
           await updateGlossaryTermWorkingVersion(
@@ -811,7 +814,8 @@ const DQImportPage: FC = () => {
           const working = await transitionGlossaryTermWorkflow(
             newTerm.id,
             'createDraft',
-            { businessVersion }
+            { businessVersion },
+            newTerm.parentBusinessVersion
           );
           created++;
           if (working?.id && working.workingRevision) {
@@ -819,6 +823,10 @@ const DQImportPage: FC = () => {
               id: working.id,
               name: working.name || termName,
               workingRevision: working.workingRevision,
+              parentBusinessVersion:
+                working.parentBusinessVersion ??
+                newTerm.parentBusinessVersion ??
+                businessVersion.split('.')[0],
             });
           }
         }
@@ -858,9 +866,12 @@ const DQImportPage: FC = () => {
       await Promise.allSettled(
         chunk.map(async (term) => {
           try {
-            await transitionGlossaryTermWorkflow(term.id, 'submit', {
-              expectedRevision: term.workingRevision,
-            });
+            await transitionGlossaryTermWorkflow(
+              term.id,
+              'submit',
+              { expectedRevision: term.workingRevision },
+              term.parentBusinessVersion
+            );
             successCount++;
           } catch (err) {
             // ignore individual error

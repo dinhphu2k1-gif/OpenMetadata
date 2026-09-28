@@ -61,6 +61,7 @@ const DescriptionV1 = ({
   showSuggestions = false,
   isDescriptionExpanded,
   entityFullyQualifiedName,
+  headerLabel,
 }: DescriptionProps) => {
   const navigate = useNavigate();
   const { isVersionView, changeSummary } = useGenericContext<Domain>();
@@ -237,7 +238,7 @@ const DescriptionV1 = ({
         <div className="description-v1-title-row d-flex items-center gap-2">
           <Text
             className={classNames('description-v1-title text-sm font-medium')}>
-            {t('label.description')}
+            {headerLabel ?? t('label.description')}
           </Text>
           <DescriptionSourceBadge
             changeSummaryEntry={changeSummary?.['description']}
@@ -249,7 +250,14 @@ const DescriptionV1 = ({
         {showSuggestions && suggestions?.length > 0 && <SuggestionsSlider />}
       </div>
     );
-  }, [showActions, actionButtons, suggestions, showSuggestions, changeSummary]);
+  }, [
+    showActions,
+    actionButtons,
+    suggestions,
+    showSuggestions,
+    changeSummary,
+    headerLabel,
+  ]);
 
   const content = (
     <EntityAttachmentProvider entityFqn={entityFqn} entityType={entityType}>

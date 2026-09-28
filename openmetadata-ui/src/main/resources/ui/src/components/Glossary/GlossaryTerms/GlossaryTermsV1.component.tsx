@@ -33,7 +33,6 @@ import {
 import { Operation } from '../../../generated/entity/policies/policy';
 import { PageType } from '../../../generated/system/ui/page';
 import { useCustomPages } from '../../../hooks/useCustomPages';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import { FeedCounts } from '../../../interface/feed.interface';
 import { MOCK_GLOSSARY_NO_PERMISSIONS } from '../../../mocks/Glossary.mock';
@@ -61,7 +60,9 @@ import { getTermQuery } from '../../../utils/SearchUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import {
   getCdeDetailPath,
+  getGovernedTermDetailPath,
   getScopedCdeFqn,
+  getScopedGovernedTermFqn,
   parseCdeRoute,
 } from '../../../utils/routing/cdeRoutingHelper';
 import { AlignRightIconButton } from '../../common/IconButtons/EditIconButton';
@@ -116,8 +117,6 @@ const GlossaryTermsV1 = ({
     [glossaryFqn, location.pathname, location.search],
   );
   const { businessVersion, parentBusinessVersion } = cdeRoute;
-  const { currentUser } = useApplicationStore();
-  const isAdmin = Boolean(currentUser?.isAdmin);
   const assetTabRef = useRef<AssetsTabRef>(null);
   const [assetModalVisible, setAssetModalVisible] = useState(false);
   const [feedCount, setFeedCount] = useState<FeedCounts>(
@@ -180,26 +179,41 @@ const GlossaryTermsV1 = ({
       }
 
       if (parentBusinessVersion) {
+        const dataQualityTerm = isDataQualityGlossary(
+          glossaryFqn,
+          currentGlossaryTerm.glossary?.name,
+          currentGlossaryTerm.glossary?.displayName,
+        );
         navigate(
-          getCdeDetailPath({
-            fqn: getScopedCdeFqn(
-              // A business-version snapshot can contain a legacy, unscoped
-              // FQN. Version selection stays on the same CDE identity, so
-              // rebuild its technical FQN from the authoritative parent scope.
-              glossaryFqn ||
-                currentGlossaryTerm.fullyQualifiedName ||
-                snapshot.fullyQualifiedName ||
-                currentGlossaryTerm.name,
-              parentBusinessVersion,
-            ),
-            businessVersion: snapshotBusinessVersion,
-            parentBusinessVersion,
-            // Keep the stable identity as well as the scoped FQN so the same
-            // CDE code in another Dictionary scope can never be selected.
-            termId: snapshot.id ?? currentGlossaryTerm.id,
-            isWorkingDraft:
-              snapshot.entityStatus !== EntityStatus.Approved,
-          }),
+          dataQualityTerm
+            ? getGovernedTermDetailPath({
+                fqn: getScopedGovernedTermFqn(
+                  snapshot.fullyQualifiedName ??
+                    currentGlossaryTerm.fullyQualifiedName ??
+                    glossaryFqn ??
+                    currentGlossaryTerm.name,
+                  parentBusinessVersion,
+                ),
+                businessVersion: snapshotBusinessVersion,
+                parentBusinessVersion,
+                termId: snapshot.id ?? currentGlossaryTerm.id,
+                isWorkingDraft:
+                  snapshot.entityStatus !== EntityStatus.Approved,
+              })
+            : getCdeDetailPath({
+                fqn: getScopedCdeFqn(
+                  glossaryFqn ||
+                    currentGlossaryTerm.fullyQualifiedName ||
+                    snapshot.fullyQualifiedName ||
+                    currentGlossaryTerm.name,
+                  parentBusinessVersion,
+                ),
+                businessVersion: snapshotBusinessVersion,
+                parentBusinessVersion,
+                termId: snapshot.id ?? currentGlossaryTerm.id,
+                isWorkingDraft:
+                  snapshot.entityStatus !== EntityStatus.Approved,
+              }),
         );
       } else {
         const searchParams = new URLSearchParams(location.search);
@@ -366,7 +380,6 @@ const GlossaryTermsV1 = ({
   useEffect(() => {
     if (
       (isCDEGlossaryTerm || isDQGlossaryTerm) &&
-      !isAdmin &&
       activeTab &&
       CDE_RESTRICTED_TABS.has(activeTab)
     ) {
@@ -375,7 +388,6 @@ const GlossaryTermsV1 = ({
   }, [
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
-    isAdmin,
     activeTab,
     activeTabHandler,
   ]);
@@ -476,13 +488,9 @@ const GlossaryTermsV1 = ({
           : tab,
       );
 
-      if (!isAdmin) {
-        return dqTabs.filter(
-          (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
-        );
-      }
-
-      return dqTabs;
+      return dqTabs.filter(
+        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
+      );
     }
 
     if (isCDEGlossaryTerm) {
@@ -517,7 +525,6 @@ const GlossaryTermsV1 = ({
     handleAssetClick,
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
-    isAdmin,
   ]);
 
   useEffect(() => {
@@ -525,15 +532,19 @@ const GlossaryTermsV1 = ({
     setTimeout(() => {
       fetchGlossaryTermAssets();
     }, 500);
-    // Data Dictionary CDEs do not expose the Activity Feed tab. Their scoped
-    // working revisions are resolved by stable term id, while the generic
-    // feed endpoint resolves an entity link by FQN. Calling it for a CDE
-    // revision therefore produces a misleading "glossaryTerm instance ...
-    // not found" toast even though the revision itself loaded successfully.
-    if (!isVersionView && !isCDEGlossaryTerm) {
+    // Governed CDE/DQ revisions do not expose the Activity Feed tab. They are
+    // resolved by stable term id plus business-version scope, while the generic
+    // feed endpoint resolves a native entity link by FQN. Calling it for a
+    // governed revision produces a misleading 404 although the snapshot loaded.
+    if (!isVersionView && !isCDEGlossaryTerm && !isDQGlossaryTerm) {
       getEntityFeedCount();
     }
-  }, [glossaryFqn, isVersionView, isCDEGlossaryTerm]);
+  }, [
+    glossaryFqn,
+    isVersionView,
+    isCDEGlossaryTerm,
+    isDQGlossaryTerm,
+  ]);
 
   const updatedGlossaryTerm = useMemo(() => {
     const name = isViewingVersion
@@ -560,10 +571,13 @@ const GlossaryTermsV1 = ({
   }, [glossaryTerm, isViewingVersion]);
 
   const effectivePermissions = useMemo(() => {
-    if (
-      glossaryTerm.entityStatus !== EntityStatus.InReview &&
-      glossaryTerm.entityStatus !== EntityStatus.Rejected
-    ) {
+    const isReadOnlyWorkflowState =
+      glossaryTerm.entityStatus === EntityStatus.InReview ||
+      glossaryTerm.entityStatus === EntityStatus.Rejected ||
+      (isDQGlossaryTerm &&
+        glossaryTerm.entityStatus !== EntityStatus.Draft);
+
+    if (!isReadOnlyWorkflowState) {
       return permissions;
     }
 
@@ -571,10 +585,13 @@ const GlossaryTermsV1 = ({
       ...permissions,
       EditAll: false,
       EditCustomFields: false,
+      EditDescription: false,
+      EditDisplayName: false,
+      EditGlossaryTerms: false,
       EditOwners: false,
       EditTags: false,
     };
-  }, [glossaryTerm.entityStatus, permissions]);
+  }, [glossaryTerm.entityStatus, isDQGlossaryTerm, permissions]);
 
   const isExpandViewSupported = useMemo(
     () =>
@@ -631,21 +648,31 @@ const GlossaryTermsV1 = ({
               setViewedVersion(null);
               setTransitionedWorking(updatedTerm);
               if (parentBusinessVersion && action !== 'createDraft') {
+                const target = {
+                  fqn:
+                    updatedTerm.fullyQualifiedName ??
+                    glossaryTerm.fullyQualifiedName ??
+                    glossaryFqn,
+                  businessVersion: getBusinessVersion(
+                    updatedTerm.businessVersion,
+                  ),
+                  parentBusinessVersion,
+                  termId: updatedTerm.id,
+                  isWorkingDraft: ![
+                    EntityStatus.Approved,
+                    EntityStatus.Archived,
+                  ].includes(updatedTerm.entityStatus as EntityStatus),
+                };
                 navigate(
-                  getCdeDetailPath({
-                    fqn:
-                      updatedTerm.fullyQualifiedName ??
-                      glossaryTerm.fullyQualifiedName ??
-                      glossaryFqn,
-                    businessVersion: getBusinessVersion(
-                      updatedTerm.businessVersion,
-                    ),
-                    parentBusinessVersion,
-                    isWorkingDraft: ![
-                      EntityStatus.Approved,
-                      EntityStatus.Archived,
-                    ].includes(updatedTerm.entityStatus as EntityStatus),
-                  }),
+                  isDQGlossaryTerm
+                    ? getGovernedTermDetailPath({
+                        ...target,
+                        fqn: getScopedGovernedTermFqn(
+                          target.fqn,
+                          parentBusinessVersion,
+                        ),
+                      })
+                    : getCdeDetailPath(target),
                   { replace: true },
                 );
               }

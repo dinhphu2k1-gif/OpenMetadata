@@ -35,7 +35,7 @@ public final class GlossaryBusinessVersion {
         || version.length() > MAX_LENGTH
         || !CANONICAL_DICTIONARY_VERSION.matcher(version).matches()) {
       throw new IllegalArgumentException(
-          "Data Dictionary businessVersion must be a canonical positive integer");
+          "businessVersion must be a canonical positive integer");
     }
     return version;
   }
@@ -45,7 +45,7 @@ public final class GlossaryBusinessVersion {
     String parent = requireCanonicalDictionary(parentBusinessVersion);
     if (!canonical.startsWith(parent + ".")) {
       throw new IllegalArgumentException(
-          "CDE businessVersion prefix must equal parentBusinessVersion");
+          "Glossary term businessVersion prefix must equal parentBusinessVersion");
     }
     return canonical;
   }

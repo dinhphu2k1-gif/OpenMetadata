@@ -24,6 +24,7 @@ interface Props {
   entityData: {
     displayName?: string;
     name: string;
+    nameNode?: React.ReactNode;
     fullyQualifiedName?: string;
     deleted?: boolean;
   };
@@ -37,6 +38,7 @@ interface Props {
   badge?: React.ReactNode;
   suffix?: React.ReactNode;
   showName?: boolean;
+  showNameRow?: boolean;
   nameClassName?: string;
   displayNameClassName?: string;
   handleFollowingClick?: () => void;
@@ -59,6 +61,7 @@ export const EntityHeader = ({
   suffix,
   titleColor,
   showName = true,
+  showNameRow = true,
   isFollowingLoading,
   nameClassName = '',
   displayNameClassName = '',
@@ -95,6 +98,8 @@ export const EntityHeader = ({
             : undefined
         }
         name={entityData.name}
+        nameNode={entityData.nameNode}
+        showNameRow={showNameRow}
         nameClassName={nameClassName}
         openEntityInNewPage={openEntityInNewPage}
         serviceName={serviceName}

@@ -84,7 +84,7 @@ import org.openmetadata.service.util.SchemaFieldExtractor;
             + "only custom properties using existing OpenMetadata data types.")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@Collection(name = "types")
+@Collection(name = "types", order = 0)
 @Slf4j
 public class TypeResource extends EntityResource<Type, TypeRepository> {
   public static final String COLLECTION_PATH = "/v1/metadata/types/";

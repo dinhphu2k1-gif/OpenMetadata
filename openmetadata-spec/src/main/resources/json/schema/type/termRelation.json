@@ -15,6 +15,10 @@
     "term": {
       "description": "Reference to the related glossary term.",
       "$ref": "entityReference.json"
+    },
+    "versionContext": {
+      "description": "Optional immutable business snapshot selected for the related term.",
+      "$ref": "entityVersionContext.json"
     }
   },
   "required": ["term"],

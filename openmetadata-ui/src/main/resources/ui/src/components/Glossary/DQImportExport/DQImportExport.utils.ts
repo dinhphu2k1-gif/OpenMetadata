@@ -20,9 +20,12 @@ import {
 import { Tag } from '../../../generated/entity/classification/tag';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityStatusLabel } from '../../../utils/EntityStatusUtils';
+import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import { getCDEReleaseLevelLabel } from '../../../constants/CDEReleaseLevel.constants';
 import {
   DQ_TAG_CLASSIFICATIONS,
   DQExtension,
+  getDQCdeName,
 } from '../GlossaryTermTab/DQGlossaryTableColumns';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab/GlossaryTermTab.interface';
 
@@ -35,13 +38,15 @@ export interface DQImportRowData {
   description: string;
   ruleExplanation: string;
   otherConstraints: string;
-  exceptions: string;
   targetPopulation: string;
   method: string;
   frequency: string;
   qualityThreshold: string;
-  dataSource: string;
   status: EntityStatus;
+  releaseVersionType?: string;
+  releaseLevel?: string;
+  effectiveDate?: string;
+  expirationDate?: string;
   isExisting?: boolean;
   existingId?: string;
   errors: string[];
@@ -60,37 +65,25 @@ export interface DQValidationResult {
 export const DQ_EXCEL_SHEET_NAME = 'Quy tắc chất lượng dữ liệu';
 
 export const DQ_EXPORT_HEADERS = [
-  'Mã quy tắc nghiệp vụ',
-  'Mã CDE quy chiếu',
-  'Tên thành tố CDE',
-  'Tiêu chí đánh giá Chất lượng Dữ liệu',
-  'Quy tắc nghiệp vụ về chất lượng dữ liệu',
-  'Diễn giải Quy tắc nghiệp vụ',
-  'Ràng buộc/yêu cầu khác/Ghi chú khác biệt',
-  'Dấu hiệu xác định các trường hợp ngoại lệ',
-  'Tiêu chí cơ sở (Tập dữ liệu kiểm tra)',
-  'Hình thức kiểm tra chất lượng dữ liệu',
+  'Mã quy tắc',
+  'Mã CDE',
+  'Tên thành tố',
+  'Tiêu chí chất lượng dữ liệu',
+  'Quy tắc nghiệp vụ',
+  'Diễn giải quy tắc nghiệp vụ',
+  'Ràng buộc/Yêu cầu khác',
+  'Tập dữ liệu kiểm tra',
+  'Hình thức kiểm tra',
   'Tần suất',
-  'Ngưỡng Chất lượng Dữ liệu',
-  'Nguồn dữ liệu',
+  'Ngưỡng chất lượng dữ liệu',
   'Trạng thái',
+  'Loại phiên bản phát hành',
+  'Cấp phát hành',
+  'Ngày hiệu lực',
+  'Ngày hết hiệu lực',
 ];
 
-export const DQ_TEMPLATE_HEADERS = [
-  'Mã quy tắc nghiệp vụ',
-  'Mã CDE quy chiếu',
-  'Tên thành tố CDE',
-  'Tiêu chí đánh giá Chất lượng Dữ liệu',
-  'Quy tắc nghiệp vụ về chất lượng dữ liệu',
-  'Diễn giải Quy tắc nghiệp vụ',
-  'Ràng buộc/yêu cầu khác/Ghi chú khác biệt',
-  'Dấu hiệu xác định các trường hợp ngoại lệ',
-  'Tiêu chí cơ sở (Tập dữ liệu kiểm tra)',
-  'Hình thức kiểm tra chất lượng dữ liệu',
-  'Tần suất',
-  'Ngưỡng Chất lượng Dữ liệu',
-  'Nguồn dữ liệu',
-];
+export const DQ_TEMPLATE_HEADERS = DQ_EXPORT_HEADERS;
 
 export const DQ_COLUMN_WIDTHS = [
   { wch: 22 }, // Mã quy tắc
@@ -100,13 +93,15 @@ export const DQ_COLUMN_WIDTHS = [
   { wch: 45 }, // Quy tắc nghiệp vụ
   { wch: 40 }, // Diễn giải
   { wch: 35 }, // Ràng buộc
-  { wch: 35 }, // Ngoại lệ
   { wch: 32 }, // Tiêu chí cơ sở
   { wch: 32 }, // Hình thức kiểm tra
   { wch: 18 }, // Tần suất
   { wch: 22 }, // Ngưỡng CLDL
-  { wch: 20 }, // Nguồn dữ liệu
   { wch: 16 }, // Trạng thái
+  { wch: 24 }, // Loại phiên bản phát hành
+  { wch: 20 }, // Cấp phát hành
+  { wch: 16 }, // Ngày hiệu lực
+  { wch: 18 }, // Ngày hết hiệu lực
 ];
 
 export const DQ_TEMPLATE_FILE_NAME = 'Agribank_DQ_Mau_Nhap_Lieu.xlsx';
@@ -452,7 +447,7 @@ export const validateDQDataSourceValues = (
         const tagNorm = normalizeDQText(t.displayName || t.name);
 
         return (
-          t.classification?.name === DQ_TAG_CLASSIFICATIONS.dataSource &&
+          t.classification?.name === 'DataSource' &&
           (tagNorm === norm || norm.includes(tagNorm))
         );
       });
@@ -527,26 +522,23 @@ export const exportDQToExcel = (
       tags,
       DQ_TAG_CLASSIFICATIONS.frequency
     );
-    const dataSource = getDQTagLabelByClassification(
-      tags,
-      DQ_TAG_CLASSIFICATIONS.dataSource
-    );
-
     return [
       term.name || '',
       ext.cdeCode || '',
-      ext.cdeName || '',
+      getDQCdeName(term),
       dimension,
       term.description || '',
       ext.ruleExplanation || '',
       ext.otherConstraints || '',
-      ext.exceptions || '',
       targetPopulation,
       method,
       frequency,
       ext.qualityThreshold || '',
-      dataSource,
       getEntityStatusLabel(term.status || EntityStatus.Draft),
+      ext.releaseVersionType || '',
+      getCDEReleaseLevelLabel(ext.releaseLevel),
+      formatCDEDate(ext.effectiveDate, ''),
+      formatCDEDate(ext.expirationDate, ''),
     ];
   });
 
@@ -592,6 +584,11 @@ export const downloadDQExcelTemplate = (): void => {
       'Hàng Quý',
       '99%',
       'IPCAS',
+      '',
+      '',
+      'Tổng Giám đốc',
+      '01/01/2026',
+      '31/12/2026',
     ],
     [
       'DQ3.2',
@@ -607,12 +604,17 @@ export const downloadDQExcelTemplate = (): void => {
       'Hàng Quý',
       '99%',
       'IPCAS',
+      '',
+      '',
+      'TTQLDL',
+      '01/01/2026',
+      '',
     ],
   ];
 
   const wsData = [DQ_TEMPLATE_HEADERS, ...sampleRows];
   const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-  worksheet['!cols'] = DQ_COLUMN_WIDTHS.slice(0, 13);
+  worksheet['!cols'] = DQ_COLUMN_WIDTHS;
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, DQ_EXCEL_SHEET_NAME);
@@ -719,8 +721,6 @@ export const readAndValidateDQExcel = async (
       colIndexMap.ruleExplanation = idx;
     } else if (norm.includes('rang buoc') || norm.includes('yeu cau khac')) {
       colIndexMap.otherConstraints = idx;
-    } else if (norm.includes('ngoai le')) {
-      colIndexMap.exceptions = idx;
     } else if (
       norm.includes('tieu chi co so') ||
       norm.includes('tap du lieu')
@@ -735,8 +735,6 @@ export const readAndValidateDQExcel = async (
       colIndexMap.frequency = idx;
     } else if (norm.includes('nguong')) {
       colIndexMap.qualityThreshold = idx;
-    } else if (norm.includes('nguon du lieu') || norm === 'nguon') {
-      colIndexMap.dataSource = idx;
     }
   });
 
@@ -767,12 +765,10 @@ export const readAndValidateDQExcel = async (
     const description = getVal(rawRow, 'description', 4);
     const ruleExplanation = getVal(rawRow, 'ruleExplanation', 5);
     const otherConstraints = getVal(rawRow, 'otherConstraints', 6);
-    const exceptions = getVal(rawRow, 'exceptions', 7);
-    const targetPopulation = getVal(rawRow, 'targetPopulation', 8);
-    const method = getVal(rawRow, 'method', 9);
-    const frequency = getVal(rawRow, 'frequency', 10);
-    const qualityThreshold = getVal(rawRow, 'qualityThreshold', 11);
-    const dataSource = getVal(rawRow, 'dataSource', 12);
+    const targetPopulation = getVal(rawRow, 'targetPopulation', 7);
+    const method = getVal(rawRow, 'method', 8);
+    const frequency = getVal(rawRow, 'frequency', 9);
+    const qualityThreshold = getVal(rawRow, 'qualityThreshold', 10);
 
     const rowErrors: string[] = [];
     const rowWarnings: string[] = [];
@@ -843,19 +839,7 @@ export const readAndValidateDQExcel = async (
       }
     }
 
-    // 7. Thẩm định Nguồn dữ liệu
-    if (dataSource) {
-      const dsRes = validateDQDataSourceValues(dataSource, availableTags);
-      if (!dsRes.isValid) {
-        rowErrors.push(
-          `Nguồn dữ liệu '${dsRes.invalidValues.join(
-            ', '
-          )}' không tồn tại trên hệ thống.`
-        );
-      }
-    }
-
-    // 8. Kiểm tra bản ghi đã tồn tại trên hệ thống
+    // 7. Kiểm tra bản ghi đã tồn tại trên hệ thống
     const existing = existingTerms.find(
       (term) =>
         term.name.toLowerCase() === name.toLowerCase() ||
@@ -879,12 +863,10 @@ export const readAndValidateDQExcel = async (
       description,
       ruleExplanation,
       otherConstraints,
-      exceptions,
       targetPopulation,
       method,
       frequency,
       qualityThreshold,
-      dataSource,
       status: EntityStatus.Draft,
       isExisting,
       existingId,
@@ -978,15 +960,7 @@ export const transformDQRowToGlossaryTermPayload = (
     }
   }
 
-  // 5. Tag Nguồn dữ liệu (DataSource)
-  if (row.dataSource) {
-    const dsRes = validateDQDataSourceValues(row.dataSource, availableTags);
-    if (dsRes.matchedTags.length > 0) {
-      tags.push(...dsRes.matchedTags);
-    }
-  }
-
-  // 6. Liên kết CDE liên quan (relatedTerms)
+  // 5. Liên kết CDE liên quan (relatedTerms)
   let relatedTerms: string[] | undefined;
   if (row.cdeCode && allCdeTerms.length > 0) {
     const cleanCode = row.cdeCode.trim().toUpperCase();
@@ -1002,13 +976,12 @@ export const transformDQRowToGlossaryTermPayload = (
     }
   }
 
-  // 7. Custom properties (extension)
+  // 6. Custom properties (extension)
   const extension: Record<string, unknown> = {
     cdeCode: row.cdeCode || undefined,
     cdeName: row.cdeName || undefined,
     ruleExplanation: row.ruleExplanation || undefined,
     otherConstraints: row.otherConstraints || undefined,
-    exceptions: row.exceptions || undefined,
     qualityThreshold: row.qualityThreshold || undefined,
   };
 

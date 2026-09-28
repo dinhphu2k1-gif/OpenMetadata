@@ -76,6 +76,7 @@ public class ListFilter extends Filter<ListFilter> {
     conditions.add(getExtensionCondition());
     conditions.add(getServerIdCondition(tableName));
     conditions.add(getExactNameCondition(tableName));
+    conditions.add(getExactNamesCondition(tableName));
     conditions.add(getNameFilterCondition());
     String condition = addCondition(conditions);
     return condition.isEmpty() ? "WHERE TRUE" : "WHERE " + condition;
@@ -93,6 +94,30 @@ public class ListFilter extends Filter<ListFilter> {
     }
     String nameColumn = tableName == null || tableName.isBlank() ? "name" : tableName + ".name";
     return nameColumn + " = :exactName";
+  }
+
+  private String getExactNamesCondition(String tableName) {
+    String exactNames = queryParams.get("exactNames");
+    if (nullOrEmpty(exactNames)) {
+      return "";
+    }
+    List<String> names =
+        Arrays.stream(exactNames.split(","))
+            .map(String::trim)
+            .filter(Predicate.not(String::isEmpty))
+            .distinct()
+            .toList();
+    if (names.isEmpty()) {
+      return "";
+    }
+    List<String> bindParams = new ArrayList<>();
+    for (int index = 0; index < names.size(); index++) {
+      String key = "exactName_" + index;
+      queryParams.put(key, names.get(index));
+      bindParams.add(":" + key);
+    }
+    String nameColumn = tableName == null || tableName.isBlank() ? "name" : tableName + ".name";
+    return nameColumn + " IN (" + String.join(",", bindParams) + ")";
   }
 
   private String getPublishedSnapshotCondition(String tableName) {

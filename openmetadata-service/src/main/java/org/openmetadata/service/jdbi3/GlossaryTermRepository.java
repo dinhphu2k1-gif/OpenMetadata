@@ -95,6 +95,7 @@ import org.openmetadata.schema.type.ChangeDescription;
 import org.openmetadata.schema.type.ChangeEvent;
 import org.openmetadata.schema.type.Column;
 import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.schema.type.EntityVersionContext;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.EventType;
 import org.openmetadata.schema.type.Include;
@@ -116,7 +117,9 @@ import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.CdeImportService.PlannedRow;
+import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
@@ -249,6 +252,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                           .withParentBusinessVersion(parentBusinessVersion)
                           .withWorkingRevision(null)
                           .withEntityStatus(EntityStatus.DRAFT);
+                  payload = withReleaseVersionType(payload, initialVersion);
                   versions.insertWorking(
                       UUID.randomUUID(),
                       GLOSSARY_TERM,
@@ -283,6 +287,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         continue;
       }
       GlossaryTerm payload = JsonUtils.convertValue(row.payload(), GlossaryTerm.class);
+      payload = withReleaseVersionType(payload, row.businessVersion());
       if ("CREATE".equals(row.action())) {
         payload.setId(row.termId());
         prepareInternal(payload, false);
@@ -382,6 +387,12 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       writeThroughCache(identity, false);
     }
     return result;
+  }
+
+  private static GlossaryTerm withReleaseVersionType(
+      GlossaryTerm payload, String businessVersion) {
+    return JsonUtils.convertValue(
+        CdeReleaseVersionType.apply(payload, businessVersion), GlossaryTerm.class);
   }
 
   private static void insertImportRelationships(CollectionDAO collection, GlossaryTerm term) {
@@ -691,17 +702,44 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   private TermRelation buildTermRelation(EntityRelationshipRecord record) {
     EntityReference termRef = Entity.getEntityReferenceById(GLOSSARY_TERM, record.getId(), ALL);
     String relationType = "relatedTo";
+    EntityVersionContext versionContext = null;
     if (record.getJson() != null) {
       try {
         Map<String, Object> jsonMap = JsonUtils.readValue(record.getJson(), Map.class);
         if (jsonMap.containsKey("relationType")) {
           relationType = (String) jsonMap.get("relationType");
         }
+        Object rawContext = jsonMap.get("versionContext");
+        Object versionedTermId = jsonMap.get("versionedTermId");
+        if (rawContext != null
+            && (versionedTermId == null || termRef.getId().toString().equals(versionedTermId))) {
+          versionContext = JsonUtils.convertValue(rawContext, EntityVersionContext.class);
+        }
       } catch (Exception e) {
         LOG.debug("Failed to parse relation JSON: {}", e.getMessage());
       }
     }
-    return new TermRelation().withTerm(termRef).withRelationType(relationType);
+    return new TermRelation()
+        .withTerm(termRef)
+        .withRelationType(relationType)
+        .withVersionContext(versionContext);
+  }
+
+  private String relationJson(
+      String canonicalType, UUID versionedTermId, EntityVersionContext versionContext) {
+    Map<String, Object> value = new LinkedHashMap<>();
+    value.put("relationType", canonicalType);
+    if (versionContext != null) {
+      value.put("versionedTermId", versionedTermId.toString());
+      value.put("versionContext", versionContext);
+    }
+    return JsonUtils.pojoToJson(value);
+  }
+
+  private boolean sameVersionContext(TermRelation left, TermRelation right) {
+    return Objects.equals(
+        JsonUtils.pojoToJson(left.getVersionContext()),
+        JsonUtils.pojoToJson(right.getVersionContext()));
   }
 
   private void populateTermRelations(List<TermRelation> termRelations) {
@@ -733,7 +771,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     }
     // Validate glossary
     Glossary glossary = Entity.getEntity(entity.getGlossary(), "reviewers", Include.NON_DELETED);
-    DataDictionaryResolver.requireDataDictionary(glossary);
+    GovernedGlossaryProfileRegistry.require(glossary);
     entity.setGlossary(glossary.getEntityReference());
     validateHierarchy(entity);
     // Validate related terms
@@ -867,7 +905,8 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       validateRelationType(relationType);
       UUID toId = termRelation.getTerm().getId();
       String canonicalType = computeCanonicalRelationType(entity.getId(), toId, relationType);
-      String json = String.format("{\"relationType\":\"%s\"}", canonicalType);
+      String json =
+          relationJson(canonicalType, toId, termRelation.getVersionContext());
       addRelationship(
           entity.getId(),
           toId,
@@ -906,7 +945,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     }
 
     String canonicalType = computeCanonicalRelationType(id, termRef.getId(), relationType);
-    String json = String.format("{\"relationType\":\"%s\"}", canonicalType);
+    String json = relationJson(canonicalType, termRef.getId(), termRelation.getVersionContext());
     addRelationship(
         id,
         termRef.getId(),
@@ -2455,7 +2494,8 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
           deleted,
           (tr1, tr2) ->
               tr1.getTerm().getId().equals(tr2.getTerm().getId())
-                  && Objects.equals(tr1.getRelationType(), tr2.getRelationType()));
+                  && Objects.equals(tr1.getRelationType(), tr2.getRelationType())
+                  && sameVersionContext(tr1, tr2));
 
       for (TermRelation termRelation : deleted) {
         String delRelationType =
@@ -2474,7 +2514,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
         validateRelationType(relationType);
         UUID toId = termRelation.getTerm().getId();
         String canonicalType = computeCanonicalRelationType(origTerm.getId(), toId, relationType);
-        String json = String.format("{\"relationType\":\"%s\"}", canonicalType);
+        String json = relationJson(canonicalType, toId, termRelation.getVersionContext());
         addRelationship(
             origTerm.getId(),
             toId,
