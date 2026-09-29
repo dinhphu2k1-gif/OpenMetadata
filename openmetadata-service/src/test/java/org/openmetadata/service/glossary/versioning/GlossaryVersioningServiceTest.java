@@ -33,8 +33,7 @@ class GlossaryVersioningServiceTest {
     PublishedSnapshotRecord v210 = snapshot("glossaryTerm", entityId, "2", "2.10");
 
     PublishedSnapshotRecord selected =
-        GlossaryVersioningService.selectLatestPublishedInScope(
-            List.of(otherScope, v29, v210), "2");
+        GlossaryVersioningService.selectLatestPublishedInScope(List.of(otherScope, v29, v210), "2");
 
     assertEquals(v210.snapshotId(), selected.snapshotId());
   }
@@ -46,21 +45,17 @@ class GlossaryVersioningServiceTest {
 
     assertThrows(
         NotFoundException.class,
-        () ->
-            GlossaryVersioningService.selectLatestPublishedInScope(
-                List.of(otherScope), "2"));
+        () -> GlossaryVersioningService.selectLatestPublishedInScope(List.of(otherScope), "2"));
   }
 
   @Test
   void latestApprovedRelationPrefersActivePredecessorOverRevokedSnapshot() {
     UUID entityId = UUID.randomUUID();
     PublishedSnapshotRecord active = snapshot("glossaryTerm", entityId, "2", "2.1");
-    PublishedSnapshotRecord revoked =
-        archivedSnapshot("glossaryTerm", entityId, "2", "2.2");
+    PublishedSnapshotRecord revoked = archivedSnapshot("glossaryTerm", entityId, "2", "2.2");
 
     PublishedSnapshotRecord selected =
-        GlossaryVersioningService.selectLatestPublishedInScope(
-            List.of(active, revoked), "2");
+        GlossaryVersioningService.selectLatestPublishedInScope(List.of(active, revoked), "2");
 
     assertEquals(active.snapshotId(), selected.snapshotId());
   }
@@ -68,10 +63,8 @@ class GlossaryVersioningServiceTest {
   @Test
   void latestApprovedRelationUsesNewestArchivedSnapshotForFrozenScope() {
     UUID entityId = UUID.randomUUID();
-    PublishedSnapshotRecord v20 =
-        archivedSnapshot("glossaryTerm", entityId, "2", "2.0");
-    PublishedSnapshotRecord v21 =
-        archivedSnapshot("glossaryTerm", entityId, "2", "2.1");
+    PublishedSnapshotRecord v20 = archivedSnapshot("glossaryTerm", entityId, "2", "2.0");
+    PublishedSnapshotRecord v21 = archivedSnapshot("glossaryTerm", entityId, "2", "2.1");
 
     PublishedSnapshotRecord selected =
         GlossaryVersioningService.selectLatestPublishedInScope(List.of(v20, v21), "2");
@@ -101,10 +94,10 @@ class GlossaryVersioningServiceTest {
     when(dao.deletePublishedHead("glossaryTerm", v1Term.entityId(), v1Term.snapshotId()))
         .thenReturn(1);
     when(dao.deletePublishedHead("glossary", glossaryId, predecessor.snapshotId())).thenReturn(1);
-    when(dao.updateSnapshotPayload(eq(active.snapshotId()), anyString(), anyString())).thenReturn(1);
+    when(dao.updateSnapshotPayload(eq(active.snapshotId()), anyString(), anyString()))
+        .thenReturn(1);
 
-    assertTrue(
-        GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
+    assertTrue(GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
 
     verify(dao).insertSnapshotTerm(predecessor.snapshotId(), v1Term.snapshotId(), 0);
     verify(dao).insertSnapshotTerm(active.snapshotId(), v2Term.snapshotId(), 0);
@@ -120,8 +113,7 @@ class GlossaryVersioningServiceTest {
     when(dao.lockLatestPublished("glossary", glossaryId)).thenReturn(active);
     when(dao.listPublished("glossary", glossaryId)).thenReturn(List.of(active));
 
-    assertFalse(
-        GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
+    assertFalse(GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
     verify(dao, never()).deleteSnapshotTerms(active.snapshotId());
   }
 
@@ -140,14 +132,13 @@ class GlossaryVersioningServiceTest {
     when(dao.listSnapshotTerms(archivedV1.snapshotId())).thenReturn(List.of());
     when(dao.listArchivedTermSnapshotsForGlossaryAndParent(glossaryId, "1"))
         .thenReturn(List.of(latest, older));
-    when(dao.listActiveLatestTermsForGlossaryAndParent(glossaryId, "2"))
-        .thenReturn(List.of());
+    when(dao.listActiveLatestTermsForGlossaryAndParent(glossaryId, "2")).thenReturn(List.of());
     when(dao.updateSnapshotPayload(eq(archivedV1.snapshotId()), anyString(), anyString()))
         .thenReturn(1);
-    when(dao.updateSnapshotPayload(eq(active.snapshotId()), anyString(), anyString())).thenReturn(1);
+    when(dao.updateSnapshotPayload(eq(active.snapshotId()), anyString(), anyString()))
+        .thenReturn(1);
 
-    assertTrue(
-        GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
+    assertTrue(GlossaryVersioningService.repairDataDictionaryCutover(dao, glossaryId, "admin"));
 
     verify(dao).insertSnapshotTerm(archivedV1.snapshotId(), latest.snapshotId(), 0);
     verify(dao, never()).insertSnapshotTerm(archivedV1.snapshotId(), older.snapshotId(), 0);

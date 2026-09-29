@@ -29,7 +29,8 @@ class GovernedGlossaryProfileRegistryTest {
         GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY,
         GovernedGlossaryProfileRegistry.requireName("Data Quality"));
     assertFalse(
-        GovernedGlossaryProfileRegistry.find(new Glossary().withName("Native Glossary")).isPresent());
+        GovernedGlossaryProfileRegistry.find(new Glossary().withName("Native Glossary"))
+            .isPresent());
   }
 
   @Test

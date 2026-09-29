@@ -418,8 +418,7 @@ public interface GlossaryVersionDAO {
     return EntityDAO.queryInChunks(
         entityIds,
         chunk ->
-            findLatestPublishedBatchByParentInternal(
-                entityType, chunk, parentBusinessVersion));
+            findLatestPublishedBatchByParentInternal(entityType, chunk, parentBusinessVersion));
   }
 
   @SqlQuery(
@@ -517,8 +516,7 @@ public interface GlossaryVersionDAO {
       @BindUUID("termSnapshotId") UUID termSnapshotId,
       @Bind("displayOrder") int displayOrder);
 
-  @SqlUpdate(
-      "DELETE FROM glossary_snapshot_term WHERE glossarySnapshotId = :glossarySnapshotId")
+  @SqlUpdate("DELETE FROM glossary_snapshot_term WHERE glossarySnapshotId = :glossarySnapshotId")
   int deleteSnapshotTerms(@BindUUID("glossarySnapshotId") UUID glossarySnapshotId);
 
   @SqlQuery(

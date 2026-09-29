@@ -333,7 +333,10 @@ public class WebsocketNotificationHandler {
       } catch (RuntimeException exception) {
         LOG.warn(
             "Unable to publish CDE import notification jobId={} status={} userId={}",
-            jobId, status, userId, exception);
+            jobId,
+            status,
+            userId,
+            exception);
       }
     }
   }

@@ -44,10 +44,14 @@ class CdeExcelExporterTest {
     row.put(
         "extension",
         Map.of(
-            "releaseLevel", List.of("CEO"),
-            "dataQualityRules", true,
-            "effectiveDate", "2026-09-25",
-            "expirationDate", "2027-09-25"));
+            "releaseLevel",
+            List.of("CEO"),
+            "dataQualityRules",
+            true,
+            "effectiveDate",
+            "2026-09-25",
+            "expirationDate",
+            "2027-09-25"));
 
     ExportedWorkbook exported = CdeExcelExporter.write(List.of(row), "2");
     try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(exported.path()))) {
@@ -57,14 +61,14 @@ class CdeExcelExporterTest {
       assertEquals("'=SUM(1,1)", workbook.getSheetAt(0).getRow(1).getCell(0).getStringCellValue());
       assertEquals("Bán lẻ", workbook.getSheetAt(0).getRow(1).getCell(1).getStringCellValue());
       assertEquals(
-          "Dòng một\nDòng hai",
-          workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue());
+          "Dòng một\nDòng hai", workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue());
       assertEquals("Có", workbook.getSheetAt(0).getRow(1).getCell(10).getStringCellValue());
       assertEquals("Bản phụ", workbook.getSheetAt(0).getRow(1).getCell(12).getStringCellValue());
-      assertEquals("Tổng Giám đốc", workbook.getSheetAt(0).getRow(1).getCell(13).getStringCellValue());
       assertEquals(
-          "25/09/2026", workbook.getSheetAt(0).getRow(1).getCell(14).getStringCellValue());
-      assertFalse(workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue().contains("termId"));
+          "Tổng Giám đốc", workbook.getSheetAt(0).getRow(1).getCell(13).getStringCellValue());
+      assertEquals("25/09/2026", workbook.getSheetAt(0).getRow(1).getCell(14).getStringCellValue());
+      assertFalse(
+          workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue().contains("termId"));
     } finally {
       Files.deleteIfExists(exported.path());
     }

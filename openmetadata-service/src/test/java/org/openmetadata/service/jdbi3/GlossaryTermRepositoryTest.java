@@ -25,10 +25,8 @@ class GlossaryTermRepositoryTest {
 
   @Test
   void buildsIndependentFqnsForTheSameBusinessCodeInDifferentDictionaryScopes() {
-    String v1 =
-        GlossaryTermRepository.buildScopedCdeFqn("Data Dictionary", "alo1", "1");
-    String v2 =
-        GlossaryTermRepository.buildScopedCdeFqn("Data Dictionary", "alo1", "2");
+    String v1 = GlossaryTermRepository.buildScopedCdeFqn("Data Dictionary", "alo1", "1");
+    String v2 = GlossaryTermRepository.buildScopedCdeFqn("Data Dictionary", "alo1", "2");
 
     assertEquals("\"Data Dictionary\".alo1@v1", v1);
     assertEquals("\"Data Dictionary\".alo1@v2", v2);

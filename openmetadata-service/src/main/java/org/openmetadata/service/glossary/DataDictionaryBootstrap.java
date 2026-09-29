@@ -104,7 +104,8 @@ public final class DataDictionaryBootstrap {
                       .withTermRevisions(new ArrayList<>());
               collectionDAO.glossaryDAO().insert(glossary, glossary.getFullyQualifiedName());
 
-              Glossary payload = JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
+              Glossary payload =
+                  JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
               payload.withBusinessVersion(INITIAL_VERSION).withWorkingRevision(null);
               versionDAO.insertWorking(
                   UUID.randomUUID(),
@@ -126,9 +127,7 @@ public final class DataDictionaryBootstrap {
       Map<String, Object> payload = JsonUtils.readValue(working.payload(), Map.class);
       Object extensionValue = payload.get("extension");
       Map<String, Object> extension =
-          extensionValue instanceof Map<?, ?> values
-              ? (Map<String, Object>) values
-              : Map.of();
+          extensionValue instanceof Map<?, ?> values ? (Map<String, Object>) values : Map.of();
       String expected = CdeReleaseVersionType.fromBusinessVersion(working.businessVersion());
       if (List.of(expected).equals(extension.get(CdeReleaseVersionType.PROPERTY))) {
         continue;
@@ -187,8 +186,10 @@ public final class DataDictionaryBootstrap {
 
   private static Glossary findIdentity(CollectionDAO dao) {
     try {
-      return dao.glossaryDAO().findEntityByName(
-          FullyQualifiedName.quoteName(DataDictionaryResolver.DATA_DICTIONARY_NAME), Include.ALL);
+      return dao.glossaryDAO()
+          .findEntityByName(
+              FullyQualifiedName.quoteName(DataDictionaryResolver.DATA_DICTIONARY_NAME),
+              Include.ALL);
     } catch (EntityNotFoundException ignored) {
       return null;
     }

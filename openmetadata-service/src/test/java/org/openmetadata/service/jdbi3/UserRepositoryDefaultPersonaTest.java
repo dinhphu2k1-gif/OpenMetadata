@@ -75,10 +75,12 @@ class UserRepositoryDefaultPersonaTest {
     EntityReference dataStewardPersona = reference("persona", UserRepository.DATA_STEWARD_PERSONA);
 
     EntityReference dataProposerRole = reference("role", UserRepository.DATA_PROPOSER_ROLE);
-    EntityReference dataProposerPersona = reference("persona", UserRepository.DATA_PROPOSER_PERSONA);
+    EntityReference dataProposerPersona =
+        reference("persona", UserRepository.DATA_PROPOSER_PERSONA);
 
     EntityReference dataConsumerRole = reference("role", UserRepository.DATA_CONSUMER_ROLE);
-    EntityReference dataConsumerPersona = reference("persona", UserRepository.DATA_CONSUMER_PERSONA);
+    EntityReference dataConsumerPersona =
+        reference("persona", UserRepository.DATA_CONSUMER_PERSONA);
 
     java.util.Map<String, EntityReference> roleToPersonaMap =
         java.util.Map.of(

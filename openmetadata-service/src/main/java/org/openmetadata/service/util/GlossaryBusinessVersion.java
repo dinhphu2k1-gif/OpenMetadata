@@ -34,8 +34,7 @@ public final class GlossaryBusinessVersion {
     if (version == null
         || version.length() > MAX_LENGTH
         || !CANONICAL_DICTIONARY_VERSION.matcher(version).matches()) {
-      throw new IllegalArgumentException(
-          "businessVersion must be a canonical positive integer");
+      throw new IllegalArgumentException("businessVersion must be a canonical positive integer");
     }
     return version;
   }

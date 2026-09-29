@@ -83,11 +83,16 @@ public final class CdeImportService {
       Row header = sheet.createRow(0);
       for (int index = 0; index < HEADERS.size(); index++) {
         header.createCell(index, CellType.STRING).setCellValue(HEADERS.get(index));
-        sheet.setColumnWidth(index, Math.min(48, Math.max(18, HEADERS.get(index).length() + 4)) * 256);
+        sheet.setColumnWidth(
+            index, Math.min(48, Math.max(18, HEADERS.get(index).length() + 4)) * 256);
       }
       sheet.createFreezePane(0, 1);
-      workbook.createSheet("Hướng dẫn").createRow(0).createCell(0).setCellValue(
-          "Mỗi dòng là trạng thái mong muốn đầy đủ của một CDE. Ô trống sẽ xóa giá trị hiện tại khi cập nhật. Ngày dùng định dạng dd/MM/yyyy.");
+      workbook
+          .createSheet("Hướng dẫn")
+          .createRow(0)
+          .createCell(0)
+          .setCellValue(
+              "Mỗi dòng là trạng thái mong muốn đầy đủ của một CDE. Ô trống sẽ xóa giá trị hiện tại khi cập nhật. Ngày dùng định dạng dd/MM/yyyy.");
       workbook.write(output);
       return output.toByteArray();
     } catch (IOException exception) {
@@ -115,9 +120,12 @@ public final class CdeImportService {
     for (RowData row : rows) {
       String normalized = normalizeName(row.value(0));
       if (normalized.isBlank()) {
-        planned.add(PlannedRow.error(row.rowNumber(), "Mã CDE", "CDE_NAME_REQUIRED", "Mã CDE là bắt buộc"));
+        planned.add(
+            PlannedRow.error(row.rowNumber(), "Mã CDE", "CDE_NAME_REQUIRED", "Mã CDE là bắt buộc"));
       } else if (!names.add(normalized)) {
-        planned.add(PlannedRow.error(row.rowNumber(), "Mã CDE", "DUPLICATE_CDE_NAME", "Mã CDE bị trùng trong file"));
+        planned.add(
+            PlannedRow.error(
+                row.rowNumber(), "Mã CDE", "DUPLICATE_CDE_NAME", "Mã CDE bị trùng trong file"));
       } else {
         planned.add(planner.apply(row));
       }
@@ -164,8 +172,16 @@ public final class CdeImportService {
   private static Preview toPreview(Session session) {
     Map<String, Long> summary = new LinkedHashMap<>();
     summary.put("total", (long) session.rows().size());
-    for (String action : List.of("CREATE", "SKIP", "CREATE_VERSION", "UPDATE_DRAFT", "REPLACE_IN_REVIEW_AND_REOPEN", "REPLACE_REJECTED_AND_REOPEN")) {
-      summary.put(action, session.rows().stream().filter(row -> action.equals(row.action())).count());
+    for (String action :
+        List.of(
+            "CREATE",
+            "SKIP",
+            "CREATE_VERSION",
+            "UPDATE_DRAFT",
+            "REPLACE_IN_REVIEW_AND_REOPEN",
+            "REPLACE_REJECTED_AND_REOPEN")) {
+      summary.put(
+          action, session.rows().stream().filter(row -> action.equals(row.action())).count());
     }
     long errors = session.rows().stream().filter(row -> !row.errors().isEmpty()).count();
     summary.put("error", errors);
@@ -174,7 +190,11 @@ public final class CdeImportService {
         session.id(),
         Instant.ofEpochMilli(session.expiresAt()).toString(),
         session.fileHash(),
-        Map.of("glossaryId", session.glossaryId(), "parentBusinessVersion", session.parentBusinessVersion()),
+        Map.of(
+            "glossaryId",
+            session.glossaryId(),
+            "parentBusinessVersion",
+            session.parentBusinessVersion()),
         session.existingCodePolicy(),
         summary,
         session.rows(),
@@ -186,18 +206,23 @@ public final class CdeImportService {
     if (contentLength > MAX_FILE_BYTES) throw tooLarge();
     try {
       ByteArrayOutputStream output = new ByteArrayOutputStream();
-      input.transferTo(new java.io.OutputStream() {
-        private long count;
-        @Override public void write(int value) throws IOException {
-          if (++count > MAX_FILE_BYTES) throw new FileTooLargeException();
-          output.write(value);
-        }
-        @Override public void write(byte[] value, int offset, int length) throws IOException {
-          count += length;
-          if (count > MAX_FILE_BYTES) throw new FileTooLargeException();
-          output.write(value, offset, length);
-        }
-      });
+      input.transferTo(
+          new java.io.OutputStream() {
+            private long count;
+
+            @Override
+            public void write(int value) throws IOException {
+              if (++count > MAX_FILE_BYTES) throw new FileTooLargeException();
+              output.write(value);
+            }
+
+            @Override
+            public void write(byte[] value, int offset, int length) throws IOException {
+              count += length;
+              if (count > MAX_FILE_BYTES) throw new FileTooLargeException();
+              output.write(value, offset, length);
+            }
+          });
       return output.toByteArray();
     } catch (FileTooLargeException exception) {
       throw tooLarge();
@@ -214,12 +239,15 @@ public final class CdeImportService {
           workbook.getPackage().getParts().stream()
               .map(part -> part.getPartName().getName().toLowerCase(Locale.ROOT))
               .anyMatch(name -> name.contains("vbaproject") || name.contains("/embeddings/"));
-      if (unsafePackage || !workbook.getExternalLinksTable().isEmpty() || !workbook.getAllPictures().isEmpty()) {
+      if (unsafePackage
+          || !workbook.getExternalLinksTable().isEmpty()
+          || !workbook.getAllPictures().isEmpty()) {
         throw new BadRequestException(
             "Macros, external links and embedded objects are not allowed");
       }
       if (workbook.getNumberOfSheets() < 1 || workbook.getNumberOfSheets() > 2) {
-        throw new BadRequestException("Workbook must contain the data sheet and optional instruction sheet only");
+        throw new BadRequestException(
+            "Workbook must contain the data sheet and optional instruction sheet only");
       }
       Sheet sheet = workbook.getSheetAt(0);
       requireHeaders(sheet.getRow(0));
@@ -266,7 +294,8 @@ public final class CdeImportService {
   }
 
   public static String normalizeName(String value) {
-    return java.text.Normalizer.normalize(value == null ? "" : value.trim(), java.text.Normalizer.Form.NFKC)
+    return java.text.Normalizer.normalize(
+            value == null ? "" : value.trim(), java.text.Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT);
   }
 
@@ -284,7 +313,8 @@ public final class CdeImportService {
   }
 
   private static ClientErrorException tooLarge() {
-    return new ClientErrorException("XLSX exceeds the import limit", Response.Status.REQUEST_ENTITY_TOO_LARGE);
+    return new ClientErrorException(
+        "XLSX exceeds the import limit", Response.Status.REQUEST_ENTITY_TOO_LARGE);
   }
 
   private static ClientErrorException conflict(String message) {
@@ -294,7 +324,9 @@ public final class CdeImportService {
   private static final class FileTooLargeException extends IOException {}
 
   public record RowData(int rowNumber, List<String> values) {
-    public String value(int index) { return values.get(index); }
+    public String value(int index) {
+      return values.get(index);
+    }
   }
 
   public record ImportError(int rowNumber, String column, String code, String message) {}
@@ -311,7 +343,17 @@ public final class CdeImportService {
       List<String> warnings,
       List<ImportError> errors) {
     public static PlannedRow error(int row, String column, String code, String message) {
-      return new PlannedRow(row, "", "ERROR", null, null, null, null, Map.of(), List.of(), List.of(new ImportError(row, column, code, message)));
+      return new PlannedRow(
+          row,
+          "",
+          "ERROR",
+          null,
+          null,
+          null,
+          null,
+          Map.of(),
+          List.of(),
+          List.of(new ImportError(row, column, code, message)));
     }
   }
 

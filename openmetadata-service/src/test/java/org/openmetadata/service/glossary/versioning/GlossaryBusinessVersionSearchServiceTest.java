@@ -32,11 +32,7 @@ class GlossaryBusinessVersionSearchServiceTest {
     assertEquals(
         "Draft",
         ((List<?>) response.get("data"))
-            .stream()
-            .map(Map.class::cast)
-            .findFirst()
-            .orElseThrow()
-            .get("entityStatus"));
+            .stream().map(Map.class::cast).findFirst().orElseThrow().get("entityStatus"));
   }
 
   @Test
@@ -54,11 +50,7 @@ class GlossaryBusinessVersionSearchServiceTest {
     assertEquals(
         "Approved",
         ((List<?>) response.get("data"))
-            .stream()
-            .map(Map.class::cast)
-            .findFirst()
-            .orElseThrow()
-            .get("entityStatus"));
+            .stream().map(Map.class::cast).findFirst().orElseThrow().get("entityStatus"));
   }
 
   @Test
@@ -120,14 +112,23 @@ class GlossaryBusinessVersionSearchServiceTest {
 
   private static Map<String, Object> row(String name, String version, String status) {
     return Map.of(
-        "termId", UUID.randomUUID().toString(),
-        "name", name,
-        "displayName", name,
-        "businessVersion", version,
-        "entityStatus", status,
-        "recordType", "Draft".equals(status) ? "working" : "published",
-        "domains", List.of(),
-        "owners", List.of(),
-        "tags", List.of());
+        "termId",
+        UUID.randomUUID().toString(),
+        "name",
+        name,
+        "displayName",
+        name,
+        "businessVersion",
+        version,
+        "entityStatus",
+        status,
+        "recordType",
+        "Draft".equals(status) ? "working" : "published",
+        "domains",
+        List.of(),
+        "owners",
+        List.of(),
+        "tags",
+        List.of());
   }
 }

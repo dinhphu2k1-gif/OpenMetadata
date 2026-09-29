@@ -58,8 +58,7 @@ public class CdeBusinessVersionSearchService {
     return validate(criteria, consumerOnly, false);
   }
 
-  public static Criteria validate(
-      Criteria criteria, boolean consumerOnly, boolean archivedScope) {
+  public static Criteria validate(Criteria criteria, boolean consumerOnly, boolean archivedScope) {
     if (criteria == null) {
       throw new BadRequestException("Search criteria are required");
     }
@@ -90,8 +89,7 @@ public class CdeBusinessVersionSearchService {
     }
     if (consumerOnly) {
       statuses =
-          List.of(
-              archivedScope ? EntityStatus.ARCHIVED.value() : EntityStatus.APPROVED.value());
+          List.of(archivedScope ? EntityStatus.ARCHIVED.value() : EntityStatus.APPROVED.value());
     }
     List<String> domainIds = parseUuids(criteria.domainIds(), "domainIds");
     List<String> ownerIds = parseUuids(criteria.ownerIds(), "ownerIds");
@@ -163,11 +161,10 @@ public class CdeBusinessVersionSearchService {
         switch (criteria.sortField() == null ? "name" : criteria.sortField()) {
           case "displayName" -> Comparator.comparing(row -> searchable(row.get("displayName")));
           case "entityStatus" -> Comparator.comparing(row -> searchable(row.get("entityStatus")));
-          case "businessVersion" ->
-              (left, right) ->
-                  compareNumericVersion(
-                      String.valueOf(left.get("businessVersion")),
-                      String.valueOf(right.get("businessVersion")));
+          case "businessVersion" -> (left, right) ->
+              compareNumericVersion(
+                  String.valueOf(left.get("businessVersion")),
+                  String.valueOf(right.get("businessVersion")));
           default -> Comparator.comparing(row -> searchable(row.get("name")));
         };
     if (criteria.sortField() == null) {
@@ -257,8 +254,7 @@ public class CdeBusinessVersionSearchService {
   }
 
   private static String searchable(Object value) {
-    return Normalizer.normalize(
-            value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
+    return Normalizer.normalize(value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT);
   }
 

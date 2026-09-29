@@ -177,7 +177,8 @@ public class RuleEvaluator {
     if (entity.getId() != null) {
       try {
         String entityType = entity.getEntityReference().getType();
-        String extensionPrefix = org.openmetadata.service.util.EntityUtil.getVersionExtensionPrefix(entityType);
+        String extensionPrefix =
+            org.openmetadata.service.util.EntityUtil.getVersionExtensionPrefix(entityType);
         List<org.openmetadata.service.jdbi3.CollectionDAO.ExtensionRecord> records =
             Entity.getCollectionDAO()
                 .entityExtensionDAO()

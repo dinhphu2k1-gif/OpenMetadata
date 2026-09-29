@@ -29,7 +29,8 @@ public final class CdeReleaseVersionType {
 
   public static void rejectClientValue(Object extension) {
     if (extension instanceof Map<?, ?> values && values.containsKey(PROPERTY)) {
-      throw new BadRequestException(PROPERTY + " is server-owned and cannot be supplied by clients");
+      throw new BadRequestException(
+          PROPERTY + " is server-owned and cannot be supplied by clients");
     }
   }
 
@@ -44,9 +45,7 @@ public final class CdeReleaseVersionType {
     Map<String, Object> payload = stringKeyMap(raw);
     Object currentExtension = payload.get("extension");
     Map<String, Object> extension =
-        currentExtension instanceof Map<?, ?> values
-            ? stringKeyMap(values)
-            : new LinkedHashMap<>();
+        currentExtension instanceof Map<?, ?> values ? stringKeyMap(values) : new LinkedHashMap<>();
     // OpenMetadata represents enum custom-property values as JSON arrays,
     // including single-select enums.
     extension.put(PROPERTY, List.of(fromBusinessVersion(businessVersion)));

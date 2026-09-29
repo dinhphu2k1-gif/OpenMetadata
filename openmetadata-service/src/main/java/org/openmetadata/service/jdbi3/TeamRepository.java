@@ -1110,7 +1110,8 @@ public class TeamRepository extends EntityRepository<Team> {
    * least-privilege model when a newly built image is deployed.
    */
   private void clearOrganizationAuthorizationGrants() {
-    List<EntityReference> defaultRoles = findTo(organization.getId(), TEAM, Relationship.HAS, Entity.ROLE);
+    List<EntityReference> defaultRoles =
+        findTo(organization.getId(), TEAM, Relationship.HAS, Entity.ROLE);
     List<EntityReference> policies = findTo(organization.getId(), TEAM, Relationship.HAS, POLICY);
     if (defaultRoles.isEmpty() && policies.isEmpty()) {
       return;
