@@ -101,6 +101,8 @@ import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.glossary.technical.TechnicalRecordValidator;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
 import org.openmetadata.service.glossary.versioning.CdeImportService;
@@ -157,6 +159,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final GlossaryBusinessVersionSearchService glossarySearchService =
       new GlossaryBusinessVersionSearchService();
   private final CdeImportService cdeImportService = new CdeImportService();
+  private final TechnicalRecordValidator technicalRecordValidator = new TechnicalRecordValidator();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -467,12 +470,12 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         versioningService.getWorking(
             GlossaryVersioningService.GLOSSARY_TERM, id, parentBusinessVersion);
     GlossaryTerm currentPayload = JsonUtils.readValue(currentWorking.payload(), GlossaryTerm.class);
-    GlossaryTerm payload = mutableDraftPayload(term, currentPayload, request);
-    Glossary glossary = Entity.getEntity(term.getGlossary(), "id,name", Include.NON_DELETED);
-    if (GovernedGlossaryProfileRegistry.require(glossary)
-        == GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY) {
-      requireCanonicalCdeRelation(securityContext, payload, false);
-    }
+    GlossaryTerm payload =
+        applyProfileDraftRules(
+            securityContext,
+            term,
+            currentPayload,
+            mutableDraftPayload(term, currentPayload, request));
     repository.prepareInternal(payload, true);
     return GlossaryVersionResponses.working(
         versioningService.saveWorking(
@@ -827,7 +830,30 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
   }
 
-  private static void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
+  private GlossaryTerm applyProfileDraftRules(
+      SecurityContext securityContext,
+      GlossaryTerm identity,
+      GlossaryTerm currentPayload,
+      GlossaryTerm payload) {
+    Glossary glossary = Entity.getEntity(identity.getGlossary(), "id,name", Include.NON_DELETED);
+    GlossaryTerm result = payload;
+    switch (GovernedGlossaryProfileRegistry.require(glossary)) {
+      case DATA_QUALITY -> requireCanonicalCdeRelation(securityContext, payload, false);
+      case TECHNICAL_DICTIONARY -> result =
+          technicalRecordValidator.prepareDraft(payload, currentPayload);
+      case DATA_DICTIONARY -> {
+        // Data Dictionary drafts need no additional profile normalization.
+      }
+    }
+    return result;
+  }
+
+  private void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
+    requireSingleTechnicalCdeRelation(payload);
+    technicalRecordValidator.requireWorkflowReady(payload);
+  }
+
+  private static void requireSingleTechnicalCdeRelation(GlossaryTerm payload) {
     List<TermRelation> relations = payload.getRelatedTerms();
     if (relations != null && relations.size() > 1) {
       throw new BadRequestException(
@@ -1940,7 +1966,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     } else if (profile == GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY) {
       requireDirectDataQualityCreate(create);
     } else {
-      requireDirectTechnicalDictionaryCreate(create);
+      rejectManualTechnicalRecordCreate();
     }
     String parentBusinessVersion =
         GlossaryBusinessVersion.requireCanonicalDictionary(create.getParentBusinessVersion());
@@ -1991,18 +2017,21 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
   }
 
-  private static void requireDirectTechnicalDictionaryCreate(CreateGlossaryTerm create) {
-    if (create.getParent() != null) {
-      throw new BadRequestException(
-          "A Technical Dictionary record must be a direct child of the Technical Dictionary glossary");
-    }
-    int relationCount =
-        create.getVersionedRelatedTerms() != null
-            ? create.getVersionedRelatedTerms().size()
-            : create.getRelatedTerms() == null ? 0 : create.getRelatedTerms().size();
-    if (relationCount > 1) {
-      throw new BadRequestException(
-          "A Technical Dictionary record can reference at most one canonical CDE");
+  private static void rejectManualTechnicalRecordCreate() {
+    throw TechnicalDictionaryErrors.forbidden(
+        TechnicalDictionaryErrors.MANUAL_CREATE_NOT_ALLOWED,
+        "Technical Dictionary records are created only from physical columns");
+  }
+
+  private void rejectTechnicalRecordDeletion(UUID termId) {
+    GlossaryTerm term =
+        repository.get(null, termId, repository.getFields("glossary"), Include.NON_DELETED, false);
+    Glossary glossary = Entity.getEntity(term.getGlossary(), "id,name", Include.NON_DELETED);
+    if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
+        == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+      throw TechnicalDictionaryErrors.forbidden(
+          TechnicalDictionaryErrors.MANUAL_DELETE_NOT_ALLOWED,
+          "Technical Dictionary records cannot be deleted by users");
     }
   }
 
@@ -3016,6 +3045,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Parameter(description = "Id of the glossary term", schema = @Schema(type = "UUID"))
           @PathParam("id")
           UUID id) {
+    rejectTechnicalRecordDeletion(id);
     requireCde(id);
     versioningService.assertDeletable(GlossaryVersioningService.GLOSSARY_TERM, id);
     return delete(uriInfo, securityContext, id, recursive, hardDelete);
@@ -3047,6 +3077,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Parameter(description = "Id of the glossary term", schema = @Schema(type = "UUID"))
           @PathParam("id")
           UUID id) {
+    rejectTechnicalRecordDeletion(id);
     requireCde(id);
     versioningService.assertDeletable(GlossaryVersioningService.GLOSSARY_TERM, id);
     return deleteByIdAsync(uriInfo, securityContext, id, recursive, hardDelete);
@@ -3083,6 +3114,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           String fqn) {
     GlossaryTerm term =
         getByNameInternal(uriInfo, securityContext, fqn, "id", Include.NON_DELETED, null);
+    rejectTechnicalRecordDeletion(term.getId());
     DataDictionaryResolver.requireCde(term);
     versioningService.assertDeletable(GlossaryVersioningService.GLOSSARY_TERM, term.getId());
     return deleteByName(uriInfo, securityContext, fqn, recursive, hardDelete);
