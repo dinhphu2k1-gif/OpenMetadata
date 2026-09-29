@@ -30,6 +30,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
+import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
@@ -1508,6 +1509,16 @@ public class GlossaryVersioningService {
       return canonical;
     }
     return value;
+  }
+
+  /** Draft payload of the next minor version, starting from an immutable Approved payload. */
+  public static GlossaryTerm nextDraftFromPublished(
+      String publishedPayload, String businessVersion, String parentBusinessVersion) {
+    Object payload =
+        normalizeWorkingPayload(publishedPayload, businessVersion, EntityStatus.DRAFT.value());
+    payload = CdeReleaseVersionType.apply(payload, businessVersion);
+    payload = withParentBusinessVersion(payload, parentBusinessVersion);
+    return JsonUtils.convertValue(payload, GlossaryTerm.class);
   }
 
   private static Object normalizeWorkingPayload(

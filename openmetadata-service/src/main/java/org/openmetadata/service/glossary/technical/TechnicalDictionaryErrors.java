@@ -24,6 +24,8 @@ public final class TechnicalDictionaryErrors {
   public static final String COLUMN_SCOPE_EMPTY = "TD_COLUMN_SCOPE_EMPTY";
   public static final String BOOTSTRAP_NOT_READY = "TD_BOOTSTRAP_NOT_READY";
   public static final String IMPORT_ROW_NOT_MATCHED = "TD_IMPORT_ROW_NOT_MATCHED";
+  public static final String IMPORT_CONFLICT = "TD_IMPORT_CONFLICT";
+  public static final String IMPORT_SESSION_INVALID = "TD_IMPORT_SESSION_INVALID";
 
   private TechnicalDictionaryErrors() {}
 
@@ -37,6 +39,13 @@ public final class TechnicalDictionaryErrors {
 
   public static WebApplicationException conflict(String code, String message) {
     return error(Response.Status.CONFLICT, code, message);
+  }
+
+  /** Stable code of an error created by this class, or an HTTP-status fallback. */
+  public static String codeOf(WebApplicationException exception) {
+    return exception.getResponse().getEntity() instanceof Map<?, ?> body && body.get("code") != null
+        ? String.valueOf(body.get("code"))
+        : "HTTP_" + exception.getResponse().getStatus();
   }
 
   public static WebApplicationException error(Response.Status status, String code, String message) {

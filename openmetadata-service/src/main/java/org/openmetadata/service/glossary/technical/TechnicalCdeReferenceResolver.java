@@ -9,7 +9,10 @@ import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
 import static org.openmetadata.service.Entity.GLOSSARY_TERM;
 
 import jakarta.ws.rs.NotFoundException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.openmetadata.schema.entity.data.Glossary;
@@ -24,6 +27,7 @@ import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.CollectionDAO;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
 
@@ -66,6 +70,23 @@ public class TechnicalCdeReferenceResolver {
     }
   }
 
+  /** Active Approved CDEs of Data Dictionary version `scope`, keyed by lowercase code. */
+  public Map<String, PublishedSnapshotRecord> activeCdesByCode(String scope) {
+    requireActiveDataDictionary(scope);
+    final Map<String, PublishedSnapshotRecord> byCode = new HashMap<>();
+    Entity.getJdbi()
+        .onDemand(GlossaryVersionDAO.class)
+        .listActiveLatestTermsForGlossaryAndParent(dataDictionary().getId(), scope)
+        .forEach(
+            snapshot ->
+                byCode.put(
+                    JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class)
+                        .getName()
+                        .toLowerCase(Locale.ROOT),
+                    snapshot));
+    return byCode;
+  }
+
   private void requireActiveDataDictionary(String scope) {
     PublishedSnapshotRecord active = null;
     try {
@@ -100,7 +121,7 @@ public class TechnicalCdeReferenceResolver {
     return snapshot;
   }
 
-  private static TermRelation relationTo(PublishedSnapshotRecord snapshot, String scope) {
+  static TermRelation relationTo(PublishedSnapshotRecord snapshot, String scope) {
     final GlossaryTerm cde = JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class);
     return new TermRelation()
         .withTerm(

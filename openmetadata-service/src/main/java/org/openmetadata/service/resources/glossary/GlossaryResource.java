@@ -26,6 +26,7 @@ import jakarta.json.JsonPatch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -40,6 +41,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -50,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
 import org.openmetadata.schema.api.data.DataDictionaryCreateVersionRequest;
@@ -100,6 +103,7 @@ import org.openmetadata.service.util.CSVExportResponse;
 @Collection(
     name = "glossaries",
     order = 6) // Initialize before GlossaryTerm and after Classification and Tags
+@Slf4j
 public class GlossaryResource extends EntityResource<Glossary, GlossaryRepository> {
   public static final String COLLECTION_PATH = "/v1/glossaries/";
   static final String FIELDS = "owners,tags,reviewers,usageCount,termCount,domains,extension";
@@ -187,6 +191,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             glossary.getVersion(),
             glossary,
             securityContext.getUserPrincipal().getName());
+    startTechnicalBootstrap(glossary, working, securityContext);
     Map<String, Object> response = GlossaryVersionResponses.working(working);
     response.put("capabilities", capabilitiesForWorking(securityContext, working).asMap());
     return Response.created(
@@ -376,6 +381,41 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     authorizer.authorizeAdmin(securityContext);
     return TechnicalBootstrapJobView.of(
         bootstrapJobService.retry(jobId, securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/{id}/bootstrap-jobs")
+  @Operation(
+      operationId = "startTechnicalDictionaryBootstrapJob",
+      summary = "Start the bootstrap job of one Technical Dictionary version if it is missing")
+  public Map<String, Object> startBootstrapJob(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @QueryParam("businessVersion") @NotNull String businessVersion) {
+    Glossary glossary =
+        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
+    requireTechnicalDictionary(glossary);
+    authorizer.authorizeAdmin(securityContext);
+    return TechnicalBootstrapJobView.of(
+        bootstrapJobService.start(
+            glossary, businessVersion, securityContext.getUserPrincipal().getName()));
+  }
+
+  private void startTechnicalBootstrap(
+      Glossary glossary, WorkingVersionRecord working, SecurityContext securityContext) {
+    if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
+        == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+      try {
+        bootstrapJobService.start(
+            glossary, working.businessVersion(), securityContext.getUserPrincipal().getName());
+      } catch (WebApplicationException exception) {
+        LOG.warn(
+            "Technical Dictionary bootstrap for version {} was not started: {}",
+            working.businessVersion(),
+            exception.getMessage());
+      }
+    }
   }
 
   private static void requireTechnicalDictionary(Glossary glossary) {

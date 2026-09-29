@@ -108,6 +108,12 @@ import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.technical.TechnicalCdeReferenceResolver;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
 import org.openmetadata.service.glossary.technical.TechnicalExcelExporter;
+import org.openmetadata.service.glossary.technical.TechnicalImportCommitter;
+import org.openmetadata.service.glossary.technical.TechnicalImportLookupsImpl;
+import org.openmetadata.service.glossary.technical.TechnicalImportPlan.UpdatePolicy;
+import org.openmetadata.service.glossary.technical.TechnicalImportService;
+import org.openmetadata.service.glossary.technical.TechnicalImportService.PreviewScope;
+import org.openmetadata.service.glossary.technical.TechnicalImportSheet;
 import org.openmetadata.service.glossary.technical.TechnicalRankGuard;
 import org.openmetadata.service.glossary.technical.TechnicalRecordValidator;
 import org.openmetadata.service.glossary.technical.TechnicalRowDecorator;
@@ -174,6 +180,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final CdeImportService cdeImportService = new CdeImportService();
   private final TechnicalRecordValidator technicalRecordValidator = new TechnicalRecordValidator();
   private final TechnicalRowDecorator technicalRowDecorator = new TechnicalRowDecorator();
+  private final TechnicalImportService technicalImportService = new TechnicalImportService();
+  private final TechnicalImportCommitter technicalImportCommitter = new TechnicalImportCommitter();
   private final GovernedBulkWorkflowService bulkWorkflowService = new GovernedBulkWorkflowService();
   private final TechnicalCdeReferenceResolver technicalCdeResolver =
       new TechnicalCdeReferenceResolver();
@@ -250,6 +258,114 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                 existing.get(CdeImportService.normalizeName(row.value(0))),
                 existingCodePolicy,
                 referenceResolver));
+  }
+
+  @GET
+  @Path("/import/technical/template")
+  @Produces(CdeImportService.XLSX_MEDIA_TYPE)
+  @Operation(
+      operationId = "downloadTechnicalDictionaryImportTemplate",
+      summary = "Download the Technical Dictionary XLSX import template")
+  public Response downloadTechnicalImportTemplate(@Context SecurityContext securityContext) {
+    authorizer.authorize(
+        securityContext,
+        new OperationContext(entityType, MetadataOperation.VIEW_BASIC),
+        getResourceContext());
+    return Response.ok(technicalImportService.template(), CdeImportService.XLSX_MEDIA_TYPE)
+        .header(
+            "Content-Disposition",
+            "attachment; filename=\"Agribank_TuDienKyThuat_Import_Template.xlsx\"")
+        .build();
+  }
+
+  @POST
+  @Path("/import/technical/preview")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Operation(
+      operationId = "previewTechnicalDictionaryImport",
+      summary = "Validate and preview an atomic Technical Dictionary import")
+  public Map<String, Object> previewTechnicalImport(
+      @Context SecurityContext securityContext,
+      @NotNull @QueryParam("glossary") UUID glossaryId,
+      @NotNull @QueryParam("parentBusinessVersion") String requestedParentBusinessVersion,
+      @QueryParam("updatePolicy") String requestedUpdatePolicy,
+      @FormDataParam("file") InputStream input,
+      @FormDataParam("file") FormDataContentDisposition fileDetail) {
+    UpdatePolicy policy = UpdatePolicy.from(requestedUpdatePolicy);
+    ImportScope scope =
+        authorizeTechnicalImport(
+            securityContext, glossaryId, requestedParentBusinessVersion, policy);
+    List<Map<String, Object>> latestRows =
+        TechnicalRowMatcher.keepLatest(
+            loadAuthorizedGlossaryFlatRows(
+                    securityContext,
+                    glossaryId.toString(),
+                    scope.parentBusinessVersion(),
+                    GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY)
+                .rows());
+    byte[] fileBytes =
+        TechnicalImportSheet.readBytes(input, fileDetail == null ? -1 : fileDetail.getSize());
+    return technicalImportService.preview(
+        fileBytes,
+        new PreviewScope(
+            glossaryId,
+            scope.parentBusinessVersion(),
+            policy,
+            securityContext.getUserPrincipal().getName()),
+        latestRows,
+        new TechnicalImportLookupsImpl(scope.parentBusinessVersion()));
+  }
+
+  @POST
+  @Path("/import/technical/{importSessionId}/commit")
+  @Operation(
+      operationId = "commitTechnicalDictionaryImport",
+      summary = "Commit a validated Technical Dictionary import atomically")
+  public Map<String, Object> commitTechnicalImport(
+      @Context SecurityContext securityContext,
+      @PathParam("importSessionId") UUID importSessionId) {
+    String actor = securityContext.getUserPrincipal().getName();
+    return technicalImportService.commit(
+        importSessionId,
+        actor,
+        session -> {
+          authorizeTechnicalImport(
+              securityContext,
+              session.glossaryId(),
+              session.parentBusinessVersion(),
+              session.policy());
+          int committed =
+              technicalImportCommitter.commit(
+                  session.glossaryId(), session.parentBusinessVersion(), session.rows(), actor);
+          LOG.info(
+              "Technical Dictionary import committed actor={} importSessionId={} parentBusinessVersion={} rows={} fileHash={}",
+              actor,
+              importSessionId,
+              session.parentBusinessVersion(),
+              committed,
+              session.fileHash());
+          return Map.of(
+              "importSessionId", importSessionId,
+              "committed", committed,
+              "parentBusinessVersion", session.parentBusinessVersion());
+        });
+  }
+
+  private ImportScope authorizeTechnicalImport(
+      SecurityContext securityContext,
+      UUID glossaryId,
+      String requestedVersion,
+      UpdatePolicy policy) {
+    ImportScope scope = authorizeImportScope(securityContext, glossaryId, requestedVersion);
+    if (GovernedGlossaryProfileRegistry.find(scope.glossary()).orElse(null)
+        != GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+      throw new NotFoundException("Technical Dictionary import scope was not found");
+    }
+    if (policy == UpdatePolicy.ALL_EDITABLE) {
+      GlossaryAuthorizationResolver.requireCreateVersion(
+          capabilitiesForAuthorizationGlossary(securityContext, scope.glossary()));
+    }
+    return scope;
   }
 
   @POST
