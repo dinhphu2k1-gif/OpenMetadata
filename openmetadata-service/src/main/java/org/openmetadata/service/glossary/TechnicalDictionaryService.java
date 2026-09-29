@@ -14,6 +14,7 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,9 +41,12 @@ import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.ColumnBindingRecord;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.ScopeRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Scope-aware application service for the Technical Dictionary governed glossary profile. */
+/** Application service for the Technical Dictionary governed glossary profile. */
 public class TechnicalDictionaryService {
+  private static final Logger LOG = LoggerFactory.getLogger(TechnicalDictionaryService.class);
   private static final String DATA_DICTIONARY = "Data Dictionary";
   private final GlossaryVersioningService versions = new GlossaryVersioningService();
 
@@ -56,6 +60,137 @@ public class TechnicalDictionaryService {
       throw error(Response.Status.NOT_FOUND, "SCOPE_NOT_FOUND", "Technical scope was not found");
     }
     return scope;
+  }
+
+  /**
+   * Resolves the private catalog-version binding. Scope identifiers are deliberately kept behind
+   * this service boundary and are never part of the public Technical Dictionary contract.
+   */
+  public ScopeRecord resolveCatalogVersion(String businessVersion) {
+    List<ScopeRecord> bindings = listScopes();
+    if (bindings.isEmpty()) {
+      throw error(
+          Response.Status.CONFLICT,
+          "BOOTSTRAP_NOT_READY",
+          "Technical Dictionary has no initialized catalog version");
+    }
+    if (businessVersion != null && !businessVersion.isBlank()) {
+      return bindings.stream()
+          .filter(binding -> businessVersion.equals(binding.technicalBusinessVersion()))
+          .findFirst()
+          .orElseThrow(
+              () ->
+                  error(
+                      Response.Status.NOT_FOUND,
+                      "CATALOG_VERSION_NOT_FOUND",
+                      "Technical Dictionary version " + businessVersion + " was not found"));
+    }
+
+    try {
+      WorkingVersionRecord working =
+          versions.getWorking(GlossaryVersioningService.GLOSSARY, technicalGlossary().getId());
+      ScopeRecord current =
+          bindings.stream()
+              .filter(binding -> working.businessVersion().equals(binding.technicalBusinessVersion()))
+              .findFirst()
+              .orElse(null);
+      if (current != null) {
+        return current;
+      }
+    } catch (RuntimeException ignored) {
+      // A published-only catalog is resolved below.
+    }
+    return bindings.stream()
+        .filter(binding -> !"Archived".equals(binding.scopeStatus()))
+        .findFirst()
+        .orElse(bindings.get(0));
+  }
+
+  public CatalogRepresentation catalogRepresentation(
+      ScopeRecord binding, String requestedBusinessVersion) {
+    String status = EntityStatus.APPROVED.value();
+    Long workingRevision = null;
+    try {
+      WorkingVersionRecord working =
+          versions.getWorking(GlossaryVersioningService.GLOSSARY, binding.technicalGlossaryId());
+      if (binding.technicalBusinessVersion().equals(working.businessVersion())) {
+        status = working.entityStatus();
+        workingRevision = working.revision();
+      }
+    } catch (RuntimeException ignored) {
+      // Published catalog versions have no working row.
+    }
+    boolean historical =
+        requestedBusinessVersion != null
+            && !requestedBusinessVersion.isBlank()
+            && !binding.technicalBusinessVersion().equals(
+                resolveCatalogVersion(null).technicalBusinessVersion());
+    return new CatalogRepresentation(
+        binding.technicalGlossaryId(),
+        binding.technicalBusinessVersion(),
+        status,
+        workingRevision,
+        historical);
+  }
+
+  public BootstrapStatus bootstrapStatus(ScopeRecord binding) {
+    String status =
+        "Active".equals(binding.scopeStatus())
+            ? "Succeeded"
+            : binding.failedColumns() > 0 ? "Failed" : "Running";
+    return new BootstrapStatus(
+        status,
+        binding.totalColumns(),
+        binding.processedColumns(),
+        binding.failedColumns());
+  }
+
+  /**
+   * Reports whether a catalog that was initialized before ingestion still needs its Column records
+   * reconciled. This is intentionally separate from the catalog workflow status.
+   */
+  public BootstrapStatus reconciliationStatus(ScopeRecord binding) {
+    List<ColumnSource> columns = loadColumns();
+    long boundColumns = dao().listColumnBindings(binding.scopeId()).size();
+    if (!columns.isEmpty() && boundColumns < columns.size()) {
+      return new BootstrapStatus("Running", columns.size(), boundColumns, 0);
+    }
+    return bootstrapStatus(binding);
+  }
+
+  /**
+   * Reconciles Columns ingested after the initial catalog bootstrap. Existing bindings are
+   * idempotently skipped, so this is safe on every service start and after ingestion.
+   */
+  public void reconcile(UUID scopeId, String actor) {
+    ScopeRecord scope = getScope(scopeId);
+    List<ColumnSource> columns = loadColumns();
+    long created = 0;
+    long failed = 0;
+    for (ColumnSource source : columns) {
+      UUID columnId =
+          UUID.nameUUIDFromBytes(("column:" + source.columnFqn()).getBytes(StandardCharsets.UTF_8));
+      if (dao().findColumnBinding(scope.scopeId(), columnId) != null) {
+        continue;
+      }
+      try {
+        createInitialRecord(scope, source, actor);
+        created++;
+      } catch (RuntimeException exception) {
+        failed++;
+        if (failed <= 10) {
+          LOG.error(
+              "Unable to reconcile Technical Dictionary record for {}",
+              source.columnFqn(),
+              exception);
+        }
+      }
+    }
+    LOG.info(
+        "Technical Dictionary reconciliation completed for catalog version {}: created={}, failed={}",
+        scope.technicalBusinessVersion(),
+        created,
+        failed);
   }
 
   public ScopeRecord createScope(UUID dataDictionaryVersionId, String actor) {
@@ -112,12 +247,22 @@ public class TechnicalDictionaryService {
     List<ColumnSource> columns = loadColumns();
     long processed = 0;
     long failed = 0;
+    RuntimeException firstFailure = null;
     for (ColumnSource source : columns) {
       try {
         createInitialRecord(scope, source, actor);
         processed++;
       } catch (RuntimeException exception) {
         failed++;
+        if (firstFailure == null) {
+          firstFailure = exception;
+        }
+        if (failed <= 10) {
+          LOG.error(
+              "Unable to bootstrap Technical Dictionary record for {}",
+              source.columnFqn(),
+              exception);
+        }
       }
       dao().updateBootstrapProgress(
           scopeId, columns.size(), processed, failed, System.currentTimeMillis(), actor);
@@ -127,6 +272,13 @@ public class TechnicalDictionaryService {
           Response.Status.CONFLICT,
           "SCOPE_VERSION_MISMATCH",
           "Technical scope could not be activated after bootstrap");
+    }
+    if (firstFailure != null) {
+      throw error(
+          Response.Status.INTERNAL_SERVER_ERROR,
+          "BOOTSTRAP_FAILED",
+          "Technical Dictionary bootstrap failed for " + failed + " columns: "
+              + firstFailure.getMessage());
     }
   }
 
@@ -143,6 +295,21 @@ public class TechnicalDictionaryService {
 
   public List<RecordView> listRecords(
       UUID scopeId, String search, String status, boolean allVersions, boolean includeWorking) {
+    return listRecords(
+        scopeId, search, status, null, null, null, null, null, allVersions, includeWorking);
+  }
+
+  public List<RecordView> listRecords(
+      UUID scopeId,
+      String search,
+      String status,
+      String sources,
+      String cdeMapping,
+      String elementTypes,
+      String generationTypes,
+      String creationMethods,
+      boolean allVersions,
+      boolean includeWorking) {
     ScopeRecord scope = getScope(scopeId);
     String needle = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
     List<RecordView> rows = new ArrayList<>();
@@ -173,11 +340,84 @@ public class TechnicalDictionaryService {
         }
       }
     }
+    Map<String, Map<String, Object>> sourceByFqn = new LinkedHashMap<>();
+    loadColumns().forEach(source -> sourceByFqn.put(source.columnFqn(), source.snapshot()));
     return rows.stream()
-        .filter(row -> status == null || status.isBlank() || status.equalsIgnoreCase(row.status()))
+        .map(row -> withSourceSnapshot(row, sourceByFqn.get(row.columnFqn())))
+        .filter(row -> matchesEntityStatus(status, row.status()))
+        .filter(row -> matchesCsv(sources, sourceReferenceName(row, "service")))
+        .filter(
+            row ->
+                cdeMapping == null
+                    || cdeMapping.isBlank()
+                    || (containsCsv(cdeMapping, "MAPPED") && row.cdeSnapshotId() != null)
+                    || (containsCsv(cdeMapping, "UNMAPPED") && row.cdeSnapshotId() == null))
+        .filter(row -> matchesCsv(elementTypes, extensionValue(row, "elementType")))
+        .filter(row -> matchesCsv(generationTypes, extensionValue(row, "generationType")))
+        .filter(row -> matchesCsv(creationMethods, extensionValue(row, "creationMethod")))
         .filter(row -> needle.isEmpty() || JsonUtils.pojoToJson(row).toLowerCase(Locale.ROOT).contains(needle))
         .sorted(Comparator.comparing(RecordView::columnFqn))
         .toList();
+  }
+
+  private static RecordView withSourceSnapshot(
+      RecordView row, Map<String, Object> sourceSnapshot) {
+    if (sourceSnapshot == null) {
+      return row;
+    }
+    Map<String, Object> payload = new LinkedHashMap<>(row.payload());
+    Map<String, Object> extension = new LinkedHashMap<>();
+    if (payload.get("extension") instanceof Map<?, ?> existing) {
+      existing.forEach((key, value) -> extension.put(String.valueOf(key), value));
+    }
+    extension.put("source", sourceSnapshot);
+    payload.put("extension", extension);
+    return new RecordView(
+        row.recordId(),
+        row.columnId(),
+        row.columnFqn(),
+        row.sourceAvailable(),
+        row.businessVersion(),
+        row.status(),
+        row.workingRevision(),
+        row.snapshotId(),
+        row.cdeSnapshotId(),
+        payload);
+  }
+
+  private static boolean containsCsv(String csv, String expected) {
+    return csv != null
+        && Arrays.stream(csv.split(","))
+            .map(String::trim)
+            .anyMatch(expected::equalsIgnoreCase);
+  }
+
+  private static boolean matchesCsv(String csv, String actual) {
+    return csv == null || csv.isBlank() || containsCsv(csv, actual);
+  }
+
+  private static boolean matchesEntityStatus(String csv, String actual) {
+    if (csv == null || csv.isBlank()) {
+      return true;
+    }
+    try {
+      EntityStatus actualStatus = EntityStatus.fromValue(actual);
+      return Arrays.stream(csv.split(","))
+          .map(String::trim)
+          .map(EntityStatus::fromValue)
+          .anyMatch(actualStatus::equals);
+    } catch (IllegalArgumentException exception) {
+      throw new BadRequestException("status contains an unsupported value");
+    }
+  }
+
+  private static String extensionValue(RecordView row, String key) {
+    Object extension = row.payload().get("extension");
+    if (!(extension instanceof Map<?, ?> extensionMap)) {
+      return "";
+    }
+    Object value = extensionMap.get(key);
+    return value == null ? "" : String.valueOf(value);
   }
 
   public Map<String, Long> stats(UUID scopeId, boolean includeWorking) {
@@ -251,11 +491,12 @@ public class TechnicalDictionaryService {
 
   private void createInitialRecord(ScopeRecord scope, ColumnSource source, String actor) {
     UUID columnId =
-        UUID.nameUUIDFromBytes((scope.scopeId() + ":" + source.columnFqn()).getBytes(StandardCharsets.UTF_8));
+        UUID.nameUUIDFromBytes(("column:" + source.columnFqn()).getBytes(StandardCharsets.UTF_8));
     if (dao().findColumnBinding(scope.scopeId(), columnId) != null) {
       return;
     }
-    UUID recordId = UUID.nameUUIDFromBytes((scope.scopeId() + ":record:" + columnId).getBytes(StandardCharsets.UTF_8));
+    UUID recordId =
+        UUID.nameUUIDFromBytes(("technical-record:" + columnId).getBytes(StandardCharsets.UTF_8));
     ColumnBindingRecord existingRecord = dao().findRecordBinding(scope.scopeId(), recordId);
     if (existingRecord != null) {
       return;
@@ -267,11 +508,6 @@ public class TechnicalDictionaryService {
             .withType(GLOSSARY)
             .withName(technical.getName())
             .withFullyQualifiedName(technical.getFullyQualifiedName());
-    Map<String, Object> extension = new LinkedHashMap<>();
-    extension.put("technicalDictionarySchemaVersion", 1);
-    extension.put("scopeId", scope.scopeId());
-    extension.put("columnId", columnId);
-    extension.put("source", source.snapshot());
     GlossaryTerm term =
         new GlossaryTerm()
             .withId(recordId)
@@ -281,8 +517,7 @@ public class TechnicalDictionaryService {
             .withGlossary(glossaryRef)
             .withEntityStatus(EntityStatus.DRAFT)
             .withProvider(ProviderType.SYSTEM)
-            .withDeleted(false)
-            .withExtension(extension);
+            .withDeleted(false);
     GlossaryTermRepository repository =
         (GlossaryTermRepository) Entity.getEntityRepository(GLOSSARY_TERM);
     try {
@@ -335,7 +570,14 @@ public class TechnicalDictionaryService {
   }
 
   private RecordView view(ScopeRecord scope, ColumnBindingRecord binding, PublishedSnapshotRecord row) {
-    return view(scope, binding, row.businessVersion(), "Approved", null, row.snapshotId(), row.payload());
+    return view(
+        scope,
+        binding,
+        row.businessVersion(),
+        EntityStatus.APPROVED.value(),
+        null,
+        row.snapshotId(),
+        row.payload());
   }
 
   private RecordView view(
@@ -356,7 +598,7 @@ public class TechnicalDictionaryService {
       }
     }
     return new RecordView(
-        binding.recordId(), scope.scopeId(), binding.columnId(), binding.columnFqnSnapshot(),
+        binding.recordId(), binding.columnId(), binding.columnFqnSnapshot(),
         binding.sourceAvailable(), businessVersion, status, revision, snapshotId, cdeSnapshotId, payload);
   }
 
@@ -391,7 +633,6 @@ public class TechnicalDictionaryService {
 
   public record RecordView(
       UUID recordId,
-      UUID scopeId,
       UUID columnId,
       String columnFqn,
       boolean sourceAvailable,
@@ -401,6 +642,16 @@ public class TechnicalDictionaryService {
       UUID snapshotId,
       UUID cdeSnapshotId,
       Map<String, Object> payload) {}
+
+  public record CatalogRepresentation(
+      UUID technicalGlossaryId,
+      String businessVersion,
+      String status,
+      Long workingRevision,
+      boolean historical) {}
+
+  public record BootstrapStatus(
+      String status, long total, long processed, long failed) {}
 
   public record CdeOption(
       UUID termId,

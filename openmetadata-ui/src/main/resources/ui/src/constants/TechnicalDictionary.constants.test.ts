@@ -16,8 +16,8 @@ describe('TechnicalDictionary constants', () => {
     );
   });
 
-  it('keeps governed read and mutation paths independently gated', () => {
-    localStorage.setItem(TECHNICAL_DICTIONARY_READ_PATH_FLAG, 'true');
+  it('enables governed paths by default and supports an explicit rollback', () => {
+    localStorage.setItem(TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG, 'false');
 
     expect(
       isTechnicalDictionaryFeatureEnabled(TECHNICAL_DICTIONARY_READ_PATH_FLAG)

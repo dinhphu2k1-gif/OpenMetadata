@@ -20,12 +20,19 @@ import {
   SearchOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import { Button, Dropdown, Input } from 'antd';
+import { Alert, Button, Dropdown, Input } from 'antd';
 import classNames from 'classnames';
 import { compare } from 'fast-json-patch';
 import { isEmpty } from 'lodash';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg';
 import CDEFilterDropdown, {
@@ -33,6 +40,7 @@ import CDEFilterDropdown, {
 } from '../../components/Glossary/GlossaryTermTab/CDEFilterDropdown.component';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
+import GovernedEntityHeaderBadges from '../../components/Glossary/GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
 import { TitleBreadcrumbProps } from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import {
@@ -48,6 +56,7 @@ import {
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import { usePaging } from '../../hooks/paging/usePaging';
 import { Table } from '../../generated/entity/data/table';
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import {
   LabelType,
   State,
@@ -67,14 +76,20 @@ import { SearchIndex } from '../../enums/search.enum';
 import { searchQuery } from '../../rest/searchAPI';
 import {
   exportTechnicalDictionary,
+  createTechnicalDictionaryRecordVersion,
   getTechnicalCdeOptions,
   getTechnicalDictionaryRecords,
+  getTechnicalDictionaryVersions,
   getTechnicalDictionaryStats,
   saveTechnicalDictionaryWorking,
   TechnicalDictionaryRecord,
+  TechnicalDictionaryCapabilities,
+  TechnicalDictionaryCatalog,
+  TechnicalDictionaryBootstrapStatus,
   transitionTechnicalDictionaryWorking,
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
+import { getCDEReleaseVersionType } from '../../utils/CDEReleaseVersionTypeUtils';
 import { getTechnicalColumnMetadata } from './TechnicalDictionaryMetadata';
 import TechnicalDictionaryTable, {
   TechnicalFieldItem,
@@ -121,7 +136,9 @@ interface ColumnSearchSource {
     systemOwner?: string;
     creationMethod?: string;
     creationMethodName?: string;
-    status?: string;
+    status?: EntityStatus;
+    businessVersion?: string;
+    releaseVersionType?: string;
   };
   description?: string;
   tags?: TagLabel[];
@@ -153,8 +170,7 @@ interface ColumnSearchSource {
   };
 }
 
-const DATA_DICTIONARY_TAG_PREFIX =
-  `${DATA_DICTIONARY_GLOSSARY_NAME.toLowerCase()}.`;
+const DATA_DICTIONARY_TAG_PREFIX = `${DATA_DICTIONARY_GLOSSARY_NAME.toLowerCase()}.`;
 
 export const isTechnicalDictionaryManagedTag = (tag: TagLabel) => {
   const fqn = (tag.tagFQN || '').toLowerCase();
@@ -245,7 +261,7 @@ export const syncColumnProposalToBackend = async (
           creationMethodName: item.creationMethodName,
           timeliness: item.timeliness,
           systemOwner: item.systemOwner,
-          status: 'In Review',
+          status: EntityStatus.InReview,
         },
       };
     });
@@ -296,42 +312,10 @@ export const syncColumnMetadataToBackend = async (
       );
 
       // Add CDE Glossary Tag
-      if (item.cdeCode) {
-        const cdeFqn =
-          item.cdeFqn || `${DATA_DICTIONARY_GLOSSARY_NAME}.${item.cdeCode}`;
+      if (item.cdeCode && item.cdeFqn) {
         existingTags.push({
-          tagFQN: cdeFqn,
+          tagFQN: item.cdeFqn,
           source: TagSource.Glossary,
-          labelType: LabelType.Manual,
-          state: State.Confirmed,
-        });
-      }
-
-      // Add Element Type Tag
-      if (item.elementType) {
-        existingTags.push({
-          tagFQN: `DataElementType.${item.elementType}`,
-          source: TagSource.Classification,
-          labelType: LabelType.Manual,
-          state: State.Confirmed,
-        });
-      }
-
-      // Add Generation Type Tag
-      if (item.generationType) {
-        existingTags.push({
-          tagFQN: `FieldGenerationType.${item.generationType}`,
-          source: TagSource.Classification,
-          labelType: LabelType.Manual,
-          state: State.Confirmed,
-        });
-      }
-
-      // Add Creation Method Tag
-      if (item.creationMethod) {
-        existingTags.push({
-          tagFQN: `DataCreationMethod.${item.creationMethod}`,
-          source: TagSource.Classification,
           labelType: LabelType.Manual,
           state: State.Confirmed,
         });
@@ -356,7 +340,7 @@ export const syncColumnMetadataToBackend = async (
           creationMethodName: item.creationMethodName,
           timeliness: item.timeliness,
           systemOwner: item.systemOwner,
-          status: item.status || 'Approved',
+          status: item.status || EntityStatus.Approved,
         },
       };
     });
@@ -373,11 +357,7 @@ export const syncColumnMetadataToBackend = async (
     }
 
     // Sync survivorship rule to CDE Glossary Term if CDE is present
-    const cdeFqnToSync =
-      item.cdeFqn ||
-      (item.cdeCode
-        ? `${DATA_DICTIONARY_GLOSSARY_NAME}.${item.cdeCode}`
-        : undefined);
+    const cdeFqnToSync = item.cdeFqn;
     const colFqnToSync =
       item.columnFqn || `${item.tableFqn}.${item.columnName}`;
     if (cdeFqnToSync && colFqnToSync) {
@@ -465,7 +445,7 @@ export const removeColumnMetadataFromBackend = async (
           generationTypeName: undefined,
           creationMethod: undefined,
           creationMethodName: undefined,
-          status: 'Draft',
+          status: EntityStatus.Draft,
         },
       };
     });
@@ -516,7 +496,7 @@ export const rejectColumnMetadataOnBackend = async (
         ...col,
         extension: {
           ...(col.extension || {}),
-          status: 'Rejected',
+          status: EntityStatus.Rejected,
         },
       };
     });
@@ -543,8 +523,13 @@ export const TechnicalDictionaryPage: React.FC<
   TechnicalDictionaryPageProps
 > = ({ isEmbedded = false }) => {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser, selectedPersona } = useApplicationStore();
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const requestGenerationRef = useRef(0);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const cdeSearchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const cdeRequestGenerationRef = useRef(0);
   const [technicalFields, setTechnicalFields] = useState<TechnicalFieldItem[]>(
     []
   );
@@ -555,22 +540,35 @@ export const TechnicalDictionaryPage: React.FC<
       name: string;
       code?: string;
       termId?: string;
+      fullyQualifiedName?: string;
+      snapshotId?: string;
       businessVersion?: string;
       parentBusinessVersion?: string;
       dataDictionaryVersionId?: string;
     }>
   >([]);
-  const [searchText, setSearchText] = useState<string>('');
-  const [selectedSources, setSelectedSources] = useState<string[]>(['all']);
+  const [searchText, setSearchText] = useState<string>(
+    searchParams.get('q') ?? ''
+  );
+  const [selectedSources, setSelectedSources] = useState<string[]>(
+    searchParams.get('sources')?.split(',').filter(Boolean) ?? ['all']
+  );
   const [selectedElementTypes, setSelectedElementTypes] = useState<string[]>([
-    'all',
+    ...(searchParams.get('elementTypes')?.split(',').filter(Boolean) ?? [
+      'all',
+    ]),
   ]);
-  const [selectedGenTypes, setSelectedGenTypes] = useState<string[]>(['all']);
+  const [selectedGenTypes, setSelectedGenTypes] = useState<string[]>(
+    searchParams.get('generationTypes')?.split(',').filter(Boolean) ?? ['all']
+  );
+  const [selectedCreationMethods, setSelectedCreationMethods] = useState<
+    string[]
+  >(searchParams.get('creationMethods')?.split(',').filter(Boolean) ?? ['all']);
   const [selectedCdeFilters, setSelectedCdeFilters] = useState<string[]>([
-    'all',
+    ...(searchParams.get('cdeMapping')?.split(',').filter(Boolean) ?? ['all']),
   ]);
   const [selectedStatusFilters, setSelectedStatusFilters] = useState<string[]>([
-    'all',
+    ...(searchParams.get('statuses')?.split(',').filter(Boolean) ?? ['all']),
   ]);
   const [stats, setStats] = useState({
     totalFields: 0,
@@ -579,12 +577,78 @@ export const TechnicalDictionaryPage: React.FC<
     totalMapped: 0,
   });
   const [availableSources, setAvailableSources] = useState<string[]>([]);
-  const governedScopeId = new URLSearchParams(globalThis.location.search).get(
-    'scopeId'
-  );
+  const [governedCapabilities, setGovernedCapabilities] =
+    useState<TechnicalDictionaryCapabilities>();
+  const [catalogVersions, setCatalogVersions] = useState<
+    TechnicalDictionaryCatalog[]
+  >([]);
+  const [selectedCatalog, setSelectedCatalog] =
+    useState<TechnicalDictionaryCatalog>();
+  const [bootstrapStatus, setBootstrapStatus] =
+    useState<TechnicalDictionaryBootstrapStatus>();
+  const requestedBusinessVersion =
+    searchParams.get('businessVersion') ?? undefined;
+  const versionView = 'LATEST' as const;
   const governedReadEnabled = isTechnicalDictionaryFeatureEnabled(
     TECHNICAL_DICTIONARY_READ_PATH_FLAG
   );
+  const governedMutationEnabled = isTechnicalDictionaryFeatureEnabled(
+    TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG
+  );
+  const headerStatus = selectedCatalog?.status ?? EntityStatus.Draft;
+  const headerVersion = selectedCatalog?.businessVersion ?? '1';
+
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const next = new URLSearchParams(searchParams);
+      Object.entries(updates).forEach(([key, value]) => {
+        if (
+          value === undefined ||
+          value === '' ||
+          (key === 'currentPage' && value === '1') ||
+          (key === 'pageSize' && value === String(PAGE_SIZE_BASE))
+        ) {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+      });
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  useEffect(() => {
+    if (!searchParams.has('scopeId') && !searchParams.has('scopeVersion')) {
+      return;
+    }
+    const canonical = new URLSearchParams(searchParams);
+    canonical.delete('scopeId');
+    canonical.delete('scopeVersion');
+    if (canonical.get('currentPage') === '1') {
+      canonical.delete('currentPage');
+    }
+    setSearchParams(canonical, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!governedReadEnabled) {
+      return;
+    }
+    let active = true;
+    getTechnicalDictionaryVersions()
+      .then((versions) => {
+        if (!active) {
+          return;
+        }
+        setCatalogVersions(Array.isArray(versions) ? versions : []);
+      })
+      .catch((error) => showErrorToast(error as Error));
+
+    return () => {
+      active = false;
+    };
+  }, [governedReadEnabled]);
 
   const {
     currentPage,
@@ -594,13 +658,46 @@ export const TechnicalDictionaryPage: React.FC<
     handlePagingChange,
     handlePageChange,
     handlePageSizeChange,
-  } = usePaging(PAGE_SIZE_BASE);
+  } = usePaging(Number(searchParams.get('pageSize')) || PAGE_SIZE_BASE);
 
   const handlePaginationChange = useCallback(
     ({ currentPage: page }: PagingHandlerParams) => {
       handlePageChange(page, { cursorType: null, cursorValue: undefined });
+      updateSearchParams({ currentPage: String(page) });
     },
-    [handlePageChange]
+    [handlePageChange, updateSearchParams]
+  );
+
+  const handlePageSizeChangeWithUrl = useCallback(
+    (size: number) => {
+      handlePageSizeChange(size);
+      updateSearchParams({ pageSize: String(size), currentPage: '1' });
+    },
+    [handlePageSizeChange, updateSearchParams]
+  );
+
+  const handleCatalogVersionChange = useCallback(
+    (businessVersion: string) => {
+      const target = catalogVersions.find(
+        (catalog) => catalog.businessVersion === businessVersion
+      );
+      setSearchText('');
+      setSelectedSources(['all']);
+      setSelectedElementTypes(['all']);
+      setSelectedGenTypes(['all']);
+      setSelectedCreationMethods(['all']);
+      setSelectedCdeFilters(['all']);
+      setSelectedStatusFilters(['all']);
+      setGovernedCapabilities(undefined);
+      handlePageChange(1);
+      setCdeOptions([]);
+      updateSearchParams({
+        businessVersion: target?.historical ? businessVersion : undefined,
+        currentPage: undefined,
+        versionView: undefined,
+      });
+    },
+    [catalogVersions, handlePageChange, updateSearchParams]
   );
 
   const customPaginationProps = useMemo(
@@ -612,7 +709,7 @@ export const TechnicalDictionaryPage: React.FC<
       pageSize,
       paging,
       pagingHandler: handlePaginationChange,
-      onShowSizeChange: handlePageSizeChange,
+      onShowSizeChange: handlePageSizeChangeWithUrl,
       pageSizeOptions: [PAGE_SIZE_BASE, PAGE_SIZE_MEDIUM, PAGE_SIZE_LARGE],
     }),
     [
@@ -622,7 +719,7 @@ export const TechnicalDictionaryPage: React.FC<
       pageSize,
       paging,
       handlePaginationChange,
-      handlePageSizeChange,
+      handlePageSizeChangeWithUrl,
     ]
   );
 
@@ -727,9 +824,9 @@ export const TechnicalDictionaryPage: React.FC<
 
   const fetchTechnicalStats = useCallback(async () => {
     try {
-      if (governedReadEnabled && governedScopeId) {
+      if (governedReadEnabled) {
         const governedStats = await getTechnicalDictionaryStats(
-          governedScopeId
+          requestedBusinessVersion
         );
         setStats({
           totalFields: governedStats.totalColumns ?? 0,
@@ -803,27 +900,40 @@ export const TechnicalDictionaryPage: React.FC<
     } catch {
       // Ignore stats error
     }
-  }, [governedReadEnabled, governedScopeId]);
+  }, [governedReadEnabled, requestedBusinessVersion]);
 
   // Load metadata from OpenMetadata Columns index with server-side pagination
   const fetchTechnicalMetadata = useCallback(
     async (page = currentPage, size = pageSize, search = searchText) => {
+      const requestGeneration = ++requestGenerationRef.current;
       setIsLoading(true);
       try {
-        if (governedReadEnabled && governedScopeId) {
-          const response = await getTechnicalDictionaryRecords(
-            governedScopeId,
-            {
-              search: search || undefined,
-              status:
-                selectedStatusFilters.length === 1 &&
-                !selectedStatusFilters.includes('all')
-                  ? selectedStatusFilters[0]
-                  : undefined,
-              limit: size,
-              offset: (page - 1) * size,
-            }
-          );
+        if (governedReadEnabled) {
+          const response = await getTechnicalDictionaryRecords({
+            businessVersion: requestedBusinessVersion,
+            search: search || undefined,
+            status: selectedStatusFilters.includes('all')
+              ? undefined
+              : selectedStatusFilters.join(','),
+            sources: selectedSources.includes('all')
+              ? undefined
+              : selectedSources.join(','),
+            cdeMapping: selectedCdeFilters.includes('all')
+              ? undefined
+              : selectedCdeFilters.join(','),
+            elementTypes: selectedElementTypes.includes('all')
+              ? undefined
+              : selectedElementTypes.join(','),
+            generationTypes: selectedGenTypes.includes('all')
+              ? undefined
+              : selectedGenTypes.join(','),
+            creationMethods: selectedCreationMethods.includes('all')
+              ? undefined
+              : selectedCreationMethods.join(','),
+            versionView,
+            limit: size,
+            offset: (page - 1) * size,
+          });
           const governedFields = response.data.map(
             (record: TechnicalDictionaryRecord): TechnicalFieldItem => {
               const payload = record.payload;
@@ -835,18 +945,43 @@ export const TechnicalDictionaryPage: React.FC<
                 string,
                 unknown
               >;
+              const relatedTerms = Array.isArray(payload.relatedTerms)
+                ? (payload.relatedTerms as Array<Record<string, unknown>>)
+                : [];
+              const cdeRelation = relatedTerms[0] ?? {};
+              const cdeTerm = (cdeRelation.term ?? {}) as Record<
+                string,
+                unknown
+              >;
+              const cdeVersion = (cdeRelation.versionContext ?? {}) as Record<
+                string,
+                unknown
+              >;
               const refName = (value: unknown) => {
                 const reference = (value ?? {}) as Record<string, unknown>;
 
                 return String(reference.displayName ?? reference.name ?? '');
               };
+              const refFqn = (value: unknown) => {
+                const reference = (value ?? {}) as Record<string, unknown>;
+
+                return String(reference.fullyQualifiedName ?? '');
+              };
 
               return {
                 id: record.recordId,
-                scopeId: record.scopeId,
+                parentBusinessVersion: response.catalog.businessVersion,
+                catalogStatus: response.catalog.status,
+                historical: response.catalog.historical,
+                businessVersion: record.businessVersion,
+                releaseVersionType:
+                  (extension.releaseVersionType as string | undefined) ??
+                  getCDEReleaseVersionType(undefined, record.businessVersion),
                 workingRevision: record.workingRevision,
                 databaseName: refName(source.database),
+                databaseFqn: refFqn(source.database),
                 schemaName: refName(source.schema),
+                schemaFqn: refFqn(source.schema),
                 tableId: String(source.tableId ?? ''),
                 tableName: String(source.tableName ?? ''),
                 tableFqn: String(source.tableFqn ?? ''),
@@ -863,6 +998,17 @@ export const TechnicalDictionaryPage: React.FC<
                 status: record.status,
                 cdeCode: extension.cdeCode as string | undefined,
                 cdeName: extension.cdeName as string | undefined,
+                cdeFqn: extension.cdeFqn as string | undefined,
+                cdeTermId: cdeTerm.id as string | undefined,
+                cdeSnapshotId: record.cdeSnapshotId,
+                cdeBusinessVersion: cdeVersion.businessVersion as
+                  | string
+                  | undefined,
+                cdeParentBusinessVersion: cdeVersion.parentBusinessVersion as
+                  | string
+                  | undefined,
+                dataDictionaryVersionId:
+                  extension.cdeDataDictionaryVersionId as string | undefined,
                 survivorshipRank: extension.survivorshipRank as
                   | number
                   | undefined,
@@ -873,15 +1019,11 @@ export const TechnicalDictionaryPage: React.FC<
                 elementTypeName: extension.elementTypeName as
                   | string
                   | undefined,
-                generationType: extension.generationType as
-                  | string
-                  | undefined,
+                generationType: extension.generationType as string | undefined,
                 generationTypeName: extension.generationTypeName as
                   | string
                   | undefined,
-                creationMethod: extension.creationMethod as
-                  | string
-                  | undefined,
+                creationMethod: extension.creationMethod as string | undefined,
                 creationMethodName: extension.creationMethodName as
                   | string
                   | undefined,
@@ -891,18 +1033,35 @@ export const TechnicalDictionaryPage: React.FC<
               };
             }
           );
+          if (requestGeneration !== requestGenerationRef.current) {
+            return;
+          }
+          setSelectedCatalog(response.catalog);
+          setBootstrapStatus(response.bootstrap);
           setTechnicalFields(governedFields);
+          setGovernedCapabilities(response.capabilities);
+          setAvailableSources(
+            Array.from(
+              new Set(
+                governedFields.map((field) => field.serviceName).filter(Boolean)
+              )
+            )
+          );
           handlePagingChange({ total: response.paging.total });
-          const options = await getTechnicalCdeOptions(governedScopeId, {
+          const options = await getTechnicalCdeOptions({
+            businessVersion: response.catalog.businessVersion,
             limit: 25,
           });
           setCdeOptions(
             options.map((option) => ({
-              label: `${option.code} - ${option.name ?? option.code}`,
+              label: `${option.code} · ${option.name ?? option.code} · v${
+                option.businessVersion
+              }`,
               value: option.snapshotId,
               name: option.name ?? option.code,
               code: option.code,
               termId: option.termId,
+              snapshotId: option.snapshotId,
               businessVersion: option.businessVersion,
               parentBusinessVersion: option.parentBusinessVersion,
               dataDictionaryVersionId: option.dataDictionaryVersionId,
@@ -913,7 +1072,10 @@ export const TechnicalDictionaryPage: React.FC<
         }
 
         // 1. Fetch CDE Glossary terms to map CDE codes to business display names and survivorship rules
-        const cdeDisplayMap: Record<string, { name: string; fqn: string }> = {};
+        const cdeDisplayMap: Record<
+          string,
+          { name: string; fqn: string; termId?: string }
+        > = {};
         const cdeSurvivorshipMap = new Map<
           string,
           Map<string, { rank: number; note?: string }>
@@ -936,6 +1098,7 @@ export const TechnicalDictionaryPage: React.FC<
                 cdeDisplayMap[term.name.trim().toUpperCase()] = {
                   name: term.displayName || term.name,
                   fqn: term.fullyQualifiedName || '',
+                  termId: term.id,
                 };
               }
               if (
@@ -980,24 +1143,30 @@ export const TechnicalDictionaryPage: React.FC<
           selectedElementTypes.length > 0 &&
           !selectedElementTypes.includes('all')
         ) {
-          const elTags = selectedElementTypes.map(
-            (type) => `dataelementtype.${type.toLowerCase()}`
-          );
           filterClauses.push({
             terms: {
-              classificationTags: elTags,
+              'extension.elementType.keyword': selectedElementTypes,
             },
           });
         }
 
         // Generation Type filter
         if (selectedGenTypes.length > 0 && !selectedGenTypes.includes('all')) {
-          const genTags = selectedGenTypes.map(
-            (gen) => `fieldgenerationtype.${gen.toLowerCase()}`
-          );
           filterClauses.push({
             terms: {
-              classificationTags: genTags,
+              'extension.generationType.keyword': selectedGenTypes,
+            },
+          });
+        }
+
+        // Creation Method filter
+        if (
+          selectedCreationMethods.length > 0 &&
+          !selectedCreationMethods.includes('all')
+        ) {
+          filterClauses.push({
+            terms: {
+              'extension.creationMethod.keyword': selectedCreationMethods,
             },
           });
         }
@@ -1181,7 +1350,9 @@ export const TechnicalDictionaryPage: React.FC<
             }
           });
 
-          const finalStatus = col.extension?.status || 'Draft';
+          const finalStatus =
+            (col.extension?.status as EntityStatus | undefined) ??
+            EntityStatus.Draft;
           const columnMetadata = getTechnicalColumnMetadata(
             col,
             cdeFqn ? cdeSurvivorshipMap.get(cdeFqn) : undefined
@@ -1203,6 +1374,13 @@ export const TechnicalDictionaryPage: React.FC<
             columnDisplayName,
             columnFqn,
             status: finalStatus,
+            businessVersion: col.extension?.businessVersion ?? '1.0',
+            releaseVersionType:
+              col.extension?.releaseVersionType ??
+              getCDEReleaseVersionType(
+                undefined,
+                col.extension?.businessVersion ?? '1.0'
+              ),
             serviceName,
             cdeCode,
             cdeName,
@@ -1212,10 +1390,18 @@ export const TechnicalDictionaryPage: React.FC<
             ...columnMetadata,
             timeliness: col.extension?.timeliness,
             systemOwner: col.extension?.systemOwner,
-            elementType,
-            elementTypeName: elementTypeName || elementType,
-            generationType,
-            generationTypeName: generationTypeName || generationType,
+            elementType: col.extension?.elementType || elementType,
+            elementTypeName:
+              col.extension?.elementTypeName ||
+              elementTypeName ||
+              col.extension?.elementType ||
+              elementType,
+            generationType: col.extension?.generationType || generationType,
+            generationTypeName:
+              col.extension?.generationTypeName ||
+              generationTypeName ||
+              col.extension?.generationType ||
+              generationType,
             creationMethod: col.extension?.creationMethod || creationMethod,
             creationMethodName:
               col.extension?.creationMethodName ||
@@ -1227,21 +1413,34 @@ export const TechnicalDictionaryPage: React.FC<
           };
         });
 
-        const cdeOpts: Array<{ label: string; value: string; name: string }> =
-          [];
+        const cdeOpts: Array<{
+          label: string;
+          value: string;
+          name: string;
+          code: string;
+          termId?: string;
+          fullyQualifiedName: string;
+        }> = [];
         Object.entries(cdeDisplayMap).forEach(([code, val]) => {
           cdeOpts.push({
             label: `${code} - ${val.name}`,
             value: code,
             name: val.name,
+            code,
+            termId: val.termId,
+            fullyQualifiedName: val.fqn,
           });
         });
-        setCdeOptions(cdeOpts);
-        setTechnicalFields(fieldsList);
+        if (requestGeneration === requestGenerationRef.current) {
+          setCdeOptions(cdeOpts);
+          setTechnicalFields(fieldsList);
+        }
       } catch (err) {
         showErrorToast(err as Error);
       } finally {
-        setIsLoading(false);
+        if (requestGeneration === requestGenerationRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [
@@ -1251,11 +1450,13 @@ export const TechnicalDictionaryPage: React.FC<
       selectedSources,
       selectedElementTypes,
       selectedGenTypes,
+      selectedCreationMethods,
       selectedCdeFilters,
       selectedStatusFilters,
       handlePagingChange,
       governedReadEnabled,
-      governedScopeId,
+      requestedBusinessVersion,
+      versionView,
     ]
   );
 
@@ -1277,8 +1478,29 @@ export const TechnicalDictionaryPage: React.FC<
     selectedSources,
     selectedElementTypes,
     selectedGenTypes,
+    selectedCreationMethods,
     selectedCdeFilters,
     selectedStatusFilters,
+    requestedBusinessVersion,
+  ]);
+
+  useEffect(() => {
+    if (bootstrapStatus?.status !== 'Running') {
+      return;
+    }
+    const timer = globalThis.setTimeout(() => {
+      fetchTechnicalStats();
+      fetchTechnicalMetadata(currentPage, pageSize, searchText);
+    }, 3000);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [
+    bootstrapStatus?.status,
+    currentPage,
+    fetchTechnicalMetadata,
+    fetchTechnicalStats,
+    pageSize,
+    searchText,
   ]);
 
   // Action Handlers
@@ -1291,61 +1513,61 @@ export const TechnicalDictionaryPage: React.FC<
     async (updatedItem: Partial<TechnicalFieldItem>) => {
       setIsSubmittingEdit(true);
       try {
-        const finalStatus = updatedItem.status || 'Approved';
+        const finalStatus = updatedItem.status || EntityStatus.Draft;
         const governedMutationEnabled = isTechnicalDictionaryFeatureEnabled(
           TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG
         );
         if (
-          governedMutationEnabled &&
-          updatedItem.scopeId &&
-          updatedItem.id &&
-          updatedItem.workingRevision !== undefined
+          !governedMutationEnabled ||
+          !updatedItem.parentBusinessVersion ||
+          !updatedItem.id ||
+          updatedItem.workingRevision === undefined
         ) {
-          await saveTechnicalDictionaryWorking(
-            updatedItem.scopeId,
-            updatedItem.id,
-            updatedItem.workingRevision,
-            {
-              description: updatedItem.description,
-              extension: {
-                cdeCode: updatedItem.cdeCode,
-                cdeName: updatedItem.cdeName,
-                cdeDataDictionaryVersionId:
-                  updatedItem.dataDictionaryVersionId,
-                survivorshipRank: updatedItem.survivorshipRank,
-                survivorshipNote: updatedItem.survivorshipNote,
-                elementType: updatedItem.elementType,
-                elementTypeName: updatedItem.elementTypeName,
-                generationType: updatedItem.generationType,
-                generationTypeName: updatedItem.generationTypeName,
-                creationMethod: updatedItem.creationMethod,
-                creationMethodName: updatedItem.creationMethodName,
-                timeliness: updatedItem.timeliness,
-                systemOwner: updatedItem.systemOwner,
-              },
-              relatedTerms:
-                updatedItem.cdeTermId && updatedItem.cdeSnapshotId
-                  ? [
-                      {
-                        term: { id: updatedItem.cdeTermId, type: 'glossaryTerm' },
-                        relationType: 'relatedTo',
-                        versionContext: {
-                          snapshotId: updatedItem.cdeSnapshotId,
-                          businessVersion: updatedItem.cdeBusinessVersion,
-                          parentBusinessVersion:
-                            updatedItem.cdeParentBusinessVersion,
-                        },
-                      },
-                    ]
-                  : [],
-            }
+          throw new Error(
+            'Không thể lưu bản ghi vì thiếu phiên bản Từ điển kỹ thuật.'
           );
-        } else {
-          await syncColumnMetadataToBackend({
-            ...updatedItem,
-            status: finalStatus,
-          });
         }
+        await saveTechnicalDictionaryWorking(
+          updatedItem.id,
+          updatedItem.parentBusinessVersion,
+          updatedItem.workingRevision,
+          {
+            description: updatedItem.description,
+            extension: {
+              cdeCode: updatedItem.cdeCode,
+              cdeName: updatedItem.cdeName,
+              cdeDataDictionaryVersionId: updatedItem.dataDictionaryVersionId,
+              survivorshipRank: updatedItem.survivorshipRank,
+              survivorshipNote: updatedItem.survivorshipNote,
+              elementType: updatedItem.elementType,
+              elementTypeName: updatedItem.elementTypeName,
+              generationType: updatedItem.generationType,
+              generationTypeName: updatedItem.generationTypeName,
+              creationMethod: updatedItem.creationMethod,
+              creationMethodName: updatedItem.creationMethodName,
+              timeliness: updatedItem.timeliness,
+              systemOwner: updatedItem.systemOwner,
+            },
+            relatedTerms:
+              updatedItem.cdeTermId && updatedItem.cdeSnapshotId
+                ? [
+                    {
+                      term: {
+                        id: updatedItem.cdeTermId,
+                        type: 'glossaryTerm',
+                      },
+                      relationType: 'relatedTo',
+                      versionContext: {
+                        snapshotId: updatedItem.cdeSnapshotId,
+                        businessVersion: updatedItem.cdeBusinessVersion,
+                        parentBusinessVersion:
+                          updatedItem.cdeParentBusinessVersion,
+                      },
+                    },
+                  ]
+                : [],
+          }
+        );
 
         setTechnicalFields((prev) =>
           prev.map((f) =>
@@ -1382,32 +1604,36 @@ export const TechnicalDictionaryPage: React.FC<
           TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG
         );
         if (
-          governedMutationEnabled &&
-          item.scopeId &&
-          item.workingRevision !== undefined
+          !governedMutationEnabled ||
+          !item.parentBusinessVersion ||
+          item.workingRevision === undefined
         ) {
-          let revision = item.workingRevision;
-          if (item.status === 'Draft') {
-            const submitted = await transitionTechnicalDictionaryWorking(
-              item.scopeId,
-              item.id,
-              'submit',
-              revision
-            );
-            revision = submitted.revision;
-          }
-          await transitionTechnicalDictionaryWorking(
-            item.scopeId,
-            item.id,
-            'approve',
-            revision
+          throw new Error(
+            'Không thể phê duyệt vì thiếu phiên bản Từ điển kỹ thuật.'
           );
-        } else {
-          await syncColumnMetadataToBackend({ ...item, status: 'Approved' });
         }
 
+        let revision = item.workingRevision;
+        if (item.status === EntityStatus.Draft) {
+          const submitted = await transitionTechnicalDictionaryWorking(
+            item.id,
+            item.parentBusinessVersion,
+            'submit',
+            revision
+          );
+          revision = submitted.revision;
+        }
+        await transitionTechnicalDictionaryWorking(
+          item.id,
+          item.parentBusinessVersion,
+          'approve',
+          revision
+        );
+
         setTechnicalFields((prev) =>
-          prev.map((f) => (f.id === item.id ? { ...f, status: 'Approved' } : f))
+          prev.map((f) =>
+            f.id === item.id ? { ...f, status: EntityStatus.Approved } : f
+          )
         );
 
         showSuccessToast(
@@ -1426,24 +1652,27 @@ export const TechnicalDictionaryPage: React.FC<
     async (item: TechnicalFieldItem) => {
       try {
         if (
-          isTechnicalDictionaryFeatureEnabled(
+          !isTechnicalDictionaryFeatureEnabled(
             TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG
-          ) &&
-          item.scopeId &&
-          item.workingRevision !== undefined
+          ) ||
+          !item.parentBusinessVersion ||
+          item.workingRevision === undefined
         ) {
-          await transitionTechnicalDictionaryWorking(
-            item.scopeId,
-            item.id,
-            'reject',
-            item.workingRevision
+          throw new Error(
+            'Không thể từ chối vì thiếu phiên bản Từ điển kỹ thuật.'
           );
-        } else {
-          await rejectColumnMetadataOnBackend(item);
         }
+        await transitionTechnicalDictionaryWorking(
+          item.id,
+          item.parentBusinessVersion,
+          'reject',
+          item.workingRevision
+        );
 
         setTechnicalFields((prev) =>
-          prev.map((f) => (f.id === item.id ? { ...f, status: 'Rejected' } : f))
+          prev.map((f) =>
+            f.id === item.id ? { ...f, status: EntityStatus.Rejected } : f
+          )
         );
 
         showSuccessToast(
@@ -1462,20 +1691,22 @@ export const TechnicalDictionaryPage: React.FC<
     async (item: TechnicalFieldItem) => {
       try {
         if (
-          isTechnicalDictionaryFeatureEnabled(
+          !isTechnicalDictionaryFeatureEnabled(
             TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG
-          ) &&
-          item.scopeId
+          ) ||
+          !item.parentBusinessVersion ||
+          item.workingRevision === undefined
         ) {
-          await transitionTechnicalDictionaryWorking(
-            item.scopeId,
-            item.id,
-            'revoke',
-            item.workingRevision ?? 0
+          throw new Error(
+            'Không thể thu hồi vì thiếu phiên bản Từ điển kỹ thuật.'
           );
-        } else {
-          await removeColumnMetadataFromBackend(item);
         }
+        await transitionTechnicalDictionaryWorking(
+          item.id,
+          item.parentBusinessVersion,
+          'revoke',
+          item.workingRevision
+        );
 
         setTechnicalFields((prev) =>
           prev.map((f) =>
@@ -1484,7 +1715,7 @@ export const TechnicalDictionaryPage: React.FC<
               f.columnName?.toLowerCase() === item.columnName?.toLowerCase())
               ? {
                   ...f,
-                  status: 'Draft',
+                  status: EntityStatus.Draft,
                   cdeCode: undefined,
                   cdeName: undefined,
                   cdeFqn: undefined,
@@ -1512,6 +1743,138 @@ export const TechnicalDictionaryPage: React.FC<
       }
     },
     [t]
+  );
+
+  const handleWorkflowAction = useCallback(
+    async (
+      item: TechnicalFieldItem,
+      action: 'submit' | 'reopen',
+      nextStatus: EntityStatus
+    ) => {
+      try {
+        let nextRevision = item.workingRevision;
+        if (!item.parentBusinessVersion || item.workingRevision === undefined) {
+          throw new Error(
+            'Không thể chuyển trạng thái vì thiếu phiên bản Từ điển kỹ thuật.'
+          );
+        }
+        const result = await transitionTechnicalDictionaryWorking(
+          item.id,
+          item.parentBusinessVersion,
+          action,
+          item.workingRevision
+        );
+        nextRevision = result.revision;
+        setTechnicalFields((current) =>
+          current.map((field) =>
+            field.id === item.id
+              ? {
+                  ...field,
+                  status: nextStatus,
+                  workingRevision: nextRevision,
+                }
+              : field
+          )
+        );
+        showSuccessToast(
+          action === 'submit'
+            ? t('message.submit-for-review-success', {
+                defaultValue: 'Đã gửi trường kỹ thuật để phê duyệt',
+              })
+            : t('message.reopen-success', {
+                defaultValue: 'Đã mở lại trường kỹ thuật',
+              })
+        );
+      } catch (error) {
+        showErrorToast(error as Error);
+      }
+    },
+    [t]
+  );
+
+  const handleCreateRecordVersion = useCallback(
+    async (item: TechnicalFieldItem) => {
+      if (!item.parentBusinessVersion) {
+        return;
+      }
+      try {
+        await createTechnicalDictionaryRecordVersion(
+          item.id,
+          item.parentBusinessVersion
+        );
+        await fetchTechnicalMetadata(currentPage, pageSize, searchText);
+        showSuccessToast(
+          t('message.create-version-success', {
+            defaultValue: 'Đã tạo phiên bản bản ghi mới',
+          })
+        );
+      } catch (error) {
+        showErrorToast(error as Error);
+      }
+    },
+    [currentPage, fetchTechnicalMetadata, pageSize, searchText, t]
+  );
+
+  const handleSearchCde = useCallback(
+    (search: string) => {
+      if (!selectedCatalog?.businessVersion) {
+        return;
+      }
+      globalThis.clearTimeout(cdeSearchTimerRef.current);
+      const requestGeneration = ++cdeRequestGenerationRef.current;
+      cdeSearchTimerRef.current = globalThis.setTimeout(async () => {
+        try {
+          const options = await getTechnicalCdeOptions({
+            businessVersion: selectedCatalog.businessVersion,
+            search,
+            limit: 25,
+          });
+          if (requestGeneration === cdeRequestGenerationRef.current) {
+            setCdeOptions(
+              options.map((option) => ({
+                label: `${option.code} · ${option.name ?? option.code} · v${
+                  option.businessVersion
+                }`,
+                value: option.snapshotId,
+                name: option.name ?? option.code,
+                code: option.code,
+                termId: option.termId,
+                snapshotId: option.snapshotId,
+                businessVersion: option.businessVersion,
+                parentBusinessVersion: option.parentBusinessVersion,
+                dataDictionaryVersionId: option.dataDictionaryVersionId,
+              }))
+            );
+          }
+        } catch (error) {
+          if (requestGeneration === cdeRequestGenerationRef.current) {
+            showErrorToast(error as Error);
+          }
+        }
+      }, 400);
+    },
+    [selectedCatalog?.businessVersion]
+  );
+
+  const handleSearchTextChange = useCallback(
+    (value: string) => {
+      setSearchText(value);
+      globalThis.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = globalThis.setTimeout(() => {
+        handlePageChange(1);
+        updateSearchParams({ q: value || undefined, currentPage: '1' });
+        fetchTechnicalMetadata(1, pageSize, value);
+      }, 400);
+    },
+    [fetchTechnicalMetadata, handlePageChange, pageSize, updateSearchParams]
+  );
+
+  useEffect(
+    () => () => {
+      globalThis.clearTimeout(searchTimerRef.current);
+      globalThis.clearTimeout(cdeSearchTimerRef.current);
+    },
+    []
   );
 
   // Available data sources
@@ -1572,6 +1935,24 @@ export const TechnicalDictionaryPage: React.FC<
     [t]
   );
 
+  const creationMethodOptions: FilterOption[] = useMemo(
+    () => [
+      {
+        label: t('label.parameterised', { defaultValue: 'Tham số' }),
+        value: 'Parameterised',
+      },
+      {
+        label: t('label.hardcoded', { defaultValue: 'Mã cứng' }),
+        value: 'Hardcoded',
+      },
+      {
+        label: t('label.not-applicable', { defaultValue: 'N/A' }),
+        value: 'NotApplicable',
+      },
+    ],
+    [t]
+  );
+
   const cdeFilterOptions: FilterOption[] = useMemo(
     () => [
       {
@@ -1592,25 +1973,25 @@ export const TechnicalDictionaryPage: React.FC<
         label: t('label.status-approved-opt', {
           defaultValue: 'Đã phê duyệt',
         }),
-        value: 'Approved',
+        value: EntityStatus.Approved,
       },
       {
         label: t('label.status-in-review-opt', {
-          defaultValue: 'Chờ phê duyệt',
+          defaultValue: 'Đang xem xét',
         }),
-        value: 'In Review',
+        value: EntityStatus.InReview,
       },
       {
         label: t('label.status-draft-opt', {
           defaultValue: 'Bản nháp',
         }),
-        value: 'Draft',
+        value: EntityStatus.Draft,
       },
       {
         label: t('label.status-rejected-opt', {
           defaultValue: 'Bị từ chối',
         }),
-        value: 'Rejected',
+        value: EntityStatus.Rejected,
       },
     ],
     [t]
@@ -1618,27 +1999,48 @@ export const TechnicalDictionaryPage: React.FC<
 
   // Filtered dataset for Consumer or direct view
   const filteredData = useMemo(() => {
+    if (governedReadEnabled) {
+      return technicalFields;
+    }
+
     if (!userRoleInfo.canViewAllStatus) {
-      return technicalFields.filter((item) => item.status === 'Approved');
+      return technicalFields.filter(
+        (item) => item.status === EntityStatus.Approved
+      );
     }
 
     return technicalFields;
-  }, [technicalFields, userRoleInfo.canViewAllStatus]);
+  }, [governedReadEnabled, technicalFields, userRoleInfo.canViewAllStatus]);
 
   // Export the current technical dictionary result set as an Excel workbook.
   const handleExportExcel = useCallback(async () => {
     const governedReadEnabled = isTechnicalDictionaryFeatureEnabled(
       TECHNICAL_DICTIONARY_READ_PATH_FLAG
     );
-    const scopeId = new URLSearchParams(globalThis.location.search).get(
-      'scopeId'
-    );
-    if (governedReadEnabled && scopeId) {
+    if (governedReadEnabled) {
       try {
-        const { blob, fileName } = await exportTechnicalDictionary(scopeId, {
+        const { blob, fileName } = await exportTechnicalDictionary({
+          businessVersion: requestedBusinessVersion,
           search: searchText || undefined,
-          status: selectedStatusFilters[0],
-          versionView: 'LATEST',
+          status: selectedStatusFilters.includes('all')
+            ? undefined
+            : selectedStatusFilters.join(','),
+          sources: selectedSources.includes('all')
+            ? undefined
+            : selectedSources.join(','),
+          cdeMapping: selectedCdeFilters.includes('all')
+            ? undefined
+            : selectedCdeFilters.join(','),
+          elementTypes: selectedElementTypes.includes('all')
+            ? undefined
+            : selectedElementTypes.join(','),
+          generationTypes: selectedGenTypes.includes('all')
+            ? undefined
+            : selectedGenTypes.join(','),
+          creationMethods: selectedCreationMethods.includes('all')
+            ? undefined
+            : selectedCreationMethods.join(','),
+          versionView,
         });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1677,6 +2079,11 @@ export const TechnicalDictionaryPage: React.FC<
       t('label.timeliness', { defaultValue: 'Thời gian sẵn sàng' }),
       t('label.system-owner', { defaultValue: 'Chủ sở hữu hệ thống' }),
       t('label.description', { defaultValue: 'Mô tả trường' }),
+      t('label.version', { defaultValue: 'Phiên bản' }),
+      t('label.release-version-type', {
+        defaultValue: 'Loại phiên bản phát hành',
+      }),
+      t('label.status', { defaultValue: 'Trạng thái' }),
     ];
 
     const rows = filteredData.map((item) => [
@@ -1695,6 +2102,9 @@ export const TechnicalDictionaryPage: React.FC<
       item.timeliness || '',
       item.systemOwner || '',
       item.description || '',
+      item.businessVersion || '',
+      item.releaseVersionType || '',
+      item.status || '',
     ]);
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
@@ -1714,6 +2124,9 @@ export const TechnicalDictionaryPage: React.FC<
       { wch: 18 },
       { wch: 28 },
       { wch: 42 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 18 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -1736,7 +2149,19 @@ export const TechnicalDictionaryPage: React.FC<
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [filteredData, searchText, selectedStatusFilters, t]);
+  }, [
+    filteredData,
+    searchText,
+    selectedStatusFilters,
+    selectedSources,
+    selectedCdeFilters,
+    selectedElementTypes,
+    selectedGenTypes,
+    selectedCreationMethods,
+    requestedBusinessVersion,
+    versionView,
+    t,
+  ]);
 
   const extraTableFilters = useMemo(
     () => (
@@ -1751,9 +2176,13 @@ export const TechnicalDictionaryPage: React.FC<
           prefix={<SearchOutlined className="text-grey-muted" />}
           style={{ width: 280 }}
           value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          onChange={(e) => handleSearchTextChange(e.target.value)}
           onPressEnter={() => {
             handlePageChange(1);
+            updateSearchParams({
+              q: searchText || undefined,
+              currentPage: '1',
+            });
             fetchTechnicalMetadata(1, pageSize, searchText);
           }}
         />
@@ -1766,6 +2195,10 @@ export const TechnicalDictionaryPage: React.FC<
           onChange={(vals) => {
             setSelectedStatusFilters(vals);
             handlePageChange(1);
+            updateSearchParams({
+              statuses: vals.includes('all') ? undefined : vals.join(','),
+              currentPage: '1',
+            });
           }}
         />
 
@@ -1777,6 +2210,10 @@ export const TechnicalDictionaryPage: React.FC<
           onChange={(vals) => {
             setSelectedSources(vals);
             handlePageChange(1);
+            updateSearchParams({
+              sources: vals.includes('all') ? undefined : vals.join(','),
+              currentPage: '1',
+            });
           }}
         />
 
@@ -1788,6 +2225,10 @@ export const TechnicalDictionaryPage: React.FC<
           onChange={(vals) => {
             setSelectedCdeFilters(vals);
             handlePageChange(1);
+            updateSearchParams({
+              cdeMapping: vals.includes('all') ? undefined : vals.join(','),
+              currentPage: '1',
+            });
           }}
         />
 
@@ -1801,6 +2242,10 @@ export const TechnicalDictionaryPage: React.FC<
           onChange={(vals) => {
             setSelectedElementTypes(vals);
             handlePageChange(1);
+            updateSearchParams({
+              elementTypes: vals.includes('all') ? undefined : vals.join(','),
+              currentPage: '1',
+            });
           }}
         />
 
@@ -1814,6 +2259,31 @@ export const TechnicalDictionaryPage: React.FC<
           onChange={(vals) => {
             setSelectedGenTypes(vals);
             handlePageChange(1);
+            updateSearchParams({
+              generationTypes: vals.includes('all')
+                ? undefined
+                : vals.join(','),
+              currentPage: '1',
+            });
+          }}
+        />
+
+        <CDEFilterDropdown
+          dataTestId="creation-method-filter-dropdown"
+          label={t('label.creation-method', {
+            defaultValue: 'Phương thức tạo',
+          })}
+          options={creationMethodOptions}
+          selectedValues={selectedCreationMethods}
+          onChange={(vals) => {
+            setSelectedCreationMethods(vals);
+            handlePageChange(1);
+            updateSearchParams({
+              creationMethods: vals.includes('all')
+                ? undefined
+                : vals.join(','),
+              currentPage: '1',
+            });
           }}
         />
 
@@ -1822,6 +2292,9 @@ export const TechnicalDictionaryPage: React.FC<
             menu={{
               items: [
                 {
+                  disabled:
+                    governedReadEnabled &&
+                    !(governedCapabilities?.canExport ?? false),
                   icon: <FileExcelOutlined />,
                   key: 'export-excel',
                   label: t('label.export-excel', {
@@ -1856,12 +2329,18 @@ export const TechnicalDictionaryPage: React.FC<
       selectedElementTypes,
       genTypeOptions,
       selectedGenTypes,
+      creationMethodOptions,
+      selectedCreationMethods,
       cdeFilterOptions,
       selectedCdeFilters,
       statusFilterOptions,
       selectedStatusFilters,
+      governedReadEnabled,
+      governedCapabilities?.canExport,
+      updateSearchParams,
       userRoleInfo.canViewAllStatus,
       handleExportExcel,
+      handleSearchTextChange,
       fetchTechnicalMetadata,
       handlePageChange,
       pageSize,
@@ -1874,24 +2353,76 @@ export const TechnicalDictionaryPage: React.FC<
       className={classNames('tech-dict-content-card', {
         'tech-dict-content-card-embedded': isEmbedded,
       })}>
+      {bootstrapStatus?.status === 'Running' && (
+        <Alert
+          showIcon
+          className="m-b-md"
+          message={t('message.technical-dictionary-bootstrap-running', {
+            defaultValue:
+              'Đang đồng bộ dữ liệu kỹ thuật ({{processed}}/{{total}})',
+            processed: bootstrapStatus.processed,
+            total: bootstrapStatus.total,
+          })}
+          type="info"
+        />
+      )}
+      {bootstrapStatus?.status === 'Failed' && (
+        <Alert
+          showIcon
+          className="m-b-md"
+          message={t('message.technical-dictionary-bootstrap-failed', {
+            defaultValue:
+              'Đồng bộ dữ liệu kỹ thuật thất bại với {{failed}} bản ghi. Vui lòng kiểm tra log bootstrap.',
+            failed: bootstrapStatus.failed,
+          })}
+          type="error"
+        />
+      )}
       {/* Matrix Table */}
       <TechnicalDictionaryTable
-        canApprove={userRoleInfo.canApprove}
-        canEdit={userRoleInfo.canEdit}
-        canReject={userRoleInfo.canReject}
-        canRevoke={userRoleInfo.canRevoke}
+        canApprove={
+          governedMutationEnabled && (governedCapabilities?.canApprove ?? false)
+        }
+        canCreateVersion={
+          governedMutationEnabled &&
+          (governedCapabilities?.canCreateVersion ?? false)
+        }
+        canEdit={
+          governedMutationEnabled &&
+          (governedCapabilities?.canEditWorking ?? false)
+        }
+        canReject={
+          governedMutationEnabled && (governedCapabilities?.canReject ?? false)
+        }
+        canReopen={
+          governedMutationEnabled &&
+          (governedCapabilities?.canEditWorking ?? false)
+        }
+        canRevoke={
+          governedMutationEnabled && (governedCapabilities?.canRevoke ?? false)
+        }
+        canSubmit={
+          governedMutationEnabled && (governedCapabilities?.canSubmit ?? false)
+        }
         customPaginationProps={customPaginationProps}
         data={filteredData}
         extraTableFilters={extraTableFilters}
         extraTableFiltersClassName="cde-glossary-table-toolbar tech-dict-table-toolbar"
         isLoading={isLoading}
         onApprove={handleApproveField}
+        onCreateVersion={handleCreateRecordVersion}
         onEdit={handleEditField}
         onRefresh={() =>
           fetchTechnicalMetadata(currentPage, pageSize, searchText)
         }
         onReject={handleRejectField}
+        onReopen={(item) =>
+          handleWorkflowAction(item, 'reopen', EntityStatus.Draft)
+        }
         onRevoke={handleRevokeField}
+        onSubmit={(item) =>
+          handleWorkflowAction(item, 'submit', EntityStatus.InReview)
+        }
       />
     </div>
   );
@@ -1907,6 +2438,7 @@ export const TechnicalDictionaryPage: React.FC<
         setEditingField(null);
       }}
       onSave={handleSaveField}
+      onSearchCde={handleSearchCde}
     />
   );
 
@@ -1920,7 +2452,9 @@ export const TechnicalDictionaryPage: React.FC<
   }
 
   return (
-    <PageLayoutV1 pageTitle={t('label.technical-dictionary')}>
+    <PageLayoutV1
+      mainContainerClassName="technical-dictionary-page-scroll"
+      pageTitle={t('label.technical-dictionary')}>
       <div className="tech-dict-page-container">
         <div className="m-b-md">
           <TitleBreadcrumb titleLinks={breadcrumbs} />
@@ -1934,21 +2468,47 @@ export const TechnicalDictionaryPage: React.FC<
                 <ColumnBulkIcon height={22} width={22} />
               </div>
               <div className="tech-dict-title-copy">
-                <h1 className="tech-dict-title">
-                  {t('label.technical-dictionary', {
-                    defaultValue: 'Từ điển kỹ thuật',
-                  })}
-                </h1>
-                <div className="tech-dict-subheading">
-                  {t('message.technical-dictionary-description', {
-                    defaultValue:
-                      'Danh mục ma trận đặc tả kỹ thuật từ Bảng, Cột, Hệ thống nguồn và ánh xạ quy chiếu về Thành tố dữ liệu dùng chung (CDE).',
-                  })}
+                <div className="tech-dict-title-heading">
+                  <h1 className="tech-dict-title">
+                    {t('label.technical-dictionary', {
+                      defaultValue: 'Từ điển kỹ thuật',
+                    })}
+                  </h1>
+                  <GovernedEntityHeaderBadges
+                    businessVersion={headerVersion}
+                    status={headerStatus as EntityStatus}
+                    statusTestId="technical-dictionary-header-status"
+                    versionButtonTestId="technical-dictionary-version-button"
+                    versionItems={
+                      catalogVersions.length > 0
+                        ? catalogVersions.map((catalog) => ({
+                            key: catalog.businessVersion,
+                            label: `${t('label.version')}: ${
+                              catalog.businessVersion
+                            }`,
+                          }))
+                        : [
+                            {
+                              key: headerVersion,
+                              label: `${t('label.version')}: ${headerVersion}`,
+                            },
+                          ]
+                    }
+                    versionLabel={t('label.version')}
+                    onVersionSelect={(key) => {
+                      if (
+                        catalogVersions.some(
+                          (catalog) => catalog.businessVersion === key
+                        )
+                      ) {
+                        handleCatalogVersionChange(key);
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>
           </div>
-
           {/* Technical dictionary summary cards */}
           <div className="tech-dict-stats-strip">
             <div className="tech-dict-stat-item">

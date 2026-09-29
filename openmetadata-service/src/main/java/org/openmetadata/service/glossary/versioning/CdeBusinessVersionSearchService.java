@@ -16,12 +16,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.openmetadata.schema.type.EntityStatus;
 
 /** Search and filter boundary over the authoritative database-backed CDE flat read model. */
 public class CdeBusinessVersionSearchService {
   private static final Set<Integer> PAGE_SIZES = Set.of(10, 15, 25, 50);
   private static final Set<String> STATUSES =
-      Set.of("Draft", "In Review", "Rejected", "Approved", "Archived");
+      Set.of(
+          EntityStatus.DRAFT.value(),
+          EntityStatus.IN_REVIEW.value(),
+          EntityStatus.REJECTED.value(),
+          EntityStatus.APPROVED.value(),
+          EntityStatus.ARCHIVED.value());
   private static final Set<String> SORT_FIELDS =
       Set.of("name", "displayName", "businessVersion", "entityStatus");
   private static final int MAX_QUERY_LENGTH = 200;
@@ -83,7 +89,9 @@ public class CdeBusinessVersionSearchService {
       throw new BadRequestException("statuses contains an unsupported value");
     }
     if (consumerOnly) {
-      statuses = List.of(archivedScope ? "Archived" : "Approved");
+      statuses =
+          List.of(
+              archivedScope ? EntityStatus.ARCHIVED.value() : EntityStatus.APPROVED.value());
     }
     List<String> domainIds = parseUuids(criteria.domainIds(), "domainIds");
     List<String> ownerIds = parseUuids(criteria.ownerIds(), "ownerIds");

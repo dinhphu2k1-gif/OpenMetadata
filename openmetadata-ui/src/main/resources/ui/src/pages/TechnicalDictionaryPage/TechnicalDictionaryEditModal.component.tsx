@@ -12,9 +12,12 @@
  */
 
 import { EditOutlined } from '@ant-design/icons';
-import { Col, Form, Input, Modal, Row, Select } from 'antd';
-import React, { useEffect } from 'react';
+import { Form, Input, Modal, Select } from 'antd';
+import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import GlossaryTermFormSection from '../../components/Glossary/AddGlossaryTermForm/GlossaryTermFormSection.component';
+import GovernedVersionFields from '../../components/Glossary/AddGlossaryTermForm/GovernedVersionFields.component';
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import { TechnicalFieldItem } from './TechnicalDictionaryTable.component';
 
 const { Option } = Select;
@@ -28,6 +31,8 @@ export interface TechnicalDictionaryEditModalProps {
     name: string;
     code?: string;
     termId?: string;
+    fullyQualifiedName?: string;
+    snapshotId?: string;
     businessVersion?: string;
     parentBusinessVersion?: string;
     dataDictionaryVersionId?: string;
@@ -35,6 +40,7 @@ export interface TechnicalDictionaryEditModalProps {
   onCancel: () => void;
   onSave: (updatedItem: Partial<TechnicalFieldItem>) => Promise<void> | void;
   isSubmitting?: boolean;
+  onSearchCde?: (search: string) => void;
 }
 
 export const TechnicalDictionaryEditModal: React.FC<
@@ -46,9 +52,18 @@ export const TechnicalDictionaryEditModal: React.FC<
   onCancel,
   onSave,
   isSubmitting = false,
+  onSearchCde,
 }) => {
   const { t } = useTranslation();
   const [form] = Form.useForm();
+  const isReadOnly = useMemo(
+    () =>
+      fieldItem?.historical ||
+      fieldItem?.catalogStatus === EntityStatus.Archived ||
+      fieldItem?.status === EntityStatus.Approved ||
+      fieldItem?.status === EntityStatus.InReview,
+    [fieldItem]
+  );
 
   useEffect(() => {
     if (visible && fieldItem) {
@@ -57,7 +72,9 @@ export const TechnicalDictionaryEditModal: React.FC<
         columnName: fieldItem.columnName,
         cdeCode:
           cdeOptions.find((option) => option.code === fieldItem.cdeCode)
-            ?.value || fieldItem.cdeCode || '',
+            ?.value ||
+          fieldItem.cdeCode ||
+          '',
         elementType: fieldItem.elementType || 'AtomicDataElement',
         generationType: fieldItem.generationType || 'ManualInput',
         creationMethod: fieldItem.creationMethod || 'NotApplicable',
@@ -70,15 +87,42 @@ export const TechnicalDictionaryEditModal: React.FC<
     }
   }, [visible, fieldItem, form]);
 
+  useEffect(() => {
+    const resetScrollFrame = visible
+      ? globalThis.requestAnimationFrame(() => {
+          document
+            .querySelector<HTMLElement>(
+              '.technical-dictionary-edit-modal .ant-modal-body'
+            )
+            ?.scrollTo({ top: 0 });
+        })
+      : undefined;
+
+    return () => {
+      if (resetScrollFrame !== undefined) {
+        globalThis.cancelAnimationFrame(resetScrollFrame);
+      }
+    };
+  }, [visible]);
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      const selectedCde = cdeOptions.find(
+        (option) => option.value === values.cdeCode
+      );
+      const keepsExistingCde = Boolean(
+        values.cdeCode &&
+          (values.cdeCode === fieldItem?.cdeCode ||
+            values.cdeCode === fieldItem?.cdeSnapshotId)
+      );
       let cdeName = fieldItem?.cdeName;
       if (values.cdeCode) {
-        const found = cdeOptions.find((c) => c.value === values.cdeCode);
-        if (found) {
-          cdeName = found.name;
+        if (selectedCde) {
+          cdeName = selectedCde.name;
         }
+      } else {
+        cdeName = undefined;
       }
 
       let elementTypeName = t('label.atomic-data-element', {
@@ -123,18 +167,26 @@ export const TechnicalDictionaryEditModal: React.FC<
       await onSave({
         ...fieldItem,
         ...values,
-        cdeCode: cdeOptions.find((c) => c.value === values.cdeCode)?.code ?? values.cdeCode,
+        cdeCode: selectedCde?.code ?? values.cdeCode,
         cdeName,
-        cdeTermId: cdeOptions.find((c) => c.value === values.cdeCode)?.termId,
-        cdeSnapshotId: values.cdeCode || undefined,
-        cdeBusinessVersion: cdeOptions.find((c) => c.value === values.cdeCode)
-          ?.businessVersion,
-        dataDictionaryVersionId: cdeOptions.find(
-          (c) => c.value === values.cdeCode
-        )?.dataDictionaryVersionId,
-        cdeParentBusinessVersion: cdeOptions.find(
-          (c) => c.value === values.cdeCode
-        )?.parentBusinessVersion,
+        cdeFqn:
+          selectedCde?.fullyQualifiedName ??
+          (keepsExistingCde ? fieldItem?.cdeFqn : undefined),
+        cdeTermId:
+          selectedCde?.termId ??
+          (keepsExistingCde ? fieldItem?.cdeTermId : undefined),
+        cdeSnapshotId:
+          selectedCde?.snapshotId ??
+          (keepsExistingCde ? fieldItem?.cdeSnapshotId : undefined),
+        cdeBusinessVersion:
+          selectedCde?.businessVersion ??
+          (keepsExistingCde ? fieldItem?.cdeBusinessVersion : undefined),
+        dataDictionaryVersionId:
+          selectedCde?.dataDictionaryVersionId ??
+          (keepsExistingCde ? fieldItem?.dataDictionaryVersionId : undefined),
+        cdeParentBusinessVersion:
+          selectedCde?.parentBusinessVersion ??
+          (keepsExistingCde ? fieldItem?.cdeParentBusinessVersion : undefined),
         elementTypeName,
         generationTypeName,
         creationMethodName,
@@ -142,7 +194,7 @@ export const TechnicalDictionaryEditModal: React.FC<
           ? Number(values.survivorshipRank)
           : undefined,
         survivorshipNote: fieldItem?.survivorshipNote,
-        status: fieldItem?.status || 'Approved',
+        status: fieldItem?.status || EntityStatus.Draft,
       });
     } catch {
       // Form validation error
@@ -151,17 +203,19 @@ export const TechnicalDictionaryEditModal: React.FC<
 
   return (
     <Modal
+      centered
       bodyStyle={{ overflowY: 'auto' }}
       cancelButtonProps={{ className: 'technical-edit-modal-cancel' }}
       cancelText={t('label.cancel', { defaultValue: 'Hủy' })}
       className="technical-dictionary-edit-modal"
       confirmLoading={isSubmitting}
       data-testid="technical-dictionary-edit-modal"
+      footer={isReadOnly ? null : undefined}
       okButtonProps={{
         className: 'technical-edit-modal-save',
         type: 'primary',
       }}
-      okText={t('label.save', { defaultValue: 'Lưu' })}
+      okText={t('label.save-draft', { defaultValue: 'Lưu nháp' })}
       open={visible}
       title={
         <div className="technical-edit-modal-title">
@@ -170,9 +224,13 @@ export const TechnicalDictionaryEditModal: React.FC<
           </span>
           <div className="technical-edit-modal-title-content">
             <span className="technical-edit-modal-title-text">
-              {t('label.edit-technical-field', {
-                defaultValue: 'Chỉnh sửa trường kỹ thuật',
-              })}
+              {isReadOnly
+                ? t('label.view-technical-field-version', {
+                    defaultValue: 'Xem phiên bản trường kỹ thuật',
+                  })
+                : t('label.edit-technical-field', {
+                    defaultValue: 'Chỉnh sửa trường kỹ thuật',
+                  })}
             </span>
             {fieldItem && (
               <div
@@ -195,230 +253,227 @@ export const TechnicalDictionaryEditModal: React.FC<
       onCancel={onCancel}
       onOk={handleSubmit}>
       <Form
-        className="technical-dictionary-edit-form"
+        className="cde-glossary-term-form technical-dictionary-edit-form"
         form={form}
         layout="vertical">
-        <section className="technical-edit-form-section technical-edit-form-section-readonly">
-          <header className="technical-edit-form-section-header">
-            <span
-              aria-hidden="true"
-              className="technical-edit-form-section-marker"
+        <GlossaryTermFormSection
+          readOnly
+          title={t('label.version-information', {
+            defaultValue: 'Thông tin phiên bản',
+          })}>
+          <GovernedVersionFields
+            bindToForm={false}
+            releaseVersionType={fieldItem?.releaseVersionType}
+            releaseVersionTypeLabel={t('label.release-version-type', {
+              defaultValue: 'Loại phiên bản phát hành',
+            })}
+            version={fieldItem?.businessVersion}
+            versionLabel={t('label.version', { defaultValue: 'Phiên bản' })}
+          />
+        </GlossaryTermFormSection>
+
+        <GlossaryTermFormSection
+          readOnly
+          description={t('message.technical-field-information-description', {
+            defaultValue: 'Thông tin định danh được đồng bộ từ hệ thống nguồn.',
+          })}
+          title={t('label.technical-field-information', {
+            defaultValue: 'Thông tin trường kỹ thuật',
+          })}>
+          <Form.Item
+            label={t('label.database-name', {
+              defaultValue: 'Tên cơ sở dữ liệu',
+            })}>
+            <Input
+              disabled
+              value={fieldItem?.databaseDisplayName || fieldItem?.databaseName}
             />
-            <div>
-              <h3 className="technical-edit-form-section-title">
-                {t('label.technical-field-information', {
-                  defaultValue: 'Thông tin trường kỹ thuật',
-                })}
-              </h3>
-              <p className="technical-edit-form-section-description">
-                {t('message.technical-field-information-description', {
-                  defaultValue:
-                    'Thông tin định danh được đồng bộ từ hệ thống nguồn.',
-                })}
-              </p>
-            </div>
-          </header>
-
-          <Row gutter={[16, 0]}>
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.table-name', { defaultValue: 'Tên Bảng' })}
-                name="tableName">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.column-name', { defaultValue: 'Tên cột' })}
-                name="columnName">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-          </Row>
-        </section>
-
-        <section className="technical-edit-form-section">
-          <header className="technical-edit-form-section-header">
-            <span
-              aria-hidden="true"
-              className="technical-edit-form-section-marker"
+          </Form.Item>
+          <Form.Item
+            label={t('label.schema-name', { defaultValue: 'Tên Schema' })}>
+            <Input
+              disabled
+              value={fieldItem?.schemaDisplayName || fieldItem?.schemaName}
             />
-            <div>
-              <h3 className="technical-edit-form-section-title">
-                {t('label.technical-specification-and-reference', {
-                  defaultValue: 'Thông tin đặc tả và quy chiếu',
-                })}
-              </h3>
-              <p className="technical-edit-form-section-description">
-                {t(
-                  'message.technical-specification-and-reference-description',
-                  {
-                    defaultValue:
-                      'Cập nhật các thuộc tính kỹ thuật và CDE quy chiếu của trường.',
-                  }
-                )}
-              </p>
-            </div>
-          </header>
+          </Form.Item>
+          <Form.Item
+            label={t('label.table-name', { defaultValue: 'Tên Bảng' })}
+            name="tableName">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item
+            label={t('label.column-name', { defaultValue: 'Tên cột' })}
+            name="columnName">
+            <Input disabled />
+          </Form.Item>
+          <Form.Item label={t('label.source', { defaultValue: 'Nguồn' })}>
+            <Input disabled value={fieldItem?.serviceName} />
+          </Form.Item>
+          <Form.Item
+            label={t('label.data-type', { defaultValue: 'Loại dữ liệu' })}>
+            <Input
+              disabled
+              value={fieldItem?.dataTypeDisplay || fieldItem?.dataType}
+            />
+          </Form.Item>
+        </GlossaryTermFormSection>
 
-          <Row gutter={[16, 0]}>
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.cde-code-ref', {
-                  defaultValue: 'Mã CDE quy chiếu',
-                })}
-                name="cdeCode">
-                <Select
-                  allowClear
-                  showSearch
-                  className="w-full"
-                  filterOption={(input, option) =>
-                    (option?.children as unknown as string)
-                      ?.toLowerCase()
-                      ?.includes(input.toLowerCase())
-                  }
-                  placeholder={t('label.select-cde', {
-                    defaultValue: 'Chọn mã CDE quy chiếu',
-                  })}>
-                  {cdeOptions.map((opt) => (
-                    <Option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
+        <GlossaryTermFormSection
+          description={t(
+            'message.technical-specification-and-reference-description',
+            {
+              defaultValue:
+                'Cập nhật các thuộc tính kỹ thuật và CDE quy chiếu của trường.',
+            }
+          )}
+          title={t('label.technical-specification-and-reference', {
+            defaultValue: 'Thông tin đặc tả và quy chiếu',
+          })}>
+          <Form.Item
+            label={t('label.cde-code-ref', {
+              defaultValue: 'Mã CDE quy chiếu',
+            })}
+            name="cdeCode">
+            <Select
+              allowClear
+              showSearch
+              className="w-full"
+              disabled={isReadOnly}
+              filterOption={false}
+              placeholder={t('label.select-cde', {
+                defaultValue: 'Tìm theo mã hoặc tên CDE',
+              })}
+              onSearch={onSearchCde}>
+              {cdeOptions.map((opt) => (
+                <Option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
 
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.survivorship-rank', {
-                  defaultValue: 'Thứ hạng sinh tồn',
+          <Form.Item
+            label={t('label.survivorship-rank', {
+              defaultValue: 'Thứ hạng sinh tồn',
+            })}
+            name="survivorshipRank">
+            <Select
+              allowClear
+              showSearch
+              className="w-full"
+              disabled={isReadOnly}
+              placeholder={t('label.unranked', {
+                defaultValue: 'Chưa gán thứ hạng',
+              })}>
+              <Option value={1}>
+                🥇{' '}
+                {t('label.rank-n', {
+                  defaultValue: 'Hạng {{rank}}',
+                  rank: 1,
                 })}
-                name="survivorshipRank">
-                <Select
-                  allowClear
-                  showSearch
-                  className="w-full"
-                  placeholder={t('label.unranked', {
-                    defaultValue: 'Chưa gán thứ hạng',
-                  })}>
-                  <Option value={1}>
-                    🥇{' '}
-                    {t('label.rank-n', {
-                      defaultValue: 'Hạng {{rank}}',
-                      rank: 1,
-                    })}
-                  </Option>
-                  <Option value={2}>
-                    🥈 {t('label.rank-2', { defaultValue: 'Hạng 2' })}
-                  </Option>
-                  <Option value={3}>
-                    🥉 {t('label.rank-3', { defaultValue: 'Hạng 3' })}
-                  </Option>
-                  <Option value={4}>
-                    🏷️ {t('label.rank-4', { defaultValue: 'Hạng 4' })}
-                  </Option>
-                  <Option value={5}>
-                    🏷️ {t('label.rank-5', { defaultValue: 'Hạng 5' })}
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
+              </Option>
+              <Option value={2}>
+                🥈 {t('label.rank-2', { defaultValue: 'Hạng 2' })}
+              </Option>
+              <Option value={3}>
+                🥉 {t('label.rank-3', { defaultValue: 'Hạng 3' })}
+              </Option>
+              <Option value={4}>
+                🏷️ {t('label.rank-4', { defaultValue: 'Hạng 4' })}
+              </Option>
+              <Option value={5}>
+                🏷️ {t('label.rank-5', { defaultValue: 'Hạng 5' })}
+              </Option>
+            </Select>
+          </Form.Item>
 
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.data-element-type', {
-                  defaultValue: 'Loại thành tố',
+          <Form.Item
+            label={t('label.data-element-type', {
+              defaultValue: 'Loại thành tố',
+            })}
+            name="elementType"
+            rules={[{ required: true }]}>
+            <Select className="w-full" disabled={isReadOnly}>
+              <Option value="AtomicDataElement">
+                {t('label.atomic-data-element', {
+                  defaultValue: 'Dữ liệu nguyên tố',
                 })}
-                name="elementType"
-                rules={[{ required: true }]}>
-                <Select className="w-full">
-                  <Option value="AtomicDataElement">
-                    {t('label.atomic-data-element', {
-                      defaultValue: 'Dữ liệu nguyên tố',
-                    })}
-                  </Option>
-                  <Option value="TransformedDataElement">
-                    {t('label.transformed-data-element', {
-                      defaultValue: 'Dữ liệu chuyển đổi',
-                    })}
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.field-generation-type', {
-                  defaultValue: 'Loại trường dữ liệu',
+              </Option>
+              <Option value="TransformedDataElement">
+                {t('label.transformed-data-element', {
+                  defaultValue: 'Dữ liệu chuyển đổi',
                 })}
-                name="generationType"
-                rules={[{ required: true }]}>
-                <Select className="w-full">
-                  <Option value="ManualInput">
-                    {t('label.manual-input', {
-                      defaultValue: 'Nhập thủ công',
-                    })}
-                  </Option>
-                  <Option value="SystemGenerated">
-                    {t('label.system-generated', {
-                      defaultValue: 'Hệ thống tự sinh',
-                    })}
-                  </Option>
-                  <Option value="SystemDerived">
-                    {t('label.system-derived', {
-                      defaultValue: 'Hệ thống tính toán',
-                    })}
-                  </Option>
-                  <Option value="FileUpload">
-                    {t('label.file-upload', {
-                      defaultValue: 'Tải lên',
-                    })}
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
+              </Option>
+            </Select>
+          </Form.Item>
 
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.data-creation-method', {
-                  defaultValue: 'Phương thức tạo',
+          <Form.Item
+            label={t('label.field-generation-type', {
+              defaultValue: 'Loại trường dữ liệu',
+            })}
+            name="generationType"
+            rules={[{ required: true }]}>
+            <Select className="w-full" disabled={isReadOnly}>
+              <Option value="ManualInput">
+                {t('label.manual-input', {
+                  defaultValue: 'Nhập thủ công',
                 })}
-                name="creationMethod"
-                rules={[{ required: true }]}>
-                <Select className="w-full">
-                  <Option value="Parameterised">
-                    {t('label.parameterised', { defaultValue: 'Tham số' })}
-                  </Option>
-                  <Option value="Hardcoded">
-                    {t('label.hardcoded', { defaultValue: 'Mã cứng' })}
-                  </Option>
-                  <Option value="NotApplicable">
-                    {t('label.not-applicable', { defaultValue: 'N/A' })}
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col md={12} xs={24}>
-              <Form.Item
-                label={t('label.timeliness', { defaultValue: 'Thời gian' })}
-                name="timeliness">
-                <Input placeholder="T, T+1, T+2..." />
-              </Form.Item>
-            </Col>
-
-            <Col xs={24}>
-              <Form.Item
-                label={t('label.system-owner', {
-                  defaultValue: 'Chủ sở hữu hệ thống',
+              </Option>
+              <Option value="SystemGenerated">
+                {t('label.system-generated', {
+                  defaultValue: 'Hệ thống tự sinh',
                 })}
-                name="systemOwner">
-                <Input placeholder="VD: Trung tâm Quản lý dữ liệu..." />
-              </Form.Item>
-            </Col>
-          </Row>
-        </section>
+              </Option>
+              <Option value="SystemDerived">
+                {t('label.system-derived', {
+                  defaultValue: 'Hệ thống tính toán',
+                })}
+              </Option>
+              <Option value="FileUpload">
+                {t('label.file-upload', {
+                  defaultValue: 'Tải lên',
+                })}
+              </Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label={t('label.data-creation-method', {
+              defaultValue: 'Phương thức tạo',
+            })}
+            name="creationMethod"
+            rules={[{ required: true }]}>
+            <Select className="w-full" disabled={isReadOnly}>
+              <Option value="Parameterised">
+                {t('label.parameterised', { defaultValue: 'Tham số' })}
+              </Option>
+              <Option value="Hardcoded">
+                {t('label.hardcoded', { defaultValue: 'Mã cứng' })}
+              </Option>
+              <Option value="NotApplicable">
+                {t('label.not-applicable', { defaultValue: 'N/A' })}
+              </Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label={t('label.timeliness', { defaultValue: 'Thời gian' })}
+            name="timeliness">
+            <Input disabled={isReadOnly} placeholder="T, T+1, T+2..." />
+          </Form.Item>
+
+          <Form.Item
+            className="cde-form-field-full"
+            label={t('label.system-owner', {
+              defaultValue: 'Chủ sở hữu hệ thống',
+            })}
+            name="systemOwner">
+            <Input
+              disabled={isReadOnly}
+              placeholder="VD: Trung tâm Quản lý dữ liệu..."
+            />
+          </Form.Item>
+        </GlossaryTermFormSection>
       </Form>
     </Modal>
   );

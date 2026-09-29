@@ -28,6 +28,7 @@ import {
 } from './AddGlossaryTermForm.interface';
 import { CDETagSelector } from './CDEGlossaryTermForm.component';
 import GlossaryTermFormSection from './GlossaryTermFormSection.component';
+import GovernedVersionFields from './GovernedVersionFields.component';
 
 export interface DQGlossaryTermFormValues {
   name?: string;
@@ -319,18 +320,16 @@ const DQGlossaryTermForm = ({
             placeholder="Ví dụ: DQ1.1 - Tính chính xác (Tên khách hàng)"
           />
         </Form.Item>
-        <Form.Item
-          required
-          label={t('cde.version', 'Phiên bản')}
-          name="version"
-          rules={[{ required: true, whitespace: true }]}>
-          <Input data-testid="dq-version" disabled placeholder="1.0" />
-        </Form.Item>
-        <Form.Item
-          label={t('dq.release-version-type', 'Loại phiên bản phát hành')}
-          name="releaseVersionType">
-          <Input disabled data-testid="dq-release-version-type" />
-        </Form.Item>
+        <GovernedVersionFields
+          versionRequired
+          releaseVersionTypeLabel={t(
+            'dq.release-version-type',
+            'Loại phiên bản phát hành'
+          )}
+          releaseVersionTypeTestId="dq-release-version-type"
+          versionLabel={t('cde.version', 'Phiên bản')}
+          versionTestId="dq-version"
+        />
 
         <Form.Item
           required

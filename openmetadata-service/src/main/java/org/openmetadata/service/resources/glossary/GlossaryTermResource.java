@@ -1070,7 +1070,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
     String effectiveEntityStatus = entityStatus;
     boolean publishedOnly =
-        "Approved".equals(effectiveEntityStatus) || "Published".equals(effectiveEntityStatus);
+        EntityStatus.APPROVED.value().equals(effectiveEntityStatus)
+            || "Published".equals(effectiveEntityStatus);
     ListFilter filter =
         new ListFilter(include)
             .addQueryParam("parent", fqn)
@@ -1233,7 +1234,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
     String effectiveEntityStatus = entityStatus;
     boolean publishedOnly =
-        "Published".equals(effectiveEntityStatus) || "Approved".equals(effectiveEntityStatus);
+        "Published".equals(effectiveEntityStatus)
+            || EntityStatus.APPROVED.value().equals(effectiveEntityStatus);
     String repositoryStatus = publishedOnly ? "Published" : effectiveEntityStatus;
     ResultList<GlossaryTerm> result;
     if (glossaryId != null) {
@@ -2199,11 +2201,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         revision = Long.valueOf(String.valueOf(existing.get("workingRevision")));
         businessVersion = String.valueOf(existing.get("businessVersion"));
         String status = String.valueOf(existing.get("entityStatus"));
-        action = switch (status.replace(" ", "")) {
-          case "InReview" -> "REPLACE_IN_REVIEW_AND_REOPEN";
-          case "Rejected" -> "REPLACE_REJECTED_AND_REOPEN";
-          default -> "UPDATE_DRAFT";
-        };
+        if (EntityStatus.IN_REVIEW.value().equals(status)) {
+          action = "REPLACE_IN_REVIEW_AND_REOPEN";
+        } else if (EntityStatus.REJECTED.value().equals(status)) {
+          action = "REPLACE_REJECTED_AND_REOPEN";
+        } else {
+          action = "UPDATE_DRAFT";
+        }
         if (!"UPDATE_DRAFT".equals(action)) {
           warnings.add("Phiên duyệt hiện tại sẽ bị vô hiệu hóa và CDE trở về Draft");
         }

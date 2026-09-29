@@ -25,9 +25,9 @@ public final class TechnicalDictionaryExcelExporter {
   public static final String XLSX_MEDIA_TYPE =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   private static final String[] HEADERS = {
-    "Tên đầy đủ cột", "Khả dụng", "Phiên bản", "Trạng thái", "Mã CDE", "Tên CDE",
-    "Thứ hạng", "Loại thành tố", "Loại trường dữ liệu", "Phương thức tạo", "Thời gian",
-    "Chủ sở hữu hệ thống", "Mô tả"
+    "Tên đầy đủ cột", "Khả dụng", "Phiên bản", "Loại phiên bản phát hành", "Trạng thái",
+    "Mã CDE", "Tên CDE", "Thứ hạng", "Loại thành tố", "Loại trường dữ liệu",
+    "Phương thức tạo", "Thời gian", "Chủ sở hữu hệ thống", "Mô tả"
   };
 
   private TechnicalDictionaryExcelExporter() {}
@@ -58,7 +58,8 @@ public final class TechnicalDictionaryExcelExporter {
         List<String> values =
             List.of(
                 source.columnFqn(), String.valueOf(source.sourceAvailable()), source.businessVersion(),
-                source.status(), text(extension.get("cdeCode")), text(extension.get("cdeName")),
+                releaseVersionType(source.businessVersion(), extension), source.status(),
+                text(extension.get("cdeCode")), text(extension.get("cdeName")),
                 text(extension.get("survivorshipRank")), text(extension.get("elementType")),
                 text(extension.get("generationType")), text(extension.get("creationMethod")),
                 text(extension.get("timeliness")), text(extension.get("systemOwner")),
@@ -99,6 +100,16 @@ public final class TechnicalDictionaryExcelExporter {
 
   private static String text(Object value) {
     return value == null ? "" : String.valueOf(value);
+  }
+
+  private static String releaseVersionType(
+      String businessVersion, Map<String, Object> extension) {
+    if (extension.get("releaseVersionType") != null) {
+      return text(extension.get("releaseVersionType"));
+    }
+    String[] components = businessVersion == null ? new String[0] : businessVersion.split("\\.");
+    int minor = components.length > 1 ? Integer.parseInt(components[1]) : 0;
+    return minor > 0 ? "Bản phụ" : "Bản chính";
   }
 
   public record ExportedWorkbook(Path path, int rowCount) {}

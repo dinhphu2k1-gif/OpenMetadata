@@ -27,9 +27,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
+import org.openmetadata.schema.type.MetadataOperation;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.TechnicalDictionaryService;
@@ -44,14 +46,13 @@ import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.ColumnBindingRecord;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.security.Authorizer;
-import org.openmetadata.service.security.policyevaluator.MetadataOperation;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
 import org.openmetadata.service.util.FullyQualifiedName;
 
 /** Thin REST facade over shared governed-glossary workflow and Technical Column binding. */
 @Path("/v1/technical-dictionary")
-@Tag(name = "Technical Dictionary", description = "Scope-aware governed technical metadata")
+@Tag(name = "Technical Dictionary", description = "Governed technical metadata")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Collection(name = "technicalDictionary", order = 8)
@@ -59,9 +60,187 @@ public class TechnicalDictionaryResource {
   private final Authorizer authorizer;
   private final TechnicalDictionaryService service = new TechnicalDictionaryService();
   private final GlossaryVersioningService versions = new GlossaryVersioningService();
+  private final java.util.Set<UUID> reconciliationInProgress = ConcurrentHashMap.newKeySet();
 
   public TechnicalDictionaryResource(Authorizer authorizer) {
     this.authorizer = authorizer;
+  }
+
+  @GET
+  @Path("/versions")
+  public Map<String, Object> listCatalogVersions(
+      @Context SecurityContext securityContext) {
+    authorize(securityContext, null, MetadataOperation.VIEW_BASIC);
+    return Map.of(
+        "data",
+        service.listScopes().stream()
+            .map(
+                binding ->
+                    service.catalogRepresentation(
+                        binding, binding.technicalBusinessVersion()))
+            .toList());
+  }
+
+  @GET
+  @Path("/records")
+  public Map<String, Object> listCatalogRecords(
+      @Context SecurityContext securityContext,
+      @QueryParam("businessVersion") String businessVersion,
+      @QueryParam("search") String search,
+      @QueryParam("status") String status,
+      @QueryParam("sources") String sources,
+      @QueryParam("cdeMapping") String cdeMapping,
+      @QueryParam("elementTypes") String elementTypes,
+      @QueryParam("generationTypes") String generationTypes,
+      @QueryParam("creationMethods") String creationMethods,
+      @QueryParam("versionView") @DefaultValue("LATEST") String versionView,
+      @QueryParam("limit") @DefaultValue("50") int limit,
+      @QueryParam("offset") @DefaultValue("0") int offset) {
+    ScopeRecord binding = service.resolveCatalogVersion(businessVersion);
+    authorize(securityContext, binding, MetadataOperation.VIEW_BASIC);
+    TechnicalDictionaryService.BootstrapStatus bootstrap =
+        ensureReconciliation(binding, securityContext.getUserPrincipal().getName());
+    boolean includeWorking = canViewWorking(securityContext, binding);
+    List<RecordView> rows =
+        service.listRecords(
+            binding.scopeId(),
+            search,
+            status,
+            sources,
+            cdeMapping,
+            elementTypes,
+            generationTypes,
+            creationMethods,
+            "ALL_VERSIONS".equals(versionView),
+            includeWorking);
+    int safeLimit = Math.max(1, Math.min(limit, 200));
+    int safeOffset = Math.max(0, offset);
+    int from = Math.min(safeOffset, rows.size());
+    int to = Math.min(from + safeLimit, rows.size());
+    return Map.of(
+        "data", rows.subList(from, to),
+        "paging", Map.of("total", rows.size(), "limit", safeLimit, "offset", safeOffset),
+        "catalog", service.catalogRepresentation(binding, businessVersion),
+        "bootstrap", bootstrap,
+        "capabilities", capabilities(securityContext, binding));
+  }
+
+  @GET
+  @Path("/stats")
+  public Map<String, Long> catalogStats(
+      @Context SecurityContext securityContext,
+      @QueryParam("businessVersion") String businessVersion) {
+    ScopeRecord binding = service.resolveCatalogVersion(businessVersion);
+    authorize(securityContext, binding, MetadataOperation.VIEW_BASIC);
+    return service.stats(
+        binding.scopeId(), canViewWorking(securityContext, binding));
+  }
+
+  @GET
+  @Path("/cde-options")
+  public Map<String, Object> catalogCdeOptions(
+      @Context SecurityContext securityContext,
+      @QueryParam("businessVersion") String businessVersion,
+      @QueryParam("search") String search,
+      @QueryParam("limit") @DefaultValue("25") int limit,
+      @QueryParam("offset") @DefaultValue("0") int offset) {
+    ScopeRecord binding = service.resolveCatalogVersion(businessVersion);
+    authorize(securityContext, binding, MetadataOperation.VIEW_BASIC);
+    return Map.of(
+        "data", service.cdeOptions(binding.scopeId(), search, limit, offset),
+        "paging", Map.of("limit", limit, "offset", offset));
+  }
+
+  @PATCH
+  @Path("/records/{recordId}/working")
+  public WorkingVersionRecord saveCatalogWorking(
+      @Context SecurityContext securityContext,
+      @PathParam("recordId") UUID recordId,
+      CatalogSaveWorkingRequest request) {
+    ScopeRecord binding = service.resolveCatalogVersion(request.parentBusinessVersion());
+    return saveWorking(
+        securityContext,
+        binding.scopeId(),
+        recordId,
+        new SaveWorkingRequest(request.expectedWorkingRevision(), request.businessFields()));
+  }
+
+  @POST
+  @Path("/records/{recordId}/{action:submit|approve|reject|reopen}")
+  public Object transitionCatalogWorking(
+      @Context SecurityContext securityContext,
+      @PathParam("recordId") UUID recordId,
+      @PathParam("action") String action,
+      CatalogRevisionRequest request) {
+    ScopeRecord binding = service.resolveCatalogVersion(request.parentBusinessVersion());
+    RevisionRequest revision = new RevisionRequest(request.expectedWorkingRevision());
+    return switch (action) {
+      case "submit" -> submit(securityContext, binding.scopeId(), recordId, revision);
+      case "approve" -> approve(securityContext, binding.scopeId(), recordId, revision);
+      case "reject" -> reject(securityContext, binding.scopeId(), recordId, revision);
+      case "reopen" -> reopen(securityContext, binding.scopeId(), recordId, revision);
+      default ->
+          throw TechnicalDictionaryService.error(
+              Response.Status.BAD_REQUEST, "INVALID_TRANSITION", "Unsupported workflow action");
+    };
+  }
+
+  @POST
+  @Path("/records/{recordId}/revoke")
+  public WorkingVersionRecord revokeCatalogWorking(
+      @Context SecurityContext securityContext,
+      @PathParam("recordId") UUID recordId,
+      CatalogRevisionRequest request) {
+    ScopeRecord binding = service.resolveCatalogVersion(request.parentBusinessVersion());
+    return revoke(securityContext, binding.scopeId(), recordId);
+  }
+
+  @POST
+  @Path("/records/{recordId}/versions")
+  public WorkingVersionRecord createCatalogRecordVersion(
+      @Context SecurityContext securityContext,
+      @PathParam("recordId") UUID recordId,
+      CatalogVersionRequest request) {
+    ScopeRecord binding = service.resolveCatalogVersion(request.parentBusinessVersion());
+    return createRecordVersion(securityContext, binding.scopeId(), recordId);
+  }
+
+  @GET
+  @Path("/records/{recordId}/versions")
+  public List<PublishedSnapshotRecord> listCatalogRecordVersions(
+      @Context SecurityContext securityContext,
+      @PathParam("recordId") UUID recordId,
+      @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
+    ScopeRecord binding = service.resolveCatalogVersion(parentBusinessVersion);
+    return listVersions(securityContext, binding.scopeId(), recordId);
+  }
+
+  @GET
+  @Path("/export")
+  @Produces(TechnicalDictionaryExcelExporter.XLSX_MEDIA_TYPE)
+  public Response exportCatalog(
+      @Context SecurityContext securityContext,
+      @QueryParam("businessVersion") String businessVersion,
+      @QueryParam("search") String search,
+      @QueryParam("status") String status,
+      @QueryParam("sources") String sources,
+      @QueryParam("cdeMapping") String cdeMapping,
+      @QueryParam("elementTypes") String elementTypes,
+      @QueryParam("generationTypes") String generationTypes,
+      @QueryParam("creationMethods") String creationMethods,
+      @QueryParam("versionView") @DefaultValue("LATEST") String versionView) {
+    ScopeRecord binding = service.resolveCatalogVersion(businessVersion);
+    return export(
+        securityContext,
+        binding.scopeId(),
+        search,
+        status,
+        sources,
+        cdeMapping,
+        elementTypes,
+        generationTypes,
+        creationMethods,
+        versionView);
   }
 
   @GET
@@ -122,15 +301,29 @@ public class TechnicalDictionaryResource {
       @PathParam("scopeId") UUID scopeId,
       @QueryParam("search") String search,
       @QueryParam("status") String status,
+      @QueryParam("sources") String sources,
+      @QueryParam("cdeMapping") String cdeMapping,
+      @QueryParam("elementTypes") String elementTypes,
+      @QueryParam("generationTypes") String generationTypes,
+      @QueryParam("creationMethods") String creationMethods,
       @QueryParam("versionView") @DefaultValue("LATEST") String versionView,
       @QueryParam("limit") @DefaultValue("50") int limit,
       @QueryParam("offset") @DefaultValue("0") int offset) {
     ScopeRecord scope = service.getScope(scopeId);
     authorize(securityContext, scope, MetadataOperation.VIEW_BASIC);
-    boolean includeWorking = can(securityContext, scope, MetadataOperation.EDIT_WORKING);
+    boolean includeWorking = canViewWorking(securityContext, scope);
     List<RecordView> rows =
         service.listRecords(
-            scopeId, search, status, "ALL_VERSIONS".equals(versionView), includeWorking);
+            scopeId,
+            search,
+            status,
+            sources,
+            cdeMapping,
+            elementTypes,
+            generationTypes,
+            creationMethods,
+            "ALL_VERSIONS".equals(versionView),
+            includeWorking);
     int safeLimit = Math.max(1, Math.min(limit, 200));
     int safeOffset = Math.max(0, offset);
     int from = Math.min(safeOffset, rows.size());
@@ -138,7 +331,8 @@ public class TechnicalDictionaryResource {
     return Map.of(
         "data", rows.subList(from, to),
         "paging", Map.of("total", rows.size(), "limit", safeLimit, "offset", safeOffset),
-        "scope", scope);
+        "scope", scope,
+        "capabilities", capabilities(securityContext, scope));
   }
 
   @GET
@@ -151,7 +345,7 @@ public class TechnicalDictionaryResource {
     authorize(securityContext, scope, MetadataOperation.VIEW_BASIC);
     return service.listRecords(
             scopeId, recordId.toString(), null, false,
-            can(securityContext, scope, MetadataOperation.EDIT_WORKING)).stream()
+            canViewWorking(securityContext, scope)).stream()
         .filter(row -> recordId.equals(row.recordId()))
         .findFirst()
         .orElseThrow(
@@ -327,7 +521,7 @@ public class TechnicalDictionaryResource {
       @Context SecurityContext securityContext, @PathParam("scopeId") UUID scopeId) {
     ScopeRecord scope = service.getScope(scopeId);
     authorize(securityContext, scope, MetadataOperation.VIEW_BASIC);
-    return service.stats(scopeId, can(securityContext, scope, MetadataOperation.EDIT_WORKING));
+    return service.stats(scopeId, canViewWorking(securityContext, scope));
   }
 
   @GET
@@ -353,13 +547,27 @@ public class TechnicalDictionaryResource {
       @PathParam("scopeId") UUID scopeId,
       @QueryParam("search") String search,
       @QueryParam("status") String status,
+      @QueryParam("sources") String sources,
+      @QueryParam("cdeMapping") String cdeMapping,
+      @QueryParam("elementTypes") String elementTypes,
+      @QueryParam("generationTypes") String generationTypes,
+      @QueryParam("creationMethods") String creationMethods,
       @QueryParam("versionView") @DefaultValue("LATEST") String versionView) {
     ScopeRecord scope = service.getScope(scopeId);
     authorize(securityContext, scope, MetadataOperation.VIEW_BASIC);
-    boolean includeWorking = can(securityContext, scope, MetadataOperation.EDIT_WORKING);
+    boolean includeWorking = canViewWorking(securityContext, scope);
     List<RecordView> rows =
         service.listRecords(
-            scopeId, search, status, "ALL_VERSIONS".equals(versionView), includeWorking);
+            scopeId,
+            search,
+            status,
+            sources,
+            cdeMapping,
+            elementTypes,
+            generationTypes,
+            creationMethods,
+            "ALL_VERSIONS".equals(versionView),
+            includeWorking);
     ExportedWorkbook workbook = null;
     try {
       workbook = TechnicalDictionaryExcelExporter.write(rows, scope.technicalBusinessVersion());
@@ -373,7 +581,7 @@ public class TechnicalDictionaryResource {
             }
           };
       String filename =
-          "Technical_Dictionary_v"
+          "TuDienKyThuat_Agribank_v"
               + scope.technicalBusinessVersion()
               + "_"
               + LocalDate.now()
@@ -527,10 +735,65 @@ public class TechnicalDictionaryResource {
     }
   }
 
+  private boolean canViewWorking(
+      SecurityContext securityContext, ScopeRecord binding) {
+    return can(securityContext, binding, MetadataOperation.EDIT_WORKING)
+        || can(securityContext, binding, MetadataOperation.SUBMIT_WORKING)
+        || can(securityContext, binding, MetadataOperation.APPROVE_WORKING);
+  }
+
+  private TechnicalDictionaryService.BootstrapStatus ensureReconciliation(
+      ScopeRecord binding, String actor) {
+    TechnicalDictionaryService.BootstrapStatus status = service.reconciliationStatus(binding);
+    if ("Running".equals(status.status())
+        && reconciliationInProgress.add(binding.scopeId())) {
+      org.openmetadata.service.util.AsyncService.getInstance()
+          .execute(
+              () -> {
+                try {
+                  service.reconcile(binding.scopeId(), actor);
+                } finally {
+                  reconciliationInProgress.remove(binding.scopeId());
+                }
+              });
+    }
+    return status;
+  }
+
+  private Map<String, Boolean> capabilities(
+      SecurityContext securityContext, ScopeRecord scope) {
+    boolean active = "Active".equals(scope.scopeStatus());
+    return Map.ofEntries(
+        Map.entry("canViewPublished", can(securityContext, scope, MetadataOperation.VIEW_BASIC)),
+        Map.entry("canViewWorking", canViewWorking(securityContext, scope)),
+        Map.entry(
+            "canEditWorking",
+            active && can(securityContext, scope, MetadataOperation.EDIT_WORKING)),
+        Map.entry(
+            "canSubmit",
+            active && can(securityContext, scope, MetadataOperation.SUBMIT_WORKING)),
+        Map.entry(
+            "canApprove",
+            active && can(securityContext, scope, MetadataOperation.APPROVE_WORKING)),
+        Map.entry(
+            "canReject",
+            active && can(securityContext, scope, MetadataOperation.APPROVE_WORKING)),
+        Map.entry(
+            "canRevoke",
+            active && can(securityContext, scope, MetadataOperation.APPROVE_WORKING)),
+        Map.entry(
+            "canCreateVersion",
+            active && can(securityContext, scope, MetadataOperation.CREATE_VERSION)),
+        Map.entry("canExport", can(securityContext, scope, MetadataOperation.VIEW_BASIC)));
+  }
+
   private Glossary technicalGlossary() {
     return service.listScopes().stream()
         .findFirst()
-        .map(scope -> Entity.getEntity(GLOSSARY, scope.technicalGlossaryId(), "id,name", Include.ALL))
+        .map(
+            scope ->
+                Entity.<Glossary>getEntity(
+                    GLOSSARY, scope.technicalGlossaryId(), "id,name", Include.ALL))
         .orElseGet(
             () ->
                 Entity.getJdbi()
@@ -546,4 +809,14 @@ public class TechnicalDictionaryResource {
 
   public record SaveWorkingRequest(
       long expectedWorkingRevision, Map<String, Object> businessFields) {}
+
+  public record CatalogSaveWorkingRequest(
+      String parentBusinessVersion,
+      long expectedWorkingRevision,
+      Map<String, Object> businessFields) {}
+
+  public record CatalogRevisionRequest(
+      String parentBusinessVersion, long expectedWorkingRevision) {}
+
+  public record CatalogVersionRequest(String parentBusinessVersion) {}
 }

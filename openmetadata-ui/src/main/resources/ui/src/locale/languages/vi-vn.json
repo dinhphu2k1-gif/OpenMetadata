@@ -196,7 +196,7 @@
     "cde-unmapped-only": "Chưa map CDE",
     "all-statuses": "Trạng thái: Tất cả",
     "status-approved-opt": "Đã phê duyệt",
-    "status-in-review-opt": "Chờ phê duyệt",
+    "status-in-review-opt": "Đang xem xét",
     "status-draft-opt": "Bản nháp",
     "status-rejected-opt": "Bị từ chối",
     "atomic-data-element": "Dữ liệu nguyên tố",
@@ -3744,6 +3744,8 @@
     "confirm-bulk-revoke-desc": "Bạn có chắc chắn muốn hủy duyệt {{count}} bản ghi đang ở trạng thái Đã duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.",
     "bulk-progress-processing": "Đang xử lý {{current}} / {{total}} bản ghi...",
     "bulk-action-completed": "Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.",
-    "all-imported-submitted-success": "Đã gửi phê duyệt toàn bộ {{count}} bản ghi vừa nạp thành công!"
+    "all-imported-submitted-success": "Đã gửi phê duyệt toàn bộ {{count}} bản ghi vừa nạp thành công!",
+    "technical-dictionary-bootstrap-running": "Đang đồng bộ dữ liệu kỹ thuật ({{processed}}/{{total}})",
+    "technical-dictionary-bootstrap-failed": "Đồng bộ dữ liệu kỹ thuật thất bại với {{failed}} bản ghi. Vui lòng kiểm tra log bootstrap."
   }
 }

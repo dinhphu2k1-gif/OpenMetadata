@@ -322,15 +322,20 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
-    return GlossaryVersionResponses.published(
+    String actor = securityContext.getUserPrincipal().getName();
+    PublishedSnapshotRecord published =
         versioningService.publish(
             GlossaryVersioningService.GLOSSARY,
             id,
             request.getExpectedRevision(),
-            securityContext.getUserPrincipal().getName(),
+            actor,
             working ->
                 GlossaryAuthorizationResolver.requireReview(
-                    capabilitiesForWorking(securityContext, working))));
+                    capabilitiesForWorking(securityContext, working)));
+    if (DataDictionaryResolver.isDataDictionary(glossary)) {
+      TechnicalDictionaryBootstrap.ensureInitialScope(published.snapshotId(), actor);
+    }
+    return GlossaryVersionResponses.published(published);
   }
 
   @GET

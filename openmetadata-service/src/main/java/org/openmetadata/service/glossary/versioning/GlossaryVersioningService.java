@@ -68,6 +68,7 @@ public class GlossaryVersioningService {
         explicitPayload,
         actor,
         false,
+        null,
         false);
   }
 
@@ -415,6 +416,8 @@ public class GlossaryVersioningService {
                           expectedRevision,
                           expectedStatus.value(),
                           targetStatus.value(),
+                          EntityStatus.IN_REVIEW.value(),
+                          EntityStatus.REJECTED.value(),
                           System.currentTimeMillis(),
                           actor);
                   requireUpdated(updated);
@@ -479,7 +482,7 @@ public class GlossaryVersioningService {
                       throw conflict("Working version revision conflict");
                     }
                     if (!EntityStatus.IN_REVIEW.value().equals(working.entityStatus())) {
-                      throw conflict("Only an InReview working version can be approved");
+                      throw conflict("Only an In Review working version can be approved");
                     }
                     if (authorizationAndValidation != null) {
                       authorizationAndValidation.accept(working);
