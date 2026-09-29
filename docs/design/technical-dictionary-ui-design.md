@@ -74,7 +74,7 @@ Thông tin nguồn là trường server-owned, được khai báo trong profile 
 | `sourceDatabase`, `sourceSchema`, `sourceTable`, `sourceColumn` | Vị trí Column |
 | `sourceDataType`, `sourceDataLength`, `sourcePrecision`, `sourceScale` | Kiểu dữ liệu |
 | `description` | Mô tả Column từ ingestion |
-| `sourceAvailable` | `false` khi Column không còn trong metadata |
+| Trạng thái nguồn | Không nằm trong snapshot của record: bảng vận hành `technical_source_state` (`Available`/`Unavailable`/`Changed`) theo `(catalog, N, columnKey)`; snapshot đã publish luôn bất biến |
 
 Quy tắc:
 
@@ -165,18 +165,20 @@ chưa Archived (active và working nếu có). Idempotent theo unique key.
 
 ### 5.3. Column không còn tồn tại
 
-- Record không bị xóa; `sourceAvailable = false`, bảng hiển thị badge **Nguồn không còn**.
+- Record không bị xóa; trạng thái nguồn là `Unavailable`, bảng hiển thị badge **Nguồn không còn**.
 - Record `Draft`/`In Review` có nguồn không còn không được Submit/Approve
   (`TD_SOURCE_UNAVAILABLE`); Reject vẫn cho phép.
 - Record `Approved` giữ nguyên để tra cứu; catalog version sau không sinh lại record cho Column này.
 - Đổi tên Column/Table được xử lý như Column cũ không còn và Column mới xuất hiện.
   Không tự nối lại mapping; người dùng gán lại qua modal hoặc Import (TD-D14).
 - Table bị soft-delete được xử lý như mọi Column của Table không còn; restore Table
-  đặt lại `sourceAvailable = true` nếu record chưa bị Archived.
+  đặt lại trạng thái nguồn `Available` nếu record chưa bị Archived.
 
 ### 5.4. Phạm vi Column
 
-Phạm vi được cấu hình trong profile manifest và **chụp lại vào bootstrap job khi tạo
+Phạm vi được cấu hình ở mục `technicalDictionary` của `openmetadata.yaml` (`includeServices`,
+`includeDatabases`, `includeSchemas`, `excludePatterns`; biến môi trường `TECHNICAL_DICTIONARY_*`,
+mặc định loại `TMP_*,*_BAK,*_OLD`) và **chụp lại vào bootstrap job khi tạo
 catalog version** (`columnScopeSnapshot`). Mọi sự kiện Column trong scope `N` dùng
 snapshot của scope `N`, nên kết quả bootstrap tái lập được.
 
@@ -390,7 +392,11 @@ Kế thừa DQ §8.6, bổ sung một điểm do quy mô dữ liệu (khoảng 6
   theo quyền trong database, xử lý theo batch và trả báo cáo thành công/thất bại theo row.
 - Chỉ Submit row `Draft`, Approve/Reject row `In Review`; row không hợp lệ được liệt kê
   trong preview với lý do.
-- Nên triển khai trong shared bulk service để DQ dùng chung.
+- Triển khai trong `GovernedBulkWorkflowService` dùng chung. Mỗi request xử lý **một chunk**
+  (mặc định 500, tối đa 1000 record, mỗi record một transaction); client lặp lại với
+  `offset = số record đã thất bại` cho tới khi `remaining = 0`. Hiệu ứng phụ (outbox,
+  search) được gom và flush cuối chunk. Bulk Approve kiểm tra Thứ hạng trên trạng thái cuối
+  của chunk.
 
 ## 10. REST contract
 
@@ -408,23 +414,34 @@ TD dùng đúng endpoint của DQ; backend rẽ nhánh theo profile resolve từ
 | Lịch sử record | `GET /v1/glossaryTerms/{id}/published?parentBusinessVersion=N` |
 | Quyền | `GET /v1/glossaryTerms/{id}/permissions?parentBusinessVersion=N` |
 | List/search | Endpoint flat list/search governed dùng chung (F11/F12), `glossary` + `parentBusinessVersion` + filter profile |
-| Export | Endpoint export governed dùng chung, rẽ nhánh theo profile |
-| Import | Endpoint import template/preview/commit dùng chung, `profileKey = TECHNICAL_DICTIONARY` |
+| Export | `GET /v1/glossaryTerms/export`, rẽ nhánh theo profile của `glossary` |
+| Bulk | `POST /v1/glossaryTerms/bulk/{submit\|approve\|reject}` (chunk, `dryRun`) |
 
 Endpoint chỉ TD có:
 
 ```http
 GET  /v1/glossaries/{id}/bootstrap-jobs?businessVersion=N
-POST /v1/glossaries/{id}/bootstrap-jobs/{jobId}/retry
+POST /v1/glossaries/{id}/bootstrap-jobs?businessVersion=N            # Admin
+POST /v1/glossaries/{id}/bootstrap-jobs/{jobId}/retry               # Admin
 GET  /v1/glossaryTerms/stats?glossary={id}&parentBusinessVersion=N
+GET  /v1/glossaryTerms/import/technical/template
+POST /v1/glossaryTerms/import/technical/preview?glossary=&parentBusinessVersion=&updatePolicy=
+POST /v1/glossaryTerms/import/technical/{importSessionId}/commit
 ```
+
+- Import dùng **modal** trong trang danh sách (không có route riêng) và endpoint riêng
+  `/glossaryTerms/import/technical/*`; session dùng một lần, gắn actor, hết hạn 30 phút.
+- `GET /glossaryTerms/search` nhận `q`, `statuses`, `sourceServices`, `cdeMapping`,
+  `cdeTermIds`, `systemOwnerIds`, `sourceStatuses`, `elementTypes`, `generationTypes`,
+  `creationMethods`, `timeliness`, `versionView`; `limit` chỉ nhận 10/15/25/50.
 
 - `POST /v1/glossaryTerms` với glossary TD từ người dùng → `403 TD_MANUAL_CREATE_NOT_ALLOWED`.
   Bootstrap gọi service nội bộ, không đi qua REST.
 - Không còn `/v1/technical-dictionary/*`, `scopeId`, `scopeVersion` hoặc scope CRUD.
 
-Mã lỗi riêng: `TD_MANUAL_CREATE_NOT_ALLOWED`, `TD_SOURCE_UNAVAILABLE`,
-`TD_CDE_SCOPE_MISMATCH`, `TD_CDE_SCOPE_NOT_ACTIVE`, `TD_IMPORT_ROW_NOT_MATCHED`,
+Mã lỗi riêng: `TD_MANUAL_CREATE_NOT_ALLOWED`, `TD_MANUAL_DELETE_NOT_ALLOWED`, `TD_SERVER_OWNED_FIELD`,
+`TD_INVALID_FIELD`, `TD_SOURCE_UNAVAILABLE`, `TD_CDE_SCOPE_MISMATCH`, `TD_CDE_SCOPE_NOT_ACTIVE`,
+`TD_IMPORT_ROW_NOT_MATCHED`, `TD_IMPORT_CONFLICT`, `TD_IMPORT_SESSION_INVALID`,
 `TD_BOOTSTRAP_NOT_READY`, `TD_RANK_DUPLICATE`, `TD_RANK_REQUIRED`, `TD_COLUMN_SCOPE_EMPTY`. Mã chung (`WORKING_REVISION_CONFLICT`, ...) theo DQ.
 
 ## 11. Persistence và projection
@@ -432,15 +449,20 @@ Mã lỗi riêng: `TD_MANUAL_CREATE_NOT_ALLOWED`, `TD_SOURCE_UNAVAILABLE`,
 - Working/snapshot/head/outbox dùng bảng governed chung. Không có
   `technical_dictionary_scope`, `technical_catalog_version_binding` hoặc
   `technical_record_column_binding`.
-- Bảng riêng duy nhất: `technical_bootstrap_job` (§5.1), unique
-  `(technicalGlossaryId, parentBusinessVersion)`.
+- Hai bảng riêng: `technical_bootstrap_job` (§5.1), unique
+  `(technicalGlossaryId, parentBusinessVersion)`; và `technical_source_state`, khóa chính
+  `(technicalGlossaryId, parentBusinessVersion, columnKey)`, giữ trạng thái nguồn vận hành.
 - Index list bổ sung cho filter nguồn: `sourceService`, `sourceDatabase`, `sourceTable`
   theo cơ chế index filter của flat read model chung.
 - Approve/Revoke/Archive phát outbox idempotent cập nhật: tag CDE (exact scoped FQN)
   và bốn tag phân loại (`DataElementType`, `FieldGenerationType`, `DataCreationMethod`,
-  `DataTimeliness`) trên Column, survivorship rule, search index và audit.
-  Projection chỉ xóa tag/rule nằm trong allowlist của profile.
-- Record có `sourceAvailable = false` bị gỡ survivorship rule; không projection lên Column không còn tồn tại.
+  `DataTimeliness`) trên Column, search index và audit.
+  Projection quản lý mọi tag Glossary có tiền tố `Data Dictionary.` trên Column và các
+  tag thuộc bốn classification của profile.
+- **Survivorship rule chưa được projection**: backend chưa có nơi lưu tương ứng trên Column;
+  UI đọc `extension.survivorshipRules` của CDE. Khi có đích lưu, thêm vào
+  `TechnicalColumnProjection`.
+- Record có trạng thái nguồn `Unavailable` không projection lên Column không còn tồn tại.
 - Khóa lock Thứ hạng (§6.4) dùng row lock trên bảng governed hiện có hoặc advisory lock
   theo khóa băm; không thêm bảng mới.
 

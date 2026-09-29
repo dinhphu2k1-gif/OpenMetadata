@@ -10,7 +10,7 @@
 Tài liệu này đặc tả chi tiết toàn bộ giao diện lập trình ứng dụng (RESTful APIs) phục vụ 3 phân hệ quản trị metadata trọng yếu của Agribank:
 1. **Từ điển dữ liệu dùng chung (Data Dictionary) & Thành tố dữ liệu dùng chung (CDE - Critical Data Elements)**.
 2. **Danh mục Quy tắc Chất lượng dữ liệu (Data Quality - DQ Rules Glossary)**.
-3. **Từ điển Kỹ thuật theo Scope và Phiên bản nghiệp vụ (Technical Dictionary)**.
+3. **Từ điển Kỹ thuật theo Phiên bản nghiệp vụ (Technical Dictionary)**.
 
 Tài liệu được biên soạn theo tiêu chuẩn kỹ thuật ngân hàng, đóng vai trò là hợp đồng giao tiếp (API Contract) chính thức giữa Backend (OpenMetadata Core Server - JAX-RS / Dropwizard), Frontend (React Single Page Application), và các hệ sinh thái tích hợp bên ngoài (Data Pipeline, Ingestion Bots, DWH/Data Lakehouse).
 
@@ -46,15 +46,15 @@ flowchart TD
     end
     subgraph Layer2["2. Frontend API Client (SDK Wrapper)"]
         CLI1["APIClient.get('/glossaries')"]
-        CLI2["APIClient.get('/technical-dictionary/scopes/...')"]
+        CLI2["APIClient.get('/glossaryTerms/search')"]
     end
     subgraph Layer3["3. Wire Network (Gói tin truyền trên mạng)"]
         NET1["GET /api/v1/glossaries"]
-        NET2["GET /api/v1/technical-dictionary/scopes/..."]
+        NET2["GET /api/v1/glossaryTerms/search"]
     end
     subgraph Layer4["4. Backend Controller (JAX-RS / Dropwizard)"]
         BE1["@Path('/v1/glossaries') GlossaryResource"]
-        BE2["@Path('/v1/technical-dictionary') TechnicalDictionaryResource"]
+        BE2["@Path('/v1/glossaryTerms') GlossaryTermResource"]
     end
 
     UI1 --> CLI1
@@ -957,403 +957,137 @@ Phân hệ quản lý các quy tắc chất lượng dữ liệu nghiệp vụ, 
 
 ## 5. PHÂN HỆ 3: TỪ ĐIỂN KỸ THUẬT (TECHNICAL DICTIONARY)
 
-> **Contract đích:** Từ điển kỹ thuật là Governed Glossary dùng chung với Từ
-> điển dữ liệu dùng chung. Phân hệ không công khai `scopeId`, `scopeVersion`,
-> scope selector hoặc scope lifecycle. Exact Data Dictionary binding vẫn tồn tại
-> ở backend dưới dạng metadata nội bộ của Technical Dictionary catalog version.
+> **Contract:** Từ điển kỹ thuật là profile `TECHNICAL_DICTIONARY` của Governed
+> Glossary, kế thừa Data Quality (và qua đó Data Dictionary). Không có
+> `/technical-dictionary/*`, `scopeId`, `scopeVersion` hay scope lifecycle. Mỗi
+> catalog version `N` có identity record riêng; record chỉ được gán CDE của Data
+> Dictionary cùng số `N`.
 >
-> Nguồn thiết kế authoritative:
+> Nguồn thiết kế:
 > [technical-dictionary-ui-design.md](../design/technical-dictionary-ui-design.md)
 > và
 > [technical-dictionary-feature-implementation-plan.md](../design/technical-dictionary-feature-implementation-plan.md).
 
-Từ điển kỹ thuật quản lý các trường vật lý (`Physical Columns`), sử dụng cùng
-catalog business version, workflow, capability và version history với Data
-Dictionary. Khác biệt nằm ở schema trường, Column binding, exact CDE binding và
-projection survivorship.
+Record chỉ do hệ thống sinh từ physical Column (bootstrap job và sự kiện Table),
+người dùng không tạo hoặc xóa: `POST`/`DELETE /glossaryTerms` trên glossary này
+trả `403` với mã `TD_MANUAL_CREATE_NOT_ALLOWED` / `TD_MANUAL_DELETE_NOT_ALLOWED`.
 
-```mermaid
-flowchart LR
-    TD[Technical Dictionary Glossary] --> TDV[Technical Dictionary Version N]
-    TDV -. Internal exact binding .-> DDV[Data Dictionary Published Version N]
-    TDV --> TR[Technical Record N.MINOR]
-    DDV --> CDE[CDE N.MINOR]
-    TR -->|Exact versioned reference| CDE
-    TR -->|Stable Column binding| COL[Physical Column]
-```
-
-### 5.1. API Catalog Version dùng chung
-
-Ưu tiên dùng các endpoint profile-neutral đang phục vụ Data Dictionary:
+### 5.1. Catalog version (dùng chung)
 
 ```http
-GET  /api/v1/glossaries/{technicalDictionaryId}/working
-GET  /api/v1/glossaries/{technicalDictionaryId}/published/{businessVersion}
-GET  /api/v1/glossaries/{technicalDictionaryId}/versions
-GET  /api/v1/glossaries/{technicalDictionaryId}/permissions
-POST /api/v1/glossaries/{technicalDictionaryId}/versions
-POST /api/v1/glossaries/{technicalDictionaryId}/{workflowAction}
+GET   /api/v1/glossaries/{id}/working
+POST  /api/v1/glossaries/{id}/working                 # tạo catalog N+1, tự chạy bootstrap job
+PATCH /api/v1/glossaries/{id}/working
+POST  /api/v1/glossaries/{id}/working/{submit|approve|reject|reopen}
+GET   /api/v1/glossaries/{id}/working/publish-preview
+GET   /api/v1/glossaries/{id}/published
+GET   /api/v1/glossaries/{id}/published/{businessVersion}
+GET   /api/v1/glossaries/{id}/permissions
 ```
 
-Route UI mặc định là `/technical-dictionary`; explicit historical version dùng
-`?businessVersion=N`. Không đưa UUID working/snapshot/binding lên route.
+Route UI mặc định `/technical-dictionary`; lịch sử dùng `?businessVersion=N`.
+Version không tồn tại là Not Found, không fallback sang version khác.
 
-### 5.2. API facade chuyên biệt
+### 5.2. Danh sách, tìm kiếm, thống kê, export
 
 ```http
-GET /api/v1/technical-dictionary/records
-  ?businessVersion=N
-  &q=customer
-  &statuses=Approved,Draft
-  &sources=MIS
-  &cdeMapping=MAPPED
-  &versionView=LATEST
-  &page=1
-  &limit=50
+GET /api/v1/glossaryTerms/search
+  ?glossary={id}&parentBusinessVersion=N&limit=25&offset=0
+  &q=customer                          # database/schema/table/column/mã-tên CDE
+  &statuses=Draft,In Review
+  &sourceServices=ipcas                # OR trong nhóm, AND giữa các nhóm
+  &cdeMapping=MAPPED|UNMAPPED
+  &cdeTermIds=uuid,uuid
+  &systemOwnerIds=uuid
+  &sourceStatuses=Available,Unavailable,Changed
+  &elementTypes=DataElementType.AtomicDataElement
+  &generationTypes=FieldGenerationType.SystemGenerated
+  &creationMethods=DataCreationMethod.Parameterised
+  &timeliness=DataTimeliness.T1
+  &versionView=LATEST|ALL              # mặc định LATEST
 
-GET /api/v1/technical-dictionary/stats?businessVersion=N
-GET /api/v1/technical-dictionary/cde-options?businessVersion=N&q=CDE1&page=1&limit=25
-GET /api/v1/technical-dictionary/export?businessVersion=N&format=xlsx
-GET /api/v1/technical-dictionary/bootstrap-status?businessVersion=N
+GET /api/v1/glossaryTerms/stats?glossary={id}&parentBusinessVersion=N
+GET /api/v1/glossaryTerms/export?glossary={id}&parentBusinessVersion=N
 ```
 
-Khi bỏ `businessVersion`, backend resolve working/latest-published representation
-giống Data Dictionary theo capability của actor. Backend tự resolve exact Data
-Dictionary snapshot từ internal binding; client không được cung cấp target tùy ý.
+- `limit` chỉ nhận `10`, `15`, `25`, `50`.
+- Mỗi row là read-model phẳng gồm payload record và các trường suy ra:
+  `sourceStatus`, `cdeCode`, `cdeName`, `dataOwners` (chủ sở hữu của CDE được
+  quy chiếu), `searchText`, `sortKey`.
+- `stats` trả `totalColumns`, `totalTables`, `mappedCde`, `totalSources`.
+- `export` trả `.xlsx` 19 cột, tên `TuDienKyThuat_Agribank_v{N}_YYYYMMDD_HHmm.xlsx`,
+  mỗi record một dòng (representation mới nhất); file này import lại được.
 
-### 5.3. API Record Version và Workflow
-
-Ưu tiên governed-term endpoints profile-neutral. Facade flat-page, nếu cần, dùng:
+### 5.3. Record workflow (dùng chung)
 
 ```http
-GET  /api/v1/technical-dictionary/records/{recordId}/versions?parentBusinessVersion=N
-GET  /api/v1/technical-dictionary/records/{recordId}?businessVersion=N.MINOR&parentBusinessVersion=N
-POST /api/v1/technical-dictionary/records/{recordId}/versions
-PATCH /api/v1/technical-dictionary/records/{recordId}/working
-POST /api/v1/technical-dictionary/records/{recordId}/{submit|approve|reject|reopen|revoke}
+GET|PATCH /api/v1/glossaryTerms/{id}/working?parentBusinessVersion=N
+POST      /api/v1/glossaryTerms/{id}/working                       # minor kế tiếp
+POST      /api/v1/glossaryTerms/{id}/working/{submit|approve|reject|reopen}?parentBusinessVersion=N
+GET       /api/v1/glossaryTerms/{id}/published?parentBusinessVersion=N
 ```
 
-Mutation phải có exact parent version context và `expectedWorkingRevision` hoặc
-`If-Match`. Approve/Reject authorize bằng governed workflow operation, không dùng
-generic Column `EditCustomFields`.
+`PATCH` chỉ nhận `survivorshipRank`, `systemOwner` (Team) trong `extension`, tag
+của 4 classification (`DataElementType`, `FieldGenerationType`,
+`DataCreationMethod`, `DataTimeliness`) và một `relatedTerms` trỏ tới CDE. Mọi
+trường nguồn (database, schema, table, column, kiểu dữ liệu, mô tả) do server
+sở hữu; gửi lên sẽ bị từ chối `400 TD_SERVER_OWNED_FIELD`. Gửi `relatedTerms`
+rỗng sẽ gỡ CDE.
 
-### 5.4. Response và error contract tối thiểu
+### 5.4. Bulk workflow
 
-- Response list trả selected catalog representation, `data`, `paging` và
-  capabilities; không trả public scope object.
-- Canonical statuses: `Draft`, `In Review`, `Rejected`, `Approved`, `Archived`.
-- Error codes: `CATALOG_VERSION_MISMATCH`, `CDE_VERSION_MISMATCH`,
-  `WORKING_REVISION_CONFLICT`, `BOOTSTRAP_NOT_READY`.
-- CDE options chỉ gồm Approved CDE thuộc exact bound Data Dictionary snapshot.
-- Export dùng filename `TuDienKyThuat_Agribank_v{businessVersion}_YYYY-MM-DD.xlsx`.
-
-### 5.5. Contract scope-based cũ — Legacy, không triển khai mới
-
-<details>
-<summary>Mở phần contract legacy phục vụ migration/đối chiếu</summary>
-
-Phần dưới đây chỉ mô tả API đã được thiết kế/triển khai trước khi chuẩn hóa kiến
-trúc. Không dùng làm nguồn cho code mới. Các endpoint
-`/technical-dictionary/scopes/...`, field `scopeId`, `scopeVersion` và lifecycle
-`Building/Active/Archived` phải được migrate rồi loại bỏ theo plan.
-
-```mermaid
-flowchart LR
-    subgraph BindingZone["Governance Scope Binding (Khóa Scope 1-1)"]
-        SB["governed_scope_binding<br/>scopeId: UUID<br/>Technical Scope N ⟷ Data Dictionary Scope N"]
-    end
-    subgraph TDZone["Từ điển Kỹ thuật (Technical Dictionary)"]
-        TR["Technical Record N.MINOR<br/>(Mã cột, Database, Schema, Table)"]
-        CB["technical_record_column_binding"]
-        COL["Physical Column<br/>(Metadata từ Ingestion)"]
-    end
-    subgraph CDEZone["Từ điển dữ liệu dùng chung"]
-        CDE["CDE N.MINOR<br/>(Approved trong Scope N)"]
-    end
-
-    SB --- TR
-    TR --> CB
-    CB --> COL
-    TR -->|Same Scope Binding Only| CDE
+```http
+POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}
+{
+  "glossaryId": "uuid", "parentBusinessVersion": "2",
+  "termIds": ["uuid"],                 // hoặc
+  "criteria": { "q": "...", "sourceServices": "ipcas", ... },   // tham số như /search
+  "dryRun": false, "offset": 0, "limit": 500
+}
 ```
 
-### 5.1. Nhóm API Quản lý Scope & Binding Từ điển Kỹ thuật
+Mỗi lần gọi xử lý một chunk (`limit` tối đa 1000), mỗi record một transaction.
+Response: `matched`, `eligible`, `ineligible`, `attempted`, `succeeded`,
+`failedCount`, `failures[{termId, code, message}]`, `remaining`. Client lặp lại với
+`offset = tổng số thất bại` cho tới khi `remaining = 0`. Bulk approve kiểm tra
+Thứ hạng trên trạng thái cuối của chunk nên đổi chỗ thứ hạng trong một lần duyệt
+là hợp lệ.
 
-#### API 5.1.1: Lấy danh sách Scope Từ điển Kỹ thuật
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes`
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "scopeId": "7a3f81e2-5b90-4a88-9122-cc4b90123ef1",
-        "scopeVersion": 1,
-        "status": "Active",
-        "technicalDictionaryVersionId": "fb23901a-883b-4155-9011-235f98a729e1",
-        "dataDictionaryVersionId": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
-        "dataDictionaryBusinessVersion": "1",
-        "createdAt": "2026-01-01T00:00:00.000Z",
-        "recordCount": 65928
-      }
-    ]
-  }
-  ```
+### 5.5. Import gán CDE
 
----
+```http
+GET  /api/v1/glossaryTerms/import/technical/template
+POST /api/v1/glossaryTerms/import/technical/preview
+       ?glossary={id}&parentBusinessVersion=N&updatePolicy=DRAFT_ONLY|ALL_EDITABLE   (multipart `file`)
+POST /api/v1/glossaryTerms/import/technical/{importSessionId}/commit
+```
 
-#### API 5.1.2: Khởi tạo Scope Từ điển Kỹ thuật mới
-- **Method & Endpoint:** `POST /api/v1/technical-dictionary/scopes`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "targetDataDictionaryScopeId": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
-    "scopeVersion": 2,
-    "description": "Khởi tạo phạm vi Từ điển kỹ thuật kỳ 2"
-  }
-  ```
-- **Mẫu Phản hồi (201 Created):**
-  ```json
-  {
-    "scopeId": "9b123456-cdef-4567-8901-234567890def",
-    "scopeVersion": 2,
-    "status": "Building",
-    "message": "Scope đã được khởi tạo, hệ thống đang đồng bộ danh mục cột kỹ thuật."
-  }
-  ```
+Khớp dòng với record theo Database/Schema/Bảng/Cột (thêm `Nguồn` để phân biệt),
+không bao giờ tạo record. Chỉ cột có trong file được áp dụng; ô trống xóa giá trị.
+Giới hạn 20 MB, 70.000 dòng. Session dùng một lần, gắn actor, hết hạn sau 30 phút;
+commit là một transaction và kiểm tra lại revision từng dòng (`409
+TD_IMPORT_CONFLICT` nếu preview đã cũ).
 
----
+### 5.6. Bootstrap job
 
-#### API 5.1.3: Xem chi tiết Scope & Trạng thái Binding
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}`
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "scopeId": "7a3f81e2-5b90-4a88-9122-cc4b90123ef1",
-    "scopeVersion": 1,
-    "status": "Active",
-    "dataDictionaryScope": {
-      "id": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
-      "businessVersion": "1",
-      "status": "Approved"
-    },
-    "totalRecords": 65928,
-    "mappedRecords": 45200,
-    "unmappedRecords": 20728
-  }
-  ```
+```http
+GET  /api/v1/glossaries/{id}/bootstrap-jobs?businessVersion=N
+POST /api/v1/glossaries/{id}/bootstrap-jobs?businessVersion=N          # Admin, tạo job còn thiếu
+POST /api/v1/glossaries/{id}/bootstrap-jobs/{jobId}/retry              # Admin, chỉ job Failed
+```
 
----
+Trạng thái job (`Pending|Running|Succeeded|Failed`) độc lập với trạng thái
+workflow của catalog. Phạm vi Column cấu hình ở `technicalDictionary.*` trong
+`openmetadata.yaml` và được chụp lại vào job khi tạo.
 
-### 5.2. Nhóm API Quản lý Bản ghi Kỹ thuật (Technical Records)
+### 5.7. Mã lỗi
 
-#### API 5.2.1: Truy vấn danh sách bản ghi Kỹ thuật theo Scope
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/records`
-- **Query Parameters:** `q`, `sources`, `cdeMapping` (`ALL`, `MAPPED`, `UNMAPPED`), `statuses`, `page`, `limit`.
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "scope": {
-      "id": "7a3f81e2-5b90-4a88-9122-cc4b90123ef1",
-      "businessVersion": "1",
-      "status": "Active",
-      "dataDictionaryVersionId": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
-      "dataDictionaryBusinessVersion": "1"
-    },
-    "data": [
-      {
-        "recordId": "48f12a33-bc12-4f90-8801-901258a12bc4",
-        "columnId": "129845aa-c112-4a00-bb34-883910245aaa",
-        "columnFqn": "CoreBanking.COREDB.dbo.CUSTOMER.CUST_ID",
-        "businessVersion": "1.0",
-        "entityStatus": "Approved",
-        "databaseName": "COREDB",
-        "schemaName": "dbo",
-        "tableName": "CUSTOMER",
-        "columnName": "CUST_ID",
-        "dataType": "VARCHAR(20)",
-        "cdeReference": {
-          "cdeId": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
-          "cdeCode": "CDE_CUST_ID",
-          "cdeDisplayName": "Mã khách hàng",
-          "cdeBusinessVersion": "1.0"
-        },
-        "survivorshipRank": 1,
-        "timeliness": "Realtime",
-        "elementCreationType": "Original",
-        "workingRevision": 1
-      }
-    ],
-    "paging": {
-      "total": 65928,
-      "page": 1,
-      "limit": 50
-    }
-  }
-  ```
-
----
-
-#### API 5.2.2: Lấy chi tiết một Bản ghi Kỹ thuật
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/records/{recordId}`
-- **Mẫu Phản hồi (200 OK):** Trả về đầy đủ thông tin metadata vật lý, ánh xạ CDE, survivorship rank, lịch sử và capabilities.
-
----
-
-#### API 5.2.3: Lấy danh sách các phiên bản của Bản ghi Kỹ thuật
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/records/{recordId}/versions`
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "businessVersion": "1.1",
-        "entityStatus": "Draft",
-        "updatedAt": "2026-09-29T08:00:00.000Z"
-      },
-      {
-        "businessVersion": "1.0",
-        "entityStatus": "Approved",
-        "updatedAt": "2026-01-01T08:00:00.000Z"
-      }
-    ]
-  }
-  ```
-
----
-
-#### API 5.2.4: Nâng phiên bản nghiệp vụ Bản ghi Kỹ thuật ($N.MINOR$)
-- **Method & Endpoint:** `POST /api/v1/technical-dictionary/scopes/{scopeId}/records/{recordId}/versions`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "businessVersion": "1.1",
-    "comment": "Điều chỉnh lại thứ tự ưu tiên survivorship rank."
-  }
-  ```
-
----
-
-#### API 5.2.5: Lấy danh sách CDE hợp lệ cùng Scope để ánh xạ (CDE Options)
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/cde-options`
-- **Mô tả:** Trả về danh sách CDE `Approved` nằm **đúng trong Scope Data Dictionary đã liên kết**. Ngăn chặn hoàn toàn việc ánh xạ chéo Scope.
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "cdeId": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
-        "cdeCode": "CDE_CUST_ID",
-        "cdeDisplayName": "Mã khách hàng",
-        "businessVersion": "1.0",
-        "domain": "Khách hàng"
-      },
-      {
-        "cdeId": "a9812e11-1244-4902-8812-78129aa123bb",
-        "cdeCode": "CDE_ACC_NO",
-        "cdeDisplayName": "Số tài khoản thanh toán",
-        "businessVersion": "1.0",
-        "domain": "Tiền gửi"
-      }
-    ],
-    "paging": {
-      "total": 1250
-    }
-  }
-  ```
-
----
-
-#### API 5.2.6: Cập nhật nháp Bản ghi Kỹ thuật (Save Draft Technical Record)
-- **Method & Endpoint:** `PATCH /api/v1/technical-dictionary/scopes/{scopeId}/records/{recordId}/working`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "expectedRevision": 1,
-    "payload": {
-      "cdeId": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
-      "cdeBusinessVersion": "1.0",
-      "survivorshipRank": 1,
-      "timeliness": "Realtime",
-      "elementCreationType": "Original",
-      "owner": "TeamCoreBanking"
-    }
-  }
-  ```
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "recordId": "48f12a33-bc12-4f90-8801-901258a12bc4",
-    "workingRevision": 2,
-    "updatedAt": "2026-09-29T08:48:00.000Z"
-  }
-  ```
-
----
-
-#### API 5.2.7: Vòng đời Phê duyệt Bản ghi Kỹ thuật (Workflow Actions)
-- **Method & Endpoint:** `POST /api/v1/technical-dictionary/scopes/{scopeId}/records/{recordId}/{action}`
-- **Path Actions:** `submit`, `approve`, `reject`, `reopen`, `revoke`.
-- **Hành vi khi `approve`:** Ghi nhận snapshot bản ghi kỹ thuật `Approved`, đồng thời chiếu (project) gắn tag CDE vào metadata của Physical Column trong OpenMetadata.
-- **Mẫu Request Body:**
-  ```json
-  {
-    "expectedRevision": 2,
-    "comment": "Đồng ý phê duyệt ánh xạ cột CUST_ID sang CDE_CUST_ID."
-  }
-  ```
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "recordId": "48f12a33-bc12-4f90-8801-901258a12bc4",
-    "entityStatus": "Approved",
-    "message": "Bản ghi kỹ thuật đã được phê duyệt và đồng bộ tag sang Physical Column."
-  }
-  ```
-
----
-
-#### API 5.2.8: Thống kê tiến độ ánh xạ CDE theo Hệ thống nguồn
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/stats`
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "scopeId": "7a3f81e2-5b90-4a88-9122-cc4b90123ef1",
-    "totalColumns": 65928,
-    "mappedColumns": 45200,
-    "mappedPercentage": 68.56,
-    "bySources": [
-      {
-        "source": "CoreBanking",
-        "total": 35000,
-        "mapped": 28000,
-        "percentage": 80.0
-      },
-      {
-        "source": "CardSystem",
-        "total": 15928,
-        "mapped": 10200,
-        "percentage": 64.04
-      },
-      {
-        "source": "CRM",
-        "total": 15000,
-        "mapped": 7000,
-        "percentage": 46.67
-      }
-    ]
-  }
-  ```
-
----
-
-#### API 5.2.9: Xuất Từ điển Kỹ thuật ra file Excel (.xlsx)
-- **Method & Endpoint:** `GET /api/v1/technical-dictionary/scopes/{scopeId}/export?format=xlsx`
-- **Headers:** `Accept: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-- **Tên file tải về:** `TuDienKyThuat_Agribank_v{scopeVersion}_YYYY-MM-DD.xlsx`
-
----
-
-</details>
+`TD_MANUAL_CREATE_NOT_ALLOWED`, `TD_MANUAL_DELETE_NOT_ALLOWED`,
+`TD_SERVER_OWNED_FIELD`, `TD_INVALID_FIELD`, `TD_SOURCE_UNAVAILABLE`,
+`TD_RANK_REQUIRED`, `TD_RANK_DUPLICATE`, `TD_CDE_SCOPE_MISMATCH`,
+`TD_CDE_SCOPE_NOT_ACTIVE`, `TD_COLUMN_SCOPE_EMPTY`, `TD_BOOTSTRAP_NOT_READY`,
+`TD_IMPORT_ROW_NOT_MATCHED`, `TD_IMPORT_CONFLICT`, `TD_IMPORT_SESSION_INVALID`.
+Mã chung (`WORKING_REVISION_CONFLICT`, ...) theo các phân hệ trước.
 
 ## 6. PHỤ LỤC: VÍ DỤ TÍCH HỢP HỆ THỐNG (INTEGRATION EXAMPLES)
 

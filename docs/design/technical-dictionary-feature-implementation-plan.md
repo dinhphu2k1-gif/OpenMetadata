@@ -163,8 +163,9 @@
 - Consumer outbox cho Column create/delete/update từ lifecycle Table.
 - Column mới → tạo `N.0 Draft` trong mọi TD scope chưa Archived, nếu Column thuộc
   `columnScopeSnapshot` của scope đó.
-- Table soft-delete → mọi record của Table có `sourceAvailable = false`; restore đặt lại `true`.
-- Column không còn → `sourceAvailable = false`; chặn Submit/Approve (`TD_SOURCE_UNAVAILABLE`).
+- Table soft-delete → mọi record của Table có trạng thái nguồn `Unavailable` (bảng
+  `technical_source_state`); restore đặt lại `Available`.
+- Column không còn → `Unavailable`; chặn Submit/Approve (`TD_SOURCE_UNAVAILABLE`).
 - Column thay đổi thuộc tính → làm mới source snapshot của working Draft; Approved chỉ
   hiển thị badge **Nguồn đã thay đổi**.
 - Đổi tên Column/Table xử lý như cặp delete + create.
@@ -270,7 +271,7 @@
 
 **Phạm vi**
 
-- Dùng khung import session chung; `profileKey = TECHNICAL_DICTIONARY`.
+- Session import riêng của TD (`TechnicalImportService`), endpoint `/glossaryTerms/import/technical/*`, giao diện là modal trong trang danh sách.
 - Match theo vị trí Column; không match/match nhiều → lỗi dòng; không tạo record.
 - Chỉ cập nhật cột editable có mặt trong file; ô trống xóa giá trị.
 - Chính sách `DRAFT_ONLY` (mặc định) và `ALL_EDITABLE`; action preview theo thiết kế §8.3.
@@ -303,9 +304,10 @@
 **Phạm vi**
 
 - Approve/Revoke/Archive phát outbox idempotent: tag CDE scoped FQN và bốn tag phân loại
-  trên Column, survivorship rule (`recordId`, record version, `columnKey`, CDE snapshot, rank),
-  search reindex, audit.
-- Record có `sourceAvailable = false` bị gỡ survivorship rule.
+  trên Column, search reindex, audit.
+- Survivorship rule (`recordId`, record version, `columnKey`, CDE snapshot, rank) **chưa được
+  projection**: chưa có đích lưu ở backend; UI đọc `extension.survivorshipRules` của CDE.
+- Record có trạng thái nguồn `Unavailable` không được projection.
 - Allowlist tag/rule profile quản lý; retry/backoff, dead-letter, metric, reconciliation.
 
 **DoD**
@@ -412,3 +414,24 @@ Critical journey:
 - [ ] Catalog `N+1` bootstrap lại record; cutover đúng DQ/CDE.
 - [ ] Projection qua outbox, không xóa metadata ngoài allowlist.
 - [ ] Data Dictionary và Data Quality không regression.
+
+## 11. Trạng thái triển khai
+
+Đã triển khai trên nhánh `feature/technical-dictionary-governed-profile` (C0–C10).
+
+**Đã kiểm chứng**
+
+- Unit test backend cho scope Column, validator, source snapshot, rank guard, projection,
+  row matcher/decorator, stats, export, import (sheet/planner/patch/service), bulk workflow.
+- 35 test Jest (7 suite) cho constants, rows, catalog, bulk runner, table, modal.
+- SQL của các DAO mới chạy thật trên PostgreSQL 15 (row lock, upsert, cast jsonb, ràng buộc unique, JSON path).
+
+**Chưa kiểm chứng / còn thiếu**
+
+- Integration test `TechnicalDictionaryResourceIT` và E2E Playwright chưa chạy (cần OpenSearch image và mạng).
+- Biến thể MySQL của SQL mới đã biên dịch nhưng chưa chạy.
+- Benchmark 65k Column (bootstrap, list p95, bulk, export) chưa đo.
+- 15 locale ngoài `en-us` và `vi-vn` chưa đồng bộ (`yarn i18n`).
+- Survivorship rule chưa projection lên Column (xem thiết kế §11).
+- Danh sách `DataTimeliness` (T0..T3) là seed tạm, cần nghiệp vụ duyệt.
+- Vòng xử lý outbox có thể bị nghẽn bởi event luôn lỗi (chưa có dead-letter).
