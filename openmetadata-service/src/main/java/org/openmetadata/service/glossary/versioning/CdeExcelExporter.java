@@ -36,7 +36,7 @@ import org.openmetadata.schema.utils.JsonUtils;
 public final class CdeExcelExporter {
   public static final String XLSX_MEDIA_TYPE =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  static final int EXCEL_MAX_DATA_ROWS = 1_048_575;
+  public static final int EXCEL_MAX_DATA_ROWS = 1_048_575;
   private static final int ROW_WINDOW = 100;
   private static final String[] HEADERS = {
     "Mã CDE",
@@ -257,7 +257,7 @@ public final class CdeExcelExporter {
     }
   }
 
-  static String safeText(String value) {
+  public static String safeText(String value) {
     if (value == null || value.isEmpty()) return "";
     char first = value.charAt(0);
     return first == '='

@@ -73,6 +73,8 @@ import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
+import org.openmetadata.service.glossary.technical.TechnicalBootstrapJobService;
+import org.openmetadata.service.glossary.technical.TechnicalBootstrapJobView;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -103,6 +105,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   static final String FIELDS = "owners,tags,reviewers,usageCount,termCount,domains,extension";
   private final GlossaryMapper mapper = new GlossaryMapper();
   private final GlossaryVersioningService versioningService = new GlossaryVersioningService();
+  private final TechnicalBootstrapJobService bootstrapJobService =
+      new TechnicalBootstrapJobService();
 
   public GlossaryResource(Authorizer authorizer, Limits limits) {
     super(Entity.GLOSSARY, authorizer, limits);
@@ -333,6 +337,52 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
                 GlossaryAuthorizationResolver.requireReview(
                     capabilitiesForWorking(securityContext, working)));
     return GlossaryVersionResponses.published(published);
+  }
+
+  @GET
+  @Path("/{id}/bootstrap-jobs")
+  @Operation(
+      operationId = "listTechnicalDictionaryBootstrapJobs",
+      summary = "List Technical Dictionary bootstrap jobs")
+  public List<Map<String, Object>> listBootstrapJobs(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @QueryParam("businessVersion") String businessVersion) {
+    Glossary glossary =
+        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
+    requireTechnicalDictionary(glossary);
+    GlossaryAuthorizationResolver.requireViewWorking(capabilities(securityContext, glossary));
+    return bootstrapJobService.list(id).stream()
+        .filter(
+            job -> businessVersion == null || businessVersion.equals(job.parentBusinessVersion()))
+        .map(TechnicalBootstrapJobView::of)
+        .toList();
+  }
+
+  @POST
+  @Path("/{id}/bootstrap-jobs/{jobId}/retry")
+  @Operation(
+      operationId = "retryTechnicalDictionaryBootstrapJob",
+      summary = "Retry a failed Technical Dictionary bootstrap job")
+  public Map<String, Object> retryBootstrapJob(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @PathParam("jobId") UUID jobId) {
+    Glossary glossary =
+        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
+    requireTechnicalDictionary(glossary);
+    authorizer.authorizeAdmin(securityContext);
+    return TechnicalBootstrapJobView.of(
+        bootstrapJobService.retry(jobId, securityContext.getUserPrincipal().getName()));
+  }
+
+  private static void requireTechnicalDictionary(Glossary glossary) {
+    if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
+        != GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+      throw new NotFoundException("Technical Dictionary was not found");
+    }
   }
 
   @GET
