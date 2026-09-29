@@ -7,7 +7,6 @@ package org.openmetadata.service.glossary.technical;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.ws.rs.WebApplicationException;
@@ -42,9 +41,6 @@ class TechnicalRecordValidatorTest {
     Map<String, Object> extension = new LinkedHashMap<>();
     extension.put(TechnicalDictionaryProfile.SOURCE_COLUMN_FQN, "ipcas.core.dbo.customer.name");
     extension.put(TechnicalDictionaryProfile.SOURCE_TABLE, "customer");
-    extension.put(
-        TechnicalDictionaryProfile.SOURCE_STATUS,
-        List.of(TechnicalDictionaryProfile.SOURCE_AVAILABLE));
     extension.put(TechnicalDictionaryProfile.RELEASE_VERSION_TYPE, List.of("Bản chính"));
     return new GlossaryTerm()
         .withDisplayName("name")
@@ -140,30 +136,29 @@ class TechnicalRecordValidatorTest {
         current().withRelatedTerms(List.of(new TermRelation().withTerm(new EntityReference())));
     WebApplicationException missing =
         assertThrows(
-            WebApplicationException.class, () -> validator.requireWorkflowReady(mappedWithoutRank));
+            WebApplicationException.class,
+            () -> validator.requireWorkflowReady(mappedWithoutRank, null));
     assertEquals(400, status(missing));
 
     Map<String, Object> extension = TechnicalRecordValidator.extension(current().getExtension());
     extension.put(TechnicalDictionaryProfile.SURVIVORSHIP_RANK, 1);
     GlossaryTerm unmappedWithRank = current().withExtension(extension);
     assertThrows(
-        WebApplicationException.class, () -> validator.requireWorkflowReady(unmappedWithRank));
+        WebApplicationException.class,
+        () -> validator.requireWorkflowReady(unmappedWithRank, null));
 
-    assertDoesNotThrow(() -> validator.requireWorkflowReady(current()));
+    assertDoesNotThrow(
+        () -> validator.requireWorkflowReady(current(), TechnicalDictionaryProfile.SOURCE_CHANGED));
   }
 
   @Test
   void blocksWorkflowWhenSourceColumnIsUnavailable() {
-    Map<String, Object> extension = TechnicalRecordValidator.extension(current().getExtension());
-    extension.put(
-        TechnicalDictionaryProfile.SOURCE_STATUS,
-        List.of(TechnicalDictionaryProfile.SOURCE_UNAVAILABLE));
-    GlossaryTerm unavailable = current().withExtension(extension);
-
-    assertFalse(TechnicalRecordValidator.isSourceUnavailable(Map.of()));
     WebApplicationException error =
         assertThrows(
-            WebApplicationException.class, () -> validator.requireWorkflowReady(unavailable));
+            WebApplicationException.class,
+            () ->
+                validator.requireWorkflowReady(
+                    current(), TechnicalDictionaryProfile.SOURCE_UNAVAILABLE));
     assertEquals(409, status(error));
   }
 }

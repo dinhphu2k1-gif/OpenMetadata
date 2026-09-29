@@ -124,3 +124,14 @@ CREATE TABLE IF NOT EXISTS `technical_bootstrap_job` (
   PRIMARY KEY (`jobId`),
   UNIQUE KEY `uq_technical_bootstrap_scope` (`technicalGlossaryId`, `parentBusinessVersion`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Operational availability of source Columns; published snapshots stay immutable.
+CREATE TABLE IF NOT EXISTS `technical_source_state` (
+  `technicalGlossaryId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) NOT NULL,
+  `columnKey` varchar(36) NOT NULL,
+  `status` varchar(32) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `detectedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`technicalGlossaryId`, `parentBusinessVersion`, `columnKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

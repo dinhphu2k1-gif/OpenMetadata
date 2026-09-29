@@ -15,7 +15,11 @@ import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.ProviderType;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.events.lifecycle.EntityLifecycleEventDispatcher;
+import org.openmetadata.service.events.lifecycle.handlers.TechnicalDictionaryColumnHandler;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.technical.TechnicalBootstrapJobService;
+import org.openmetadata.service.glossary.technical.TechnicalCatalog;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryProperties;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
@@ -30,6 +34,15 @@ public final class TechnicalDictionaryBootstrap {
 
   public static void initialize() {
     TechnicalDictionaryProperties.ensureRegistered();
+    createIdentity();
+    final EntityLifecycleEventDispatcher dispatcher = EntityLifecycleEventDispatcher.getInstance();
+    dispatcher.unregisterHandler(TechnicalDictionaryColumnHandler.HANDLER_NAME);
+    dispatcher.registerHandler(new TechnicalDictionaryColumnHandler());
+    TechnicalCatalog.findGlossary()
+        .ifPresent(technical -> new TechnicalBootstrapJobService().resumeOnStartup(technical));
+  }
+
+  private static void createIdentity() {
     Entity.getJdbi()
         .useTransaction(
             handle -> {

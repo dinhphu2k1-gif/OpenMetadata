@@ -26,11 +26,15 @@ public final class TechnicalDictionaryProfile {
   public static final String SOURCE_DATA_LENGTH = "sourceDataLength";
   public static final String SOURCE_PRECISION = "sourcePrecision";
   public static final String SOURCE_SCALE = "sourceScale";
+
+  /** Read-model field carrying the operational source state; never persisted in payloads. */
   public static final String SOURCE_STATUS = "sourceStatus";
+
   public static final String RELEASE_VERSION_TYPE = "releaseVersionType";
 
   public static final String SOURCE_AVAILABLE = "Available";
   public static final String SOURCE_UNAVAILABLE = "Unavailable";
+  public static final String SOURCE_CHANGED = "Changed";
 
   public static final String ELEMENT_TYPE_CLASSIFICATION = "DataElementType";
   public static final String GENERATION_TYPE_CLASSIFICATION = "FieldGenerationType";
@@ -53,8 +57,7 @@ public final class TechnicalDictionaryProfile {
           SOURCE_DATA_TYPE,
           SOURCE_DATA_LENGTH,
           SOURCE_PRECISION,
-          SOURCE_SCALE,
-          SOURCE_STATUS);
+          SOURCE_SCALE);
 
   public static final Set<String> SERVER_OWNED_EXTENSION_KEYS = serverOwnedKeys();
 

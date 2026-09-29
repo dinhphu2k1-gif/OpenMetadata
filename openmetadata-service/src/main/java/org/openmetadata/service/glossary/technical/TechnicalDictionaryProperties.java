@@ -5,7 +5,6 @@
 
 package org.openmetadata.service.glossary.technical;
 
-import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_AVAILABLE;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_COLUMN;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_COLUMN_FQN;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_DATABASE;
@@ -15,14 +14,11 @@ import static org.openmetadata.service.glossary.technical.TechnicalDictionaryPro
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_SCALE;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_SCHEMA;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_SERVICE;
-import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_STATUS;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_TABLE;
-import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SOURCE_UNAVAILABLE;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SURVIVORSHIP_RANK;
 import static org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile.SYSTEM_OWNER;
 
 import java.util.List;
-import org.openmetadata.schema.type.customProperties.EnumConfig;
 import org.openmetadata.service.glossary.GovernedCustomPropertyBootstrap;
 import org.openmetadata.service.glossary.GovernedCustomPropertyBootstrap.PropertyDefinition;
 
@@ -56,15 +52,7 @@ public final class TechnicalDictionaryProperties {
         property(SOURCE_DATA_TYPE, "Loại dữ liệu", "Kiểu dữ liệu của Column", STRING),
         property(SOURCE_DATA_LENGTH, "Độ dài", "Độ dài dữ liệu của Column", INTEGER),
         property(SOURCE_PRECISION, "Độ chính xác", "Precision của Column", INTEGER),
-        property(SOURCE_SCALE, "Số chữ số thập phân", "Scale của Column", INTEGER),
-        new PropertyDefinition(
-            SOURCE_STATUS,
-            "Tình trạng nguồn",
-            "Column nguồn còn tồn tại trong metadata hay không",
-            "enum",
-            new EnumConfig()
-                .withMultiSelect(false)
-                .withValues(List.of(SOURCE_AVAILABLE, SOURCE_UNAVAILABLE))));
+        property(SOURCE_SCALE, "Số chữ số thập phân", "Scale của Column", INTEGER));
   }
 
   private static PropertyDefinition property(

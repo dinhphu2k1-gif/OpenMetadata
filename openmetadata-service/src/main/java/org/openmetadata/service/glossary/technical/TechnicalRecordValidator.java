@@ -56,9 +56,9 @@ public final class TechnicalRecordValidator {
   }
 
   /** Checks invariants that must hold before a record enters or leaves review. */
-  public void requireWorkflowReady(GlossaryTerm payload) {
+  public void requireWorkflowReady(GlossaryTerm payload, String sourceStatus) {
     final Map<String, Object> values = extension(payload.getExtension());
-    if (isSourceUnavailable(values)) {
+    if (TechnicalDictionaryProfile.SOURCE_UNAVAILABLE.equals(sourceStatus)) {
       throw TechnicalDictionaryErrors.conflict(
           TechnicalDictionaryErrors.SOURCE_UNAVAILABLE,
           String.format(
@@ -80,12 +80,6 @@ public final class TechnicalRecordValidator {
   public static Integer rank(Map<String, Object> values) {
     final Object raw = values.get(TechnicalDictionaryProfile.SURVIVORSHIP_RANK);
     return raw instanceof Number number ? number.intValue() : null;
-  }
-
-  public static boolean isSourceUnavailable(Map<String, Object> values) {
-    final Object status = values.get(TechnicalDictionaryProfile.SOURCE_STATUS);
-    return status instanceof List<?> list
-        && list.contains(TechnicalDictionaryProfile.SOURCE_UNAVAILABLE);
   }
 
   private static void rejectServerOwnedKeys(Map<String, Object> requested) {

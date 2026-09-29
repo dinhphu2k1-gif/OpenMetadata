@@ -103,6 +103,7 @@ import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
 import org.openmetadata.service.glossary.technical.TechnicalRecordValidator;
+import org.openmetadata.service.glossary.technical.TechnicalSourceStates;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
 import org.openmetadata.service.glossary.versioning.CdeImportService;
@@ -850,7 +851,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
     requireSingleTechnicalCdeRelation(payload);
-    technicalRecordValidator.requireWorkflowReady(payload);
+    technicalRecordValidator.requireWorkflowReady(
+        payload,
+        TechnicalSourceStates.statusOf(
+            payload.getGlossary().getId(), payload.getParentBusinessVersion(), payload.getName()));
   }
 
   private static void requireSingleTechnicalCdeRelation(GlossaryTerm payload) {

@@ -2043,12 +2043,19 @@ CREATE TABLE IF NOT EXISTS public.technical_bootstrap_job (
   updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL,
   CONSTRAINT uq_technical_bootstrap_scope UNIQUE (technicalGlossaryId, parentBusinessVersion)
 );
+CREATE TABLE IF NOT EXISTS public.technical_source_state (
+  technicalGlossaryId varchar(36) NOT NULL, parentBusinessVersion varchar(64) NOT NULL,
+  columnKey varchar(36) NOT NULL, status varchar(32) NOT NULL, columnFqn text NOT NULL,
+  detectedAt bigint NOT NULL,
+  PRIMARY KEY (technicalGlossaryId, parentBusinessVersion, columnKey)
+);
 ALTER TABLE public.glossary_business_working OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_business_snapshot OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
 ALTER TABLE public.technical_bootstrap_job OWNER TO openmetadata_user;
+ALTER TABLE public.technical_source_state OWNER TO openmetadata_user;
 
 
 --

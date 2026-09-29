@@ -132,3 +132,14 @@ CREATE TABLE IF NOT EXISTS technical_bootstrap_job (
   updatedBy varchar(256) NOT NULL,
   CONSTRAINT uq_technical_bootstrap_scope UNIQUE (technicalGlossaryId, parentBusinessVersion)
 );
+
+-- Operational availability of source Columns; published snapshots stay immutable.
+CREATE TABLE IF NOT EXISTS technical_source_state (
+  technicalGlossaryId varchar(36) NOT NULL,
+  parentBusinessVersion varchar(64) NOT NULL,
+  columnKey varchar(36) NOT NULL,
+  status varchar(32) NOT NULL,
+  columnFqn text NOT NULL,
+  detectedAt bigint NOT NULL,
+  PRIMARY KEY (technicalGlossaryId, parentBusinessVersion, columnKey)
+);

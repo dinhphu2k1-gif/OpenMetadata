@@ -80,6 +80,17 @@ public interface TechnicalBootstrapJobDAO {
       @Bind("actor") String actor);
 
   @SqlUpdate(
+      "UPDATE technical_bootstrap_job SET status = :status, total = 0, processed = 0, created = 0, "
+          + "skipped = 0, failed = 0, checkpoint = NULL, errorSummary = NULL, updatedAt = :now, "
+          + "updatedBy = :actor WHERE jobId = :jobId AND status = :expectedStatus")
+  int resetJob(
+      @BindUUID("jobId") UUID jobId,
+      @Bind("expectedStatus") String expectedStatus,
+      @Bind("status") String status,
+      @Bind("now") long now,
+      @Bind("actor") String actor);
+
+  @SqlUpdate(
       "UPDATE technical_bootstrap_job SET total = :total, processed = :processed, "
           + "created = :created, skipped = :skipped, failed = :failed, checkpoint = :checkpoint, "
           + "updatedAt = :now WHERE jobId = :jobId")
