@@ -58,6 +58,19 @@ public class GlossaryBusinessVersionSearchService {
         Map.of("total", total, "limit", validated.limit(), "offset", validated.offset()));
   }
 
+  /** Every row matching the criteria in stable order, without pagination. */
+  public List<Map<String, Object>> filterAll(
+      Criteria criteria,
+      List<Map<String, Object>> authorizedDatabaseRows,
+      boolean consumerOnly,
+      boolean archivedScope) {
+    final Criteria validated = validate(criteria, consumerOnly, archivedScope);
+    return authorizedDatabaseRows.stream()
+        .filter(row -> matches(row, validated))
+        .sorted(comparator(validated))
+        .toList();
+  }
+
   public static Criteria validate(Criteria criteria, boolean consumerOnly) {
     return validate(criteria, consumerOnly, false);
   }

@@ -49,6 +49,9 @@ import org.slf4j.LoggerFactory;
 public class GlossaryVersioningService {
   private static final Logger LOG = LoggerFactory.getLogger(GlossaryVersioningService.class);
   private static final int OUTBOX_BATCH_SIZE = 100;
+  private static final int MAX_FLUSH_ROUNDS = 500;
+  private static final ThreadLocal<Boolean> DEFER_SIDE_EFFECTS =
+      ThreadLocal.withInitial(() -> false);
   public static final String GLOSSARY = "glossary";
   public static final String GLOSSARY_TERM = "glossaryTerm";
 
@@ -586,7 +589,9 @@ public class GlossaryVersioningService {
       }
       throw exception;
     }
-    processPendingOutbox();
+    if (!DEFER_SIDE_EFFECTS.get()) {
+      processPendingOutbox();
+    }
     refreshManagerIndexSafely(entityType, entityId);
     return published;
   }
@@ -888,7 +893,33 @@ public class GlossaryVersioningService {
         .createEntity(indexName, entityId.toString(), JsonUtils.pojoToJson(document));
   }
 
+  /**
+   * Runs a batch of mutations without per-record outbox processing or search refresh; the caller
+   * must invoke {@link #flushSideEffects} once afterwards.
+   */
+  public static void runWithDeferredSideEffects(Runnable batch) {
+    final boolean previous = DEFER_SIDE_EFFECTS.get();
+    DEFER_SIDE_EFFECTS.set(true);
+    try {
+      batch.run();
+    } finally {
+      DEFER_SIDE_EFFECTS.set(previous);
+    }
+  }
+
+  /** Drains the snapshot outbox and refreshes the manager index of the given entities. */
+  public void flushSideEffects(String entityType, java.util.Collection<UUID> entityIds) {
+    final GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
+    for (int round = 0; round < MAX_FLUSH_ROUNDS && !dao.listPendingOutbox(1).isEmpty(); round++) {
+      processPendingOutbox();
+    }
+    entityIds.forEach(entityId -> refreshManagerIndexSafely(entityType, entityId));
+  }
+
   private void refreshManagerIndexSafely(String entityType, UUID entityId) {
+    if (DEFER_SIDE_EFFECTS.get()) {
+      return;
+    }
     try {
       GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
       SearchRepository searchRepository = Entity.getSearchRepository();

@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jdbi.v3.core.Handle;
@@ -31,6 +32,14 @@ public final class TechnicalRankGuard {
 
   /** Checks one record; with a handle the CDE identity is locked for the current transaction. */
   public static void requireUnique(Handle handle, GlossaryTerm payload) {
+    requireUnique(handle, payload, Set.of());
+  }
+
+  /**
+   * Like {@link #requireUnique(Handle, GlossaryTerm)} but ignores Approved records that are part of
+   * the same bulk approval; the batch as a whole was validated with {@link #finalStateConflicts}.
+   */
+  public static void requireUnique(Handle handle, GlossaryTerm payload, Set<UUID> batchTermIds) {
     final RankKey key = RankKey.of(payload);
     if (key != null) {
       final TechnicalRecordQueryDAO dao =
@@ -41,7 +50,9 @@ public final class TechnicalRankGuard {
         dao.lockTermIdentity(UUID.fromString(key.cdeId()));
       }
       final List<RankedRecord> conflicts =
-          conflictsWith(key, payload, approvedFor(dao, payload, List.of(key.cdeId())));
+          conflictsWith(key, payload, approvedFor(dao, payload, List.of(key.cdeId()))).stream()
+              .filter(record -> !batchTermIds.contains(record.termId()))
+              .toList();
       if (!conflicts.isEmpty()) {
         throw duplicate(key, conflicts.getFirst().columnFqn());
       }

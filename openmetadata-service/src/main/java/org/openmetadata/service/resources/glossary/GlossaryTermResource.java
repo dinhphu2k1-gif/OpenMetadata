@@ -13,6 +13,7 @@
 
 package org.openmetadata.service.resources.glossary;
 
+import static org.openmetadata.common.utils.CommonUtil.listOrEmpty;
 import static org.openmetadata.service.Entity.ADMIN_USER_NAME;
 import static org.openmetadata.service.Entity.GLOSSARY;
 import static org.openmetadata.service.Entity.GLOSSARY_TERM;
@@ -60,10 +61,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
@@ -125,6 +128,7 @@ import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Cand
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Scope;
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.ScopeType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
+import org.openmetadata.service.glossary.versioning.GovernedBulkWorkflowService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
 import org.openmetadata.service.jdbi3.GlossaryTermRepository;
@@ -170,6 +174,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final CdeImportService cdeImportService = new CdeImportService();
   private final TechnicalRecordValidator technicalRecordValidator = new TechnicalRecordValidator();
   private final TechnicalRowDecorator technicalRowDecorator = new TechnicalRowDecorator();
+  private final GovernedBulkWorkflowService bulkWorkflowService = new GovernedBulkWorkflowService();
   private final TechnicalCdeReferenceResolver technicalCdeResolver =
       new TechnicalCdeReferenceResolver();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
@@ -444,6 +449,144 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
   }
 
+  @POST
+  @Path("/bulk/{action}")
+  @Operation(
+      operationId = "bulkGovernedWorkflow",
+      summary = "Submit, approve or reject working records selected by ids or filters")
+  public Map<String, Object> bulkWorkflow(
+      @Context SecurityContext securityContext,
+      @PathParam("action") String action,
+      @NotNull @Valid GovernedBulkWorkflowService.Request request) {
+    GovernedBulkWorkflowService.Action workflowAction =
+        GovernedBulkWorkflowService.Action.from(action);
+    AuthorizedFlatRows authorized =
+        loadAuthorizedGlossaryFlatRows(
+            securityContext,
+            String.valueOf(request.glossaryId()),
+            request.parentBusinessVersion(),
+            null);
+    if (authorized.scopeType() == ScopeType.ARCHIVED) {
+      throw new BadRequestException("Bulk workflow is not available for an archived scope");
+    }
+    return bulkWorkflowService.run(
+        workflowAction,
+        request,
+        selectBulkRows(request, authorized),
+        (row, batchTermIds) ->
+            applyBulkAction(workflowAction, securityContext, request, row, batchTermIds),
+        bulkPrecheck(workflowAction, authorized, request));
+  }
+
+  private List<Map<String, Object>> selectBulkRows(
+      GovernedBulkWorkflowService.Request request, AuthorizedFlatRows authorized) {
+    Set<UUID> ids = new HashSet<>(listOrEmpty(request.termIds()));
+    List<Map<String, Object>> rows =
+        authorized.rows().stream()
+            .filter(row -> "working".equals(row.get("recordType")))
+            .filter(row -> ids.isEmpty() || ids.contains(GovernedBulkWorkflowService.termId(row)))
+            .toList();
+    Map<String, String> criteria = request.criteria() == null ? Map.of() : request.criteria();
+    return criteria.isEmpty()
+        ? rows
+        : glossarySearchService.filterAll(
+            bulkCriteria(request, criteria, authorized), rows, authorized.consumerOnly(), false);
+  }
+
+  private static Criteria bulkCriteria(
+      GovernedBulkWorkflowService.Request request,
+      Map<String, String> criteria,
+      AuthorizedFlatRows authorized) {
+    return new Criteria(
+        request.glossaryId(),
+        request.parentBusinessVersion(),
+        criteria.get("q"),
+        GlossaryBusinessVersionSearchService.splitCsvParameter(criteria.get("statuses")),
+        GlossaryBusinessVersionSearchService.splitCsvParameter(criteria.get("domainIds")),
+        GlossaryBusinessVersionSearchService.splitCsvParameter(criteria.get("ownerIds")),
+        GlossaryBusinessVersionSearchService.splitCsvParameter(criteria.get("dataSourceTags")),
+        GlossaryBusinessVersionSearchService.splitCsvParameter(criteria.get("classificationTags")),
+        null,
+        null,
+        10,
+        0,
+        profileFilters(authorized.profile(), criteria));
+  }
+
+  private void applyBulkAction(
+      GovernedBulkWorkflowService.Action action,
+      SecurityContext securityContext,
+      GovernedBulkWorkflowService.Request request,
+      Map<String, Object> row,
+      Set<UUID> batchTermIds) {
+    UUID termId = GovernedBulkWorkflowService.termId(row);
+    long revision = ((Number) row.get("workingRevision")).longValue();
+    String scope = request.parentBusinessVersion();
+    String actor = securityContext.getUserPrincipal().getName();
+    switch (action) {
+      case SUBMIT -> versioningService.transition(
+          GlossaryVersioningService.GLOSSARY_TERM,
+          termId,
+          scope,
+          revision,
+          EntityStatus.DRAFT,
+          EntityStatus.IN_REVIEW,
+          actor,
+          working -> authorizeAndValidateSubmit(securityContext, working));
+      case REJECT -> versioningService.transition(
+          GlossaryVersioningService.GLOSSARY_TERM,
+          termId,
+          scope,
+          revision,
+          EntityStatus.IN_REVIEW,
+          EntityStatus.REJECTED,
+          actor,
+          working ->
+              GlossaryAuthorizationResolver.requireReject(
+                  capabilitiesForWorking(securityContext, working)));
+      case APPROVE -> versioningService.publish(
+          GlossaryVersioningService.GLOSSARY_TERM,
+          termId,
+          scope,
+          revision,
+          actor,
+          working -> authorizeAndValidateApprove(securityContext, working),
+          technicalRankHook(batchTermIds));
+    }
+  }
+
+  private GovernedBulkWorkflowService.ChunkPrecheck bulkPrecheck(
+      GovernedBulkWorkflowService.Action action,
+      AuthorizedFlatRows authorized,
+      GovernedBulkWorkflowService.Request request) {
+    boolean technicalApproval =
+        action == GovernedBulkWorkflowService.Action.APPROVE
+            && authorized.profile() == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
+    return technicalApproval ? rows -> technicalRankConflicts(rows, request) : rows -> Map.of();
+  }
+
+  private Map<UUID, String> technicalRankConflicts(
+      List<Map<String, Object>> rows, GovernedBulkWorkflowService.Request request) {
+    List<GlossaryTerm> candidates =
+        rows.stream()
+            .map(
+                row ->
+                    JsonUtils.readValue(
+                        versioningService
+                            .getWorking(
+                                GlossaryVersioningService.GLOSSARY_TERM,
+                                GovernedBulkWorkflowService.termId(row),
+                                request.parentBusinessVersion())
+                            .payload(),
+                        GlossaryTerm.class))
+            .toList();
+    Map<UUID, String> rejected = new LinkedHashMap<>();
+    TechnicalRankGuard.finalStateConflicts(
+            request.glossaryId(), request.parentBusinessVersion(), candidates)
+        .forEach(termId -> rejected.put(termId, TechnicalDictionaryErrors.RANK_DUPLICATE));
+    return rejected;
+  }
+
   @GET
   @Path("/stats")
   @Operation(
@@ -646,7 +789,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             request.getExpectedRevision(),
             securityContext.getUserPrincipal().getName(),
             working -> authorizeAndValidateApprove(securityContext, working),
-            technicalRankHook()));
+            technicalRankHook(Set.of())));
   }
 
   @GET
@@ -845,7 +988,19 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
     GlossaryAuthorizationResolver.requireSubmit(capabilitiesForWorking(securityContext, working));
     requireGovernedWorkflowPayload(securityContext, payload, working.glossaryId());
+    requireUniqueTechnicalRank(payload);
     repository.prepareInternal(payload, true);
+  }
+
+  private static void requireUniqueTechnicalRank(GlossaryTerm payload) {
+    boolean technical =
+        payload.getGlossary() != null
+            && GovernedGlossaryProfileRegistry.findByName(payload.getGlossary().getName())
+                    .orElse(null)
+                == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
+    if (technical) {
+      TechnicalRankGuard.requireUnique(null, payload);
+    }
   }
 
   private void authorizeAndValidateApprove(
@@ -915,7 +1070,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return result;
   }
 
-  private static GlossaryVersioningService.PublicationHook technicalRankHook() {
+  private static GlossaryVersioningService.PublicationHook technicalRankHook(
+      Set<UUID> batchTermIds) {
     return (handle, working, published) -> {
       GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
       Glossary glossary =
@@ -925,7 +1081,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
               Include.NON_DELETED);
       if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
           == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
-        TechnicalRankGuard.requireUnique(handle, payload);
+        TechnicalRankGuard.requireUnique(handle, payload, batchTermIds);
       }
     };
   }
@@ -933,7 +1089,6 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
     requireSingleTechnicalCdeRelation(payload);
     technicalCdeResolver.requireInScope(payload);
-    TechnicalRankGuard.requireUnique(null, payload);
     technicalRecordValidator.requireWorkflowReady(
         payload,
         TechnicalSourceStates.statusOf(
