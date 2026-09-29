@@ -22,7 +22,16 @@ const { Option } = Select;
 export interface TechnicalDictionaryEditModalProps {
   visible: boolean;
   fieldItem?: TechnicalFieldItem | null;
-  cdeOptions?: Array<{ label: string; value: string; name: string }>;
+  cdeOptions?: Array<{
+    label: string;
+    value: string;
+    name: string;
+    code?: string;
+    termId?: string;
+    businessVersion?: string;
+    parentBusinessVersion?: string;
+    dataDictionaryVersionId?: string;
+  }>;
   onCancel: () => void;
   onSave: (updatedItem: Partial<TechnicalFieldItem>) => Promise<void> | void;
   isSubmitting?: boolean;
@@ -46,7 +55,9 @@ export const TechnicalDictionaryEditModal: React.FC<
       form.setFieldsValue({
         tableName: fieldItem.tableName,
         columnName: fieldItem.columnName,
-        cdeCode: fieldItem.cdeCode || '',
+        cdeCode:
+          cdeOptions.find((option) => option.code === fieldItem.cdeCode)
+            ?.value || fieldItem.cdeCode || '',
         elementType: fieldItem.elementType || 'AtomicDataElement',
         generationType: fieldItem.generationType || 'ManualInput',
         creationMethod: fieldItem.creationMethod || 'NotApplicable',
@@ -112,7 +123,18 @@ export const TechnicalDictionaryEditModal: React.FC<
       await onSave({
         ...fieldItem,
         ...values,
+        cdeCode: cdeOptions.find((c) => c.value === values.cdeCode)?.code ?? values.cdeCode,
         cdeName,
+        cdeTermId: cdeOptions.find((c) => c.value === values.cdeCode)?.termId,
+        cdeSnapshotId: values.cdeCode || undefined,
+        cdeBusinessVersion: cdeOptions.find((c) => c.value === values.cdeCode)
+          ?.businessVersion,
+        dataDictionaryVersionId: cdeOptions.find(
+          (c) => c.value === values.cdeCode
+        )?.dataDictionaryVersionId,
+        cdeParentBusinessVersion: cdeOptions.find(
+          (c) => c.value === values.cdeCode
+        )?.parentBusinessVersion,
         elementTypeName,
         generationTypeName,
         creationMethodName,

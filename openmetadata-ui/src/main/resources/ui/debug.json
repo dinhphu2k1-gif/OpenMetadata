@@ -26,7 +26,7 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1790633508062,
+  "startTime": 1790636735771,
   "success": false,
   "testResults": [
     {
@@ -37,10 +37,10 @@
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1790633514152,
-        "runtime": 5712,
+        "end": 1790636742444,
+        "runtime": 6289,
         "slow": true,
-        "start": 1790633508440
+        "start": 1790636736155
       },
       "skipped": false,
       "snapshot": {
@@ -58,7 +58,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 158,
+          "duration": 184,
           "failureDetails": [
             {
               "name": "TestingLibraryElementError"
@@ -79,7 +79,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 43,
+          "duration": 46,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary renders status and handles edit action by default",
@@ -94,7 +94,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 28,
+          "duration": 34,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary enforces RBAC: Data Steward can approve/reject in-review items and revoke approved items, but cannot edit",
@@ -109,7 +109,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 23,
+          "duration": 36,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary enforces RBAC: Data Proposer can edit but cannot approve/reject or revoke",
@@ -124,7 +124,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 16,
+          "duration": 19,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary enforces RBAC: Data Consumer cannot edit, approve/reject, or revoke",
@@ -139,7 +139,7 @@
           "ancestorTitles": [
             "TechnicalDictionary"
           ],
-          "duration": 19,
+          "duration": 22,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary does not render actions column when explicitly hidden",
@@ -155,7 +155,7 @@
             "TechnicalDictionary",
             "Backend metadata synchronization on approve and revoke"
           ],
-          "duration": 1,
+          "duration": 2,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke removes CDE glossary and classification tags from table columns when revoked",
@@ -187,7 +187,7 @@
             "TechnicalDictionary",
             "Backend metadata synchronization on approve and revoke"
           ],
-          "duration": 0,
+          "duration": 1,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke persists proposed metadata with In Review status to backend table when submitted by proposer",
@@ -203,7 +203,7 @@
             "TechnicalDictionary",
             "Backend metadata synchronization on approve and revoke"
           ],
-          "duration": 1,
+          "duration": 0,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "TechnicalDictionary Backend metadata synchronization on approve and revoke persists rejected status to backend table when rejected by steward",
@@ -248,7 +248,7 @@
           "ancestorTitles": [
             "Technical dictionary CDE search"
           ],
-          "duration": 1,
+          "duration": 0,
           "failureDetails": [],
           "failureMessages": [],
           "fullName": "Technical dictionary CDE search searches   CDE1   by exact glossary tag instead of full-text tokens",

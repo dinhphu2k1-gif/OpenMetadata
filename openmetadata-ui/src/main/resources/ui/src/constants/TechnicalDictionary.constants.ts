@@ -61,3 +61,13 @@ export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
 
 export const TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY =
   'technicalDictionaryTableColumns_v5';
+
+export const TECHNICAL_DICTIONARY_READ_PATH_FLAG =
+  'openmetadata.feature.technicalDictionary.dbRead';
+export const TECHNICAL_DICTIONARY_MUTATION_PATH_FLAG =
+  'openmetadata.feature.technicalDictionary.governedMutation';
+export const TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY =
+  'governedGlossary.TECHNICAL_DICTIONARY.v1';
+
+export const isTechnicalDictionaryFeatureEnabled = (key: string) =>
+  globalThis.localStorage?.getItem(key) === 'true';

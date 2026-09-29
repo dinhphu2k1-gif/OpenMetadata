@@ -53,6 +53,8 @@ import {
 
 export interface TechnicalFieldItem {
   id: string;
+  scopeId?: string;
+  workingRevision?: number;
   databaseName?: string;
   databaseDisplayName?: string;
   databaseFqn?: string;
@@ -71,6 +73,11 @@ export interface TechnicalFieldItem {
   cdeCode?: string;
   cdeName?: string;
   cdeFqn?: string;
+  cdeTermId?: string;
+  cdeSnapshotId?: string;
+  cdeBusinessVersion?: string;
+  cdeParentBusinessVersion?: string;
+  dataDictionaryVersionId?: string;
   dataType: string;
   dataTypeDisplay: string;
   dataLength?: number;

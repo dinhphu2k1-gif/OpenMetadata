@@ -23,6 +23,9 @@ class GovernedGlossaryProfileRegistryTest {
         GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY,
         GovernedGlossaryProfileRegistry.require(new Glossary().withName("Data Quality")));
     assertEquals(
+        GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY,
+        GovernedGlossaryProfileRegistry.require(new Glossary().withName("Technical Dictionary")));
+    assertEquals(
         GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY,
         GovernedGlossaryProfileRegistry.requireName("Data Quality"));
     assertFalse(

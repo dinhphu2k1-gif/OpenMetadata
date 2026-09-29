@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
+import org.jdbi.v3.core.Handle;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
@@ -66,6 +67,7 @@ public class GlossaryVersioningService {
         nativeVersion,
         explicitPayload,
         actor,
+        false,
         false);
   }
 
@@ -88,7 +90,32 @@ public class GlossaryVersioningService {
         identityPayload,
         actor,
         true,
-        authorization);
+        authorization,
+        false);
+  }
+
+  /** Creates the next scoped Technical Dictionary minor from its immutable Approved payload. */
+  public WorkingVersionRecord createNextTermWorkingFromPublished(
+      UUID entityId,
+      UUID glossaryId,
+      String businessVersion,
+      String parentBusinessVersion,
+      Double nativeVersion,
+      Object identityPayload,
+      String actor,
+      Consumer<PublishedSnapshotRecord> authorization) {
+    return createWorking(
+        GLOSSARY_TERM,
+        entityId,
+        glossaryId,
+        requireParentScope(parentBusinessVersion),
+        businessVersion,
+        nativeVersion,
+        identityPayload,
+        actor,
+        true,
+        authorization,
+        true);
   }
 
   private WorkingVersionRecord createWorking(
@@ -111,7 +138,8 @@ public class GlossaryVersioningService {
         explicitPayload,
         actor,
         requirePublished,
-        null);
+        null,
+        false);
   }
 
   private WorkingVersionRecord createWorking(
@@ -124,7 +152,8 @@ public class GlossaryVersioningService {
       Object explicitPayload,
       String actor,
       boolean requirePublished,
-      Consumer<PublishedSnapshotRecord> authorization) {
+      Consumer<PublishedSnapshotRecord> authorization,
+      boolean copyPublishedPayload) {
     requireEntityType(entityType);
     String canonicalVersion = requireBusinessVersion(entityType, businessVersion);
     if (GLOSSARY_TERM.equals(entityType)) {
@@ -179,7 +208,9 @@ public class GlossaryVersioningService {
                     Object payload =
                         latest == null
                             ? explicitPayload
-                            : emptyWorkingPayload(entityType, explicitPayload, latest);
+                            : copyPublishedPayload
+                                ? latest.payload()
+                                : emptyWorkingPayload(entityType, explicitPayload, latest);
                     if (payload == null) {
                       throw new BadRequestException(
                           "payload is required when no published snapshot exists");
@@ -404,7 +435,8 @@ public class GlossaryVersioningService {
       long expectedRevision,
       String actor,
       Consumer<WorkingVersionRecord> authorizationAndValidation) {
-    return publish(entityType, entityId, null, expectedRevision, actor, authorizationAndValidation);
+    return publish(
+        entityType, entityId, null, expectedRevision, actor, authorizationAndValidation, null);
   }
 
   public PublishedSnapshotRecord publish(
@@ -414,6 +446,24 @@ public class GlossaryVersioningService {
       long expectedRevision,
       String actor,
       Consumer<WorkingVersionRecord> authorizationAndValidation) {
+    return publish(
+        entityType,
+        entityId,
+        parentBusinessVersion,
+        expectedRevision,
+        actor,
+        authorizationAndValidation,
+        null);
+  }
+
+  public PublishedSnapshotRecord publish(
+      String entityType,
+      UUID entityId,
+      String parentBusinessVersion,
+      long expectedRevision,
+      String actor,
+      Consumer<WorkingVersionRecord> authorizationAndValidation,
+      PublicationHook publicationHook) {
     requireEntityType(entityType);
     PublishedSnapshotRecord published;
     try {
@@ -501,24 +551,29 @@ public class GlossaryVersioningService {
                         "PUBLISHED_SNAPSHOT_UPSERT",
                         approvedPayload,
                         now);
+                    PublishedSnapshotRecord result =
+                        new PublishedSnapshotRecord(
+                            snapshotId,
+                            entityType,
+                            entityId,
+                            working.glossaryId(),
+                            working.parentBusinessVersion(),
+                            working.businessVersion(),
+                            working.nativeVersion(),
+                            sequence,
+                            approvedPayload,
+                            contentHash,
+                            now,
+                            actor,
+                            null,
+                            null);
+                    if (publicationHook != null) {
+                      publicationHook.onPublished(handle, working, result);
+                    }
                     requireUpdated(
                         dao.deleteWorking(
                             entityType, entityId, parentBusinessVersion, expectedRevision));
-                    return new PublishedSnapshotRecord(
-                        snapshotId,
-                        entityType,
-                        entityId,
-                        working.glossaryId(),
-                        working.parentBusinessVersion(),
-                        working.businessVersion(),
-                        working.nativeVersion(),
-                        sequence,
-                        approvedPayload,
-                        contentHash,
-                        now,
-                        actor,
-                        null,
-                        null);
+                    return result;
                   });
     } catch (UnableToExecuteStatementException exception) {
       if (isConstraintConflict(exception)) {
@@ -529,6 +584,12 @@ public class GlossaryVersioningService {
     processPendingOutbox();
     refreshManagerIndexSafely(entityType, entityId);
     return published;
+  }
+
+  @FunctionalInterface
+  public interface PublicationHook {
+    void onPublished(
+        Handle handle, WorkingVersionRecord working, PublishedSnapshotRecord published);
   }
 
   public WorkingVersionRecord getWorking(String entityType, UUID entityId) {
@@ -686,18 +747,27 @@ public class GlossaryVersioningService {
    */
   public WorkingVersionRecord revokeLatestToRejectedWorking(
       String entityType, UUID entityId, String actor) {
+    return revokeLatestToRejectedWorking(entityType, entityId, null, actor);
+  }
+
+  public WorkingVersionRecord revokeLatestToRejectedWorking(
+      String entityType, UUID entityId, String parentBusinessVersion, String actor) {
     requireEntityType(entityType);
     WorkingVersionRecord rejectedWorking =
         Entity.getJdbi()
             .inTransaction(
                 handle -> {
                   GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
-                  lockPublicationScope(dao, entityType, entityId, null);
-                  PublishedSnapshotRecord latest = dao.findLatestPublished(entityType, entityId);
+                  lockPublicationScope(dao, entityType, entityId, parentBusinessVersion);
+                  PublishedSnapshotRecord latest =
+                      parentBusinessVersion == null
+                          ? dao.findLatestPublished(entityType, entityId)
+                          : dao.lockLatestPublishedByParent(
+                              entityType, entityId, parentBusinessVersion);
                   if (latest == null) {
                     throw new NotFoundException("No published snapshot exists");
                   }
-                  if (dao.lockWorking(entityType, entityId) != null) {
+                  if (dao.lockWorking(entityType, entityId, parentBusinessVersion) != null) {
                     throw conflict("A working version already exists");
                   }
 
@@ -706,7 +776,19 @@ public class GlossaryVersioningService {
                   requireUpdated(
                       dao.deletePublishedHead(entityType, entityId, latest.snapshotId()));
                   PublishedSnapshotRecord previous =
-                      dao.findNewestActivePublished(entityType, entityId);
+                      parentBusinessVersion == null
+                          ? dao.findNewestActivePublished(entityType, entityId)
+                          : dao.listPublished(entityType, entityId).stream()
+                              .filter(
+                                  row ->
+                                      parentBusinessVersion.equals(row.parentBusinessVersion())
+                                          && row.archivedAt() == null
+                                          && !latest.snapshotId().equals(row.snapshotId()))
+                              .max(
+                                  Comparator.comparing(
+                                      PublishedSnapshotRecord::businessVersion,
+                                      GlossaryBusinessVersion::compare))
+                              .orElse(null);
                   if (previous != null) {
                     dao.upsertPublishedHead(
                         entityType,
@@ -738,13 +820,14 @@ public class GlossaryVersioningService {
                       entityType,
                       entityId,
                       latest.glossaryId(),
+                      parentBusinessVersion,
                       nextVersion,
                       EntityStatus.REJECTED.value(),
                       latest.nativeVersion(),
                       JsonUtils.pojoToJson(payload),
                       now,
                       actor);
-                  return dao.findWorking(entityType, entityId);
+                  return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     processPendingOutbox();
     refreshManagerIndexSafely(entityType, entityId);

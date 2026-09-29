@@ -790,13 +790,32 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       throw new BadRequestException(
           profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY
               ? "A CDE must be a direct child of the Data Dictionary"
-              : "A Data Quality Rule must be a direct child of the Data Quality glossary");
+              : profile == GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY
+                  ? "A Data Quality Rule must be a direct child of the Data Quality glossary"
+                  : "A Technical Dictionary record must be a direct child of the Technical Dictionary glossary");
     }
     if (profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY) {
       DataDictionaryResolver.requireCdePayload(payload, expectedGlossaryId);
-    } else {
+    } else if (profile == GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY) {
       restoreCanonicalCdeRelationFromPublishedVersion(payload);
       requireCanonicalCdeRelation(securityContext, payload, true);
+    } else {
+      requireTechnicalDictionaryRelation(payload);
+    }
+  }
+
+  private static void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
+    List<TermRelation> relations = payload.getRelatedTerms();
+    if (relations != null && relations.size() > 1) {
+      throw new BadRequestException(
+          "A Technical Dictionary record can reference at most one canonical CDE");
+    }
+    if (relations != null && !relations.isEmpty()) {
+      EntityVersionContext context = relations.get(0).getVersionContext();
+      if (context == null || context.getSnapshotId() == null) {
+        throw new BadRequestException(
+            "A Technical Dictionary CDE relation must pin an exact published snapshot");
+      }
     }
   }
 
@@ -1915,8 +1934,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         throw new BadRequestException(
             "reviewers is not supported for a Data Dictionary CDE");
       }
-    } else {
+    } else if (profile == GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY) {
       requireDirectDataQualityCreate(create);
+    } else {
+      requireDirectTechnicalDictionaryCreate(create);
     }
     String parentBusinessVersion =
         GlossaryBusinessVersion.requireCanonicalDictionary(create.getParentBusinessVersion());
@@ -1967,6 +1988,21 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
     if (create.getName() == null || create.getName().trim().isEmpty()) {
       throw new BadRequestException("A Data Quality Rule must provide name as its rule code");
+    }
+  }
+
+  private static void requireDirectTechnicalDictionaryCreate(CreateGlossaryTerm create) {
+    if (create.getParent() != null) {
+      throw new BadRequestException(
+          "A Technical Dictionary record must be a direct child of the Technical Dictionary glossary");
+    }
+    int relationCount =
+        create.getVersionedRelatedTerms() != null
+            ? create.getVersionedRelatedTerms().size()
+            : create.getRelatedTerms() == null ? 0 : create.getRelatedTerms().size();
+    if (relationCount > 1) {
+      throw new BadRequestException(
+          "A Technical Dictionary record can reference at most one canonical CDE");
     }
   }
 

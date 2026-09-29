@@ -2031,11 +2031,51 @@ CREATE TABLE IF NOT EXISTS public.glossary_snapshot_outbox (
   CONSTRAINT uq_glossary_outbox_snapshot_event UNIQUE (snapshotId, eventType)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending ON public.glossary_snapshot_outbox (processedAt, createdAt);
+
+CREATE TABLE IF NOT EXISTS public.technical_dictionary_scope (
+  scopeId varchar(36) PRIMARY KEY, technicalGlossaryId varchar(36) NOT NULL,
+  technicalVersionId varchar(36) NOT NULL, technicalBusinessVersion varchar(64) NOT NULL,
+  dataDictionaryGlossaryId varchar(36) NOT NULL, dataDictionaryVersionId varchar(36) NOT NULL,
+  dataDictionaryBusinessVersion varchar(64) NOT NULL, scopeStatus varchar(32) NOT NULL,
+  revision bigint NOT NULL DEFAULT 1, totalColumns bigint NOT NULL DEFAULT 0,
+  processedColumns bigint NOT NULL DEFAULT 0, failedColumns bigint NOT NULL DEFAULT 0,
+  createdAt bigint NOT NULL, createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL,
+  archivedAt bigint, archivedBy varchar(256),
+  CONSTRAINT uq_technical_scope_source_version UNIQUE (technicalVersionId),
+  CONSTRAINT uq_technical_scope_target_version UNIQUE (dataDictionaryVersionId),
+  CONSTRAINT uq_technical_scope_business_version UNIQUE (technicalGlossaryId, technicalBusinessVersion)
+);
+CREATE INDEX IF NOT EXISTS idx_technical_scope_status ON public.technical_dictionary_scope
+  (technicalGlossaryId, scopeStatus, technicalBusinessVersion);
+
+CREATE TABLE IF NOT EXISTS public.technical_record_column_binding (
+  scopeId varchar(36) NOT NULL, recordId varchar(36) NOT NULL, columnId varchar(36) NOT NULL,
+  columnFqnSnapshot text NOT NULL, sourceAvailable boolean NOT NULL DEFAULT true,
+  createdAt bigint NOT NULL, createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL,
+  PRIMARY KEY (scopeId, columnId), CONSTRAINT uq_technical_record_scope UNIQUE (scopeId, recordId)
+);
+CREATE INDEX IF NOT EXISTS idx_technical_record_column ON public.technical_record_column_binding
+  (columnId, scopeId);
+
+CREATE TABLE IF NOT EXISTS public.technical_projection_outbox (
+  eventId varchar(36) PRIMARY KEY, snapshotId varchar(36) NOT NULL,
+  scopeId varchar(36) NOT NULL, recordId varchar(36) NOT NULL, columnId varchar(36) NOT NULL,
+  eventType varchar(64) NOT NULL, payload jsonb NOT NULL, createdAt bigint NOT NULL,
+  processedAt bigint, attempts integer NOT NULL DEFAULT 0, lastError text,
+  CONSTRAINT uq_technical_projection_event UNIQUE (snapshotId, eventType)
+);
+CREATE INDEX IF NOT EXISTS idx_technical_projection_pending ON public.technical_projection_outbox
+  (processedAt, createdAt);
 ALTER TABLE public.glossary_business_working OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_business_snapshot OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
+ALTER TABLE public.technical_dictionary_scope OWNER TO openmetadata_user;
+ALTER TABLE public.technical_record_column_binding OWNER TO openmetadata_user;
+ALTER TABLE public.technical_projection_outbox OWNER TO openmetadata_user;
 
 
 --

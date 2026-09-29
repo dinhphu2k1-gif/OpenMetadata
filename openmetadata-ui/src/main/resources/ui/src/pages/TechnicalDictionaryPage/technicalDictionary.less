@@ -18,26 +18,23 @@
   width: 100%;
   padding-bottom: 24px;
 
-  /* Sleek OpenMetadata-Standard Header */
+  /* Entity header aligned with the governed glossary pages. */
   .tech-dict-page-header {
-    background: @white;
-    border-radius: 8px;
-    padding: 16px 20px;
+    padding: 4px 0 0;
     margin-bottom: 16px;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
-    border: 1px solid @grey-200;
 
     .tech-dict-title-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 6px;
+      padding: 0 16px;
 
       .tech-dict-title-left {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 12px;
+        min-width: 0;
 
         .tech-dict-icon-wrapper {
           display: flex;
@@ -45,17 +42,23 @@
           justify-content: center;
           width: 40px;
           height: 40px;
-          border-radius: 8px;
-          background: rgba(165, 28, 48, 0.08);
-          color: @primary-color;
+          margin-top: 2px;
+          border: 1px solid #d0d5dd;
+          border-radius: 6px;
+          background: @white;
+          color: #667085;
           flex-shrink: 0;
         }
 
+        .tech-dict-title-copy {
+          min-width: 0;
+        }
+
         .tech-dict-title {
-          font-size: 20px;
+          font-size: 24px;
           font-weight: 600;
           color: @text-color;
-          line-height: 28px;
+          line-height: 32px;
           margin: 0;
         }
       }
@@ -63,61 +66,86 @@
 
     .tech-dict-subheading {
       color: @text-color-tertiary;
-      font-size: 13.5px;
+      font-size: 14px;
       line-height: 20px;
-      margin-bottom: 14px;
-      max-width: 900px;
+      margin-top: 2px;
+      max-width: 980px;
     }
 
-    /* Flat, Elegant Stats Strip */
+    /* Summary cards */
     .tech-dict-stats-strip {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 16px;
-      padding-top: 12px;
-      border-top: 1px solid #eaecf0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
 
       .tech-dict-stat-item {
-        display: inline-flex;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        column-gap: 12px;
         align-items: center;
-        gap: 8px;
-        background: #f8fafc;
-        border: 1px solid #eaecf0;
-        border-radius: 6px;
-        padding: 6px 12px;
+        min-height: 86px;
+        padding: 16px;
+        border: 1px solid @grey-200;
+        border-radius: 10px;
+        background: @white;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
         transition: all 0.2s ease;
 
+        &:hover {
+          border-color: #d0d5dd;
+          box-shadow: 0 4px 10px rgba(16, 24, 40, 0.08);
+          transform: translateY(-1px);
+        }
+
         .stat-icon {
-          font-size: 15px;
-          display: inline-flex;
+          display: flex;
+          grid-column: 1;
+          grid-row: 1 / span 2;
           align-items: center;
           justify-content: center;
+          width: 44px;
+          height: 44px;
+          border-radius: 8px;
+          font-size: 19px;
 
           &.primary {
+            background: rgba(165, 28, 48, 0.08);
             color: @primary-color;
           }
           &.blue {
+            background: #eff8ff;
             color: #175cd3;
           }
           &.green {
+            background: #ecfdf3;
             color: #027a48;
           }
           &.purple {
+            background: #f4ebff;
             color: #6941c6;
           }
         }
 
         .stat-label {
-          font-size: 12.5px;
+          grid-column: 2;
+          grid-row: 1;
+          align-self: end;
+          font-size: 13px;
           color: #475467;
           font-weight: 500;
         }
 
         .stat-value {
-          font-size: 13.5px;
+          grid-column: 2;
+          grid-row: 2;
+          align-self: start;
+          margin-top: 1px;
+          font-size: 22px;
           font-weight: 700;
           color: #101828;
+          line-height: 28px;
         }
       }
     }
@@ -151,6 +179,50 @@
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+
+      .tech-dict-more-actions-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-color: #d0d5dd;
+        border-radius: 6px;
+        color: #344054;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+        font-size: 18px;
+
+        &:hover,
+        &:focus {
+          border-color: @primary-color;
+          color: @primary-color;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 1199px) {
+  .tech-dict-page-container {
+    .tech-dict-page-header .tech-dict-stats-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .tech-dict-page-container {
+    .tech-dict-page-header {
+      .tech-dict-title-row {
+        padding: 0;
+      }
+
+      .tech-dict-stats-strip {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 16px;
+      }
     }
   }
 }

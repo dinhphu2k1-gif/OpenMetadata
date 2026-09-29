@@ -71,6 +71,7 @@ import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
+import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
@@ -112,6 +113,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     super.initialize(config);
     DataDictionaryBootstrap.initialize();
     DataQualityBootstrap.initialize();
+    TechnicalDictionaryBootstrap.initialize();
     versioningService.processPendingOutbox();
   }
 
