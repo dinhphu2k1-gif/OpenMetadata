@@ -1,0 +1,31 @@
+{
+  "createClassification": {
+    "name": "FieldGenerationType",
+    "displayName": "Loại trường dữ liệu trong hệ thống",
+    "description": "Cơ chế phát sinh giá trị của trường kỹ thuật.",
+    "provider": "system",
+    "mutuallyExclusive": "true"
+  },
+  "createTags": [
+    {
+      "name": "SystemGenerated",
+      "displayName": "Hệ thống tự sinh",
+      "description": "Dữ liệu do hệ thống tự sinh."
+    },
+    {
+      "name": "SystemDerived",
+      "displayName": "Hệ thống tính toán",
+      "description": "Dữ liệu do hệ thống tính toán theo công thức."
+    },
+    {
+      "name": "ManualInput",
+      "displayName": "Nhập thủ công",
+      "description": "Dữ liệu do người dùng nhập tay."
+    },
+    {
+      "name": "FileUpload",
+      "displayName": "Tải lên",
+      "description": "Dữ liệu nhập qua file đính kèm hoặc tải lên."
+    }
+  ]
+}

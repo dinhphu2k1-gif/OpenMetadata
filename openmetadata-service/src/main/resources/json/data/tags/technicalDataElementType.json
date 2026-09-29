@@ -1,0 +1,21 @@
+{
+  "createClassification": {
+    "name": "DataElementType",
+    "displayName": "Loại thành tố dữ liệu",
+    "description": "Phân loại dữ liệu nguyên tố hoặc dữ liệu chuyển đổi của trường kỹ thuật.",
+    "provider": "system",
+    "mutuallyExclusive": "true"
+  },
+  "createTags": [
+    {
+      "name": "AtomicDataElement",
+      "displayName": "Dữ liệu nguyên tố",
+      "description": "Dữ liệu gốc, không qua tính toán phức tạp."
+    },
+    {
+      "name": "TransformedDataElement",
+      "displayName": "Dữ liệu chuyển đổi",
+      "description": "Dữ liệu được tổng hợp, tính toán hoặc làm giàu."
+    }
+  ]
+}

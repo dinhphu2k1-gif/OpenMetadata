@@ -16,6 +16,7 @@ import org.openmetadata.schema.type.ProviderType;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryProperties;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.util.FullyQualifiedName;
@@ -28,6 +29,7 @@ public final class TechnicalDictionaryBootstrap {
   private TechnicalDictionaryBootstrap() {}
 
   public static void initialize() {
+    TechnicalDictionaryProperties.ensureRegistered();
     Entity.getJdbi()
         .useTransaction(
             handle -> {
