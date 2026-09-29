@@ -71,8 +71,8 @@ import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
-import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -332,9 +332,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             working ->
                 GlossaryAuthorizationResolver.requireReview(
                     capabilitiesForWorking(securityContext, working)));
-    if (DataDictionaryResolver.isDataDictionary(glossary)) {
-      TechnicalDictionaryBootstrap.ensureInitialScope(published.snapshotId(), actor);
-    }
     return GlossaryVersionResponses.published(published);
   }
 
@@ -364,12 +361,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    Glossary glossary = getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
     GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord snapshot =
-        versioningService.getPublished(
-            GlossaryVersioningService.GLOSSARY, id, businessVersion);
+        versioningService.getPublished(GlossaryVersioningService.GLOSSARY, id, businessVersion);
     Map<String, Object> response = GlossaryVersionResponses.published(snapshot);
     int termCount = versioningService.listPublishedGlossaryTerms(id, businessVersion).size();
     if (snapshot.archivedAt() == null
@@ -393,12 +388,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    Glossary glossary = getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
     GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord glossarySnapshot =
-        versioningService.getPublished(
-            GlossaryVersioningService.GLOSSARY, id, businessVersion);
+        versioningService.getPublished(GlossaryVersioningService.GLOSSARY, id, businessVersion);
     List<Map<String, Object>> terms =
         new java.util.ArrayList<>(
             versioningService.listPublishedGlossaryTerms(id, businessVersion).stream()

@@ -99,61 +99,28 @@ CREATE TABLE IF NOT EXISTS `glossary_snapshot_outbox` (
   KEY `idx_glossary_outbox_pending` (`processedAt`, `createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Governed Technical Dictionary scope and physical-column identity bindings.
-CREATE TABLE IF NOT EXISTS `technical_dictionary_scope` (
-  `scopeId` varchar(36) NOT NULL,
+-- Technical Dictionary bootstrap jobs. Records use the shared governed working/snapshot stores.
+DROP TABLE IF EXISTS `technical_projection_outbox`;
+DROP TABLE IF EXISTS `technical_record_column_binding`;
+DROP TABLE IF EXISTS `technical_dictionary_scope`;
+
+CREATE TABLE IF NOT EXISTS `technical_bootstrap_job` (
+  `jobId` varchar(36) NOT NULL,
   `technicalGlossaryId` varchar(36) NOT NULL,
-  `technicalVersionId` varchar(36) NOT NULL,
-  `technicalBusinessVersion` varchar(64) NOT NULL,
-  `dataDictionaryGlossaryId` varchar(36) NOT NULL,
-  `dataDictionaryVersionId` varchar(36) NOT NULL,
-  `dataDictionaryBusinessVersion` varchar(64) NOT NULL,
-  `scopeStatus` varchar(32) NOT NULL,
-  `revision` bigint unsigned NOT NULL DEFAULT 1,
-  `totalColumns` bigint unsigned NOT NULL DEFAULT 0,
-  `processedColumns` bigint unsigned NOT NULL DEFAULT 0,
-  `failedColumns` bigint unsigned NOT NULL DEFAULT 0,
+  `parentBusinessVersion` varchar(64) NOT NULL,
+  `status` varchar(32) NOT NULL,
+  `columnScopeSnapshot` json NOT NULL,
+  `total` bigint unsigned NOT NULL DEFAULT 0,
+  `processed` bigint unsigned NOT NULL DEFAULT 0,
+  `created` bigint unsigned NOT NULL DEFAULT 0,
+  `skipped` bigint unsigned NOT NULL DEFAULT 0,
+  `failed` bigint unsigned NOT NULL DEFAULT 0,
+  `checkpoint` varchar(36) DEFAULT NULL,
+  `errorSummary` json DEFAULT NULL,
   `createdAt` bigint unsigned NOT NULL,
   `createdBy` varchar(256) NOT NULL,
   `updatedAt` bigint unsigned NOT NULL,
   `updatedBy` varchar(256) NOT NULL,
-  `archivedAt` bigint unsigned DEFAULT NULL,
-  `archivedBy` varchar(256) DEFAULT NULL,
-  PRIMARY KEY (`scopeId`),
-  UNIQUE KEY `uq_technical_scope_source_version` (`technicalVersionId`),
-  UNIQUE KEY `uq_technical_scope_target_version` (`dataDictionaryVersionId`),
-  UNIQUE KEY `uq_technical_scope_business_version` (`technicalGlossaryId`, `technicalBusinessVersion`),
-  KEY `idx_technical_scope_status` (`technicalGlossaryId`, `scopeStatus`, `technicalBusinessVersion`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS `technical_record_column_binding` (
-  `scopeId` varchar(36) NOT NULL,
-  `recordId` varchar(36) NOT NULL,
-  `columnId` varchar(36) NOT NULL,
-  `columnFqnSnapshot` text NOT NULL,
-  `sourceAvailable` tinyint(1) NOT NULL DEFAULT 1,
-  `createdAt` bigint unsigned NOT NULL,
-  `createdBy` varchar(256) NOT NULL,
-  `updatedAt` bigint unsigned NOT NULL,
-  `updatedBy` varchar(256) NOT NULL,
-  PRIMARY KEY (`scopeId`, `columnId`),
-  UNIQUE KEY `uq_technical_record_scope` (`scopeId`, `recordId`),
-  KEY `idx_technical_record_column` (`columnId`, `scopeId`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE IF NOT EXISTS `technical_projection_outbox` (
-  `eventId` varchar(36) NOT NULL,
-  `snapshotId` varchar(36) NOT NULL,
-  `scopeId` varchar(36) NOT NULL,
-  `recordId` varchar(36) NOT NULL,
-  `columnId` varchar(36) NOT NULL,
-  `eventType` varchar(64) NOT NULL,
-  `payload` json NOT NULL,
-  `createdAt` bigint unsigned NOT NULL,
-  `processedAt` bigint unsigned DEFAULT NULL,
-  `attempts` int unsigned NOT NULL DEFAULT 0,
-  `lastError` text,
-  PRIMARY KEY (`eventId`),
-  UNIQUE KEY `uq_technical_projection_event` (`snapshotId`, `eventType`),
-  KEY `idx_technical_projection_pending` (`processedAt`, `createdAt`)
+  PRIMARY KEY (`jobId`),
+  UNIQUE KEY `uq_technical_bootstrap_scope` (`technicalGlossaryId`, `parentBusinessVersion`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -18,7 +18,6 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
-import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
 
 /** Creates the system-owned Technical Dictionary governed glossary on a clean environment. */
@@ -62,7 +61,8 @@ public final class TechnicalDictionaryBootstrap {
                       .withTermRevisions(new ArrayList<>());
               collectionDAO.glossaryDAO().insert(glossary, glossary.getFullyQualifiedName());
 
-              Glossary payload = JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
+              Glossary payload =
+                  JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
               payload.withBusinessVersion(INITIAL_VERSION).withWorkingRevision(null);
               versionDAO.insertWorking(
                   UUID.randomUUID(),
@@ -76,63 +76,11 @@ public final class TechnicalDictionaryBootstrap {
                   now,
                   ADMIN_USER_NAME);
             });
-    ensureInitialScopeFromLatestDataDictionaryVersion();
-  }
-
-  /** Creates the first private catalog binding and starts bootstrap on a clean environment. */
-  public static synchronized void ensureInitialScope(
-      UUID dataDictionaryVersionId, String actor) {
-    TechnicalDictionaryService service = new TechnicalDictionaryService();
-    java.util.List<org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.ScopeRecord> bindings =
-        service.listScopes();
-    if (!bindings.isEmpty()) {
-      org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.ScopeRecord current = bindings.get(0);
-      if ("Building".equals(current.scopeStatus())) {
-        org.openmetadata.service.util.AsyncService.getInstance()
-            .execute(() -> service.bootstrap(current.scopeId(), actor));
-      } else {
-        org.openmetadata.service.util.AsyncService.getInstance()
-            .execute(() -> service.reconcile(current.scopeId(), actor));
-      }
-      return;
-    }
-    try {
-      service.createScope(dataDictionaryVersionId, actor);
-    } catch (jakarta.ws.rs.WebApplicationException exception) {
-      // Concurrent startup/cutover can race after the empty check. The database uniqueness
-      // constraint is authoritative; an existing scope means bootstrap already succeeded.
-      if (service.listScopes().isEmpty()) {
-        throw exception;
-      }
-    }
-  }
-
-  private static void ensureInitialScopeFromLatestDataDictionaryVersion() {
-    CollectionDAO collectionDAO = Entity.getJdbi().onDemand(CollectionDAO.class);
-    Glossary dataDictionary;
-    try {
-      dataDictionary =
-          collectionDAO
-              .glossaryDAO()
-              .findEntityByName(
-                  FullyQualifiedName.quoteName(DataDictionaryResolver.DATA_DICTIONARY_NAME),
-                  Include.ALL);
-    } catch (EntityNotFoundException ignored) {
-      return;
-    }
-    PublishedSnapshotRecord published =
-        Entity.getJdbi()
-            .onDemand(GlossaryVersionDAO.class)
-            .findLatestPublished("glossary", dataDictionary.getId());
-    if (published != null && published.archivedAt() == null) {
-      ensureInitialScope(published.snapshotId(), ADMIN_USER_NAME);
-    }
   }
 
   private static Glossary findIdentity(CollectionDAO dao) {
     try {
-      String name =
-          GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY.glossaryName();
+      String name = GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY.glossaryName();
       return dao.glossaryDAO().findEntityByName(FullyQualifiedName.quoteName(name), Include.ALL);
     } catch (EntityNotFoundException ignored) {
       return null;
