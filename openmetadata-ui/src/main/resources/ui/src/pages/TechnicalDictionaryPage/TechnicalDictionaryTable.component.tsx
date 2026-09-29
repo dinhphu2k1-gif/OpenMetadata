@@ -10,707 +10,554 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 import {
   CheckOutlined,
   CloseOutlined,
+  EyeOutlined,
   PlusOutlined,
   RollbackOutlined,
   SendOutlined,
 } from '@ant-design/icons';
-import { Button, Tooltip } from 'antd';
+import { Button, Tag, Tooltip } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
-import { EntityTabs, EntityType } from '../../enums/entity.enum';
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ReactComponent as EditIcon } from '../../assets/svg/edit-new.svg';
-import { TagLabel } from '../../generated/type/tagLabel';
-import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
-import {
-  NO_DATA_PLACEHOLDER,
-  PAGE_SIZE_BASE,
-  PAGE_SIZE_LARGE,
-  PAGE_SIZE_MEDIUM,
-} from '../../constants/constants';
-import {
-  TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS,
-  TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS,
-  TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS,
-  TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY,
-} from '../../constants/TechnicalDictionary.constants';
-import { getEntityDetailsPath, getGlossaryPath } from '../../utils/RouterUtils';
-import {
-  NextPreviousProps,
-  PagingHandlerParams,
-} from '../../components/common/NextPrevious/NextPrevious.interface';
-import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
-import { renderCDEReleaseVersionType } from '../../components/Glossary/GlossaryTermTab/CDEGlossaryTableColumns';
+import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import Table from '../../components/common/Table/Table';
-import { usePaging } from '../../hooks/paging/usePaging';
 import {
-  renderDictionaryOwnerList,
   renderDictionaryMarkdown,
+  renderDictionaryOwnerList,
   renderDictionaryPastelTag,
   renderDictionaryStatusBadge,
 } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
+import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
+import { renderCDEReleaseVersionType } from '../../components/Glossary/GlossaryTermTab/CDEGlossaryTableColumns';
+import { NO_DATA_PLACEHOLDER } from '../../constants/constants';
+import {
+  TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY,
+  TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS,
+  TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS,
+  TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS as KEYS,
+  TECHNICAL_PAGE_SIZE_OPTIONS,
+} from '../../constants/TechnicalDictionary.constants';
+import { EntityTabs, EntityType } from '../../enums/entity.enum';
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
+import { getEntityDetailsPath } from '../../utils/RouterUtils';
+import {
+  TechnicalCatalogState,
+  TechnicalDictionaryCapabilities,
+  TechnicalDictionaryRow,
+} from './technicalDictionary.interface';
+import {
+  getTagLabel,
+  isEditableRow,
+  isSourceUnavailable,
+} from './TechnicalDictionaryRows';
 
-export interface TechnicalFieldItem {
-  id: string;
-  parentBusinessVersion?: string;
-  catalogStatus?: EntityStatus;
-  historical?: boolean;
-  businessVersion?: string;
-  releaseVersionType?: string;
-  workingRevision?: number;
-  databaseName?: string;
-  databaseDisplayName?: string;
-  databaseFqn?: string;
-  schemaName?: string;
-  schemaDisplayName?: string;
-  schemaFqn?: string;
-  tableId?: string;
-  tableName: string;
-  tableDisplayName?: string;
-  tableFqn: string;
-  columnName: string;
-  columnDisplayName?: string;
-  columnFqn?: string;
-  status?: EntityStatus;
-  serviceName: string;
-  cdeCode?: string;
-  cdeName?: string;
-  cdeFqn?: string;
-  cdeTermId?: string;
-  cdeSnapshotId?: string;
-  cdeBusinessVersion?: string;
-  cdeParentBusinessVersion?: string;
-  dataDictionaryVersionId?: string;
-  dataType: string;
-  dataTypeDisplay: string;
-  dataLength?: number;
-  scale?: number;
-  precision?: number;
-  elementType?: string;
-  elementTypeName?: string;
-  generationType?: string;
-  generationTypeName?: string;
-  creationMethod?: string;
-  creationMethodName?: string;
-  timeliness?: string;
-  systemOwner?: string;
-  survivorshipRank?: number;
-  survivorshipNote?: string;
-  description?: string;
-  tags?: TagLabel[];
-}
-
-interface TechnicalDictionaryTableProps {
-  data: TechnicalFieldItem[];
+export interface TechnicalDictionaryTableProps {
+  rows: TechnicalDictionaryRow[];
   isLoading: boolean;
-  canEdit?: boolean;
-  canApprove?: boolean;
-  canReject?: boolean;
-  canRevoke?: boolean;
-  canSubmit?: boolean;
-  canReopen?: boolean;
-  canCreateVersion?: boolean;
-  showActions?: boolean;
+  total: number;
+  page: number;
+  pageSize: number;
+  capabilities: TechnicalDictionaryCapabilities;
+  catalog?: TechnicalCatalogState;
+  selectedKeys: string[];
   extraTableFilters?: React.ReactNode;
-  extraTableFiltersClassName?: string;
-  customPaginationProps?: NextPreviousProps & {
-    showPagination: boolean;
-  };
-  onRefresh?: () => void;
-  onEdit?: (item: TechnicalFieldItem) => void;
-  onApprove?: (item: TechnicalFieldItem) => void;
-  onReject?: (item: TechnicalFieldItem) => void;
-  onRevoke?: (item: TechnicalFieldItem) => void;
-  onSubmit?: (item: TechnicalFieldItem) => void;
-  onReopen?: (item: TechnicalFieldItem) => void;
-  onCreateVersion?: (item: TechnicalFieldItem) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  onSelectionChange: (keys: string[]) => void;
+  onView: (row: TechnicalDictionaryRow) => void;
+  onEdit: (row: TechnicalDictionaryRow) => void;
+  onSubmit: (row: TechnicalDictionaryRow) => void;
+  onApprove: (row: TechnicalDictionaryRow) => void;
+  onReject: (row: TechnicalDictionaryRow) => void;
+  onReopen: (row: TechnicalDictionaryRow) => void;
+  onCreateVersion: (row: TechnicalDictionaryRow) => void;
 }
 
-export const TechnicalDictionaryTable: React.FC<
-  TechnicalDictionaryTableProps
-> = ({
-  data,
+const Placeholder = () => (
+  <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
+);
+
+const TAG_VARIANTS = {
+  elementType: 'method',
+  generationType: 'quality',
+  creationMethod: 'source',
+  timeliness: 'frequency',
+} as const;
+
+const TechnicalDictionaryTable = ({
+  rows,
   isLoading,
-  canEdit = true,
-  canApprove = true,
-  canReject = true,
-  canRevoke = true,
-  canSubmit = true,
-  canReopen = true,
-  canCreateVersion = true,
-  showActions = true,
+  total,
+  page,
+  pageSize,
+  capabilities,
+  catalog,
+  selectedKeys,
   extraTableFilters,
-  extraTableFiltersClassName,
-  customPaginationProps: externalPaginationProps,
+  onPageChange,
+  onPageSizeChange,
+  onSelectionChange,
+  onView,
   onEdit,
+  onSubmit,
   onApprove,
   onReject,
-  onRevoke,
-  onSubmit,
   onReopen,
   onCreateVersion,
-}) => {
+}: TechnicalDictionaryTableProps) => {
   const { t } = useTranslation();
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isReadOnly = catalog?.isReadOnly ?? true;
 
-  const {
-    currentPage,
-    pageSize,
-    showPagination,
-    paging,
-    handlePagingChange,
-    handlePageChange,
-    handlePageSizeChange,
-  } = usePaging(PAGE_SIZE_BASE);
-
-  useEffect(() => {
-    if (!externalPaginationProps) {
-      handlePagingChange({ total: data.length });
-      const maxPage = Math.max(1, Math.ceil(data.length / pageSize));
-      if (currentPage > maxPage) {
-        handlePageChange(maxPage, { cursorType: null, cursorValue: undefined });
-      }
-    }
-  }, [externalPaginationProps, data.length, pageSize]);
-
-  const paginatedData = useMemo(() => {
-    if (externalPaginationProps) {
-      return data;
-    }
-    const start = (currentPage - 1) * pageSize;
-
-    return data.slice(start, start + pageSize);
-  }, [externalPaginationProps, data, currentPage, pageSize]);
-
-  const handlePaginationChange = useCallback(
-    ({ currentPage: page }: PagingHandlerParams) => {
-      handlePageChange(page, { cursorType: null, cursorValue: undefined });
-    },
-    [handlePageChange]
+  const renderTag = useCallback(
+    (
+      tag: TechnicalDictionaryRow['elementType'],
+      variant: (typeof TAG_VARIANTS)[keyof typeof TAG_VARIANTS]
+    ) =>
+      tag ? (
+        renderDictionaryPastelTag(getTagLabel(tag), variant)
+      ) : (
+        <Placeholder />
+      ),
+    []
   );
 
-  const localPaginationProps = useMemo(
-    () => ({
-      currentPage,
-      showPagination,
-      isNumberBased: true,
-      isLoading,
-      pageSize,
-      paging,
-      pagingHandler: handlePaginationChange,
-      onShowSizeChange: handlePageSizeChange,
-      pageSizeOptions: [PAGE_SIZE_BASE, PAGE_SIZE_MEDIUM, PAGE_SIZE_LARGE],
-    }),
+  const renderLink = useCallback(
+    (
+      name: string,
+      fqn: string | undefined,
+      type: EntityType,
+      tab?: EntityTabs
+    ) =>
+      !name ? (
+        <Placeholder />
+      ) : fqn ? (
+        <Link
+          className="tech-entity-link"
+          title={name}
+          to={getEntityDetailsPath(type, fqn, tab)}>
+          {name}
+        </Link>
+      ) : (
+        <span className="tech-text-muted" title={name}>
+          {name}
+        </span>
+      ),
+    []
+  );
+
+  const renderActions = useCallback(
+    (row: TechnicalDictionaryRow) => {
+      const unavailable = isSourceUnavailable(row);
+      const isWorking = row.recordType === 'working';
+      const canWrite = !isReadOnly && isWorking;
+
+      return (
+        <div className="d-flex items-center gap-2">
+          <Tooltip title={t('label.view')}>
+            <Button
+              aria-label={t('label.view')}
+              data-testid={`view-btn-${row.columnName}`}
+              icon={<EyeOutlined />}
+              size="small"
+              type="text"
+              onClick={() => onView(row)}
+            />
+          </Tooltip>
+          {capabilities.canEditWorking && isEditableRow(row) && !isReadOnly && (
+            <Tooltip title={t('label.edit')}>
+              <Button
+                aria-label={t('label.edit')}
+                data-testid={`edit-btn-${row.columnName}`}
+                icon={<EditIcon height={14} width={14} />}
+                size="small"
+                type="text"
+                onClick={() => onEdit(row)}
+              />
+            </Tooltip>
+          )}
+          {capabilities.canSubmit &&
+            canWrite &&
+            row.status === 'Draft' &&
+            !unavailable && (
+              <Tooltip title={t('label.submit-for-review')}>
+                <Button
+                  aria-label={t('label.submit-for-review')}
+                  data-testid={`submit-btn-${row.columnName}`}
+                  icon={<SendOutlined />}
+                  size="small"
+                  type="text"
+                  onClick={() => onSubmit(row)}
+                />
+              </Tooltip>
+            )}
+          {capabilities.canApprove &&
+            canWrite &&
+            row.status === 'In Review' &&
+            !unavailable && (
+              <Tooltip title={t('label.approve')}>
+                <Button
+                  aria-label={t('label.approve')}
+                  className="text-success"
+                  data-testid={`approve-btn-${row.columnName}`}
+                  icon={<CheckOutlined />}
+                  size="small"
+                  type="text"
+                  onClick={() => onApprove(row)}
+                />
+              </Tooltip>
+            )}
+          {capabilities.canReject && canWrite && row.status === 'In Review' && (
+            <Tooltip title={t('label.reject')}>
+              <Button
+                aria-label={t('label.reject')}
+                className="text-danger"
+                data-testid={`reject-btn-${row.columnName}`}
+                icon={<CloseOutlined />}
+                size="small"
+                type="text"
+                onClick={() => onReject(row)}
+              />
+            </Tooltip>
+          )}
+          {capabilities.canEditWorking &&
+            canWrite &&
+            row.status === 'Rejected' && (
+              <Tooltip title={t('label.reopen')}>
+                <Button
+                  aria-label={t('label.reopen')}
+                  icon={<RollbackOutlined />}
+                  size="small"
+                  type="text"
+                  onClick={() => onReopen(row)}
+                />
+              </Tooltip>
+            )}
+          {capabilities.canCreateVersion &&
+            !isReadOnly &&
+            row.recordType === 'published' &&
+            row.status === 'Approved' && (
+              <Tooltip title={t('label.create-new-version')}>
+                <Button
+                  aria-label={t('label.create-new-version')}
+                  data-testid={`create-version-btn-${row.columnName}`}
+                  icon={<PlusOutlined />}
+                  size="small"
+                  type="text"
+                  onClick={() => onCreateVersion(row)}
+                />
+              </Tooltip>
+            )}
+        </div>
+      );
+    },
     [
-      currentPage,
-      showPagination,
-      isLoading,
-      pageSize,
-      paging,
-      handlePaginationChange,
-      handlePageSizeChange,
+      capabilities,
+      isReadOnly,
+      onApprove,
+      onCreateVersion,
+      onEdit,
+      onReject,
+      onReopen,
+      onSubmit,
+      onView,
+      t,
     ]
   );
 
-  const activePaginationProps = externalPaginationProps || localPaginationProps;
-
-  const columns: ColumnsType<TechnicalFieldItem> = useMemo(() => {
-    const baseColumns: ColumnsType<TechnicalFieldItem> = [
+  const columns: ColumnsType<TechnicalDictionaryRow> = useMemo(
+    () => [
       {
-        title: t('label.database-name', { defaultValue: 'Tên cơ sở dữ liệu' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
+        title: t('label.database-name'),
+        dataIndex: KEYS.DATABASE_NAME,
+        key: KEYS.DATABASE_NAME,
         fixed: 'left',
         width: 150,
-        render: (_, record) => {
-          if (!record.databaseName) {
-            return (
-              <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
-            );
-          }
-
-          return record.databaseFqn ? (
-            <Link
-              className="tech-entity-link"
-              title={record.databaseDisplayName || record.databaseName}
-              to={getEntityDetailsPath(
-                EntityType.DATABASE,
-                record.databaseFqn
-              )}>
-              {record.databaseDisplayName || record.databaseName}
-            </Link>
-          ) : (
-            <span
-              className="tech-text-muted"
-              title={record.databaseDisplayName || record.databaseName}>
-              {record.databaseDisplayName || record.databaseName}
-            </span>
-          );
-        },
+        render: (_, row) =>
+          renderLink(row.databaseName, row.databaseFqn, EntityType.DATABASE),
       },
       {
-        title: t('label.schema-name', { defaultValue: 'Schema Name' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
+        title: t('label.schema-name'),
+        dataIndex: KEYS.SCHEMA_NAME,
+        key: KEYS.SCHEMA_NAME,
         fixed: 'left',
         width: 130,
-        render: (_, record) => {
-          if (!record.schemaName) {
-            return (
-              <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
-            );
-          }
-
-          return record.schemaFqn ? (
-            <Link
-              className="tech-entity-link"
-              title={record.schemaDisplayName || record.schemaName}
-              to={getEntityDetailsPath(
-                EntityType.DATABASE_SCHEMA,
-                record.schemaFqn
-              )}>
-              {record.schemaDisplayName || record.schemaName}
-            </Link>
-          ) : (
-            <span
-              className="tech-text-muted"
-              title={record.schemaDisplayName || record.schemaName}>
-              {record.schemaDisplayName || record.schemaName}
-            </span>
-          );
-        },
+        render: (_, row) =>
+          renderLink(row.schemaName, row.schemaFqn, EntityType.DATABASE_SCHEMA),
       },
       {
-        title: t('label.table-name', { defaultValue: 'Tên Bảng' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
+        title: t('label.table-name'),
+        dataIndex: KEYS.TABLE_NAME,
+        key: KEYS.TABLE_NAME,
         fixed: 'left',
         width: 190,
-        render: (_, record) => (
-          <Link
-            className="tech-entity-link"
-            title={record.tableName}
-            to={getEntityDetailsPath(
-              EntityType.TABLE,
-              record.tableFqn,
-              EntityTabs.SCHEMA
-            )}>
-            {record.tableName}
-          </Link>
-        ),
+        render: (_, row) =>
+          renderLink(
+            row.tableName,
+            row.tableFqn,
+            EntityType.TABLE,
+            EntityTabs.SCHEMA
+          ),
       },
       {
-        title: t('label.column-name', { defaultValue: 'Tên cột' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
+        title: t('label.column-name'),
+        dataIndex: KEYS.COLUMN_NAME,
+        key: KEYS.COLUMN_NAME,
         fixed: 'left',
         width: 160,
-        render: (_, record) => (
-          <span className="tech-column-name" title={record.columnName}>
-            {record.columnName}
+        render: (_, row) => (
+          <span className="tech-column-name" title={row.columnName}>
+            {row.columnName}
           </span>
         ),
       },
       {
-        title: t('label.data-owner', { defaultValue: 'Chủ sở hữu dữ liệu' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SYSTEM_OWNER,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SYSTEM_OWNER,
+        title: t('label.data-owner'),
+        dataIndex: KEYS.DATA_OWNER,
+        key: KEYS.DATA_OWNER,
         width: 180,
-        render: (owner: string) =>
-          renderDictionaryOwnerList(owner, 'tech-owner'),
+        render: (_, row) =>
+          renderDictionaryOwnerList(row.dataOwners, 'tech-owner'),
       },
       {
-        title: t('label.source', { defaultValue: 'Nguồn' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SERVICE_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SERVICE_NAME,
-        width: 130,
-        render: (serviceName: string) =>
-          serviceName ? (
-            renderDictionaryPastelTag(serviceName, 'source')
-          ) : (
-            <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
-          ),
+        title: t('label.source'),
+        dataIndex: KEYS.SERVICE_NAME,
+        key: KEYS.SERVICE_NAME,
+        width: 170,
+        render: (_, row) => (
+          <>
+            {row.serviceName ? (
+              renderDictionaryPastelTag(row.serviceName, 'source')
+            ) : (
+              <Placeholder />
+            )}
+            {row.sourceStatus === 'Unavailable' && (
+              <Tag
+                color="error"
+                data-testid={`source-unavailable-${row.columnName}`}>
+                {t('label.source-unavailable')}
+              </Tag>
+            )}
+            {row.sourceStatus === 'Changed' && (
+              <Tag
+                color="warning"
+                data-testid={`source-changed-${row.columnName}`}>
+                {t('label.source-changed')}
+              </Tag>
+            )}
+          </>
+        ),
       },
       {
-        title: t('label.cde-code-ref', { defaultValue: 'Mã CDE quy chiếu' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_CODE,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_CODE,
+        title: t('label.cde-code-ref'),
+        dataIndex: KEYS.CDE_CODE,
+        key: KEYS.CDE_CODE,
         width: 150,
-        render: (_, record) =>
-          record.cdeCode && record.cdeFqn ? (
-            <Link
-              className="cde-code-link cursor-pointer"
-              data-testid={`cde-code-${record.cdeCode}`}
-              title={record.cdeName || record.cdeCode}
-              to={getGlossaryPath(record.cdeFqn)}>
-              {record.cdeCode}
-            </Link>
-          ) : record.cdeCode ? (
-            <span title={record.cdeName || record.cdeCode}>
-              {record.cdeCode}
+        render: (_, row) =>
+          row.cdeCode ? (
+            <span
+              data-testid={`cde-code-${row.cdeCode}`}
+              title={row.cdeName || row.cdeCode}>
+              {row.cdeCode}
             </span>
           ) : (
-            <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
+            <Placeholder />
           ),
       },
       {
-        title: t('label.cde-name', { defaultValue: 'Tên thành tố CDE' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_NAME,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CDE_NAME,
+        title: t('label.cde-name'),
+        dataIndex: KEYS.CDE_NAME,
+        key: KEYS.CDE_NAME,
         width: 220,
-        render: (cdeName: string) => renderDictionaryMarkdown(cdeName),
+        render: (_, row) => renderDictionaryMarkdown(row.cdeName),
       },
       {
-        title: 'Thứ hạng (Rank)',
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SURVIVORSHIP_RANK,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SURVIVORSHIP_RANK,
-        width: 170,
-        sorter: (a, b) =>
-          (a.survivorshipRank ?? 9999) - (b.survivorshipRank ?? 9999),
-        render: (_, record) => {
-          if (!record.survivorshipRank) {
-            return (
-              <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
-            );
-          }
-
-          return (
-            <SurvivorshipBadge
-              rule={{
-                assetFqn: record.columnFqn || record.id,
-                rank: record.survivorshipRank,
-                note: record.survivorshipNote,
-              }}
-            />
-          );
-        },
-      },
-      {
-        title: t('label.data-type', { defaultValue: 'Loại dữ liệu' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATA_TYPE,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATA_TYPE,
+        title: t('label.rank'),
+        dataIndex: KEYS.SURVIVORSHIP_RANK,
+        key: KEYS.SURVIVORSHIP_RANK,
         width: 130,
-        render: (_, record) => {
-          const type = record.dataTypeDisplay || record.dataType;
-          if (!type) {
-            return (
-              <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
-            );
-          }
-
-          return renderDictionaryPastelTag(type, 'classification');
-        },
-      },
-      {
-        title: t('label.data-element-type', { defaultValue: 'Loại thành tố' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ELEMENT_TYPE,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ELEMENT_TYPE,
-        width: 160,
-        render: (_, record) => {
-          const type = record.elementType || '';
-          if (!type) {
-            return NO_DATA_PLACEHOLDER;
-          }
-          const isAtomic =
-            type === 'Atomic' ||
-            type.includes('Nguyên tố') ||
-            type.includes('nguyen to');
-
-          return renderDictionaryPastelTag(
-            record.elementTypeName || type,
-            isAtomic ? 'atomic' : 'transformed'
-          );
-        },
-      },
-      {
-        title: t('label.generation-type', {
-          defaultValue: 'Loại trường dữ liệu',
-        }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.GENERATION_TYPE,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.GENERATION_TYPE,
-        width: 180,
-        render: (_, record) => {
-          const genType = record.generationType || '';
-          if (!genType) {
-            return NO_DATA_PLACEHOLDER;
-          }
-          const isSystem =
-            genType.includes('SystemGenerated') || genType.includes('Tự sinh');
-          const isDerived =
-            genType.includes('SystemDerived') || genType.includes('Tính toán');
-          const isManual =
-            genType.includes('Manual') || genType.includes('Nhập');
-          const isUpload =
-            genType.includes('Upload') || genType.includes('Tải');
-
-          let variant = 'classification';
-          if (isSystem) {
-            variant = 'quality';
-          } else if (isDerived) {
-            variant = 'source';
-          } else if (isManual) {
-            variant = 'quality';
-          } else if (isUpload) {
-            variant = 'personal';
-          }
-
-          return renderDictionaryPastelTag(
-            record.generationTypeName || genType,
-            variant
-          );
-        },
-      },
-      {
-        title: t('label.creation-method', { defaultValue: 'Phương thức tạo' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CREATION_METHOD,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.CREATION_METHOD,
-        width: 160,
-        render: (creationMethod: string, record) =>
-          record.creationMethodName || creationMethod || NO_DATA_PLACEHOLDER,
-      },
-      {
-        title: t('label.timeliness', { defaultValue: 'Thời gian' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TIMELINESS,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TIMELINESS,
-        width: 110,
-        render: (timeliness: string) =>
-          timeliness
-            ? renderDictionaryPastelTag(timeliness, 'frequency')
-            : NO_DATA_PLACEHOLDER,
-      },
-      {
-        title: t('label.description', { defaultValue: 'Mô tả' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
-        width: 240,
-        render: (description: string) => renderDictionaryMarkdown(description),
-      },
-      {
-        title: t('label.version', {
-          defaultValue: 'Phiên bản',
-        }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.VERSION,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.VERSION,
-        width: 120,
-        render: (version: string) =>
-          version ? getBusinessVersion(version) : NO_DATA_PLACEHOLDER,
-      },
-      {
-        title: t('label.release-version-type', {
-          defaultValue: 'Loại phiên bản phát hành',
-        }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
-        width: 190,
-        render: (releaseVersionType: string, record) =>
-          renderCDEReleaseVersionType(
-            releaseVersionType,
-            record.businessVersion
+        render: (_, row) =>
+          row.rank ? (
+            <SurvivorshipBadge
+              rule={{ assetFqn: row.columnFqn || row.termId, rank: row.rank }}
+            />
+          ) : (
+            <Placeholder />
           ),
       },
       {
-        title: t('label.status', { defaultValue: 'Trạng thái' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
+        title: t('label.data-type'),
+        dataIndex: KEYS.DATA_TYPE,
+        key: KEYS.DATA_TYPE,
         width: 140,
-        render: (status: EntityStatus, record) =>
-          renderDictionaryStatusBadge(
-            status || record.status,
-            `${record.columnName}-status`
+        render: (_, row) =>
+          row.dataType ? (
+            renderDictionaryPastelTag(row.dataType, 'classification')
+          ) : (
+            <Placeholder />
           ),
       },
-    ];
-
-    if (showActions) {
-      baseColumns.push({
-        title: t('label.action-plural', { defaultValue: 'Thao tác' }),
-        dataIndex: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
-        key: TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
+      {
+        title: t('label.data-element-type'),
+        dataIndex: KEYS.ELEMENT_TYPE,
+        key: KEYS.ELEMENT_TYPE,
+        width: 160,
+        render: (_, row) =>
+          renderTag(row.elementType, TAG_VARIANTS.elementType),
+      },
+      {
+        title: t('label.generation-type'),
+        dataIndex: KEYS.GENERATION_TYPE,
+        key: KEYS.GENERATION_TYPE,
+        width: 180,
+        render: (_, row) =>
+          renderTag(row.generationType, TAG_VARIANTS.generationType),
+      },
+      {
+        title: t('label.creation-method'),
+        dataIndex: KEYS.CREATION_METHOD,
+        key: KEYS.CREATION_METHOD,
+        width: 160,
+        render: (_, row) =>
+          renderTag(row.creationMethod, TAG_VARIANTS.creationMethod),
+      },
+      {
+        title: t('label.timeliness'),
+        dataIndex: KEYS.TIMELINESS,
+        key: KEYS.TIMELINESS,
+        width: 110,
+        render: (_, row) => renderTag(row.timeliness, TAG_VARIANTS.timeliness),
+      },
+      {
+        title: t('label.system-owner'),
+        dataIndex: KEYS.SYSTEM_OWNER,
+        key: KEYS.SYSTEM_OWNER,
+        width: 180,
+        render: (_, row) =>
+          row.systemOwner ? (
+            renderDictionaryOwnerList([row.systemOwner], 'tech-system-owner')
+          ) : (
+            <Placeholder />
+          ),
+      },
+      {
+        title: t('label.description'),
+        dataIndex: KEYS.DESCRIPTION,
+        key: KEYS.DESCRIPTION,
+        width: 240,
+        render: (_, row) => renderDictionaryMarkdown(row.description),
+      },
+      {
+        title: t('label.version'),
+        dataIndex: KEYS.VERSION,
+        key: KEYS.VERSION,
+        width: 110,
+        render: (_, row) => getBusinessVersion(row.businessVersion),
+      },
+      {
+        title: t('label.release-version-type'),
+        dataIndex: KEYS.RELEASE_VERSION_TYPE,
+        key: KEYS.RELEASE_VERSION_TYPE,
+        width: 190,
+        render: (_, row) =>
+          renderCDEReleaseVersionType(
+            row.releaseVersionType,
+            row.businessVersion
+          ),
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        width: 140,
+        render: (_, row) =>
+          renderDictionaryStatusBadge(
+            row.status as EntityStatus,
+            `${row.columnName}-status`
+          ),
+      },
+      {
+        title: t('label.action-plural'),
+        dataIndex: KEYS.ACTIONS,
+        key: KEYS.ACTIONS,
         fixed: 'right',
-        width: 96,
-        render: (_, record) => {
-          const currentStatus = record.status || EntityStatus.Draft;
-          const isInReview = currentStatus === EntityStatus.InReview;
-          const isApproved = currentStatus === EntityStatus.Approved;
-          const isDraft = currentStatus === EntityStatus.Draft;
-          const isRejected = currentStatus === EntityStatus.Rejected;
-          const isReadOnlyCatalog =
-            record.historical || record.catalogStatus === EntityStatus.Archived;
+        width: 150,
+        render: (_, row) => renderActions(row),
+      },
+    ],
+    [renderActions, renderLink, renderTag, t]
+  );
 
-          return (
-            <div className="d-flex items-center gap-2">
-              {canEdit && isDraft && !isReadOnlyCatalog && (
-                <Tooltip title={t('label.edit', { defaultValue: 'Sửa' })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0"
-                    data-testid={`edit-btn-${record.columnName}`}
-                    icon={<EditIcon height={14} width={14} />}
-                    size="small"
-                    type="text"
-                    onClick={() => onEdit?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canSubmit && isDraft && !isReadOnlyCatalog && (
-                <Tooltip
-                  title={t('label.submit-for-review', {
-                    defaultValue: 'Gửi duyệt',
-                  })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0"
-                    icon={<SendOutlined />}
-                    size="small"
-                    type="text"
-                    onClick={() => onSubmit?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canApprove && isInReview && (
-                <Tooltip
-                  title={t('label.approve', { defaultValue: 'Phê duyệt' })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0 text-success"
-                    data-testid={`approve-btn-${record.columnName}`}
-                    icon={<CheckOutlined height={14} width={14} />}
-                    size="small"
-                    type="text"
-                    onClick={() => onApprove?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canReject && isInReview && (
-                <Tooltip title={t('label.reject', { defaultValue: 'Từ chối' })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0 text-danger"
-                    data-testid={`reject-btn-${record.columnName}`}
-                    icon={<CloseOutlined height={14} width={14} />}
-                    size="small"
-                    type="text"
-                    onClick={() => onReject?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canRevoke && isApproved && (
-                <Tooltip
-                  title={t('label.revoke-approval', {
-                    defaultValue: 'Thu hồi phê duyệt',
-                  })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0 text-warning"
-                    data-testid={`revoke-btn-${record.columnName}`}
-                    icon={<RollbackOutlined height={14} width={14} />}
-                    size="small"
-                    type="text"
-                    onClick={() => onRevoke?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canReopen && isRejected && !isReadOnlyCatalog && (
-                <Tooltip title={t('label.reopen', { defaultValue: 'Mở lại' })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0"
-                    icon={<RollbackOutlined />}
-                    size="small"
-                    type="text"
-                    onClick={() => onReopen?.(record)}
-                  />
-                </Tooltip>
-              )}
-              {canCreateVersion && isApproved && !isReadOnlyScope && (
-                <Tooltip
-                  title={t('label.create-new-version', {
-                    defaultValue: 'Tạo phiên bản mới',
-                  })}>
-                  <Button
-                    className="d-flex items-center justify-center p-0"
-                    icon={<PlusOutlined />}
-                    size="small"
-                    type="text"
-                    onClick={() => onCreateVersion?.(record)}
-                  />
-                </Tooltip>
-              )}
-            </div>
-          );
-        },
-      });
-    }
+  const paginationProps = useMemo(
+    () => ({
+      currentPage: page,
+      showPagination: total > 0,
+      isNumberBased: true,
+      isLoading,
+      pageSize,
+      paging: { total },
+      pagingHandler: ({ currentPage }: PagingHandlerParams) =>
+        onPageChange(currentPage),
+      onShowSizeChange: onPageSizeChange,
+      pageSizeOptions: TECHNICAL_PAGE_SIZE_OPTIONS,
+    }),
+    [isLoading, onPageChange, onPageSizeChange, page, pageSize, total]
+  );
 
-    return baseColumns;
-  }, [
-    t,
-    showActions,
-    canEdit,
-    onEdit,
-    canApprove,
-    onApprove,
-    canReject,
-    onReject,
-    canRevoke,
-    onRevoke,
-    canSubmit,
-    onSubmit,
-    canReopen,
-    onReopen,
-    canCreateVersion,
-    onCreateVersion,
-  ]);
-
-  // Ant Design calculates the sticky scrollbar from the table's first measured
-  // width. Columns are populated after the initial render, so request a layout
-  // recalculation as soon as rows/columns are available; otherwise the bar can
-  // remain hidden until the user scrolls the page.
+  // The sticky horizontal scrollbar is measured from the first render, before
+  // the columns exist; ask antd to measure again once rows are present.
   useLayoutEffect(() => {
-    if (!tableContainerRef.current || isLoading || paginatedData.length === 0) {
-      return;
+    if (isLoading || rows.length === 0) {
+      return undefined;
     }
-    const firstFrame = globalThis.requestAnimationFrame(() => {
-      globalThis.requestAnimationFrame(() => {
-        globalThis.dispatchEvent(new Event('resize'));
-      });
-    });
+    const frame = globalThis.requestAnimationFrame(() =>
+      globalThis.requestAnimationFrame(() =>
+        globalThis.dispatchEvent(new Event('resize'))
+      )
+    );
 
-    return () => globalThis.cancelAnimationFrame(firstFrame);
-  }, [columns, isLoading, paginatedData.length]);
+    return () => globalThis.cancelAnimationFrame(frame);
+  }, [columns, isLoading, rows.length]);
 
   return (
     <div
       className="glossary-terms-scroll-container"
-      ref={tableContainerRef}
+      ref={containerRef}
       style={{ position: 'relative' }}>
       <Table
         resizableColumns
         className="cde-glossary-terms-table glossary-terms-table"
         columns={columns}
         containerClassName="cde-glossary-table-container"
-        customPaginationProps={activePaginationProps}
+        customPaginationProps={paginationProps}
         data-testid="technical-dictionary-table"
-        dataSource={paginatedData}
+        dataSource={rows}
         defaultVisibleColumns={TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS}
-        entityType={TECHNICAL_DICTIONARY_TABLE_PREFERENCE_KEY}
+        entityType={TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY}
         extraTableFilters={extraTableFilters}
-        extraTableFiltersClassName={extraTableFiltersClassName}
+        extraTableFiltersClassName="cde-glossary-table-toolbar tech-dict-table-toolbar"
         loading={isLoading}
         pagination={false}
-        rowKey="id"
+        rowKey="key"
+        rowSelection={{
+          selectedRowKeys: selectedKeys,
+          onChange: (keys) => onSelectionChange(keys.map(String)),
+          getCheckboxProps: (row) => ({
+            disabled: row.recordType !== 'working',
+          }),
+        }}
         size="small"
         staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
         sticky={{
           offsetScroll: 0,
           getContainer: () =>
-            tableContainerRef.current?.closest<HTMLElement>(
+            containerRef.current?.closest<HTMLElement>(
               '.page-layout-v1-vertical-scroll'
             ) ?? document.body,
         }}

@@ -10,570 +10,280 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  createGlossaryTermWorkingVersion,
+  transitionGlossaryTermWorkflow,
+  updateGlossaryTermWorkingVersion,
+} from '../../rest/glossaryAPI';
+import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import TechnicalDictionaryPage from './TechnicalDictionaryPage.component';
 
-import { render, screen } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+const ROW = {
+  key: 'term-1:2.0:working',
+  termId: 'term-1',
+  businessVersion: '2.0',
+  parentBusinessVersion: '2',
+  status: 'Draft',
+  recordType: 'working',
+  workingRevision: 3,
+  columnName: 'NAME',
+  columnFqn: 'ipcas.core.dbo.CUSTOMER.NAME',
+  description: 'Tên khách hàng',
+  cdeRelation: undefined,
+} as unknown as TechnicalDictionaryRow;
 
+const mockCatalogState = {
+  glossary: { id: 'glossary-1' },
+  catalog: {
+    businessVersion: '2',
+    status: 'Draft',
+    isWorking: true,
+    isReadOnly: false,
+    workingRevision: 1,
+  },
+  versions: ['2'],
+  capabilities: {
+    canViewWorking: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canApprove: true,
+    canReject: true,
+    canCreateVersion: true,
+    canArchive: false,
+  },
+  isLoading: false,
+  error: undefined as string | undefined,
+  selectVersion: jest.fn(),
+  reload: jest.fn().mockResolvedValue(undefined),
+};
+const mockReloadRecords = jest.fn();
+
+jest.mock('../../hooks/useTechnicalDictionaryCatalog', () => ({
+  useTechnicalDictionaryCatalog: () => mockCatalogState,
+}));
+jest.mock('../../hooks/useTechnicalDictionaryOptions', () => ({
+  useTechnicalDictionaryOptions: () => ({
+    elementTypes: [],
+    generationTypes: [],
+    creationMethods: [],
+    timeliness: [],
+    teams: [{ id: 'team-1', name: 'khcl', type: 'team' }],
+    services: [],
+    isLoading: false,
+  }),
+}));
+jest.mock('../../hooks/useTechnicalDictionaryRecords', () => ({
+  useTechnicalDictionaryRecords: () => ({
+    rows: [ROW],
+    total: 1,
+    isLoading: false,
+    failed: false,
+    filters: {},
+    page: 1,
+    pageSize: 25,
+    searchText: '',
+    setSearchText: jest.fn(),
+    setFilters: jest.fn(),
+    setPage: jest.fn(),
+    setPageSize: jest.fn(),
+    reload: mockReloadRecords,
+  }),
+}));
 jest.mock('../../rest/glossaryAPI', () => ({
-  getGlossariesByName: jest.fn(),
-  getGlossaryTerms: jest.fn(),
+  createGlossaryTermWorkingVersion: jest.fn().mockResolvedValue({}),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
+  transitionGlossaryWorkflow: jest.fn().mockResolvedValue({}),
+  updateGlossaryTermWorkingVersion: jest.fn().mockResolvedValue({}),
 }));
-
-jest.mock('../../rest/tableAPI', () => ({
-  getTableList: jest.fn(),
-  getTableDetailsByFQN: jest.fn(),
-  patchTableDetails: jest.fn(),
+jest.mock('../../rest/technicalDictionaryAPI', () => ({
+  exportTechnicalDictionary: jest.fn(),
+  getTechnicalBootstrapJobs: jest.fn().mockResolvedValue([]),
+  getTechnicalStats: jest.fn().mockResolvedValue({ totalColumns: 1 }),
+  retryTechnicalBootstrapJob: jest.fn(),
 }));
-
 jest.mock('../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
+  showSuccessToast: jest.fn(),
 }));
-
-jest.mock('../../components/PageLayoutV1/PageLayoutV1', () => ({
+jest.mock('../../components/common/Loader/Loader', () => () => (
+  <div>loader</div>
+));
+jest.mock('./TechnicalDictionaryTable.component', () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(({ children }) => <div>{children}</div>),
+  default: ({
+    onSubmit,
+    onApprove,
+    onReject,
+    onReopen,
+    onEdit,
+    onCreateVersion,
+    rows,
+  }: {
+    rows: TechnicalDictionaryRow[];
+    onSubmit: (row: TechnicalDictionaryRow) => void;
+    onApprove: (row: TechnicalDictionaryRow) => void;
+    onReject: (row: TechnicalDictionaryRow) => void;
+    onReopen: (row: TechnicalDictionaryRow) => void;
+    onEdit: (row: TechnicalDictionaryRow) => void;
+    onCreateVersion: (row: TechnicalDictionaryRow) => void;
+  }) => (
+    <div data-testid="table">
+      <button onClick={() => onSubmit(rows[0])}>submit</button>
+      <button onClick={() => onApprove(rows[0])}>approve</button>
+      <button onClick={() => onReject(rows[0])}>reject</button>
+      <button onClick={() => onReopen(rows[0])}>reopen</button>
+      <button onClick={() => onEdit(rows[0])}>edit</button>
+      <button onClick={() => onCreateVersion(rows[0])}>create-version</button>
+    </div>
+  ),
 }));
-
-jest.mock('../../components/common/TitleBreadcrumb/TitleBreadcrumb.component', () => ({
+jest.mock('./TechnicalDictionaryHeader.component', () => ({
   __esModule: true,
-  default: jest.fn().mockImplementation(() => <div>TitleBreadcrumb</div>),
+  default: () => <div data-testid="header" />,
 }));
+jest.mock('./TechnicalRecordModal.component', () => ({
+  __esModule: true,
+  default: ({
+    open,
+    onSave,
+    mode,
+  }: {
+    open: boolean;
+    mode: string;
+    onSave: (values: unknown) => void;
+  }) =>
+    open ? (
+      <div data-testid={`record-modal-${mode}`}>
+        <button
+          onClick={() =>
+            onSave({
+              rank: 2,
+              systemOwnerId: 'team-1',
+              elementType: 'DataElementType.AtomicDataElement',
+            })
+          }>
+          save
+        </button>
+        <button onClick={() => onSave({ cde: null })}>clear-cde</button>
+      </div>
+    ) : null,
+}));
+jest.mock('./TechnicalBulkActionModal.component', () => () => null);
+jest.mock('./TechnicalImportModal.component', () => () => null);
+jest.mock('./TechnicalDictionaryToolbar.component', () => () => null);
+jest.mock('./TechnicalBootstrapStatus.component', () => () => null);
+jest.mock(
+  '../../components/PageLayoutV1/PageLayoutV1',
+  () =>
+    ({ children }: { children: React.ReactNode }) =>
+      <div>{children}</div>
+);
+jest.mock(
+  '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component',
+  () => () => null
+);
 
-jest.mock('../../components/common/Table/Table', () => {
-  return jest
-    .fn()
-    .mockImplementation(
-      ({ columns, dataSource, loading, extraTableFilters }) => {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { Table: AntTable } = jest.requireActual('antd');
+describe('TechnicalDictionaryPage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCatalogState.error = undefined;
+  });
 
-        return (
-          <div>
-            {extraTableFilters}
-            <AntTable
-              columns={columns}
-              dataSource={dataSource}
-              loading={loading}
-              pagination={false}
-              rowKey="id"
-            />
-          </div>
-        );
-      }
-    );
-});
+  it('shows a not-found result instead of a table when the catalog cannot be resolved', () => {
+    mockCatalogState.error = 'notFound';
 
-describe('TechnicalDictionary', () => {
-  const mockData = [
-    {
-      id: 'MIS.MISDB.ms1.AGR_USER.address',
-      databaseName: 'MISDB',
-      databaseDisplayName: 'MISDB',
-      databaseFqn: 'MIS.MISDB',
-      schemaName: 'ms1',
-      schemaDisplayName: 'ms1',
-      schemaFqn: 'MIS.MISDB.ms1',
-      tableId: 'tbl-1',
-      tableName: 'AGR_USER',
-      tableDisplayName: 'AGR_USER',
-      tableFqn: 'MIS.MISDB.ms1.AGR_USER',
-      columnName: 'address',
-      columnDisplayName: 'address',
-      columnFqn: 'MIS.MISDB.ms1.AGR_USER.address',
-      serviceName: 'MIS',
-      cdeCode: 'CDE12',
-      cdeName: 'Địa chỉ khách hàng',
-      cdeFqn: 'Data Dictionary.CDE12',
-      dataType: 'VARCHAR',
-      dataTypeDisplay: 'VARCHAR(255)',
-      dataLength: 255,
-      elementType: 'AtomicDataElement',
-      elementTypeName: 'Dữ liệu nguyên tố',
-      generationType: 'ManualInput',
-      generationTypeName: 'Nhập thủ công',
-      creationMethod: 'NotApplicable',
-      creationMethodName: 'N/A',
-      timeliness: 'T',
-      systemOwner: 'Trung tâm Quản lý dữ liệu',
-    },
-    {
-      id: 'MIS.MISDB.ms1.AGR_USER.birthday',
-      databaseName: 'MISDB',
-      databaseDisplayName: 'MISDB',
-      databaseFqn: 'MIS.MISDB',
-      schemaName: 'ms1',
-      schemaDisplayName: 'ms1',
-      schemaFqn: 'MIS.MISDB.ms1',
-      tableId: 'tbl-1',
-      tableName: 'AGR_USER',
-      tableDisplayName: 'AGR_USER',
-      tableFqn: 'MIS.MISDB.ms1.AGR_USER',
-      columnName: 'birthday',
-      columnDisplayName: 'birthday',
-      columnFqn: 'MIS.MISDB.ms1.AGR_USER.birthday',
-      serviceName: 'MIS',
-      cdeCode: 'CDE17',
-      cdeName: 'Ngày sinh',
-      cdeFqn: 'Data Dictionary.CDE17',
-      dataType: 'DATE',
-      dataTypeDisplay: 'DATE',
-      elementType: 'AtomicDataElement',
-      elementTypeName: 'Dữ liệu nguyên tố',
-      generationType: 'ManualInput',
-      generationTypeName: 'Nhập thủ công',
-      creationMethod: 'NotApplicable',
-      creationMethodName: 'N/A',
-      timeliness: 'T',
-      systemOwner: 'Trung tâm Quản lý dữ liệu',
-    },
-  ];
+    render(<TechnicalDictionaryPage isEmbedded />);
 
-  it('renders TechnicalDictionaryTable columns and data correctly', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
+    expect(
+      screen.getByText('message.technical-dictionary-not-found')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('table')).not.toBeInTheDocument();
+  });
 
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable data={mockData} isLoading={false} />
-      </MemoryRouter>
+  it('runs record workflow actions against the record scope with its working revision', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('submit'));
+    fireEvent.click(screen.getByText('approve'));
+    fireEvent.click(screen.getByText('reject'));
+    fireEvent.click(screen.getByText('reopen'));
+
+    await waitFor(() =>
+      expect(transitionGlossaryTermWorkflow).toHaveBeenCalledTimes(4)
     );
 
-    // Verify Database and Schema columns
-    expect(screen.getAllByText('MISDB').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('ms1').length).toBeGreaterThan(0);
+    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-1',
+      'submit',
+      { expectedRevision: 3 },
+      '2'
+    );
+    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
+      'term-1',
+      'approve',
+      { expectedRevision: 3 },
+      '2'
+    );
+    expect(mockReloadRecords).toHaveBeenCalled();
+  });
 
-    // Verify Table and Column names
-    expect(screen.getAllByText('AGR_USER').length).toBeGreaterThan(0);
-    expect(screen.getByText('address')).toBeInTheDocument();
-    expect(screen.getByText('birthday')).toBeInTheDocument();
+  it('creates the next minor version of a record inside the same catalog version', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
 
-    // Verify CDE codes and mapped attributes
-    expect(screen.getByText(/CDE12/)).toBeInTheDocument();
-    expect(screen.getByText(/CDE17/)).toBeInTheDocument();
-    expect(screen.getAllByText('Dữ liệu nguyên tố').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Nhập thủ công').length).toBeGreaterThan(0);
-    expect(screen.getByText('255')).toBeInTheDocument();
-    expect(screen.getByText('VARCHAR(255)')).toHaveClass('cde-value-pill-classification');
-    screen.getAllByText('Nhập thủ công').forEach((tag) => {
-      expect(tag).toHaveClass('cde-value-pill-quality');
+    fireEvent.click(screen.getByText('create-version'));
+
+    await waitFor(() =>
+      expect(createGlossaryTermWorkingVersion).toHaveBeenCalledWith(
+        'term-1',
+        '2.1',
+        '2'
+      )
+    );
+  });
+
+  it('saves only editable fields and never sends server-owned extension keys', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(await screen.findByText('save'));
+
+    await waitFor(() =>
+      expect(updateGlossaryTermWorkingVersion).toHaveBeenCalledTimes(1)
+    );
+    const [termId, revision, payload, scope] = (
+      updateGlossaryTermWorkingVersion as jest.Mock
+    ).mock.calls[0];
+
+    expect(termId).toBe('term-1');
+    expect(revision).toBe(3);
+    expect(scope).toBe('2');
+    expect(Object.keys(payload.extension).sort()).toEqual([
+      'survivorshipRank',
+      'systemOwner',
+    ]);
+    expect(payload.extension.systemOwner).toMatchObject({
+      id: 'team-1',
+      type: 'team',
     });
-    expect(screen.getAllByText('N/A')).toHaveLength(2);
-    expect(screen.queryByText('NotApplicable')).not.toBeInTheDocument();
-    expect(screen.getAllByText('T', { selector: '.cde-value-pill-frequency' })).toHaveLength(2);
-    expect(screen.getAllByText('Trung tâm Quản lý dữ liệu')).toHaveLength(2);
+    expect(payload.tags).toHaveLength(1);
+    expect(payload.tags[0].tagFQN).toBe('DataElementType.AtomicDataElement');
+    expect(payload.owners).toEqual([]);
   });
 
-  it('renders status and handles edit action by default', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
-    const mockOnEdit = jest.fn();
-    const mockOnApprove = jest.fn();
-    const mockOnReject = jest.fn();
+  it('clears the CDE relation when the user clears the selector', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
 
-    const dataWithStatus = [
-      {
-        ...mockData[0],
-        status: 'In Review',
-      },
-      {
-        ...mockData[1],
-        status: 'Approved',
-      },
-    ];
+    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(await screen.findByText('clear-cde'));
 
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable
-          data={dataWithStatus}
-          isLoading={false}
-          onApprove={mockOnApprove}
-          onEdit={mockOnEdit}
-          onReject={mockOnReject}
-        />
-      </MemoryRouter>
+    await waitFor(() =>
+      expect(updateGlossaryTermWorkingVersion).toHaveBeenCalled()
     );
 
-    // Verify status badges
-    expect(screen.getByTestId('address-status')).toBeInTheDocument();
-    expect(screen.getByTestId('birthday-status')).toBeInTheDocument();
-
-    // Keep actions visible even with previously saved column preferences.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const Table = require('../../components/common/Table/Table');
-
-    expect(Table.mock.calls[Table.mock.calls.length - 1][0]).toEqual(
-      expect.objectContaining({
-        defaultVisibleColumns: expect.arrayContaining(['actions']),
-        staticVisibleColumns: expect.arrayContaining(['actions']),
-      })
-    );
-
-    // Verify edit button is present and clickable
-    const editBtn = screen.getByTestId('edit-btn-address');
-
-    expect(editBtn).toBeInTheDocument();
-
-    editBtn.click();
-
-    expect(mockOnEdit).toHaveBeenCalledWith(dataWithStatus[0]);
-
-    // Verify approve and reject buttons are rendered for 'In Review' item
-    expect(screen.getByTestId('approve-btn-address')).toBeInTheDocument();
-    expect(screen.getByTestId('reject-btn-address')).toBeInTheDocument();
-  });
-
-  it('enforces RBAC: Data Steward can approve/reject in-review items and revoke approved items, but cannot edit', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
-    const mockOnEdit = jest.fn();
-    const mockOnApprove = jest.fn();
-    const mockOnReject = jest.fn();
-    const mockOnRevoke = jest.fn();
-
-    const dataItems = [
-      {
-        ...mockData[0],
-        columnName: 'address',
-        status: 'In Review',
-      },
-      {
-        ...mockData[1],
-        columnName: 'user_id',
-        status: 'Approved',
-      },
-    ];
-
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable
-          canApprove
-          canReject
-          canRevoke
-          canEdit={false}
-          data={dataItems}
-          isLoading={false}
-          onApprove={mockOnApprove}
-          onEdit={mockOnEdit}
-          onReject={mockOnReject}
-          onRevoke={mockOnRevoke}
-        />
-      </MemoryRouter>
-    );
-
-    // Data Steward: Edit button must NOT be rendered
-    expect(screen.queryByTestId('edit-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('edit-btn-user_id')).not.toBeInTheDocument();
-
-    // Data Steward: Approve & Reject buttons MUST be rendered for in-review item
-    expect(screen.getByTestId('approve-btn-address')).toBeInTheDocument();
-    expect(screen.getByTestId('reject-btn-address')).toBeInTheDocument();
-
-    // Data Steward: Revoke button MUST be rendered for approved item
-    expect(screen.getByTestId('revoke-btn-user_id')).toBeInTheDocument();
-  });
-
-  it('enforces RBAC: Data Proposer can edit but cannot approve/reject or revoke', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
-    const mockOnEdit = jest.fn();
-    const mockOnApprove = jest.fn();
-    const mockOnReject = jest.fn();
-    const mockOnRevoke = jest.fn();
-
-    const dataItems = [
-      {
-        ...mockData[0],
-        columnName: 'address',
-        status: 'In Review',
-      },
-      {
-        ...mockData[1],
-        columnName: 'user_id',
-        status: 'Approved',
-      },
-    ];
-
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable
-          canEdit
-          canApprove={false}
-          canReject={false}
-          canRevoke={false}
-          data={dataItems}
-          isLoading={false}
-          onApprove={mockOnApprove}
-          onEdit={mockOnEdit}
-          onReject={mockOnReject}
-          onRevoke={mockOnRevoke}
-        />
-      </MemoryRouter>
-    );
-
-    // Data Proposer: Edit button MUST be rendered
-    expect(screen.getByTestId('edit-btn-address')).toBeInTheDocument();
-    expect(screen.getByTestId('edit-btn-user_id')).toBeInTheDocument();
-
-    // Data Proposer: Approve, Reject, and Revoke buttons must NOT be rendered
-    expect(screen.queryByTestId('approve-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('reject-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('revoke-btn-user_id')).not.toBeInTheDocument();
-  });
-
-  it('enforces RBAC: Data Consumer cannot edit, approve/reject, or revoke', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
-
-    const dataApproved = [
-      {
-        ...mockData[0],
-        columnName: 'address',
-        status: 'Approved',
-      },
-    ];
-
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable
-          canApprove={false}
-          canEdit={false}
-          canReject={false}
-          canRevoke={false}
-          data={dataApproved}
-          isLoading={false}
-        />
-      </MemoryRouter>
-    );
-
-    // Data Consumer: No edit, approve/reject, or revoke buttons
-    expect(screen.queryByTestId('edit-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('approve-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('reject-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('revoke-btn-address')).not.toBeInTheDocument();
-
-    // Table view link remains accessible when showActions is true
-    expect(screen.getByTestId('view-table-AGR_USER')).toBeInTheDocument();
-  });
-
-  it('does not render actions column when explicitly hidden', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const TechnicalDictionaryTable = require('./TechnicalDictionaryTable.component').default;
-
-    render(
-      <MemoryRouter>
-        <TechnicalDictionaryTable
-          data={mockData}
-          isLoading={false}
-          showActions={false}
-        />
-      </MemoryRouter>
-    );
-
-    expect(screen.queryByTestId('edit-btn-address')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('view-table-AGR_USER')).not.toBeInTheDocument();
-  });
-
-  describe('Backend metadata synchronization on approve and revoke', () => {
-    it('removes CDE glossary and classification tags from table columns when revoked', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { removeColumnMetadataFromBackend } = require('./TechnicalDictionaryPage.component');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getTableDetailsByFQN, patchTableDetails } = require('../../rest/tableAPI');
-
-      getTableDetailsByFQN.mockResolvedValueOnce({
-        id: 'tbl-123',
-        name: 'AGR_USER',
-        columns: [
-          {
-            name: 'address',
-            tags: [
-              { tagFQN: 'Data Dictionary.CDE12', source: 'Glossary' },
-              { tagFQN: 'DataElementType.AtomicDataElement', source: 'Classification' },
-              { tagFQN: 'FieldGenerationType.ManualInput', source: 'Classification' },
-              { tagFQN: 'DataCreationMethod.Parameterised', source: 'Classification' },
-              { tagFQN: 'PII.Sensitive', source: 'Classification' },
-            ],
-          },
-        ],
-      });
-
-      await removeColumnMetadataFromBackend({
-        tableFqn: 'MIS.MISDB.ms1.AGR_USER',
-        columnName: 'address',
-      });
-
-      expect(getTableDetailsByFQN).toHaveBeenCalledWith('MIS.MISDB.ms1.AGR_USER', {
-        fields: 'columns,tags,extension',
-      });
-
-      expect(patchTableDetails).toHaveBeenCalledWith(
-        'tbl-123',
-        expect.arrayContaining([
-          expect.objectContaining({
-            path: expect.stringMatching(/^\/columns\/0\/(tags|extension)/),
-          }),
-        ])
-      );
-    });
-
-    it('attaches CDE glossary and classification tags to table columns when approved', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { syncColumnMetadataToBackend } = require('./TechnicalDictionaryPage.component');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getTableDetailsByFQN, patchTableDetails } = require('../../rest/tableAPI');
-
-      getTableDetailsByFQN.mockResolvedValueOnce({
-        id: 'tbl-123',
-        name: 'AGR_USER',
-        columns: [
-          {
-            name: 'address',
-            tags: [{ tagFQN: 'PII.Sensitive', source: 'Classification' }],
-          },
-        ],
-      });
-
-      await syncColumnMetadataToBackend({
-        tableFqn: 'MIS.MISDB.ms1.AGR_USER',
-        columnName: 'address',
-        cdeCode: 'CDE12',
-        cdeFqn: 'Data Dictionary.CDE12',
-        elementType: 'AtomicDataElement',
-        generationType: 'ManualInput',
-        creationMethod: 'Parameterised',
-      });
-
-      expect(patchTableDetails).toHaveBeenCalledWith(
-        'tbl-123',
-        expect.arrayContaining([
-          expect.objectContaining({
-            path: expect.stringMatching(/^\/columns\/0\/(tags|extension)/),
-          }),
-        ])
-      );
-    });
-
-    it('persists proposed metadata with In Review status to backend table when submitted by proposer', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { syncColumnProposalToBackend } = require('./TechnicalDictionaryPage.component');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getTableDetailsByFQN, patchTableDetails } = require('../../rest/tableAPI');
-
-      getTableDetailsByFQN.mockResolvedValueOnce({
-        id: 'tbl-123',
-        name: 'Account',
-        columns: [
-          {
-            name: 'id',
-            tags: [],
-          },
-        ],
-      });
-
-      await syncColumnProposalToBackend({
-        tableFqn: 'MIS.MISDB.ms1.Account',
-        columnName: 'id',
-        cdeCode: 'CDE1',
-        cdeName: 'Mã định danh tài khoản',
-        cdeFqn: 'Data Dictionary.CDE1',
-        elementType: 'AtomicDataElement',
-        elementTypeName: 'Dữ liệu nguyên tố',
-        generationType: 'SystemGenerated',
-        generationTypeName: 'Tự sinh hệ thống',
-        creationMethod: 'Parameterised',
-        creationMethodName: 'Tham số hoá',
-        timeliness: 'T',
-        systemOwner: 'Trung tâm CNTT',
-      });
-
-      expect(getTableDetailsByFQN).toHaveBeenCalledWith('MIS.MISDB.ms1.Account', {
-        fields: 'columns,tags,extension',
-      });
-
-      expect(patchTableDetails).toHaveBeenCalledWith(
-        'tbl-123',
-        expect.arrayContaining([
-          expect.objectContaining({
-            path: '/columns/0/extension',
-            value: expect.objectContaining({
-              cdeCode: 'CDE1',
-              cdeName: 'Mã định danh tài khoản',
-              status: 'In Review',
-            }),
-          }),
-        ])
-      );
-    });
-
-    it('persists rejected status to backend table when rejected by steward', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { rejectColumnMetadataOnBackend } = require('./TechnicalDictionaryPage.component');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getTableDetailsByFQN, patchTableDetails } = require('../../rest/tableAPI');
-
-      getTableDetailsByFQN.mockResolvedValueOnce({
-        id: 'tbl-123',
-        name: 'Account',
-        columns: [
-          {
-            name: 'id',
-            tags: [],
-            extension: {
-              cdeCode: 'CDE1',
-              status: 'In Review',
-            },
-          },
-        ],
-      });
-
-      await rejectColumnMetadataOnBackend({
-        tableFqn: 'MIS.MISDB.ms1.Account',
-        columnName: 'id',
-      });
-
-      expect(patchTableDetails).toHaveBeenCalledWith(
-        'tbl-123',
-        expect.arrayContaining([
-          expect.objectContaining({
-            path: '/columns/0/extension/status',
-            value: 'Rejected',
-          }),
-        ])
-      );
-    });
-  });
-});
-
-
-describe('Technical dictionary CDE search', () => {
-  const { getTechnicalDictionarySearchQuery } = require('./TechnicalDictionaryPage.component');
-
-  it.each(['CDE1', 'cde1', '  CDE1  '])(
-    'searches %s by exact glossary tag instead of full-text tokens',
-    (search) => {
-      expect(getTechnicalDictionarySearchQuery(search)).toEqual({
-        query: '*',
-        cdeFilter: { term: { glossaryTags: 'data dictionary.cde1' } },
-      });
-    }
-  );
-
-  it('keeps different CDE codes distinct', () => {
-    expect(getTechnicalDictionarySearchQuery('CDE10').cdeFilter).toEqual({
-      term: { glossaryTags: 'data dictionary.cde10' },
-    });
-  });
-
-  it.each([
-    ['AGR_USER', '*AGR_USER*'],
-    ['address', '*address*'],
-    ['', '*'],
-    ['   ', '*'],
-  ])('preserves general search for %s', (search, query) => {
-    expect(getTechnicalDictionarySearchQuery(search)).toEqual({
-      query,
-      cdeFilter: undefined,
-    });
+    expect(
+      (updateGlossaryTermWorkingVersion as jest.Mock).mock.calls[0][2]
+        .relatedTerms
+    ).toEqual([]);
   });
 });
