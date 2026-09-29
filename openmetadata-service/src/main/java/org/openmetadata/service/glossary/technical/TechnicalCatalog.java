@@ -44,6 +44,11 @@ public final class TechnicalCatalog {
     return Optional.ofNullable(glossary);
   }
 
+  public static boolean isTechnicalGlossary(UUID glossaryId) {
+    return glossaryId != null
+        && findGlossary().map(glossary -> glossary.getId().equals(glossaryId)).orElse(false);
+  }
+
   public static Glossary requireGlossary() {
     return findGlossary()
         .orElseThrow(

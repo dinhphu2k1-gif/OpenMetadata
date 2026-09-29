@@ -33,6 +33,8 @@ import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.glossary.technical.TechnicalColumnProjection;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotOutboxRecord;
@@ -847,6 +849,7 @@ public class GlossaryVersioningService {
           throw new IllegalStateException("Snapshot not found for outbox event " + event.eventId());
         }
         refreshPublishedIndex(dao, changed.entityType(), changed.entityId());
+        projectTechnicalDictionary(changed);
         dao.markOutboxProcessed(event.eventId(), System.currentTimeMillis());
       } catch (Exception exception) {
         String message =
@@ -856,6 +859,13 @@ public class GlossaryVersioningService {
         dao.markOutboxFailed(event.eventId(), message);
         LOG.warn("Failed to process glossary snapshot outbox event {}", event.eventId(), exception);
       }
+    }
+  }
+
+  private static void projectTechnicalDictionary(PublishedSnapshotRecord snapshot) {
+    if (GLOSSARY_TERM.equals(snapshot.entityType())
+        && TechnicalCatalog.isTechnicalGlossary(snapshot.glossaryId())) {
+      new TechnicalColumnProjection().onSnapshotChanged(snapshot);
     }
   }
 
