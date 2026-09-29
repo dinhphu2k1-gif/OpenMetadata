@@ -101,7 +101,9 @@ import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.technical.TechnicalCdeReferenceResolver;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.glossary.technical.TechnicalRankGuard;
 import org.openmetadata.service.glossary.technical.TechnicalRecordValidator;
 import org.openmetadata.service.glossary.technical.TechnicalSourceStates;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
@@ -161,6 +163,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       new GlossaryBusinessVersionSearchService();
   private final CdeImportService cdeImportService = new CdeImportService();
   private final TechnicalRecordValidator technicalRecordValidator = new TechnicalRecordValidator();
+  private final TechnicalCdeReferenceResolver technicalCdeResolver =
+      new TechnicalCdeReferenceResolver();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -476,7 +480,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             securityContext,
             term,
             currentPayload,
-            mutableDraftPayload(term, currentPayload, request));
+            mutableDraftPayload(term, currentPayload, request),
+            request.getRelatedTerms());
     repository.prepareInternal(payload, true);
     return GlossaryVersionResponses.working(
         versioningService.saveWorking(
@@ -584,7 +589,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             parentBusinessVersion,
             request.getExpectedRevision(),
             securityContext.getUserPrincipal().getName(),
-            working -> authorizeAndValidateApprove(securityContext, working)));
+            working -> authorizeAndValidateApprove(securityContext, working),
+            technicalRankHook()));
   }
 
   @GET
@@ -835,13 +841,17 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       SecurityContext securityContext,
       GlossaryTerm identity,
       GlossaryTerm currentPayload,
-      GlossaryTerm payload) {
+      GlossaryTerm payload,
+      List<TermRelation> requestedRelations) {
     Glossary glossary = Entity.getEntity(identity.getGlossary(), "id,name", Include.NON_DELETED);
     GlossaryTerm result = payload;
     switch (GovernedGlossaryProfileRegistry.require(glossary)) {
       case DATA_QUALITY -> requireCanonicalCdeRelation(securityContext, payload, false);
       case TECHNICAL_DICTIONARY -> result =
-          technicalRecordValidator.prepareDraft(payload, currentPayload);
+          technicalRecordValidator.prepareDraft(
+              payload.withRelatedTerms(
+                  technicalCdeResolver.resolveForDraft(requestedRelations, currentPayload)),
+              currentPayload);
       case DATA_DICTIONARY -> {
         // Data Dictionary drafts need no additional profile normalization.
       }
@@ -849,8 +859,25 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return result;
   }
 
+  private static GlossaryVersioningService.PublicationHook technicalRankHook() {
+    return (handle, working, published) -> {
+      GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
+      Glossary glossary =
+          Entity.getEntity(
+              new EntityReference().withId(working.glossaryId()).withType(GLOSSARY),
+              "id,name",
+              Include.NON_DELETED);
+      if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
+          == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+        TechnicalRankGuard.requireUnique(handle, payload);
+      }
+    };
+  }
+
   private void requireTechnicalDictionaryRelation(GlossaryTerm payload) {
     requireSingleTechnicalCdeRelation(payload);
+    technicalCdeResolver.requireInScope(payload);
+    TechnicalRankGuard.requireUnique(null, payload);
     technicalRecordValidator.requireWorkflowReady(
         payload,
         TechnicalSourceStates.statusOf(
