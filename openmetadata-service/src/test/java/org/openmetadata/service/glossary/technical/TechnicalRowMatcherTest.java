@@ -83,6 +83,29 @@ class TechnicalRowMatcherTest {
   }
 
   @Test
+  void tagGroupsAreOrWithinAGroupAndAndAcrossGroups() {
+    Map<String, Object> row = row("a", "1.0", "published");
+    row.put(
+        "tags",
+        List.of(
+            Map.of("tagFQN", "DataTimeliness.T1"),
+            Map.of("tagFQN", "DataElementType.AtomicDataElement")));
+    Map<String, String> raw = new HashMap<>();
+    raw.put(TechnicalRowMatcher.TIMELINESS, "DataTimeliness.T0,DataTimeliness.T1");
+    raw.put(TechnicalRowMatcher.ELEMENT_TYPES, "DataElementType.AtomicDataElement");
+    assertTrue(TechnicalRowMatcher.matches(row, TechnicalRowMatcher.validate(raw)));
+
+    raw.put(TechnicalRowMatcher.ELEMENT_TYPES, "DataElementType.TransformedDataElement");
+    assertFalse(TechnicalRowMatcher.matches(row, TechnicalRowMatcher.validate(raw)));
+  }
+
+  @Test
+  void tagFiltersMustBelongToTheirClassification() {
+    assertThrows(
+        BadRequestException.class, () -> filters(TechnicalRowMatcher.TIMELINESS, "PII.Sensitive"));
+  }
+
+  @Test
   void rejectsMalformedValues() {
     assertThrows(
         BadRequestException.class, () -> filters(TechnicalRowMatcher.CDE_TERM_IDS, "not-a-uuid"));

@@ -23,6 +23,10 @@ public final class TechnicalRowMatcher {
   public static final String SYSTEM_OWNER_IDS = "systemOwnerIds";
   public static final String SOURCE_STATUSES = "sourceStatuses";
   public static final String VERSION_VIEW = "versionView";
+  public static final String ELEMENT_TYPES = "elementTypes";
+  public static final String GENERATION_TYPES = "generationTypes";
+  public static final String CREATION_METHODS = "creationMethods";
+  public static final String TIMELINESS = "timeliness";
 
   public static final String MAPPED = "MAPPED";
   public static final String UNMAPPED = "UNMAPPED";
@@ -36,6 +40,7 @@ public final class TechnicalRowMatcher {
           TechnicalDictionaryProfile.SOURCE_UNAVAILABLE,
           TechnicalDictionaryProfile.SOURCE_CHANGED);
   private static final int MAX_VALUES = 50;
+  private static final Map<String, String> TAG_FILTERS = tagFilters();
 
   private TechnicalRowMatcher() {}
 
@@ -55,6 +60,9 @@ public final class TechnicalRowMatcher {
         filters,
         SOURCE_STATUSES,
         allowed(SOURCE_STATUSES, csv(raw.get(SOURCE_STATUSES)), SOURCE_STATUS_VALUES));
+    TAG_FILTERS.forEach(
+        (param, classification) ->
+            put(filters, param, tagFqns(param, classification, csv(raw.get(param)))));
     filters.put(VERSION_VIEW, List.of(versionView(raw.get(VERSION_VIEW))));
     return filters;
   }
@@ -70,7 +78,28 @@ public final class TechnicalRowMatcher {
         && anyOf(
             filters,
             SOURCE_STATUSES,
-            TechnicalRowFields.text(row, TechnicalRowFields.SOURCE_STATUS));
+            TechnicalRowFields.text(row, TechnicalRowFields.SOURCE_STATUS))
+        && TAG_FILTERS.keySet().stream().allMatch(param -> matchesTags(row, filters, param));
+  }
+
+  private static boolean matchesTags(
+      Map<String, Object> row, Map<String, List<String>> filters, String param) {
+    final List<String> wanted = filters.get(param);
+    return wanted == null
+        || wanted.isEmpty()
+        || rowTagFqns(row).stream().anyMatch(wanted::contains);
+  }
+
+  private static List<String> rowTagFqns(Map<String, Object> row) {
+    final List<String> fqns = new ArrayList<>();
+    if (row.get("tags") instanceof List<?> tags) {
+      for (Object raw : tags) {
+        if (raw instanceof Map<?, ?> tag && tag.get("tagFQN") != null) {
+          fqns.add(String.valueOf(tag.get("tagFQN")));
+        }
+      }
+    }
+    return fqns;
   }
 
   public static boolean matchesText(Map<String, Object> row, String normalizedNeedle) {
@@ -142,6 +171,22 @@ public final class TechnicalRowMatcher {
       }
     }
     return result;
+  }
+
+  private static Map<String, String> tagFilters() {
+    final Map<String, String> filters = new LinkedHashMap<>();
+    filters.put(ELEMENT_TYPES, TechnicalDictionaryProfile.ELEMENT_TYPE_CLASSIFICATION);
+    filters.put(GENERATION_TYPES, TechnicalDictionaryProfile.GENERATION_TYPE_CLASSIFICATION);
+    filters.put(CREATION_METHODS, TechnicalDictionaryProfile.CREATION_METHOD_CLASSIFICATION);
+    filters.put(TIMELINESS, TechnicalDictionaryProfile.TIMELINESS_CLASSIFICATION);
+    return filters;
+  }
+
+  private static List<String> tagFqns(String name, String classification, List<String> values) {
+    if (values.stream().anyMatch(value -> !value.startsWith(classification + "."))) {
+      throw new BadRequestException(name + " must contain " + classification + " tags");
+    }
+    return values;
   }
 
   private static List<String> allowed(String name, List<String> values, Set<String> allowlist) {

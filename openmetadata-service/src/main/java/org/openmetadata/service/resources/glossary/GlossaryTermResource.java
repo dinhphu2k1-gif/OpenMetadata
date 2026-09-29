@@ -1592,7 +1592,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @QueryParam("cdeTermIds") String cdeTermIds,
       @QueryParam("systemOwnerIds") String systemOwnerIds,
       @QueryParam("sourceStatuses") String sourceStatuses,
-      @QueryParam("versionView") String versionView) {
+      @QueryParam("versionView") String versionView,
+      @QueryParam("elementTypes") String elementTypes,
+      @QueryParam("generationTypes") String generationTypes,
+      @QueryParam("creationMethods") String creationMethods,
+      @QueryParam("timeliness") String timeliness) {
 
     if (parentBusinessVersion != null) {
       if (glossaryId == null) {
@@ -1614,7 +1618,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           limitParam,
           offsetParam,
           technicalFilterParameters(
-              sourceServices, cdeMapping, cdeTermIds, systemOwnerIds, sourceStatuses, versionView));
+              new String[] {
+                sourceServices,
+                cdeMapping,
+                cdeTermIds,
+                systemOwnerIds,
+                sourceStatuses,
+                versionView,
+                elementTypes,
+                generationTypes,
+                creationMethods,
+                timeliness
+              }));
     }
 
     Fields fields = getFields(fieldsParam);
@@ -1738,20 +1753,24 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         authorized.scopeType() == ScopeType.ARCHIVED);
   }
 
-  private static Map<String, String> technicalFilterParameters(
-      String sourceServices,
-      String cdeMapping,
-      String cdeTermIds,
-      String systemOwnerIds,
-      String sourceStatuses,
-      String versionView) {
+  private static final List<String> TECHNICAL_FILTER_NAMES =
+      List.of(
+          TechnicalRowMatcher.SOURCE_SERVICES,
+          TechnicalRowMatcher.CDE_MAPPING,
+          TechnicalRowMatcher.CDE_TERM_IDS,
+          TechnicalRowMatcher.SYSTEM_OWNER_IDS,
+          TechnicalRowMatcher.SOURCE_STATUSES,
+          TechnicalRowMatcher.VERSION_VIEW,
+          TechnicalRowMatcher.ELEMENT_TYPES,
+          TechnicalRowMatcher.GENERATION_TYPES,
+          TechnicalRowMatcher.CREATION_METHODS,
+          TechnicalRowMatcher.TIMELINESS);
+
+  private static Map<String, String> technicalFilterParameters(String[] values) {
     Map<String, String> parameters = new LinkedHashMap<>();
-    parameters.put(TechnicalRowMatcher.SOURCE_SERVICES, sourceServices);
-    parameters.put(TechnicalRowMatcher.CDE_MAPPING, cdeMapping);
-    parameters.put(TechnicalRowMatcher.CDE_TERM_IDS, cdeTermIds);
-    parameters.put(TechnicalRowMatcher.SYSTEM_OWNER_IDS, systemOwnerIds);
-    parameters.put(TechnicalRowMatcher.SOURCE_STATUSES, sourceStatuses);
-    parameters.put(TechnicalRowMatcher.VERSION_VIEW, versionView);
+    for (int index = 0; index < TECHNICAL_FILTER_NAMES.size(); index++) {
+      parameters.put(TECHNICAL_FILTER_NAMES.get(index), values[index]);
+    }
     return parameters;
   }
 
