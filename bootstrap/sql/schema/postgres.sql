@@ -2032,30 +2032,24 @@ CREATE TABLE IF NOT EXISTS public.glossary_snapshot_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending ON public.glossary_snapshot_outbox (processedAt, createdAt);
 
-CREATE TABLE IF NOT EXISTS public.technical_bootstrap_job (
-  jobId varchar(36) PRIMARY KEY, technicalGlossaryId varchar(36) NOT NULL,
-  parentBusinessVersion varchar(64) NOT NULL, status varchar(32) NOT NULL,
-  columnScopeSnapshot jsonb NOT NULL, total bigint NOT NULL DEFAULT 0,
-  processed bigint NOT NULL DEFAULT 0, created bigint NOT NULL DEFAULT 0,
-  skipped bigint NOT NULL DEFAULT 0, failed bigint NOT NULL DEFAULT 0,
-  checkpoint varchar(36), errorSummary jsonb,
-  createdAt bigint NOT NULL, createdBy varchar(256) NOT NULL,
-  updatedAt bigint NOT NULL, updatedBy varchar(256) NOT NULL,
-  CONSTRAINT uq_technical_bootstrap_scope UNIQUE (technicalGlossaryId, parentBusinessVersion)
-);
 CREATE TABLE IF NOT EXISTS public.technical_source_state (
   technicalGlossaryId varchar(36) NOT NULL, parentBusinessVersion varchar(64) NOT NULL,
   columnKey varchar(36) NOT NULL, status varchar(32) NOT NULL, columnFqn text NOT NULL,
   detectedAt bigint NOT NULL,
   PRIMARY KEY (technicalGlossaryId, parentBusinessVersion, columnKey)
 );
+CREATE TABLE IF NOT EXISTS public.technical_index_outbox (
+  termId varchar(36) PRIMARY KEY, enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0, lastError text
+);
+CREATE INDEX IF NOT EXISTS idx_technical_index_outbox_enqueued ON public.technical_index_outbox (enqueuedAt);
 ALTER TABLE public.glossary_business_working OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_business_snapshot OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
-ALTER TABLE public.technical_bootstrap_job OWNER TO openmetadata_user;
 ALTER TABLE public.technical_source_state OWNER TO openmetadata_user;
+ALTER TABLE public.technical_index_outbox OWNER TO openmetadata_user;
 
 
 --

@@ -1224,22 +1224,15 @@ CREATE TABLE IF NOT EXISTS `glossary_snapshot_outbox` (
   KEY `idx_glossary_outbox_pending` (`processedAt`,`createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `technical_bootstrap_job` (
-  `jobId` varchar(36) NOT NULL, `technicalGlossaryId` varchar(36) NOT NULL,
-  `parentBusinessVersion` varchar(64) NOT NULL, `status` varchar(32) NOT NULL,
-  `columnScopeSnapshot` json NOT NULL, `total` bigint unsigned NOT NULL DEFAULT 0,
-  `processed` bigint unsigned NOT NULL DEFAULT 0, `created` bigint unsigned NOT NULL DEFAULT 0,
-  `skipped` bigint unsigned NOT NULL DEFAULT 0, `failed` bigint unsigned NOT NULL DEFAULT 0,
-  `checkpoint` varchar(36) DEFAULT NULL, `errorSummary` json DEFAULT NULL,
-  `createdAt` bigint unsigned NOT NULL, `createdBy` varchar(256) NOT NULL,
-  `updatedAt` bigint unsigned NOT NULL, `updatedBy` varchar(256) NOT NULL,
-  PRIMARY KEY (`jobId`),
-  UNIQUE KEY `uq_technical_bootstrap_scope` (`technicalGlossaryId`,`parentBusinessVersion`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
 CREATE TABLE IF NOT EXISTS `technical_source_state` (
   `technicalGlossaryId` varchar(36) NOT NULL, `parentBusinessVersion` varchar(64) NOT NULL,
   `columnKey` varchar(36) NOT NULL, `status` varchar(32) NOT NULL, `columnFqn` text NOT NULL,
   `detectedAt` bigint unsigned NOT NULL,
   PRIMARY KEY (`technicalGlossaryId`,`parentBusinessVersion`,`columnKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `technical_index_outbox` (
+  `termId` varchar(36) NOT NULL, `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0, `lastError` text,
+  PRIMARY KEY (`termId`), KEY `idx_technical_index_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -10,7 +10,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Alert, Modal, Result } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Alert, Button, Modal, Result, Space } from 'antd';
 import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,15 +36,13 @@ import {
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
 import {
+  deleteTechnicalDraft,
   exportTechnicalDictionary,
-  getTechnicalBootstrapJobs,
   getTechnicalStats,
-  retryTechnicalBootstrapJob,
-  TechnicalBootstrapJob,
   TechnicalStats,
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
-import TechnicalBootstrapStatus from './TechnicalBootstrapStatus.component';
+import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
 import TechnicalBulkActionModal from './TechnicalBulkActionModal.component';
 import TechnicalDictionaryHeader, {
   TechnicalCatalogAction,
@@ -58,8 +57,6 @@ import TechnicalRecordModal, {
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
-
-const BOOTSTRAP_POLL_MS = 5000;
 
 interface TechnicalDictionaryPageProps {
   isEmbedded?: boolean;
@@ -100,7 +97,6 @@ const TechnicalDictionaryPage = ({
     businessVersion: catalog?.businessVersion,
   });
   const [stats, setStats] = useState<TechnicalStats>();
-  const [job, setJob] = useState<TechnicalBootstrapJob>();
   const [statsKey, setStatsKey] = useState(0);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [modal, setModal] = useState<{
@@ -111,6 +107,7 @@ const TechnicalDictionaryPage = ({
   const [isBusy, setIsBusy] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [addColumnOpen, setAddColumnOpen] = useState(false);
 
   const refreshData = useCallback(() => {
     records.reload();
@@ -126,40 +123,6 @@ const TechnicalDictionaryPage = ({
       .then(setStats)
       .catch(() => setStats(undefined));
   }, [glossary?.id, catalog?.businessVersion, statsKey]);
-
-  useEffect(() => {
-    if (!glossary?.id || !catalog || !capabilities.canViewWorking) {
-      setJob(undefined);
-
-      return undefined;
-    }
-    let active = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      const jobs = await getTechnicalBootstrapJobs(
-        glossary.id,
-        catalog.businessVersion
-      ).catch(() => [] as TechnicalBootstrapJob[]);
-      if (!active) {
-        return;
-      }
-      const current = jobs[0];
-      setJob(current);
-      if (current?.status === 'Running' || current?.status === 'Pending') {
-        timer = setTimeout(poll, BOOTSTRAP_POLL_MS);
-      } else if (current?.status === 'Succeeded') {
-        refreshData();
-      }
-    };
-    poll();
-
-    return () => {
-      active = false;
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
-  }, [glossary?.id, catalog?.businessVersion, capabilities.canViewWorking]);
 
   const fail = useCallback((failure: unknown) => {
     showErrorToast(failure as AxiosError);
@@ -197,6 +160,28 @@ const TechnicalDictionaryPage = ({
       } catch (failure) {
         fail(failure);
       }
+    },
+    [fail, refreshData, t]
+  );
+
+  const handleDelete = useCallback(
+    (row: TechnicalDictionaryRow) => {
+      Modal.confirm({
+        title: t('label.delete-declaration'),
+        content: t('message.technical-declaration-delete-confirm'),
+        okText: t('label.delete'),
+        okButtonProps: { danger: true },
+        cancelText: t('label.cancel'),
+        onOk: async () => {
+          try {
+            await deleteTechnicalDraft(row.termId, row.parentBusinessVersion);
+            showSuccessToast(t('message.technical-declaration-deleted'));
+            refreshData();
+          } catch (failure) {
+            fail(failure);
+          }
+        },
+      });
     },
     [fail, refreshData, t]
   );
@@ -332,23 +317,6 @@ const TechnicalDictionaryPage = ({
     }
   }, [catalog, fail, glossary]);
 
-  const handleRetryBootstrap = useCallback(
-    async (target: TechnicalBootstrapJob) => {
-      if (!glossary) {
-        return;
-      }
-      setIsBusy(true);
-      try {
-        setJob(await retryTechnicalBootstrapJob(glossary.id, target.jobId));
-      } catch (failure) {
-        fail(failure);
-      } finally {
-        setIsBusy(false);
-      }
-    },
-    [fail, glossary]
-  );
-
   const selectedTermIds = useMemo(
     () =>
       records.rows
@@ -363,6 +331,12 @@ const TechnicalDictionaryPage = ({
       capabilities.canReject);
   const canImport =
     !(catalog?.isReadOnly ?? true) && capabilities.canEditWorking;
+  const canAddColumn = canImport;
+  const hasActiveFilters =
+    Boolean(records.filters.q) ||
+    Object.values(records.filters).some(
+      (value) => Array.isArray(value) && value.length > 0
+    );
 
   if (isCatalogLoading && !catalog) {
     return <Loader />;
@@ -388,12 +362,6 @@ const TechnicalDictionaryPage = ({
           ? 'tech-dict-content-card tech-dict-content-card-embedded'
           : 'tech-dict-content-card'
       }>
-      <TechnicalBootstrapStatus
-        canManage={capabilities.canViewWorking}
-        isBusy={isBusy}
-        job={job}
-        onRetry={handleRetryBootstrap}
-      />
       {records.failed && (
         <Alert
           showIcon
@@ -408,18 +376,40 @@ const TechnicalDictionaryPage = ({
         catalog={catalog}
         extraTableFilters={
           <TechnicalDictionaryToolbar
+            canAddColumn={canAddColumn}
             canBulk={canBulk}
             canImport={canImport}
             capabilities={capabilities}
             filters={records.filters}
             options={options}
             searchText={records.searchText}
+            onAddColumn={() => setAddColumnOpen(true)}
             onBulk={() => setBulkOpen(true)}
             onExport={handleExport}
             onFilters={records.setFilters}
             onImport={() => setImportOpen(true)}
             onSearchText={records.setSearchText}
           />
+        }
+        emptyContent={
+          hasActiveFilters ? undefined : (
+            <div data-testid="technical-dictionary-empty">
+              <p>{t('message.technical-dictionary-empty')}</p>
+              {canAddColumn && (
+                <Space>
+                  <Button
+                    icon={<PlusOutlined />}
+                    type="primary"
+                    onClick={() => setAddColumnOpen(true)}>
+                    {t('label.add-column')}
+                  </Button>
+                  <Button onClick={() => setImportOpen(true)}>
+                    {t('label.import')}
+                  </Button>
+                </Space>
+              )}
+            </div>
+          )
         }
         isLoading={records.isLoading}
         page={records.page}
@@ -429,6 +419,7 @@ const TechnicalDictionaryPage = ({
         total={records.total}
         onApprove={(row) => runRecordAction(row, 'approve')}
         onCreateVersion={(row) => runRecordAction(row, 'createVersion')}
+        onDelete={handleDelete}
         onEdit={(row) => setModal({ mode: 'edit', row })}
         onPageChange={records.setPage}
         onPageSizeChange={records.setPageSize}
@@ -455,6 +446,14 @@ const TechnicalDictionaryPage = ({
         open={bulkOpen}
         selectedTermIds={selectedTermIds}
         onClose={() => setBulkOpen(false)}
+        onDone={refreshData}
+      />
+      <TechnicalAddColumnModal
+        businessVersion={catalog.businessVersion}
+        glossaryId={glossary.id}
+        open={addColumnOpen}
+        options={options}
+        onClose={() => setAddColumnOpen(false)}
         onDone={refreshData}
       />
       <TechnicalImportModal

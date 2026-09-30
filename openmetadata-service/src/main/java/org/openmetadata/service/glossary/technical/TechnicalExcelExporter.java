@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.zip.ZipFile;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -63,17 +64,28 @@ public final class TechnicalExcelExporter {
 
   private TechnicalExcelExporter() {}
 
+  /** Rows visited in export order; lets the caller stream them instead of holding a list. */
+  @FunctionalInterface
+  public interface RowSource {
+    void forEach(Consumer<Map<String, Object>> visitor);
+  }
+
   public static ExportedWorkbook write(List<Map<String, Object>> rows, String version)
       throws IOException {
+    return write(rows::forEach, version);
+  }
+
+  public static ExportedWorkbook write(RowSource rows, String version) throws IOException {
     final Path directory =
         Path.of(System.getProperty("java.io.tmpdir"), "openmetadata", "td-exports");
     Files.createDirectories(directory);
     final Path file =
         Files.createTempFile(directory, "technical-dictionary-v" + version + "-", ".xlsx");
     boolean complete = false;
+    int written = 0;
     try (SXSSFWorkbook workbook = new SXSSFWorkbook(ROW_WINDOW)) {
       workbook.setCompressTempFiles(true);
-      writeSheets(workbook, rows, version);
+      written = writeSheets(workbook, rows, version);
       try (OutputStream output = Files.newOutputStream(file)) {
         workbook.write(output);
       }
@@ -85,7 +97,7 @@ public final class TechnicalExcelExporter {
         Files.deleteIfExists(file);
       }
     }
-    return new ExportedWorkbook(file, rows.size());
+    return new ExportedWorkbook(file, written);
   }
 
   public static List<String> values(Map<String, Object> row) {
@@ -113,19 +125,38 @@ public final class TechnicalExcelExporter {
     return values;
   }
 
-  private static void writeSheets(
-      SXSSFWorkbook workbook, List<Map<String, Object>> rows, String version) {
-    final CellStyle header = headerStyle(workbook);
-    final CellStyle wrapped = wrappedStyle(workbook);
-    Sheet sheet = newSheet(workbook, version, 1, header);
-    int sheetIndex = 1;
-    int written = 0;
-    for (Map<String, Object> row : rows) {
+  private static int writeSheets(SXSSFWorkbook workbook, RowSource rows, String version) {
+    final SheetWriter writer = new SheetWriter(workbook, version);
+    rows.forEach(writer::write);
+    return writer.total;
+  }
+
+  /** Appends rows and starts a new sheet when one reaches the Excel row limit. */
+  private static final class SheetWriter {
+    private final SXSSFWorkbook workbook;
+    private final String version;
+    private final CellStyle header;
+    private final CellStyle wrapped;
+    private Sheet sheet;
+    private int sheetIndex = 1;
+    private int written;
+    private int total;
+
+    private SheetWriter(SXSSFWorkbook workbook, String version) {
+      this.workbook = workbook;
+      this.version = version;
+      this.header = headerStyle(workbook);
+      this.wrapped = wrappedStyle(workbook);
+      this.sheet = newSheet(workbook, version, sheetIndex, header);
+    }
+
+    private void write(Map<String, Object> row) {
       if (written == CdeExcelExporter.EXCEL_MAX_DATA_ROWS) {
         sheet = newSheet(workbook, version, ++sheetIndex, header);
         written = 0;
       }
       writeRow(sheet.createRow(++written), values(row), wrapped);
+      total++;
     }
   }
 

@@ -13,8 +13,6 @@ import java.util.Map;
 /** Read-model fields added to Technical Dictionary flat rows, plus typed accessors over them. */
 public final class TechnicalRowFields {
   public static final String SOURCE_STATUS = "sourceStatus";
-  public static final String SEARCH_TEXT = "searchText";
-  public static final String SORT_KEY = "sortKey";
   public static final String CDE_CODE = "cdeCode";
   public static final String CDE_NAME = "cdeName";
   public static final String DATA_OWNERS = "dataOwners";

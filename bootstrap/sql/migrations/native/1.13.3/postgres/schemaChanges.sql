@@ -108,30 +108,13 @@ CREATE TABLE IF NOT EXISTS glossary_snapshot_outbox (
 CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending
   ON glossary_snapshot_outbox (processedAt, createdAt);
 
--- Technical Dictionary bootstrap jobs. Records use the shared governed working/snapshot stores.
+-- Technical Dictionary records use the shared governed working/snapshot stores; Columns without
+-- a record are read from the Column search index, so there is no bootstrap job table.
 DROP TABLE IF EXISTS technical_projection_outbox;
 DROP TABLE IF EXISTS technical_record_column_binding;
 DROP TABLE IF EXISTS technical_dictionary_scope;
 
-CREATE TABLE IF NOT EXISTS technical_bootstrap_job (
-  jobId varchar(36) PRIMARY KEY,
-  technicalGlossaryId varchar(36) NOT NULL,
-  parentBusinessVersion varchar(64) NOT NULL,
-  status varchar(32) NOT NULL,
-  columnScopeSnapshot jsonb NOT NULL,
-  total bigint NOT NULL DEFAULT 0,
-  processed bigint NOT NULL DEFAULT 0,
-  created bigint NOT NULL DEFAULT 0,
-  skipped bigint NOT NULL DEFAULT 0,
-  failed bigint NOT NULL DEFAULT 0,
-  checkpoint varchar(36),
-  errorSummary jsonb,
-  createdAt bigint NOT NULL,
-  createdBy varchar(256) NOT NULL,
-  updatedAt bigint NOT NULL,
-  updatedBy varchar(256) NOT NULL,
-  CONSTRAINT uq_technical_bootstrap_scope UNIQUE (technicalGlossaryId, parentBusinessVersion)
-);
+DROP TABLE IF EXISTS technical_bootstrap_job;
 
 -- Operational availability of source Columns; published snapshots stay immutable.
 CREATE TABLE IF NOT EXISTS technical_source_state (
@@ -143,3 +126,13 @@ CREATE TABLE IF NOT EXISTS technical_source_state (
   detectedAt bigint NOT NULL,
   PRIMARY KEY (technicalGlossaryId, parentBusinessVersion, columnKey)
 );
+
+-- Technical Dictionary records whose search document must be rebuilt from the database.
+CREATE TABLE IF NOT EXISTS technical_index_outbox (
+  termId varchar(36) PRIMARY KEY,
+  enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  lastError text
+);
+CREATE INDEX IF NOT EXISTS idx_technical_index_outbox_enqueued
+  ON technical_index_outbox (enqueuedAt);

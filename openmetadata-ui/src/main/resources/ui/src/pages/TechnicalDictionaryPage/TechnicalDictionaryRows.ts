@@ -16,10 +16,16 @@ import {
   TagLabel,
 } from '../../generated/entity/data/glossaryTerm';
 import { TECHNICAL_CLASSIFICATIONS } from '../../constants/TechnicalDictionary.constants';
-import { TechnicalRecordApiRow } from '../../rest/technicalDictionaryAPI';
+import {
+  TechnicalColumnCandidate,
+  TechnicalRecordApiRow,
+} from '../../rest/technicalDictionaryAPI';
 import { getCDEReleaseVersionType } from '../../utils/CDEReleaseVersionTypeUtils';
 import Fqn from '../../utils/Fqn';
-import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import {
+  TechnicalDictionaryCapabilities,
+  TechnicalDictionaryRow,
+} from './technicalDictionary.interface';
 
 const text = (value: unknown): string =>
   value === undefined || value === null ? '' : String(value);
@@ -69,6 +75,7 @@ export const toTechnicalDictionaryRow = (
     status: row.entityStatus,
     recordType: row.recordType,
     workingRevision: row.workingRevision,
+    hasPublished: Boolean(row.hasPublished),
     databaseName: text(extension.sourceDatabase),
     databaseFqn: columnFqn ? parentFqn(columnFqn, 2) : undefined,
     schemaName: text(extension.sourceSchema),
@@ -121,3 +128,44 @@ export const isEditableRow = (row: TechnicalDictionaryRow): boolean =>
 
 export const isSourceUnavailable = (row: TechnicalDictionaryRow): boolean =>
   row.sourceStatus === 'Unavailable';
+
+/** A not-yet-declared Column as the empty Draft row the create form starts from. */
+export const candidateToRow = (
+  candidate: TechnicalColumnCandidate,
+  parentBusinessVersion: string
+): TechnicalDictionaryRow => ({
+  key: candidate.columnKey,
+  termId: '',
+  businessVersion: `${parentBusinessVersion}.0`,
+  parentBusinessVersion,
+  status: 'Draft',
+  recordType: 'working',
+  hasPublished: false,
+  databaseName: text(candidate.sourceDatabase),
+  databaseFqn: parentFqn(candidate.columnFqn, 2),
+  schemaName: text(candidate.sourceSchema),
+  schemaFqn: parentFqn(candidate.columnFqn, 3),
+  tableName: text(candidate.sourceTable),
+  tableFqn: parentFqn(candidate.columnFqn, 4),
+  columnName: text(candidate.sourceColumn),
+  columnFqn: candidate.columnFqn,
+  serviceName: text(candidate.sourceService),
+  dataType: text(candidate.sourceDataType),
+  description: text(candidate.description),
+  cdeCode: '',
+  cdeName: '',
+  dataOwners: [],
+  releaseVersionType: '',
+  sourceStatus: 'Available',
+});
+
+/** A Draft that was never Approved may be deleted by an editor of an open catalog (TDX-06). */
+export const canDeleteRow = (
+  row: TechnicalDictionaryRow,
+  capabilities: TechnicalDictionaryCapabilities,
+  isReadOnly: boolean
+): boolean =>
+  row.status === 'Draft' &&
+  !row.hasPublished &&
+  capabilities.canEditWorking &&
+  !isReadOnly;

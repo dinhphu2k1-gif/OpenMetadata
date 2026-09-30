@@ -490,78 +490,36 @@ const GlossaryPage = () => {
             fields: termFields,
           });
 
-      const parentGlossaryId = current.glossary?.id;
-      if (!parentGlossaryId) {
-        navigate(ROUTES.NOT_FOUND, { replace: true });
-
-        return;
-      }
-
-      let liveGlossary: Glossary | null = null;
-      try {
-        const capabilities = await getGlossaryVersionPermissions(
-          parentGlossaryId
-        );
-        if (capabilities.canViewWorking) {
-          try {
-            liveGlossary = await getGlossaryWorkingVersion(parentGlossaryId);
-          } catch (error) {
-            if (
-              (error as AxiosError)?.response?.status === ClientErrors.NOT_FOUND
-            ) {
-              liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
-            } else {
-              throw error;
-            }
-          }
-        } else {
-          liveGlossary = await getLatestPublishedGlossary(parentGlossaryId);
-        }
-      } catch {
-        const found = glossaries.find((g) => g.id === parentGlossaryId);
-        if (found) {
-          liveGlossary = found;
-        }
-      }
-
-      const liveParentVer = liveGlossary?.businessVersion
-        ? getBusinessVersion(liveGlossary.businessVersion, '')
-        : '';
       const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
       const reqCdeVer = getBusinessVersion(businessVersion, '');
 
-      if (
-        liveParentVer &&
-        compareBusinessVersions(liveParentVer, reqParentVer) === 0
-      ) {
-        try {
-          // The FQN endpoint resolves the stable term identity. It must not be
-          // used as the scoped working representation because a CDE can have
-          // independent working rows in different Data Dictionary versions.
-          const working = await getGlossaryTermWorkingVersion(
-            current.id,
-            reqParentVer
-          );
-          const workingVersion = getBusinessVersion(
-            working.businessVersion,
-            ''
-          );
-          if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
-            setIsTermHistorical(false);
-            setActiveGlossary(working as ModifiedGlossary);
+      try {
+        // The working row is keyed by the requested Data Dictionary scope, not
+        // by the live glossary version. A newer Data Dictionary working
+        // version must not hide the draft of an older scope, so always try it
+        // first. The FQN endpoint must not be used as the scoped working
+        // representation because a CDE can have independent working rows in
+        // different Data Dictionary versions.
+        const working = await getGlossaryTermWorkingVersion(
+          current.id,
+          reqParentVer
+        );
+        const workingVersion = getBusinessVersion(working.businessVersion, '');
+        if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
+          setIsTermHistorical(false);
+          setActiveGlossary(working as ModifiedGlossary);
 
-            return;
-          }
-        } catch (error) {
-          const status = (error as AxiosError)?.response?.status;
-          // A Consumer cannot read a working version, and a published-only CDE
-          // has no working row. Both cases should continue to snapshot lookup.
-          if (
-            status !== ClientErrors.FORBIDDEN &&
-            status !== ClientErrors.NOT_FOUND
-          ) {
-            throw error;
-          }
+          return;
+        }
+      } catch (error) {
+        const status = (error as AxiosError)?.response?.status;
+        // A Consumer cannot read a working version, and a published-only CDE
+        // has no working row. Both cases should continue to snapshot lookup.
+        if (
+          status !== ClientErrors.FORBIDDEN &&
+          status !== ClientErrors.NOT_FOUND
+        ) {
+          throw error;
         }
       }
 

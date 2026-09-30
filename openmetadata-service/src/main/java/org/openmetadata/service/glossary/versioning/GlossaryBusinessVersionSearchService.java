@@ -17,8 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.openmetadata.schema.type.EntityStatus;
-import org.openmetadata.service.glossary.technical.TechnicalRowFields;
-import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 
 /** Search and filter boundary over the authoritative governed-glossary flat read model. */
 public class GlossaryBusinessVersionSearchService {
@@ -42,10 +40,8 @@ public class GlossaryBusinessVersionSearchService {
       boolean archivedScope) {
     Criteria validated = validate(criteria, consumerOnly, archivedScope);
     List<Map<String, Object>> filtered =
-        applyVersionView(
-                authorizedDatabaseRows.stream().filter(row -> matches(row, validated)).toList(),
-                validated)
-            .stream()
+        authorizedDatabaseRows.stream()
+            .filter(row -> matches(row, validated))
             .sorted(comparator(validated))
             .toList();
     int total = filtered.size();
@@ -136,23 +132,13 @@ public class GlossaryBusinessVersionSearchService {
         sortField,
         sortOrder,
         criteria.limit(),
-        criteria.offset(),
-        criteria.profileFilters());
-  }
-
-  private static List<Map<String, Object>> applyVersionView(
-      List<Map<String, Object>> rows, Criteria criteria) {
-    return criteria.profileFilters().containsKey(TechnicalRowMatcher.VERSION_VIEW)
-            && TechnicalRowMatcher.wantsLatest(criteria.profileFilters())
-        ? TechnicalRowMatcher.keepLatest(rows)
-        : rows;
+        criteria.offset());
   }
 
   private static boolean matchesQuery(Map<String, Object> row, String q) {
     final String needle = searchable(q);
     return searchable(row.get("name")).contains(needle)
-        || searchable(row.get("displayName")).contains(needle)
-        || TechnicalRowMatcher.matchesText(row, needle);
+        || searchable(row.get("displayName")).contains(needle);
   }
 
   private static boolean matches(Map<String, Object> row, Criteria criteria) {
@@ -161,9 +147,6 @@ public class GlossaryBusinessVersionSearchService {
       return false;
     }
     if (criteria.q() != null && !matchesQuery(row, criteria.q())) {
-      return false;
-    }
-    if (!TechnicalRowMatcher.matches(row, criteria.profileFilters())) {
       return false;
     }
     return matchesReferences(row.get("domains"), criteria.domainIds(), "id")
@@ -198,7 +181,7 @@ public class GlossaryBusinessVersionSearchService {
                   String.valueOf(left.get("businessVersion")),
                   String.valueOf(right.get("businessVersion")));
           default -> Comparator.comparing(
-              row -> searchable(row.getOrDefault(TechnicalRowFields.SORT_KEY, row.get("name"))));
+              row -> searchable(row.get("name")));
         };
     if (criteria.sortField() == null) {
       primary =
@@ -303,40 +286,5 @@ public class GlossaryBusinessVersionSearchService {
       String sortField,
       String sortOrder,
       int limit,
-      int offset,
-      Map<String, List<String>> profileFilters) {
-
-    public Criteria {
-      profileFilters = profileFilters == null ? Map.of() : Map.copyOf(profileFilters);
-    }
-
-    public Criteria(
-        UUID glossaryId,
-        String parentBusinessVersion,
-        String q,
-        List<String> statuses,
-        List<String> domainIds,
-        List<String> ownerIds,
-        List<String> dataSourceTags,
-        List<String> classificationTags,
-        String sortField,
-        String sortOrder,
-        int limit,
-        int offset) {
-      this(
-          glossaryId,
-          parentBusinessVersion,
-          q,
-          statuses,
-          domainIds,
-          ownerIds,
-          dataSourceTags,
-          classificationTags,
-          sortField,
-          sortOrder,
-          limit,
-          offset,
-          Map.of());
-    }
-  }
+      int offset) {}
 }

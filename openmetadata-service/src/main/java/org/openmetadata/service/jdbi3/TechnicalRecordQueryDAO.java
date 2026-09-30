@@ -18,6 +18,8 @@ import org.jdbi.v3.sqlobject.config.RegisterRowMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindList;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotMapper;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.locator.ConnectionAwareSqlQuery;
 import org.openmetadata.service.util.jdbi.BindUUID;
 
@@ -58,6 +60,19 @@ public interface TechnicalRecordQueryDAO {
       @BindUUID("glossaryId") UUID glossaryId,
       @Bind("pbv") String parentBusinessVersion,
       @BindList("cdeIds") List<String> cdeIds);
+
+  /** Term snapshots of the given records that belong to one glossary snapshot manifest. */
+  @SqlQuery(
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, "
+          + "s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, "
+          + "s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+          + "FROM glossary_snapshot_term r "
+          + "JOIN glossary_business_snapshot s ON s.snapshotId = r.termSnapshotId "
+          + "WHERE r.glossarySnapshotId = :glossarySnapshotId AND s.entityId IN (<termIds>)")
+  @RegisterRowMapper(PublishedSnapshotMapper.class)
+  List<PublishedSnapshotRecord> listManifestSnapshots(
+      @BindUUID("glossarySnapshotId") UUID glossarySnapshotId,
+      @BindList("termIds") List<String> termIds);
 
   record RankedRecord(
       UUID termId, String columnKey, String columnFqn, String cdeId, Integer survivorshipRank) {}

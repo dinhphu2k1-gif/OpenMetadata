@@ -36,6 +36,7 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.technical.TechnicalCatalog;
 import org.openmetadata.service.glossary.technical.TechnicalColumnProjection;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexSync;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotOutboxRecord;
@@ -55,6 +56,7 @@ public class GlossaryVersioningService {
       ThreadLocal.withInitial(() -> false);
   public static final String GLOSSARY = "glossary";
   public static final String GLOSSARY_TERM = "glossaryTerm";
+  public static final String SNAPSHOT_UPSERT_EVENT = "PUBLISHED_SNAPSHOT_UPSERT";
 
   public WorkingVersionRecord createWorking(
       String entityType,
@@ -253,7 +255,7 @@ public class GlossaryVersioningService {
       }
       throw exception;
     }
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, result.payload());
     return result;
   }
 
@@ -317,7 +319,7 @@ public class GlossaryVersioningService {
                   requireUpdated(updated);
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, result.payload());
     return result;
   }
 
@@ -429,7 +431,7 @@ public class GlossaryVersioningService {
                   requireUpdated(updated);
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, result.payload());
     return result;
   }
 
@@ -593,7 +595,8 @@ public class GlossaryVersioningService {
     if (!DEFER_SIDE_EFFECTS.get()) {
       processPendingOutbox();
     }
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, published.payload());
+    refreshTechnicalPredecessorScope(entityType, published);
     return published;
   }
 
@@ -743,7 +746,8 @@ public class GlossaryVersioningService {
                       actor);
                 });
     processPendingOutbox();
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, archived.payload());
+    refreshTechnicalCatalogScope(entityType, archived.payload(), archived.businessVersion());
     return archived;
   }
 
@@ -841,21 +845,27 @@ public class GlossaryVersioningService {
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     processPendingOutbox();
-    refreshManagerIndexSafely(entityType, entityId);
+    refreshIndexes(entityType, entityId, rejectedWorking.payload());
     return rejectedWorking;
   }
 
   /** Flushes snapshot outbox events idempotently; failures remain pending for a later request. */
   public void processPendingOutbox() {
     GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
+    Map<String, Set<UUID>> changedCdes = new LinkedHashMap<>();
     for (SnapshotOutboxRecord event : dao.listPendingOutbox(OUTBOX_BATCH_SIZE)) {
       try {
         PublishedSnapshotRecord changed = dao.findSnapshot(event.snapshotId());
         if (changed == null) {
           throw new IllegalStateException("Snapshot not found for outbox event " + event.eventId());
         }
-        refreshPublishedIndex(dao, changed.entityType(), changed.entityId());
-        projectTechnicalDictionary(changed);
+        if (isTechnicalRecordSnapshot(changed)) {
+          // TDX-11: Technical Dictionary records are only in technical_dictionary_search_index.
+          new TechnicalColumnProjection().onSnapshotChanged(changed);
+        } else {
+          refreshPublishedIndex(dao, changed.entityType(), changed.entityId());
+          collectApprovedCde(event, changed, changedCdes);
+        }
         dao.markOutboxProcessed(event.eventId(), System.currentTimeMillis());
       } catch (Exception exception) {
         String message =
@@ -866,12 +876,24 @@ public class GlossaryVersioningService {
         LOG.warn("Failed to process glossary snapshot outbox event {}", event.eventId(), exception);
       }
     }
+    TechnicalIndexSync.onCdesApproved(changedCdes);
   }
 
-  private static void projectTechnicalDictionary(PublishedSnapshotRecord snapshot) {
-    if (GLOSSARY_TERM.equals(snapshot.entityType())
-        && TechnicalCatalog.isTechnicalGlossary(snapshot.glossaryId())) {
-      new TechnicalColumnProjection().onSnapshotChanged(snapshot);
+  private static boolean isTechnicalRecordSnapshot(PublishedSnapshotRecord snapshot) {
+    return GLOSSARY_TERM.equals(snapshot.entityType())
+        && TechnicalCatalog.isTechnicalGlossary(snapshot.glossaryId());
+  }
+
+  /** A newly Approved Data Dictionary CDE changes the CDE data stored in Technical documents. */
+  private static void collectApprovedCde(
+      SnapshotOutboxRecord event,
+      PublishedSnapshotRecord changed,
+      Map<String, Set<UUID>> changedCdes) {
+    if (SNAPSHOT_UPSERT_EVENT.equals(event.eventType())
+        && TechnicalIndexSync.isDataDictionaryTerm(changed)) {
+      changedCdes
+          .computeIfAbsent(changed.parentBusinessVersion(), scope -> new HashSet<>())
+          .add(changed.entityId());
     }
   }
 
@@ -914,7 +936,47 @@ public class GlossaryVersioningService {
     for (int round = 0; round < MAX_FLUSH_ROUNDS && !dao.listPendingOutbox(1).isEmpty(); round++) {
       processPendingOutbox();
     }
-    entityIds.forEach(entityId -> refreshManagerIndexSafely(entityType, entityId));
+    final Set<UUID> technicalRecords =
+        GLOSSARY_TERM.equals(entityType)
+            ? TechnicalIndexSync.technicalRecordIds(entityIds)
+            : Set.of();
+    TechnicalIndexSync.refresh(technicalRecords);
+    entityIds.stream()
+        .filter(entityId -> !technicalRecords.contains(entityId))
+        .forEach(entityId -> refreshManagerIndexSafely(entityType, entityId));
+  }
+
+  /**
+   * Refreshes the search documents of one written entity. Technical Dictionary records are written
+   * only to their own index (TDX-11); every other profile keeps the manager index refresh.
+   */
+  private void refreshIndexes(String entityType, UUID entityId, String payload) {
+    if (GLOSSARY_TERM.equals(entityType) && TechnicalIndexSync.isTechnicalPayload(payload)) {
+      if (!DEFER_SIDE_EFFECTS.get()) {
+        TechnicalIndexSync.refresh(entityId);
+      }
+    } else {
+      refreshManagerIndexSafely(entityType, entityId);
+    }
+  }
+
+  /** Approving Technical Dictionary catalog N+1 archives catalog N (cutover). */
+  private static void refreshTechnicalPredecessorScope(
+      String entityType, PublishedSnapshotRecord published) {
+    final BigInteger predecessor =
+        GLOSSARY.equals(entityType)
+            ? new BigInteger(published.businessVersion()).subtract(BigInteger.ONE)
+            : BigInteger.ZERO;
+    if (predecessor.signum() > 0) {
+      refreshTechnicalCatalogScope(entityType, published.payload(), predecessor.toString());
+    }
+  }
+
+  private static void refreshTechnicalCatalogScope(
+      String entityType, String payload, String catalogVersion) {
+    if (GLOSSARY.equals(entityType) && TechnicalIndexSync.isTechnicalPayload(payload)) {
+      TechnicalIndexSync.refreshScope(catalogVersion);
+    }
   }
 
   private void refreshManagerIndexSafely(String entityType, UUID entityId) {

@@ -26,6 +26,8 @@ import {
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 
+const CREATE_RECORD_ACTION = 'CREATE_RECORD';
+
 interface TechnicalImportModalProps {
   open: boolean;
   glossaryId: string;
@@ -113,13 +115,16 @@ const TechnicalImportModal = ({
     }
   };
 
+  const actionLabel = (action: string) =>
+    action === CREATE_RECORD_ACTION ? t('label.declare-column') : action;
+
   const columns: ColumnsType<TechnicalImportPreviewRow> = [
     { title: t('label.row'), dataIndex: 'rowNumber', width: 80 },
     {
       title: t('label.action'),
       dataIndex: 'action',
       width: 220,
-      render: (action: string) => <Tag>{action}</Tag>,
+      render: (action: string) => <Tag>{actionLabel(action)}</Tag>,
     },
     {
       title: t('label.detail-plural'),
@@ -222,7 +227,7 @@ const TechnicalImportModal = ({
                 .filter(([, count]) => count > 0)
                 .map(([key, count]) => (
                   <Tag color={key === 'error' ? 'error' : undefined} key={key}>
-                    {key}: {count}
+                    {actionLabel(key)}: {count}
                   </Tag>
                 ))}
             </Space>

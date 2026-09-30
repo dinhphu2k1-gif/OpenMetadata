@@ -5,6 +5,8 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.ws.rs.WebApplicationException;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ import org.openmetadata.service.jdbi3.ListFilter;
 public final class TechnicalImportLookupsImpl implements TechnicalImportLookups {
   private static final String TAG_NOT_FOUND = "TD_REFERENCE_NOT_FOUND";
   private static final String TAG_AMBIGUOUS = "TD_REFERENCE_AMBIGUOUS";
+  private static final int MAX_CACHED_TABLES = 500;
 
   private final String scope;
   private final TechnicalCdeReferenceResolver cdeResolver = new TechnicalCdeReferenceResolver();
@@ -36,6 +39,8 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
   private Map<String, List<EntityReference>> teams;
   private Map<String, PublishedSnapshotRecord> cdes;
   private WebApplicationException cdeFailure;
+  private final Cache<String, List<TechnicalColumnSource>> tableColumns =
+      Caffeine.newBuilder().maximumSize(MAX_CACHED_TABLES).build();
 
   public TechnicalImportLookupsImpl(String scope) {
     this.scope = scope;
@@ -79,6 +84,16 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
               code, scope));
     }
     return TechnicalCdeReferenceResolver.relationTo(snapshot, scope);
+  }
+
+  @Override
+  public List<TechnicalColumnSource> columns(String database, String schema, String table) {
+    return tableColumns.get(
+        String.join("|", normalize(database), normalize(schema), normalize(table)),
+        key ->
+            TechnicalColumnIndex.columnsOfTable(database, schema, table).stream()
+                .map(TechnicalColumnIndex.ColumnDocument::toSource)
+                .toList());
   }
 
   private Map<String, PublishedSnapshotRecord> loadCdes() {

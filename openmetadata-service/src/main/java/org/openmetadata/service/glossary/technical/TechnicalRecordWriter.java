@@ -10,8 +10,10 @@ import static org.openmetadata.service.Entity.GLOSSARY_TERM;
 
 import jakarta.ws.rs.NotFoundException;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.entity.data.GlossaryTerm;
@@ -24,31 +26,49 @@ import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryTermRepository;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
+import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO;
+import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO.RecordIdentity;
 
-/** Creates and refreshes system-owned Technical Dictionary records for physical Columns. */
+/** Creates declared Technical Dictionary records and refreshes their Column snapshot. */
 public class TechnicalRecordWriter {
   private static final String INTEGRITY_CONSTRAINT_STATE_PREFIX = "23";
 
   private final GlossaryVersioningService versioningService = new GlossaryVersioningService();
 
-  /** Creates identity and working `N.0 Draft`; returns false when the record already exists. */
-  public boolean createDraft(
+  /**
+   * Creates identity and working `N.0 Draft` of one Column with the editable values the user
+   * declared. Returns the new record id, or null when the Column already has a record in the scope.
+   * The caller synchronizes the Technical Dictionary index.
+   */
+  public UUID createDraft(
       Glossary technical,
       String parentBusinessVersion,
       TechnicalColumnSource column,
+      UnaryOperator<GlossaryTerm> declaredValues,
       String actor) {
-    boolean created = true;
+    final GlossaryTerm term = declaredValues.apply(newTerm(technical, parentBusinessVersion, column));
+    UUID created = term.getId();
     try {
-      repository()
-          .createInitialDraft(
-              newTerm(technical, parentBusinessVersion, column), parentBusinessVersion, actor);
+      repository().createInitialDraft(term, parentBusinessVersion, actor);
     } catch (UnableToExecuteStatementException exception) {
       if (!isConstraintViolation(exception)) {
         throw exception;
       }
-      created = false;
+      created = null;
     }
     return created;
+  }
+
+  /** Id of the record of a Column in one scope, or null when the Column has not been declared. */
+  public static UUID findRecord(Glossary technical, String parentBusinessVersion, String columnKey) {
+    return Entity.getJdbi()
+        .onDemand(TechnicalSourceStateDAO.class)
+        .listRecordsByNames(TechnicalCatalog.recordHashPrefix(technical), List.of(columnKey))
+        .stream()
+        .filter(identity -> parentBusinessVersion.equals(identity.parentBusinessVersion()))
+        .map(RecordIdentity::termId)
+        .findFirst()
+        .orElse(null);
   }
 
   /**

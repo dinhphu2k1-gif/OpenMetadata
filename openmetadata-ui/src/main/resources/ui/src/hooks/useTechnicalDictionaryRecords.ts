@@ -41,7 +41,6 @@ const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
 const PAGE_PARAM = 'page';
 const PAGE_SIZE_PARAM = 'pageSize';
 const QUERY_PARAM = 'q';
-const VERSION_VIEW_PARAM = 'versionView';
 
 const splitList = (value: string | null): string[] =>
   value ? value.split(',').filter(Boolean) : [];
@@ -52,7 +51,6 @@ export const parseTechnicalFilters = (
   const filters: TechnicalDictionaryFilters = {
     ...EMPTY_TECHNICAL_FILTERS,
     q: params.get(QUERY_PARAM) ?? '',
-    versionView: params.get(VERSION_VIEW_PARAM) === 'ALL' ? 'ALL' : 'LATEST',
   };
   LIST_KEYS.forEach((key) => {
     (filters[key] as string[]) = splitList(params.get(key));
@@ -68,9 +66,6 @@ export const writeTechnicalFilters = (
 ): URLSearchParams => {
   const next = new URLSearchParams(params);
   filters.q ? next.set(QUERY_PARAM, filters.q) : next.delete(QUERY_PARAM);
-  filters.versionView === 'ALL'
-    ? next.set(VERSION_VIEW_PARAM, 'ALL')
-    : next.delete(VERSION_VIEW_PARAM);
   LIST_KEYS.forEach((key) => {
     const values = filters[key] as string[];
     values.length > 0 ? next.set(key, values.join(',')) : next.delete(key);
@@ -202,7 +197,6 @@ export const useTechnicalDictionaryRecords = ({
         generationTypes: filters.generationType,
         creationMethods: filters.creationMethod,
         timeliness: filters.timeliness,
-        versionView: filters.versionView,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       },

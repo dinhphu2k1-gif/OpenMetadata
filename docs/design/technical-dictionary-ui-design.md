@@ -11,6 +11,11 @@
 > observability — áp dụng nguyên văn tài liệu DQ.
 >
 > Baseline kiến trúc: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md).
+>
+> **Đã thay thế một phần** bởi [Bản ghi theo khai báo, đọc qua index riêng](./technical-dictionary-search-index-design.md):
+> sinh record từ Column (§5.1, §5.2, §5.4), TD-D02, TD-D05, TD-D07 (phần bootstrap), TD-D09,
+> search/filter (§7.3), import tạo record (§8.1), REST (§10) và persistence (§11).
+> Khi hai tài liệu mâu thuẫn, tài liệu mới được áp dụng.
 
 ## 1. Khác biệt so với Chất lượng dữ liệu
 

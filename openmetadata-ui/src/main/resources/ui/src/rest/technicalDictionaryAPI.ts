@@ -19,17 +19,10 @@ import {
 import APIClient from './index';
 
 export type TechnicalSourceStatus = 'Available' | 'Unavailable' | 'Changed';
-export type TechnicalVersionView = 'LATEST' | 'ALL';
 export type TechnicalRecordType = 'working' | 'published' | 'archived';
 export type TechnicalBulkAction = 'submit' | 'approve' | 'reject';
 export type TechnicalImportPolicy = 'DRAFT_ONLY' | 'ALL_EDITABLE';
-export type TechnicalBootstrapStatusValue =
-  | 'Pending'
-  | 'Running'
-  | 'Succeeded'
-  | 'Failed';
-
-/** A flat row of the governed read model, as returned by /glossaryTerms/search. */
+/** A flat row of the Technical Dictionary index, as returned by /glossaryTerms/technical/search. */
 export interface TechnicalRecordApiRow {
   termId: string;
   name: string;
@@ -48,6 +41,7 @@ export interface TechnicalRecordApiRow {
   cdeCode: string;
   cdeName: string;
   dataOwners: EntityReference[];
+  hasPublished: boolean;
 }
 
 export interface TechnicalRecordQuery {
@@ -64,7 +58,6 @@ export interface TechnicalRecordQuery {
   generationTypes?: string[];
   creationMethods?: string[];
   timeliness?: string[];
-  versionView?: TechnicalVersionView;
   limit: number;
   offset: number;
 }
@@ -77,21 +70,35 @@ export interface TechnicalRecordPage {
 export interface TechnicalStats {
   totalColumns: number;
   totalTables: number;
-  mappedCde: number;
   totalSources: number;
+  approved: number;
 }
 
-export interface TechnicalBootstrapJob {
-  jobId: string;
-  businessVersion: string;
-  status: TechnicalBootstrapStatusValue;
-  total: number;
-  processed: number;
-  created: number;
-  skipped: number;
-  failed: number;
-  errors?: Array<{ source: string; error: string; message: string }> | null;
-  updatedAt: number;
+/** A physical Column returned by the Add column picker. */
+export interface TechnicalColumnCandidate {
+  columnKey: string;
+  columnFqn: string;
+  description?: string;
+  declared: boolean;
+  termId?: string;
+  sourceService?: string;
+  sourceDatabase?: string;
+  sourceSchema?: string;
+  sourceTable?: string;
+  sourceColumn?: string;
+  sourceDataType?: string;
+}
+
+/** Initial values sent when declaring a Column; every value but the Column is optional. */
+export interface TechnicalDeclarationRequest {
+  columnFqn: string;
+  cde?: string;
+  rank?: number;
+  elementType?: string;
+  generationType?: string;
+  creationMethod?: string;
+  timeliness?: string;
+  systemOwnerId?: string;
 }
 
 export interface TechnicalBulkRequest {
@@ -157,7 +164,7 @@ export const searchTechnicalRecords = async (
   signal?: AbortSignal
 ): Promise<TechnicalRecordPage> => {
   const response = await APIClient.get<TechnicalRecordPage>(
-    '/glossaryTerms/search',
+    '/glossaryTerms/technical/search',
     {
       params: {
         glossary: query.glossary,
@@ -173,7 +180,6 @@ export const searchTechnicalRecords = async (
         generationTypes: csv(query.generationTypes),
         creationMethods: csv(query.creationMethods),
         timeliness: csv(query.timeliness),
-        versionView: query.versionView,
         limit: query.limit,
         offset: query.offset,
       },
@@ -188,11 +194,51 @@ export const getTechnicalStats = async (
   glossary: string,
   parentBusinessVersion: string
 ): Promise<TechnicalStats> => {
-  const response = await APIClient.get<TechnicalStats>('/glossaryTerms/stats', {
+  const response = await APIClient.get<TechnicalStats>(
+    '/glossaryTerms/technical/stats',
+    { params: { glossary, parentBusinessVersion } }
+  );
+
+  return response.data;
+};
+
+export const searchTechnicalColumns = async (
+  glossary: string,
+  parentBusinessVersion: string,
+  q: string,
+  limit: number,
+  signal?: AbortSignal
+): Promise<TechnicalColumnCandidate[]> => {
+  const response = await APIClient.get<{ data: TechnicalColumnCandidate[] }>(
+    '/glossaryTerms/technical/columns',
+    { params: { glossary, parentBusinessVersion, q: q || undefined, limit }, signal }
+  );
+
+  return response.data.data;
+};
+
+export const declareTechnicalColumn = async (
+  glossary: string,
+  parentBusinessVersion: string,
+  request: TechnicalDeclarationRequest
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.post<
+    TechnicalDeclarationRequest,
+    AxiosResponse<TechnicalRecordApiRow>
+  >('/glossaryTerms/technical/records', request, {
     params: { glossary, parentBusinessVersion },
   });
 
   return response.data;
+};
+
+export const deleteTechnicalDraft = async (
+  termId: string,
+  parentBusinessVersion: string
+): Promise<void> => {
+  await APIClient.delete(`/glossaryTerms/technical/records/${termId}`, {
+    params: { parentBusinessVersion },
+  });
 };
 
 export const exportTechnicalDictionary = async (
@@ -212,42 +258,6 @@ export const exportTechnicalDictionary = async (
     blob: response.data,
     fileName: match?.[1] ?? `TuDienKyThuat_v${parentBusinessVersion}.xlsx`,
   };
-};
-
-export const getTechnicalBootstrapJobs = async (
-  glossaryId: string,
-  businessVersion?: string
-): Promise<TechnicalBootstrapJob[]> => {
-  const response = await APIClient.get<TechnicalBootstrapJob[]>(
-    `/glossaries/${glossaryId}/bootstrap-jobs`,
-    { params: { businessVersion } }
-  );
-
-  return response.data;
-};
-
-export const retryTechnicalBootstrapJob = async (
-  glossaryId: string,
-  jobId: string
-): Promise<TechnicalBootstrapJob> => {
-  const response = await APIClient.post<TechnicalBootstrapJob>(
-    `/glossaries/${glossaryId}/bootstrap-jobs/${jobId}/retry`
-  );
-
-  return response.data;
-};
-
-export const startTechnicalBootstrapJob = async (
-  glossaryId: string,
-  businessVersion: string
-): Promise<TechnicalBootstrapJob> => {
-  const response = await APIClient.post<TechnicalBootstrapJob>(
-    `/glossaries/${glossaryId}/bootstrap-jobs`,
-    undefined,
-    { params: { businessVersion } }
-  );
-
-  return response.data;
 };
 
 export const runTechnicalBulkWorkflow = async (

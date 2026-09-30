@@ -69,7 +69,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
@@ -114,13 +113,14 @@ import org.openmetadata.service.glossary.technical.TechnicalImportPlan.UpdatePol
 import org.openmetadata.service.glossary.technical.TechnicalImportService;
 import org.openmetadata.service.glossary.technical.TechnicalImportService.PreviewScope;
 import org.openmetadata.service.glossary.technical.TechnicalImportSheet;
+import org.openmetadata.service.glossary.technical.TechnicalImportTables;
 import org.openmetadata.service.glossary.technical.TechnicalRankGuard;
 import org.openmetadata.service.glossary.technical.TechnicalRecordValidator;
-import org.openmetadata.service.glossary.technical.TechnicalRowDecorator;
-import org.openmetadata.service.glossary.technical.TechnicalRowFields;
-import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 import org.openmetadata.service.glossary.technical.TechnicalSourceStates;
-import org.openmetadata.service.glossary.technical.TechnicalStats;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexSync;
+import org.openmetadata.service.glossary.technical.search.TechnicalSearchCriteria;
+import org.openmetadata.service.glossary.technical.search.TechnicalSearchParameters;
+import org.openmetadata.service.glossary.technical.search.TechnicalSearchService;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
 import org.openmetadata.service.glossary.versioning.CdeImportService;
@@ -179,12 +179,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       new GlossaryBusinessVersionSearchService();
   private final CdeImportService cdeImportService = new CdeImportService();
   private final TechnicalRecordValidator technicalRecordValidator = new TechnicalRecordValidator();
-  private final TechnicalRowDecorator technicalRowDecorator = new TechnicalRowDecorator();
   private final TechnicalImportService technicalImportService = new TechnicalImportService();
   private final TechnicalImportCommitter technicalImportCommitter = new TechnicalImportCommitter();
   private final GovernedBulkWorkflowService bulkWorkflowService = new GovernedBulkWorkflowService();
   private final TechnicalCdeReferenceResolver technicalCdeResolver =
       new TechnicalCdeReferenceResolver();
+  private final GovernedScopeAuthorizer scopeAuthorizer;
+  private final TechnicalSearchService technicalSearchService = new TechnicalSearchService();
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
@@ -295,14 +296,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     ImportScope scope =
         authorizeTechnicalImport(
             securityContext, glossaryId, requestedParentBusinessVersion, policy);
-    List<Map<String, Object>> latestRows =
-        TechnicalRowMatcher.keepLatest(
-            loadAuthorizedGlossaryFlatRows(
-                    securityContext,
-                    glossaryId.toString(),
-                    scope.parentBusinessVersion(),
-                    GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY)
-                .rows());
+    TechnicalSearchCriteria declared =
+        technicalScope(
+            scopeAuthorizer.authorizeRead(
+                securityContext,
+                glossaryId.toString(),
+                scope.parentBusinessVersion(),
+                GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY));
+    TechnicalIndexSync.processPendingForRequest();
     byte[] fileBytes =
         TechnicalImportSheet.readBytes(input, fileDetail == null ? -1 : fileDetail.getSize());
     return technicalImportService.preview(
@@ -312,8 +313,37 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             scope.parentBusinessVersion(),
             policy,
             securityContext.getUserPrincipal().getName()),
-        latestRows,
+        sheet -> declaredRowsOfTables(declared, sheet),
         new TechnicalImportLookupsImpl(scope.parentBusinessVersion()));
+  }
+
+  /** Declared records of the tables named in the file, read from the Technical index. */
+  private List<Map<String, Object>> declaredRowsOfTables(
+      TechnicalSearchCriteria declared, TechnicalImportSheet sheet) {
+    return TechnicalImportTables.of(sheet).stream()
+        .flatMap(
+            table ->
+                technicalSearchService
+                    .rowsOfTable(declared, table.database(), table.schema(), table.table())
+                    .stream())
+        .toList();
+  }
+
+  /** Scope and view a caller reads in the Technical index (design §6). */
+  private static TechnicalSearchCriteria technicalScope(GovernedScopeAuthorizer.ScopeAccess access) {
+    return TechnicalSearchCriteria.scopeOnly(
+        access.glossaryId(),
+        access.parentBusinessVersion(),
+        TechnicalDictionaryResource.readsPublishedOnly(access));
+  }
+
+  private static TechnicalSearchParameters.ReadScope technicalReadScope(
+      GovernedScopeAuthorizer.ScopeAccess access) {
+    return new TechnicalSearchParameters.ReadScope(
+        access.glossaryId(),
+        access.parentBusinessVersion(),
+        TechnicalDictionaryResource.readsPublishedOnly(access),
+        access.isArchived());
   }
 
   @POST
@@ -461,6 +491,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   public GlossaryTermResource(Authorizer authorizer, Limits limits) {
     super(Entity.GLOSSARY_TERM, authorizer, limits);
+    this.scopeAuthorizer = new GovernedScopeAuthorizer(authorizer);
   }
 
   private static GlossaryTerm publishedTerm(PublishedSnapshotRecord snapshot) {
@@ -478,50 +509,63 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @Context SecurityContext securityContext,
       @NotNull @QueryParam("glossary") UUID glossaryId,
       @NotNull @QueryParam("parentBusinessVersion") String requestedParentBusinessVersion) {
-    AuthorizedFlatRows authorized =
-        loadAuthorizedGlossaryFlatRows(
+    GovernedScopeAuthorizer.ScopeAccess access =
+        scopeAuthorizer.authorizeRead(
             securityContext,
             glossaryId == null ? null : glossaryId.toString(),
             requestedParentBusinessVersion,
             null);
-    return switch (authorized.profile()) {
-      case DATA_DICTIONARY -> exportWorkbook(
-          securityContext,
-          glossaryId,
-          authorized,
-          "Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v",
-          CdeExcelExporter::write);
+    String version = access.parentBusinessVersion();
+    return switch (access.profile()) {
+      case DATA_DICTIONARY -> {
+        AuthorizedFlatRows authorized = loadFlatRows(securityContext, access);
+        yield exportWorkbook(
+            securityContext,
+            glossaryId,
+            version,
+            "Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v",
+            () -> CdeExcelExporter.write(authorized.rows(), version));
+      }
       case TECHNICAL_DICTIONARY -> exportWorkbook(
           securityContext,
           glossaryId,
-          authorized.withRows(TechnicalRowMatcher.keepLatest(authorized.rows())),
+          version,
           "TuDienKyThuat_Agribank_v",
-          TechnicalExcelExporter::write);
+          () -> exportTechnicalRows(access, version));
       case DATA_QUALITY -> throw new BadRequestException(
           "Export is not supported for this glossary profile");
     };
   }
 
+  /** Streams every record the caller may read from the Technical index into the workbook. */
+  private ExportedWorkbook exportTechnicalRows(
+      GovernedScopeAuthorizer.ScopeAccess access, String version) throws IOException {
+    TechnicalIndexSync.processPendingForRequest();
+    TechnicalSearchCriteria criteria = technicalScope(access);
+    return TechnicalExcelExporter.write(
+        visitor -> technicalSearchService.scanRows(criteria, visitor), version);
+  }
+
   @FunctionalInterface
-  private interface WorkbookWriter {
-    ExportedWorkbook write(List<Map<String, Object>> rows, String version) throws IOException;
+  private interface WorkbookProducer {
+    ExportedWorkbook produce() throws IOException;
   }
 
   private Response exportWorkbook(
       SecurityContext securityContext,
       UUID glossaryId,
-      AuthorizedFlatRows authorized,
+      String parentBusinessVersion,
       String filenamePrefix,
-      WorkbookWriter writer) {
+      WorkbookProducer producer) {
     ExportedWorkbook workbook = null;
     try {
-      workbook = writer.write(authorized.rows(), authorized.parentBusinessVersion());
+      workbook = producer.produce();
       java.nio.file.Path file = workbook.path();
       file.toFile().deleteOnExit();
       long contentLength = Files.size(file);
       String filename =
           filenamePrefix
-              + authorized.parentBusinessVersion()
+              + parentBusinessVersion
               + "_"
               + LocalDateTime.now().format(CDE_EXPORT_TIMESTAMP)
               + ".xlsx";
@@ -537,7 +581,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           "Governed Excel export authorized actor={} glossaryId={} parentBusinessVersion={} rows={}",
           securityContext.getUserPrincipal().getName(),
           glossaryId,
-          authorized.parentBusinessVersion(),
+          parentBusinessVersion,
           workbook.rowCount());
       return Response.ok(stream, CdeExcelExporter.XLSX_MEDIA_TYPE)
           .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
@@ -549,7 +593,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           "Governed Excel export failed actor={} glossaryId={} parentBusinessVersion={}",
           securityContext.getUserPrincipal().getName(),
           glossaryId,
-          authorized.parentBusinessVersion(),
+          parentBusinessVersion,
           exception);
       throw new jakarta.ws.rs.InternalServerErrorException("Unable to export glossary", exception);
     }
@@ -576,22 +620,73 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @NotNull @Valid GovernedBulkWorkflowService.Request request) {
     GovernedBulkWorkflowService.Action workflowAction =
         GovernedBulkWorkflowService.Action.from(action);
-    AuthorizedFlatRows authorized =
-        loadAuthorizedGlossaryFlatRows(
+    GovernedScopeAuthorizer.ScopeAccess access =
+        scopeAuthorizer.authorizeRead(
             securityContext,
             String.valueOf(request.glossaryId()),
             request.parentBusinessVersion(),
             null);
-    if (authorized.scopeType() == ScopeType.ARCHIVED) {
+    if (access.isArchived()) {
       throw new BadRequestException("Bulk workflow is not available for an archived scope");
     }
+    boolean technical =
+        access.profile() == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
     return bulkWorkflowService.run(
         workflowAction,
         request,
-        selectBulkRows(request, authorized),
+        technical
+            ? selectTechnicalBulkRows(request, access)
+            : selectBulkRows(request, loadFlatRows(securityContext, access)),
         (row, batchTermIds) ->
             applyBulkAction(workflowAction, securityContext, request, row, batchTermIds),
-        bulkPrecheck(workflowAction, authorized, request));
+        bulkPrecheck(workflowAction, access.profile(), request));
+  }
+
+  /**
+   * Technical Dictionary bulk selection: record ids come from the Technical index (filters) or the
+   * request (explicit ids); the working state that decides eligibility is re-read from the
+   * database.
+   */
+  private List<Map<String, Object>> selectTechnicalBulkRows(
+      GovernedBulkWorkflowService.Request request, GovernedScopeAuthorizer.ScopeAccess access) {
+    Map<String, String> criteria = request.criteria() == null ? Map.of() : request.criteria();
+    List<UUID> requestedIds = listOrEmpty(request.termIds());
+    List<UUID> selected = requestedIds;
+    if (!criteria.isEmpty() || requestedIds.isEmpty()) {
+      TechnicalIndexSync.processPendingForRequest();
+      Set<UUID> requested = new HashSet<>(requestedIds);
+      selected =
+          technicalSearchService
+              .termIds(
+                  TechnicalSearchParameters.scanCriteria(technicalReadScope(access), criteria))
+              .stream()
+              .filter(termId -> requested.isEmpty() || requested.contains(termId))
+              .toList();
+    }
+    return technicalWorkingRows(access, selected);
+  }
+
+  private List<Map<String, Object>> technicalWorkingRows(
+      GovernedScopeAuthorizer.ScopeAccess access, List<UUID> termIds) {
+    Map<UUID, WorkingVersionRecord> working =
+        versioningService.getWorkingBatch(
+            GlossaryVersioningService.GLOSSARY_TERM, termIds, access.parentBusinessVersion());
+    return termIds.stream()
+        .distinct()
+        .map(working::get)
+        .filter(java.util.Objects::nonNull)
+        .filter(record -> access.glossaryId().equals(record.glossaryId()))
+        .map(GlossaryTermResource::bulkRow)
+        .toList();
+  }
+
+  private static Map<String, Object> bulkRow(WorkingVersionRecord working) {
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("termId", working.entityId().toString());
+    row.put("recordType", "working");
+    row.put("entityStatus", working.entityStatus());
+    row.put("workingRevision", working.revision());
+    return row;
   }
 
   private List<Map<String, Object>> selectBulkRows(
@@ -625,8 +720,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         null,
         null,
         10,
-        0,
-        profileFilters(authorized.profile(), criteria));
+        0);
   }
 
   private void applyBulkAction(
@@ -673,11 +767,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private GovernedBulkWorkflowService.ChunkPrecheck bulkPrecheck(
       GovernedBulkWorkflowService.Action action,
-      AuthorizedFlatRows authorized,
+      GovernedGlossaryProfileRegistry.Profile profile,
       GovernedBulkWorkflowService.Request request) {
     boolean technicalApproval =
         action == GovernedBulkWorkflowService.Action.APPROVE
-            && authorized.profile() == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
+            && profile == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
     return technicalApproval ? rows -> technicalRankConflicts(rows, request) : rows -> Map.of();
   }
 
@@ -707,18 +801,14 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Path("/stats")
   @Operation(
       operationId = "getTechnicalDictionaryStats",
-      summary = "Header statistics of one Technical Dictionary version")
-  public Map<String, Long> getTechnicalDictionaryStats(
-      @Context SecurityContext securityContext,
-      @NotNull @QueryParam("glossary") UUID glossaryId,
-      @NotNull @QueryParam("parentBusinessVersion") String requestedParentBusinessVersion) {
-    AuthorizedFlatRows authorized =
-        loadAuthorizedGlossaryFlatRows(
-            securityContext,
-            glossaryId.toString(),
-            requestedParentBusinessVersion,
-            GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY);
-    return TechnicalStats.of(TechnicalRowMatcher.keepLatest(authorized.rows()));
+      summary = "Moved: use /v1/glossaryTerms/technical/stats")
+  public Map<String, Long> getTechnicalDictionaryStats() {
+    throw technicalEndpointMoved("/v1/glossaryTerms/technical/stats");
+  }
+
+  private static BadRequestException technicalEndpointMoved(String replacement) {
+    return new BadRequestException(
+        "Technical Dictionary records are read through " + replacement);
   }
 
   @GET
@@ -1586,17 +1676,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @QueryParam("dataSourceTags") String dataSourceTags,
       @QueryParam("classificationTags") String classificationTags,
       @QueryParam("sortField") String sortField,
-      @QueryParam("sortOrder") String sortOrder,
-      @QueryParam("sourceServices") String sourceServices,
-      @QueryParam("cdeMapping") String cdeMapping,
-      @QueryParam("cdeTermIds") String cdeTermIds,
-      @QueryParam("systemOwnerIds") String systemOwnerIds,
-      @QueryParam("sourceStatuses") String sourceStatuses,
-      @QueryParam("versionView") String versionView,
-      @QueryParam("elementTypes") String elementTypes,
-      @QueryParam("generationTypes") String generationTypes,
-      @QueryParam("creationMethods") String creationMethods,
-      @QueryParam("timeliness") String timeliness) {
+      @QueryParam("sortOrder") String sortOrder) {
 
     if (parentBusinessVersion != null) {
       if (glossaryId == null) {
@@ -1616,20 +1696,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           sortField,
           sortOrder,
           limitParam,
-          offsetParam,
-          technicalFilterParameters(
-              new String[] {
-                sourceServices,
-                cdeMapping,
-                cdeTermIds,
-                systemOwnerIds,
-                sourceStatuses,
-                versionView,
-                elementTypes,
-                generationTypes,
-                creationMethods,
-                timeliness
-              }));
+          offsetParam);
     }
 
     Fields fields = getFields(fieldsParam);
@@ -1647,10 +1714,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     authorizer.authorizeRequests(securityContext, authRequests, AuthorizationLogic.ANY);
 
     if (glossaryId != null) {
-      GovernedGlossaryProfileRegistry.requireName(
-          repository.getGlossary(glossaryId.toString()).getName());
+      rejectTechnicalSearch(
+          GovernedGlossaryProfileRegistry.requireName(
+              repository.getGlossary(glossaryId.toString()).getName()));
     } else if (glossaryFqn != null) {
-      GovernedGlossaryProfileRegistry.requireName(glossaryFqn);
+      rejectTechnicalSearch(GovernedGlossaryProfileRegistry.requireName(glossaryFqn));
     } else if (parentId != null) {
       requireCde(parentId);
     } else if (parentFqn != null) {
@@ -1720,8 +1788,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String sortField,
       String sortOrder,
       int limit,
-      int offset,
-      Map<String, String> technicalFilterParameters) {
+      int offset) {
     AuthorizedFlatRows authorized =
         loadAuthorizedGlossaryFlatRows(
             securityContext, glossaryId.toString(), parentBusinessVersion, null);
@@ -1738,8 +1805,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             sortField,
             sortOrder,
             limit,
-            offset,
-            profileFilters(authorized.profile(), technicalFilterParameters));
+            offset);
     Criteria validated =
         GlossaryBusinessVersionSearchService.validate(
             criteria, authorized.consumerOnly(), authorized.scopeType() == ScopeType.ARCHIVED);
@@ -1753,32 +1819,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         authorized.scopeType() == ScopeType.ARCHIVED);
   }
 
-  private static final List<String> TECHNICAL_FILTER_NAMES =
-      List.of(
-          TechnicalRowMatcher.SOURCE_SERVICES,
-          TechnicalRowMatcher.CDE_MAPPING,
-          TechnicalRowMatcher.CDE_TERM_IDS,
-          TechnicalRowMatcher.SYSTEM_OWNER_IDS,
-          TechnicalRowMatcher.SOURCE_STATUSES,
-          TechnicalRowMatcher.VERSION_VIEW,
-          TechnicalRowMatcher.ELEMENT_TYPES,
-          TechnicalRowMatcher.GENERATION_TYPES,
-          TechnicalRowMatcher.CREATION_METHODS,
-          TechnicalRowMatcher.TIMELINESS);
-
-  private static Map<String, String> technicalFilterParameters(String[] values) {
-    Map<String, String> parameters = new LinkedHashMap<>();
-    for (int index = 0; index < TECHNICAL_FILTER_NAMES.size(); index++) {
-      parameters.put(TECHNICAL_FILTER_NAMES.get(index), values[index]);
+  private static void rejectTechnicalSearch(GovernedGlossaryProfileRegistry.Profile profile) {
+    if (profile == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
+      throw technicalEndpointMoved("/v1/glossaryTerms/technical/search");
     }
-    return parameters;
-  }
-
-  private static Map<String, List<String>> profileFilters(
-      GovernedGlossaryProfileRegistry.Profile profile, Map<String, String> parameters) {
-    return profile == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY
-        ? TechnicalRowMatcher.validate(parameters)
-        : Map.of();
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
@@ -2450,25 +2494,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       UUID glossaryId,
       String parentBusinessVersion,
       GovernedGlossaryProfileRegistry.Profile profile) {
-    try {
-      WorkingVersionRecord working =
-          versioningService.getWorking(GlossaryVersioningService.GLOSSARY, glossaryId);
-      if (parentBusinessVersion.equals(working.businessVersion())) {
-        return JsonUtils.readValue(working.payload(), Glossary.class);
-      }
-    } catch (NotFoundException ignored) {
-      // An active Approved governed glossary intentionally has no working record.
-    }
-
-    PublishedSnapshotRecord published =
-        versioningService.getLatestPublished(GlossaryVersioningService.GLOSSARY, glossaryId);
-    if (!parentBusinessVersion.equals(published.businessVersion())
-        || published.archivedAt() != null) {
-      throw new BadRequestException(
-          "parentBusinessVersion must identify a working or active Approved "
-              + profile.glossaryName());
-    }
-    return JsonUtils.readValue(published.payload(), Glossary.class);
+    return scopeAuthorizer.resolveCreateScope(glossaryId, parentBusinessVersion, profile);
   }
 
   private Map<String, Object> listGlossaryFlatRows(
@@ -2503,58 +2529,26 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String glossaryIdParam,
       String requestedParentBusinessVersion,
       GovernedGlossaryProfileRegistry.Profile requiredProfile) {
-    if (glossaryIdParam == null || glossaryIdParam.isBlank()) {
-      throw new BadRequestException("glossary is required for a governed flat list");
-    }
-    final String parentBusinessVersion;
-    try {
-      parentBusinessVersion =
-          GlossaryBusinessVersion.requireCanonicalDictionary(requestedParentBusinessVersion);
-    } catch (IllegalArgumentException exception) {
-      throw new BadRequestException(exception.getMessage());
-    }
+    return loadFlatRows(
+        securityContext,
+        scopeAuthorizer.authorizeRead(
+            securityContext, glossaryIdParam, requestedParentBusinessVersion, requiredProfile));
+  }
 
-    final EntityReference glossaryReference;
-    final GovernedGlossaryProfileRegistry.Profile profile;
-    try {
-      glossaryReference = repository.getGlossary(glossaryIdParam);
-      profile = GovernedGlossaryProfileRegistry.requireName(glossaryReference.getName());
-      if (requiredProfile != null && profile != requiredProfile) {
-        throw new BadRequestException("Unexpected governed glossary profile");
-      }
-    } catch (BadRequestException | EntityNotFoundException exception) {
-      throw new NotFoundException("Governed glossary scope was not found");
-    }
-    UUID glossaryId = glossaryReference.getId();
-    Scope scope = glossaryFlatListService.resolveScope(glossaryId, parentBusinessVersion);
-    Glossary authorizationGlossary = JsonUtils.readValue(scope.payload(), Glossary.class);
-    boolean consumerOnly =
-        GlossaryAuthorizationResolver.isConsumerOnly(
-            org.openmetadata.service.security.DefaultAuthorizer.getSubjectContext(securityContext));
-    GlossaryAuthorizationResolver.Capabilities parentCapabilities =
-        capabilitiesForAuthorizationGlossary(securityContext, authorizationGlossary);
-    if ((scope.type() == ScopeType.ACTIVE
-            && !policyAllowsGlossary(
-                securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC))
-        || (scope.type() == ScopeType.WORKING
-            && (consumerOnly || !parentCapabilities.canViewWorking()))
-        || (scope.type() == ScopeType.ARCHIVED
-            && !policyAllowsGlossary(
-                securityContext, authorizationGlossary, MetadataOperation.VIEW_BASIC)
-            && !parentCapabilities.canViewWorking()
-            && !parentCapabilities.canArchive())) {
-      throw new NotFoundException(profile.glossaryName() + " scope was not found");
-    }
+  private AuthorizedFlatRows loadFlatRows(
+      SecurityContext securityContext, GovernedScopeAuthorizer.ScopeAccess access) {
+    rejectTechnicalSearch(access.profile());
+    UUID glossaryId = access.glossaryId();
+    String parentBusinessVersion = access.parentBusinessVersion();
+    Scope scope = access.scope();
+    GovernedGlossaryProfileRegistry.Profile profile = access.profile();
+    boolean consumerOnly = access.consumerOnly();
 
     Candidates candidates = glossaryFlatListService.loadCandidates(glossaryId, scope);
     List<Map<String, Object>> visibleRows = new ArrayList<>();
-    GovernedRowAuthorizationCache authorizationCache =
-        profile == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY
-            ? new GovernedRowAuthorizationCache()
-            : null;
     for (PublishedSnapshotRecord record : candidates.published()) {
       GlossaryTerm term = publishedTerm(record);
-      if (!isPublishedVisible(securityContext, term, authorizationCache)) {
+      if (!isPublishedVisible(securityContext, term)) {
         continue;
       }
       Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.published(record));
@@ -2566,7 +2560,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       visibleRows.add(row);
     }
     for (WorkingVersionRecord record : candidates.working()) {
-      if (!isWorkingVisible(securityContext, record, authorizationCache)) {
+      if (!isWorkingVisible(securityContext, record)) {
         continue;
       }
       Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.working(record));
@@ -2575,35 +2569,17 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
 
     visibleRows.sort(GLOSSARY_FLAT_ROW_COMPARATOR);
-    if (profile == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
-      technicalRowDecorator.decorate(visibleRows, glossaryId, parentBusinessVersion);
-      visibleRows.sort(GLOSSARY_FLAT_ROW_COMPARATOR);
-    }
     return new AuthorizedFlatRows(
         parentBusinessVersion, scope.type(), consumerOnly, profile, visibleRows);
   }
 
-  private boolean isPublishedVisible(
-      SecurityContext securityContext, GlossaryTerm term, GovernedRowAuthorizationCache cache) {
-    Supplier<Boolean> decision =
-        () ->
-            capabilitiesForAuthorizationTerm(securityContext, term).canViewPublished()
-                && policyAllows(securityContext, term, MetadataOperation.VIEW_BASIC);
-    return cache == null ? decision.get() : cache.publishedVisible(term, decision);
+  private boolean isPublishedVisible(SecurityContext securityContext, GlossaryTerm term) {
+    return capabilitiesForAuthorizationTerm(securityContext, term).canViewPublished()
+        && policyAllows(securityContext, term, MetadataOperation.VIEW_BASIC);
   }
 
-  private boolean isWorkingVisible(
-      SecurityContext securityContext,
-      WorkingVersionRecord record,
-      GovernedRowAuthorizationCache cache) {
-    Supplier<Boolean> decision =
-        () -> capabilitiesForWorking(securityContext, record).canViewWorking();
-    return cache == null
-        ? decision.get()
-        : cache.workingVisible(
-            JsonUtils.readValue(record.payload(), GlossaryTerm.class),
-            securityContext.getUserPrincipal().getName().equals(record.createdBy()),
-            decision);
+  private boolean isWorkingVisible(SecurityContext securityContext, WorkingVersionRecord record) {
+    return capabilitiesForWorking(securityContext, record).canViewWorking();
   }
 
   private record AuthorizedFlatRows(
@@ -2611,12 +2587,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       ScopeType scopeType,
       boolean consumerOnly,
       GovernedGlossaryProfileRegistry.Profile profile,
-      List<Map<String, Object>> rows) {
-    AuthorizedFlatRows withRows(List<Map<String, Object>> replacement) {
-      return new AuthorizedFlatRows(
-          parentBusinessVersion, scopeType, consumerOnly, profile, replacement);
-    }
-  }
+      List<Map<String, Object>> rows) {}
 
   private ImportScope authorizeImportScope(
       SecurityContext securityContext, UUID glossaryId, String requestedParentBusinessVersion) {
@@ -2948,14 +2919,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private GlossaryAuthorizationResolver.Capabilities capabilitiesForAuthorizationGlossary(
       SecurityContext securityContext, Glossary glossary) {
-    return GlossaryAuthorizationResolver.fromPolicy(
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.VIEW_WORKING),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.EDIT_WORKING),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.SUBMIT_WORKING),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.CREATE_VERSION),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.APPROVE_WORKING),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.REJECT_WORKING),
-        policyAllowsGlossary(securityContext, glossary, MetadataOperation.ARCHIVE_PUBLISHED));
+    return scopeAuthorizer.capabilitiesFor(securityContext, glossary);
   }
 
   private void authorizeCdeDetailScope(
@@ -2981,16 +2945,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
 
   private boolean policyAllowsGlossary(
       SecurityContext securityContext, Glossary glossary, MetadataOperation operation) {
-    try {
-      authorizer.authorize(
-          securityContext,
-          new OperationContext(GLOSSARY, operation),
-          new ResourceContext<Glossary>(
-              GLOSSARY, glossary, (GlossaryRepository) Entity.getEntityRepository(GLOSSARY)));
-      return true;
-    } catch (AuthorizationException exception) {
-      return false;
-    }
+    return scopeAuthorizer.policyAllows(securityContext, glossary, operation);
   }
 
   private static void normalizeFlatRow(
@@ -3015,10 +2970,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private static final Comparator<Map<String, Object>> GLOSSARY_FLAT_ROW_COMPARATOR =
       Comparator.<Map<String, Object>, String>comparing(
               row ->
-                  String.valueOf(
-                          row.getOrDefault(
-                              TechnicalRowFields.SORT_KEY, row.getOrDefault("name", "")))
-                      .toLowerCase(Locale.ROOT))
+                  String.valueOf(row.getOrDefault("name", "")).toLowerCase(Locale.ROOT))
           .thenComparing(
               (left, right) ->
                   compareNumericBusinessVersion(

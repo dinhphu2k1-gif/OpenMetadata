@@ -29,6 +29,7 @@ export interface TechnicalDictionaryRow {
   status: string;
   recordType: TechnicalRecordType;
   workingRevision?: number;
+  hasPublished: boolean;
   databaseName: string;
   databaseFqn?: string;
   schemaName: string;
@@ -68,7 +69,6 @@ export interface TechnicalDictionaryFilters {
   creationMethod: string[];
   timeliness: string[];
   systemOwnerIds: string[];
-  versionView: 'LATEST' | 'ALL';
 }
 
 export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
@@ -83,7 +83,6 @@ export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
   creationMethod: [],
   timeliness: [],
   systemOwnerIds: [],
-  versionView: 'LATEST',
 };
 
 /** What the signed-in user may do; the backend remains the authority. */

@@ -24,6 +24,7 @@ import { Tag } from '../../generated/entity/classification/tag';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import TechnicalVersionHistory from './TechnicalVersionHistory.component';
 
 /** Editable values collected from the modal. `cde` is undefined when unchanged, null when cleared. */
 export interface TechnicalRecordFormValues {
@@ -36,7 +37,7 @@ export interface TechnicalRecordFormValues {
   systemOwnerId?: string;
 }
 
-export type TechnicalRecordModalMode = 'view' | 'edit';
+export type TechnicalRecordModalMode = 'view' | 'edit' | 'create';
 
 interface TechnicalRecordModalProps {
   open: boolean;
@@ -67,6 +68,12 @@ const TechnicalRecordModal = ({
   const [form] = Form.useForm<TechnicalRecordFormValues>();
   const [pendingCde, setPendingCde] = useState<GlossaryTerm | null>();
   const isReadOnly = mode === 'view';
+  const isCreate = mode === 'create';
+  const titleKey = {
+    view: 'label.view-technical-field',
+    edit: 'label.edit-technical-field',
+    create: 'label.add-column',
+  }[mode];
 
   useEffect(() => {
     if (open && row) {
@@ -125,9 +132,7 @@ const TechnicalRecordModal = ({
         <div className="technical-edit-modal-title-content">
           <span className="technical-edit-modal-title-text">
             <EditOutlined />{' '}
-            {isReadOnly
-              ? t('label.view-technical-field')
-              : t('label.edit-technical-field')}
+            {t(titleKey)}
           </span>
           {row && (
             <div className="technical-edit-modal-path" title={row.columnFqn}>
@@ -146,17 +151,19 @@ const TechnicalRecordModal = ({
         disabled={isReadOnly}
         form={form}
         layout="vertical">
-        <GlossaryTermFormSection
-          readOnly
-          title={t('label.version-information')}>
-          <GovernedVersionFields
-            bindToForm={false}
-            releaseVersionType={row?.releaseVersionType}
-            releaseVersionTypeLabel={t('label.release-version-type')}
-            version={row?.businessVersion}
-            versionLabel={t('label.version')}
-          />
-        </GlossaryTermFormSection>
+        {!isCreate && (
+          <GlossaryTermFormSection
+            readOnly
+            title={t('label.version-information')}>
+            <GovernedVersionFields
+              bindToForm={false}
+              releaseVersionType={row?.releaseVersionType}
+              releaseVersionTypeLabel={t('label.release-version-type')}
+              version={row?.businessVersion}
+              versionLabel={t('label.version')}
+            />
+          </GlossaryTermFormSection>
+        )}
 
         <GlossaryTermFormSection
           readOnly
@@ -261,6 +268,13 @@ const TechnicalRecordModal = ({
             />
           </Form.Item>
         </GlossaryTermFormSection>
+        {!isCreate && row && (
+          <GlossaryTermFormSection readOnly title={t('label.version-history')}>
+            <div className="cde-form-field-full">
+              <TechnicalVersionHistory row={row} />
+            </div>
+          </GlossaryTermFormSection>
+        )}
       </Form>
     </Modal>
   );

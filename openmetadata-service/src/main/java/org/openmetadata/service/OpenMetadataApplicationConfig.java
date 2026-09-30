@@ -45,7 +45,6 @@ import org.openmetadata.service.config.CacheConfiguration;
 import org.openmetadata.service.config.OMWebConfiguration;
 import org.openmetadata.service.config.ObjectStorageConfiguration;
 import org.openmetadata.service.config.QoSConfiguration;
-import org.openmetadata.service.config.TechnicalDictionaryConfiguration;
 import org.openmetadata.service.jdbi3.HikariCPDataSourceFactory;
 import org.openmetadata.service.migration.MigrationConfiguration;
 import org.openmetadata.service.monitoring.EventMonitorConfiguration;
@@ -68,10 +67,6 @@ public class OpenMetadataApplicationConfig extends Configuration {
 
   @JsonProperty("swagger")
   private SwaggerBundleConfiguration swaggerBundleConfig;
-
-  @JsonProperty("technicalDictionary")
-  private TechnicalDictionaryConfiguration technicalDictionaryConfiguration =
-      new TechnicalDictionaryConfiguration();
 
   @JsonProperty("authorizerConfiguration")
   private AuthorizerConfiguration authorizerConfiguration;

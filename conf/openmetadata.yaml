@@ -661,16 +661,6 @@ limits:
 
 # Bulk Operation Configuration
 # Controls parallelism and admission control for bulk API operations.
-technicalDictionary:
-  # Comma-separated database service names whose Columns are catalogued. Empty disables bootstrap.
-  includeServices: ${TECHNICAL_DICTIONARY_INCLUDE_SERVICES:-}
-  # Optional comma-separated `service.database` FQNs narrowing the included services
-  includeDatabases: ${TECHNICAL_DICTIONARY_INCLUDE_DATABASES:-}
-  # Optional comma-separated `service.database.schema` FQNs narrowing the included databases
-  includeSchemas: ${TECHNICAL_DICTIONARY_INCLUDE_SCHEMAS:-}
-  # Comma-separated case-insensitive glob patterns matched against table and schema names
-  excludePatterns: ${TECHNICAL_DICTIONARY_EXCLUDE_PATTERNS:-TMP_*,*_BAK,*_OLD}
-
 bulkOperation:
   # Max threads for processing
   maxThreads: ${BULK_OPERATION_MAX_THREADS:-10}

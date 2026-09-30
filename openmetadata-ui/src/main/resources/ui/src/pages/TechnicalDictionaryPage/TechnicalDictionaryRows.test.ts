@@ -12,6 +12,8 @@
  */
 import { TechnicalRecordApiRow } from '../../rest/technicalDictionaryAPI';
 import {
+  candidateToRow,
+  canDeleteRow,
   getTagLabel,
   isEditableRow,
   isSourceUnavailable,
@@ -51,6 +53,7 @@ const apiRow = (
   cdeCode: 'CDE1',
   cdeName: 'Tên khách hàng',
   dataOwners: [{ id: 'owner-1', type: 'team', name: 'khcl' } as never],
+  hasPublished: false,
   ...overrides,
 });
 
@@ -132,5 +135,74 @@ describe('row predicates', () => {
       )
     ).toBe(true);
     expect(isSourceUnavailable(toTechnicalDictionaryRow(apiRow()))).toBe(false);
+  });
+});
+
+describe('hasPublished and deletion', () => {
+  const editor = {
+    canViewWorking: true,
+    canEditWorking: true,
+    canSubmit: true,
+    canApprove: true,
+    canReject: true,
+    canCreateVersion: true,
+    canArchive: false,
+  };
+
+  it('maps hasPublished from the index row', () => {
+    expect(toTechnicalDictionaryRow(apiRow()).hasPublished).toBe(false);
+    expect(
+      toTechnicalDictionaryRow(apiRow({ hasPublished: true })).hasPublished
+    ).toBe(true);
+  });
+
+  it('allows deleting only a never-approved Draft in an open catalog for an editor', () => {
+    const draft = toTechnicalDictionaryRow(apiRow());
+
+    expect(canDeleteRow(draft, editor, false)).toBe(true);
+    expect(canDeleteRow(draft, editor, true)).toBe(false);
+    expect(
+      canDeleteRow(draft, { ...editor, canEditWorking: false }, false)
+    ).toBe(false);
+    expect(
+      canDeleteRow(
+        toTechnicalDictionaryRow(apiRow({ hasPublished: true })),
+        editor,
+        false
+      )
+    ).toBe(false);
+    expect(
+      canDeleteRow(
+        toTechnicalDictionaryRow(apiRow({ entityStatus: 'In Review' })),
+        editor,
+        false
+      )
+    ).toBe(false);
+  });
+});
+
+describe('candidateToRow', () => {
+  it('starts an empty Draft row from a physical Column', () => {
+    const row = candidateToRow(
+      {
+        columnKey: 'key-1',
+        columnFqn: 'MIS.MISDB.aml.TBMS_CTR.brcd',
+        declared: false,
+        sourceService: 'MIS',
+        sourceDatabase: 'MISDB',
+        sourceSchema: 'aml',
+        sourceTable: 'TBMS_CTR',
+        sourceColumn: 'brcd',
+        sourceDataType: 'VARCHAR',
+      },
+      '2'
+    );
+
+    expect(row.termId).toBe('');
+    expect(row.status).toBe('Draft');
+    expect(row.parentBusinessVersion).toBe('2');
+    expect(row.hasPublished).toBe(false);
+    expect(row.columnName).toBe('brcd');
+    expect(row.tableFqn).toBe('MIS.MISDB.aml.TBMS_CTR');
   });
 });

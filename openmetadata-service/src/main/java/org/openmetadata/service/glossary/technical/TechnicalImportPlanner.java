@@ -43,6 +43,11 @@ public final class TechnicalImportPlanner {
   public static final String TIMELINESS = "Thời gian";
   public static final String SYSTEM_OWNER = "Chủ sở hữu hệ thống";
 
+  private static final String RECORD_TYPE = "recordType";
+  private static final String EXTENSION = "extension";
+  private static final String UNDECLARED_RECORD_TYPE = "column";
+  private static final String COLUMN_SOURCE = "columnSource";
+
   static final List<String> LOCATION_HEADERS = List.of(DATABASE, SCHEMA, TABLE, COLUMN);
   static final Map<String, String> TAG_HEADERS = tagHeaders();
   private static final List<String> EDITABLE_HEADERS =
@@ -116,7 +121,10 @@ public final class TechnicalImportPlanner {
 
   private Map<String, Object> matchTarget(
       TechnicalImportSheet.Row row, String location, List<ImportError> errors) {
-    final List<Map<String, Object>> candidates = candidatesFor(row, location);
+    List<Map<String, Object>> candidates = candidatesFor(row, location);
+    if (candidates.isEmpty()) {
+      candidates = undeclaredCandidatesFor(row);
+    }
     if (candidates.size() != 1) {
       errors.add(
           error(
@@ -131,11 +139,34 @@ public final class TechnicalImportPlanner {
   }
 
   private List<Map<String, Object>> candidatesFor(TechnicalImportSheet.Row row, String location) {
-    final List<Map<String, Object>> byLocation = rowsByLocation.getOrDefault(location, List.of());
+    return matchingService(row, rowsByLocation.getOrDefault(location, List.of()));
+  }
+
+  /** Physical Columns at the row location that have no record yet; the import declares them. */
+  private List<Map<String, Object>> undeclaredCandidatesFor(TechnicalImportSheet.Row row) {
+    final String column = normalize(row.value(COLUMN));
+    final List<Map<String, Object>> columns =
+        lookups.columns(row.value(DATABASE), row.value(SCHEMA), row.value(TABLE)).stream()
+            .filter(source -> column.equals(normalize(source.columnName())))
+            .map(TechnicalImportPlanner::undeclaredTarget)
+            .toList();
+    return matchingService(row, columns);
+  }
+
+  private static Map<String, Object> undeclaredTarget(TechnicalColumnSource source) {
+    final Map<String, Object> target = new HashMap<>();
+    target.put(RECORD_TYPE, UNDECLARED_RECORD_TYPE);
+    target.put(EXTENSION, source.sourceExtension());
+    target.put(COLUMN_SOURCE, source);
+    return target;
+  }
+
+  private static List<Map<String, Object>> matchingService(
+      TechnicalImportSheet.Row row, List<Map<String, Object>> candidates) {
     final String service = normalize(row.value(SERVICE));
     return !row.has(SERVICE) || service.isEmpty()
-        ? byLocation
-        : byLocation.stream()
+        ? candidates
+        : candidates.stream()
             .filter(
                 candidate ->
                     service.equals(
@@ -194,8 +225,35 @@ public final class TechnicalImportPlanner {
 
   private PlannedRow decide(
       TechnicalImportSheet.Row row, String location, Map<String, Object> target, RowPatch patch) {
+    return UNDECLARED_RECORD_TYPE.equals(target.get(RECORD_TYPE))
+        ? declare(row, location, (TechnicalColumnSource) target.get(COLUMN_SOURCE), patch)
+        : update(row, location, target, patch);
+  }
+
+  private static PlannedRow declare(
+      TechnicalImportSheet.Row row, String location, TechnicalColumnSource column, RowPatch patch) {
+    final String action =
+        isNoChange(Map.of(), patch)
+            ? TechnicalImportPlan.NO_CHANGE
+            : TechnicalImportPlan.CREATE_RECORD;
+    return new PlannedRow(
+        row.rowNumber(),
+        location,
+        action,
+        null,
+        null,
+        null,
+        null,
+        patch,
+        column,
+        List.of(),
+        new ArrayList<>());
+  }
+
+  private PlannedRow update(
+      TechnicalImportSheet.Row row, String location, Map<String, Object> target, RowPatch patch) {
     final String status = TechnicalRowFields.text(target, "entityStatus");
-    final boolean working = "working".equals(target.get("recordType"));
+    final boolean working = "working".equals(target.get(RECORD_TYPE));
     final String action =
         isNoChange(target, patch) ? TechnicalImportPlan.NO_CHANGE : actionFor(working, status);
     final List<String> warnings = new ArrayList<>();
@@ -212,6 +270,7 @@ public final class TechnicalImportPlanner {
         working ? null : String.valueOf(target.get("businessVersion")),
         working ? null : nextMinor(String.valueOf(target.get("businessVersion"))),
         patch,
+        null,
         List.of(),
         warnings);
   }
@@ -306,6 +365,7 @@ public final class TechnicalImportPlanner {
         row.rowNumber(),
         location,
         TechnicalImportPlan.ERROR,
+        null,
         null,
         null,
         null,

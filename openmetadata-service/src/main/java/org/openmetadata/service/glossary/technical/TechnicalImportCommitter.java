@@ -7,6 +7,7 @@ package org.openmetadata.service.glossary.technical;
 
 import static org.openmetadata.service.Entity.GLOSSARY_TERM;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +17,7 @@ import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.PlannedRow;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexSync;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
@@ -27,13 +29,38 @@ import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
  */
 public final class TechnicalImportCommitter {
 
-  /** Returns the number of records written. */
+  private final TechnicalRecordWriter writer = new TechnicalRecordWriter();
+
+  /**
+   * Returns the number of records written. Updates of existing records are atomic; Columns
+   * declared by the file are created afterwards, each in its own transaction. Every record written
+   * is synchronized to the Technical Dictionary index, even when a later declaration fails.
+   */
   public int commit(UUID glossaryId, String scope, List<PlannedRow> rows, String actor) {
-    final List<PlannedRow> mutations =
+    final List<PlannedRow> updates =
         rows.stream()
             .filter(PlannedRow::mutates)
+            .filter(row -> !isDeclaration(row))
             .sorted(Comparator.comparing(row -> row.termId().toString()))
             .toList();
+    final List<PlannedRow> declarations = rows.stream().filter(this::isDeclaration).toList();
+    final List<UUID> written = new ArrayList<>();
+    try {
+      updateAtomically(glossaryId, scope, updates, actor);
+      updates.forEach(row -> written.add(row.termId()));
+      declarations.forEach(row -> written.add(declare(scope, row, actor)));
+    } finally {
+      TechnicalIndexSync.refresh(written);
+    }
+    return updates.size() + declarations.size();
+  }
+
+  private boolean isDeclaration(PlannedRow row) {
+    return TechnicalImportPlan.CREATE_RECORD.equals(row.action());
+  }
+
+  private void updateAtomically(
+      UUID glossaryId, String scope, List<PlannedRow> updates, String actor) {
     try {
       Entity.getJdbi()
           .useTransaction(
@@ -42,14 +69,27 @@ public final class TechnicalImportCommitter {
                 if (versions.lockGlossaryIdentity(glossaryId) == null) {
                   throw conflict("Technical Dictionary identity was not found");
                 }
-                for (PlannedRow row : mutations) {
+                for (PlannedRow row : updates) {
                   write(versions, glossaryId, scope, row, actor);
                 }
               });
     } catch (UnableToExecuteStatementException exception) {
       throw conflict("A record was changed concurrently while the import was committing");
     }
-    return mutations.size();
+  }
+
+  private UUID declare(String scope, PlannedRow row, String actor) {
+    final UUID created =
+        writer.createDraft(
+            TechnicalCatalog.requireGlossary(),
+            scope,
+            row.column(),
+            term -> TechnicalImportPatch.apply(term, row.patch()),
+            actor);
+    if (created == null) {
+      throw conflict("Column " + row.location() + " was declared by another user after the preview");
+    }
+    return created;
   }
 
   private void write(

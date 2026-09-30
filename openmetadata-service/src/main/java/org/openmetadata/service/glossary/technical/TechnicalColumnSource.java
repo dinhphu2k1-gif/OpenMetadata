@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.openmetadata.schema.entity.data.Table;
 import org.openmetadata.schema.type.Column;
-import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.service.util.FullyQualifiedName;
 
 /**
  * Snapshot of one top-level physical Column used to create or refresh a Technical Dictionary
@@ -41,17 +41,17 @@ public record TechnicalColumnSource(
   public static List<TechnicalColumnSource> columnsOf(Table table) {
     return listOrEmpty(table.getColumns()).stream()
         .filter(column -> column.getFullyQualifiedName() != null)
-        .map(column -> of(table, column))
+        .map(TechnicalColumnSource::of)
         .toList();
   }
 
-  public static TechnicalColumnSource of(Table table, Column column) {
+  public static TechnicalColumnSource of(Column column) {
     return new TechnicalColumnSource(
         columnKey(column.getFullyQualifiedName()),
         column.getFullyQualifiedName(),
         column.getName(),
         column.getDescription(),
-        sourceExtension(table, column));
+        sourceExtension(column));
   }
 
   /** True when the given payload already carries this Column snapshot. */
@@ -66,19 +66,38 @@ public record TechnicalColumnSource(
                         normalize(entry.getValue()), normalize(extension.get(entry.getKey()))));
   }
 
-  private static Map<String, Object> sourceExtension(Table table, Column column) {
+  private static Map<String, Object> sourceExtension(Column column) {
+    return sourceExtension(
+        column.getFullyQualifiedName(),
+        dataType(column),
+        column.getDataLength(),
+        column.getPrecision(),
+        column.getScale());
+  }
+
+  /**
+   * Source snapshot of one Column. Service, database, schema and table are taken from the Column
+   * FQN: the persisted Table JSON and the Column search document do not both carry them.
+   */
+  public static Map<String, Object> sourceExtension(
+      String columnFqn, String dataType, Integer dataLength, Integer precision, Integer scale) {
+    final String[] parts = FullyQualifiedName.split(columnFqn);
     final Map<String, Object> values = new LinkedHashMap<>();
-    values.put(TechnicalDictionaryProfile.SOURCE_COLUMN_FQN, column.getFullyQualifiedName());
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SERVICE, name(table.getService()));
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATABASE, name(table.getDatabase()));
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SCHEMA, name(table.getDatabaseSchema()));
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_TABLE, table.getName());
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_COLUMN, column.getName());
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATA_TYPE, dataType(column));
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATA_LENGTH, column.getDataLength());
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_PRECISION, column.getPrecision());
-    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SCALE, column.getScale());
+    values.put(TechnicalDictionaryProfile.SOURCE_COLUMN_FQN, columnFqn);
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SERVICE, part(parts, 0));
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATABASE, part(parts, 1));
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SCHEMA, part(parts, 2));
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_TABLE, part(parts, 3));
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_COLUMN, part(parts, 4));
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATA_TYPE, dataType);
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_DATA_LENGTH, dataLength);
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_PRECISION, precision);
+    putIfPresent(values, TechnicalDictionaryProfile.SOURCE_SCALE, scale);
     return values;
+  }
+
+  private static String part(String[] parts, int index) {
+    return index < parts.length ? FullyQualifiedName.unquoteName(parts[index]) : null;
   }
 
   private static String dataType(Column column) {
@@ -86,10 +105,6 @@ public record TechnicalColumnSource(
     return display != null
         ? display
         : column.getDataType() == null ? null : column.getDataType().value();
-  }
-
-  private static String name(EntityReference reference) {
-    return reference == null ? null : reference.getName();
   }
 
   private static void putIfPresent(Map<String, Object> values, String key, Object value) {

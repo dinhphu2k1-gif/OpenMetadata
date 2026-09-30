@@ -21,11 +21,14 @@ public final class TechnicalDictionaryErrors {
   public static final String RANK_DUPLICATE = "TD_RANK_DUPLICATE";
   public static final String CDE_SCOPE_MISMATCH = "TD_CDE_SCOPE_MISMATCH";
   public static final String CDE_SCOPE_NOT_ACTIVE = "TD_CDE_SCOPE_NOT_ACTIVE";
-  public static final String COLUMN_SCOPE_EMPTY = "TD_COLUMN_SCOPE_EMPTY";
-  public static final String BOOTSTRAP_NOT_READY = "TD_BOOTSTRAP_NOT_READY";
+  public static final String NOT_INITIALIZED = "TD_NOT_INITIALIZED";
   public static final String IMPORT_ROW_NOT_MATCHED = "TD_IMPORT_ROW_NOT_MATCHED";
   public static final String IMPORT_CONFLICT = "TD_IMPORT_CONFLICT";
   public static final String IMPORT_SESSION_INVALID = "TD_IMPORT_SESSION_INVALID";
+  public static final String INDEX_UNAVAILABLE = "TD_INDEX_UNAVAILABLE";
+  public static final String COLUMN_NOT_FOUND = "TD_COLUMN_NOT_FOUND";
+  public static final String COLUMN_ALREADY_DECLARED = "TD_COLUMN_ALREADY_DECLARED";
+  public static final String DRAFT_NOT_DELETABLE = "TD_DRAFT_NOT_DELETABLE";
 
   private TechnicalDictionaryErrors() {}
 
@@ -37,8 +40,16 @@ public final class TechnicalDictionaryErrors {
     return error(Response.Status.FORBIDDEN, code, message);
   }
 
+  public static WebApplicationException notFound(String code, String message) {
+    return error(Response.Status.NOT_FOUND, code, message);
+  }
+
   public static WebApplicationException conflict(String code, String message) {
     return error(Response.Status.CONFLICT, code, message);
+  }
+
+  public static WebApplicationException indexUnavailable(String message) {
+    return error(Response.Status.SERVICE_UNAVAILABLE, INDEX_UNAVAILABLE, message);
   }
 
   /** Stable code of an error created by this class, or an HTTP-status fallback. */

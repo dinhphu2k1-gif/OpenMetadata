@@ -82,6 +82,18 @@ public final class TechnicalImportService {
       PreviewScope scope,
       List<Map<String, Object>> latestRows,
       TechnicalImportLookups lookups) {
+    return preview(fileBytes, scope, sheet -> latestRows, lookups);
+  }
+
+  /**
+   * Plans the file against the declared records returned by {@code declaredRows} for the parsed
+   * sheet, so only the tables named in the file have to be read.
+   */
+  public Map<String, Object> preview(
+      byte[] fileBytes,
+      PreviewScope scope,
+      Function<TechnicalImportSheet, List<Map<String, Object>>> declaredRows,
+      TechnicalImportLookups lookups) {
     expireSessions();
     if (sessions.size() >= MAX_ACTIVE_SESSIONS) {
       throw new ClientErrorException(
@@ -90,7 +102,9 @@ public final class TechnicalImportService {
     final TechnicalImportSheet sheet = TechnicalImportSheet.parse(fileBytes);
     final List<PlannedRow> planned =
         new TechnicalImportPlanner(
-                TechnicalImportPlanner.indexRows(latestRows), lookups, scope.policy())
+                TechnicalImportPlanner.indexRows(declaredRows.apply(sheet)),
+                lookups,
+                scope.policy())
             .plan(sheet);
     final Session session =
         new Session(

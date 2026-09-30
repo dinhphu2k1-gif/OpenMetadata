@@ -26,7 +26,6 @@ import jakarta.json.JsonPatch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -41,7 +40,6 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -76,8 +74,10 @@ import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
-import org.openmetadata.service.glossary.technical.TechnicalBootstrapJobService;
-import org.openmetadata.service.glossary.technical.TechnicalBootstrapJobView;
+import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexUnavailableException;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -109,8 +109,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   static final String FIELDS = "owners,tags,reviewers,usageCount,termCount,domains,extension";
   private final GlossaryMapper mapper = new GlossaryMapper();
   private final GlossaryVersioningService versioningService = new GlossaryVersioningService();
-  private final TechnicalBootstrapJobService bootstrapJobService =
-      new TechnicalBootstrapJobService();
 
   public GlossaryResource(Authorizer authorizer, Limits limits) {
     super(Entity.GLOSSARY, authorizer, limits);
@@ -191,7 +189,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             glossary.getVersion(),
             glossary,
             securityContext.getUserPrincipal().getName());
-    startTechnicalBootstrap(glossary, working, securityContext);
     Map<String, Object> response = GlossaryVersionResponses.working(working);
     response.put("capabilities", capabilitiesForWorking(securityContext, working).asMap());
     return Response.created(
@@ -345,87 +342,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   }
 
   @GET
-  @Path("/{id}/bootstrap-jobs")
-  @Operation(
-      operationId = "listTechnicalDictionaryBootstrapJobs",
-      summary = "List Technical Dictionary bootstrap jobs")
-  public List<Map<String, Object>> listBootstrapJobs(
-      @Context UriInfo uriInfo,
-      @Context SecurityContext securityContext,
-      @PathParam("id") UUID id,
-      @QueryParam("businessVersion") String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    requireTechnicalDictionary(glossary);
-    GlossaryAuthorizationResolver.requireViewWorking(capabilities(securityContext, glossary));
-    return bootstrapJobService.list(id).stream()
-        .filter(
-            job -> businessVersion == null || businessVersion.equals(job.parentBusinessVersion()))
-        .map(TechnicalBootstrapJobView::of)
-        .toList();
-  }
-
-  @POST
-  @Path("/{id}/bootstrap-jobs/{jobId}/retry")
-  @Operation(
-      operationId = "retryTechnicalDictionaryBootstrapJob",
-      summary = "Retry a failed Technical Dictionary bootstrap job")
-  public Map<String, Object> retryBootstrapJob(
-      @Context UriInfo uriInfo,
-      @Context SecurityContext securityContext,
-      @PathParam("id") UUID id,
-      @PathParam("jobId") UUID jobId) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    requireTechnicalDictionary(glossary);
-    authorizer.authorizeAdmin(securityContext);
-    return TechnicalBootstrapJobView.of(
-        bootstrapJobService.retry(jobId, securityContext.getUserPrincipal().getName()));
-  }
-
-  @POST
-  @Path("/{id}/bootstrap-jobs")
-  @Operation(
-      operationId = "startTechnicalDictionaryBootstrapJob",
-      summary = "Start the bootstrap job of one Technical Dictionary version if it is missing")
-  public Map<String, Object> startBootstrapJob(
-      @Context UriInfo uriInfo,
-      @Context SecurityContext securityContext,
-      @PathParam("id") UUID id,
-      @QueryParam("businessVersion") @NotNull String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    requireTechnicalDictionary(glossary);
-    authorizer.authorizeAdmin(securityContext);
-    return TechnicalBootstrapJobView.of(
-        bootstrapJobService.start(
-            glossary, businessVersion, securityContext.getUserPrincipal().getName()));
-  }
-
-  private void startTechnicalBootstrap(
-      Glossary glossary, WorkingVersionRecord working, SecurityContext securityContext) {
-    if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
-        == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
-      try {
-        bootstrapJobService.start(
-            glossary, working.businessVersion(), securityContext.getUserPrincipal().getName());
-      } catch (WebApplicationException exception) {
-        LOG.warn(
-            "Technical Dictionary bootstrap for version {} was not started: {}",
-            working.businessVersion(),
-            exception.getMessage());
-      }
-    }
-  }
-
-  private static void requireTechnicalDictionary(Glossary glossary) {
-    if (GovernedGlossaryProfileRegistry.find(glossary).orElse(null)
-        != GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY) {
-      throw new NotFoundException("Technical Dictionary was not found");
-    }
-  }
-
-  @GET
   @Path("/{id}/published")
   @Operation(
       operationId = "listPublishedGlossaryVersions",
@@ -518,6 +434,29 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     return GlossaryVersionResponses.working(
         versioningService.revokeLatestToRejectedWorking(
             GlossaryVersioningService.GLOSSARY, id, securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/{id}/technical-index/rebuild")
+  @Operation(
+      operationId = "rebuildTechnicalDictionaryIndex",
+      summary = "Rebuild the Technical Dictionary search index from the database",
+      description =
+          "Admin only. Fills a new physical index from the declared records and then moves the "
+              + "alias, so readers keep using the previous index while it runs.")
+  public Map<String, Object> rebuildTechnicalIndex(
+      @Context SecurityContext securityContext, @PathParam("id") UUID id) {
+    authorizer.authorizeAdmin(securityContext);
+    if (!TechnicalCatalog.isTechnicalGlossary(id)) {
+      throw new NotFoundException("Technical Dictionary glossary was not found");
+    }
+    Map<String, Object> result;
+    try {
+      result = TechnicalIndexRebuilder.rebuild();
+    } catch (TechnicalIndexUnavailableException exception) {
+      throw TechnicalDictionaryErrors.indexUnavailable(exception.getMessage());
+    }
+    return result;
   }
 
   @GET

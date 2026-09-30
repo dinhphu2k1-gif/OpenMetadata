@@ -13,6 +13,7 @@
 import {
   CheckOutlined,
   CloseOutlined,
+  DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
   RollbackOutlined,
@@ -52,6 +53,7 @@ import {
   TechnicalDictionaryRow,
 } from './technicalDictionary.interface';
 import {
+  canDeleteRow,
   getTagLabel,
   isEditableRow,
   isSourceUnavailable,
@@ -67,6 +69,7 @@ export interface TechnicalDictionaryTableProps {
   catalog?: TechnicalCatalogState;
   selectedKeys: string[];
   extraTableFilters?: React.ReactNode;
+  emptyContent?: React.ReactNode;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSelectionChange: (keys: string[]) => void;
@@ -77,6 +80,7 @@ export interface TechnicalDictionaryTableProps {
   onReject: (row: TechnicalDictionaryRow) => void;
   onReopen: (row: TechnicalDictionaryRow) => void;
   onCreateVersion: (row: TechnicalDictionaryRow) => void;
+  onDelete: (row: TechnicalDictionaryRow) => void;
 }
 
 const Placeholder = () => (
@@ -100,6 +104,7 @@ const TechnicalDictionaryTable = ({
   catalog,
   selectedKeys,
   extraTableFilters,
+  emptyContent,
   onPageChange,
   onPageSizeChange,
   onSelectionChange,
@@ -110,6 +115,7 @@ const TechnicalDictionaryTable = ({
   onReject,
   onReopen,
   onCreateVersion,
+  onDelete,
 }: TechnicalDictionaryTableProps) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -239,6 +245,19 @@ const TechnicalDictionaryTable = ({
                 />
               </Tooltip>
             )}
+          {canDeleteRow(row, capabilities, isReadOnly) && (
+            <Tooltip title={t('label.delete-declaration')}>
+              <Button
+                aria-label={t('label.delete-declaration')}
+                className="text-danger"
+                data-testid={`delete-btn-${row.columnName}`}
+                icon={<DeleteOutlined />}
+                size="small"
+                type="text"
+                onClick={() => onDelete(row)}
+              />
+            </Tooltip>
+          )}
           {capabilities.canCreateVersion &&
             !isReadOnly &&
             row.recordType === 'published' &&
@@ -262,6 +281,7 @@ const TechnicalDictionaryTable = ({
       isReadOnly,
       onApprove,
       onCreateVersion,
+      onDelete,
       onEdit,
       onReject,
       onReopen,
@@ -543,6 +563,7 @@ const TechnicalDictionaryTable = ({
         extraTableFilters={extraTableFilters}
         extraTableFiltersClassName="cde-glossary-table-toolbar tech-dict-table-toolbar"
         loading={isLoading}
+        locale={emptyContent ? { emptyText: emptyContent } : undefined}
         pagination={false}
         rowKey="key"
         rowSelection={{

@@ -5,6 +5,7 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import java.util.List;
 import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.TagLabel;
 import org.openmetadata.schema.type.TermRelation;
@@ -18,6 +19,11 @@ public interface TechnicalImportLookups {
 
   /** Resolves an Approved CDE of the same-numbered Data Dictionary by its code. */
   TermRelation cde(String code);
+
+  /** Physical Columns of one table that have no record yet and may be declared by the import. */
+  default List<TechnicalColumnSource> columns(String database, String schema, String table) {
+    return List.of();
+  }
 
   /** A lookup failure with a stable code, attributed to the column being resolved. */
   class LookupException extends RuntimeException {

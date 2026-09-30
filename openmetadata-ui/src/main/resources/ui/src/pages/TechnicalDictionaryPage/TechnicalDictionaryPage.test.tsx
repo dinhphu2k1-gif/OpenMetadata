@@ -16,6 +16,7 @@ import {
   transitionGlossaryTermWorkflow,
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
+import { deleteTechnicalDraft } from '../../rest/technicalDictionaryAPI';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import TechnicalDictionaryPage from './TechnicalDictionaryPage.component';
 
@@ -97,10 +98,15 @@ jest.mock('../../rest/glossaryAPI', () => ({
   updateGlossaryTermWorkingVersion: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('../../rest/technicalDictionaryAPI', () => ({
+  deleteTechnicalDraft: jest.fn().mockResolvedValue(undefined),
   exportTechnicalDictionary: jest.fn(),
-  getTechnicalBootstrapJobs: jest.fn().mockResolvedValue([]),
   getTechnicalStats: jest.fn().mockResolvedValue({ totalColumns: 1 }),
-  retryTechnicalBootstrapJob: jest.fn(),
+}));
+jest.mock('antd', () => ({
+  ...jest.requireActual('antd'),
+  Modal: Object.assign(jest.requireActual('antd').Modal, {
+    confirm: jest.fn((config: { onOk: () => void }) => config.onOk()),
+  }),
 }));
 jest.mock('../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
@@ -118,6 +124,7 @@ jest.mock('./TechnicalDictionaryTable.component', () => ({
     onReopen,
     onEdit,
     onCreateVersion,
+    onDelete,
     rows,
   }: {
     rows: TechnicalDictionaryRow[];
@@ -127,6 +134,7 @@ jest.mock('./TechnicalDictionaryTable.component', () => ({
     onReopen: (row: TechnicalDictionaryRow) => void;
     onEdit: (row: TechnicalDictionaryRow) => void;
     onCreateVersion: (row: TechnicalDictionaryRow) => void;
+    onDelete: (row: TechnicalDictionaryRow) => void;
   }) => (
     <div data-testid="table">
       <button onClick={() => onSubmit(rows[0])}>submit</button>
@@ -135,6 +143,7 @@ jest.mock('./TechnicalDictionaryTable.component', () => ({
       <button onClick={() => onReopen(rows[0])}>reopen</button>
       <button onClick={() => onEdit(rows[0])}>edit</button>
       <button onClick={() => onCreateVersion(rows[0])}>create-version</button>
+      <button onClick={() => onDelete(rows[0])}>delete</button>
     </div>
   ),
 }));
@@ -172,7 +181,7 @@ jest.mock('./TechnicalRecordModal.component', () => ({
 jest.mock('./TechnicalBulkActionModal.component', () => () => null);
 jest.mock('./TechnicalImportModal.component', () => () => null);
 jest.mock('./TechnicalDictionaryToolbar.component', () => () => null);
-jest.mock('./TechnicalBootstrapStatus.component', () => () => null);
+jest.mock('./TechnicalAddColumnModal.component', () => () => null);
 jest.mock(
   '../../components/PageLayoutV1/PageLayoutV1',
   () =>
@@ -269,6 +278,17 @@ describe('TechnicalDictionaryPage', () => {
     expect(payload.tags).toHaveLength(1);
     expect(payload.tags[0].tagFQN).toBe('DataElementType.AtomicDataElement');
     expect(payload.owners).toEqual([]);
+  });
+
+  it('deletes a Draft declaration in the record scope after confirmation', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('delete'));
+
+    await waitFor(() =>
+      expect(deleteTechnicalDraft).toHaveBeenCalledWith('term-1', '2')
+    );
+    expect(mockReloadRecords).toHaveBeenCalled();
   });
 
   it('clears the CDE relation when the user clears the selector', async () => {

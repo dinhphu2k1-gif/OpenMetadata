@@ -77,7 +77,7 @@ export const getCatalogActions = (
   return actions;
 };
 
-const STAT_ITEMS: Array<{
+export const STAT_ITEMS: Array<{
   key: keyof TechnicalStats;
   label: string;
   icon: React.ReactNode;
@@ -96,16 +96,16 @@ const STAT_ITEMS: Array<{
     tone: 'blue',
   },
   {
-    key: 'mappedCde',
-    label: 'label.cde-mapped',
-    icon: <CheckCircleOutlined />,
-    tone: 'green',
-  },
-  {
     key: 'totalSources',
     label: 'label.source-systems',
     icon: <DatabaseOutlined />,
     tone: 'purple',
+  },
+  {
+    key: 'approved',
+    label: 'label.approved',
+    icon: <CheckCircleOutlined />,
+    tone: 'green',
   },
 ];
 

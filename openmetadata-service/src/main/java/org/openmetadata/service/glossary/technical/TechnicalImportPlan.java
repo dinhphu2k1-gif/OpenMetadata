@@ -19,6 +19,7 @@ public final class TechnicalImportPlan {
   public static final String REPLACE_IN_REVIEW_AND_REOPEN = "REPLACE_IN_REVIEW_AND_REOPEN";
   public static final String REPLACE_REJECTED_AND_REOPEN = "REPLACE_REJECTED_AND_REOPEN";
   public static final String CREATE_VERSION = "CREATE_VERSION";
+  public static final String CREATE_RECORD = "CREATE_RECORD";
   public static final String SKIP = "SKIP";
   public static final String NO_CHANGE = "NO_CHANGE";
   public static final String ERROR = "ERROR";
@@ -29,6 +30,7 @@ public final class TechnicalImportPlan {
           REPLACE_IN_REVIEW_AND_REOPEN,
           REPLACE_REJECTED_AND_REOPEN,
           CREATE_VERSION,
+          CREATE_RECORD,
           SKIP,
           NO_CHANGE);
 
@@ -78,6 +80,7 @@ public final class TechnicalImportPlan {
       String expectedPublishedVersion,
       String newBusinessVersion,
       @JsonIgnore RowPatch patch,
+      @JsonIgnore TechnicalColumnSource column,
       List<ImportError> errors,
       List<String> warnings) {
 
@@ -90,7 +93,8 @@ public final class TechnicalImportPlan {
               UPDATE_DRAFT,
               REPLACE_IN_REVIEW_AND_REOPEN,
               REPLACE_REJECTED_AND_REOPEN,
-              CREATE_VERSION)
+              CREATE_VERSION,
+              CREATE_RECORD)
           .contains(action);
     }
   }

@@ -13,7 +13,6 @@ import java.util.UUID;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.OpenMetadataApplicationConfigHolder;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
@@ -21,7 +20,7 @@ import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
 
-/** Resolves the Technical Dictionary glossary identity, its open scopes and configuration. */
+/** Resolves the Technical Dictionary glossary identity and its open scopes. */
 public final class TechnicalCatalog {
   public static final String SYSTEM_ACTOR = Entity.ADMIN_USER_NAME;
 
@@ -54,7 +53,7 @@ public final class TechnicalCatalog {
         .orElseThrow(
             () ->
                 TechnicalDictionaryErrors.conflict(
-                    TechnicalDictionaryErrors.BOOTSTRAP_NOT_READY,
+                    TechnicalDictionaryErrors.NOT_INITIALIZED,
                     "Technical Dictionary glossary has not been initialized"));
   }
 
@@ -72,14 +71,6 @@ public final class TechnicalCatalog {
         .filter(version -> !scopes.contains(version))
         .ifPresent(scopes::add);
     return List.copyOf(scopes);
-  }
-
-  public static TechnicalColumnScope configuredColumnScope() {
-    return TechnicalColumnScope.fromConfiguration(
-        OpenMetadataApplicationConfigHolder.isInitialized()
-            ? OpenMetadataApplicationConfigHolder.getInstance()
-                .getTechnicalDictionaryConfiguration()
-            : null);
   }
 
   private static Optional<String> workingVersion(

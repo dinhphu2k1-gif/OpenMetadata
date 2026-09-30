@@ -14,7 +14,10 @@ import {
   TechnicalCatalogState,
   TechnicalDictionaryCapabilities,
 } from './technicalDictionary.interface';
-import { getCatalogActions } from './TechnicalDictionaryHeader.component';
+import {
+  getCatalogActions,
+  STAT_ITEMS,
+} from './TechnicalDictionaryHeader.component';
 
 const all: TechnicalDictionaryCapabilities = {
   canViewWorking: true,
@@ -89,5 +92,16 @@ describe('getCatalogActions', () => {
     expect(getCatalogActions(catalog('Approved', false), none, true)).toEqual(
       []
     );
+  });
+});
+
+describe('STAT_ITEMS', () => {
+  it('shows the four declared-column cards in order', () => {
+    expect(STAT_ITEMS.map((item) => item.key)).toEqual([
+      'totalColumns',
+      'totalTables',
+      'totalSources',
+      'approved',
+    ]);
   });
 });

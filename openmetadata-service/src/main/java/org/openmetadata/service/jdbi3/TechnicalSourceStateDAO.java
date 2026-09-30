@@ -103,6 +103,59 @@ public interface TechnicalSourceStateDAO {
   List<RecordIdentity> listRecordsByNames(
       @Bind("prefix") String glossaryHashPrefix, @BindList("names") List<String> names);
 
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, JSON_UNQUOTE(JSON_EXTRACT(json, '$.parentBusinessVersion')) AS pbv "
+              + "FROM glossary_term_entity WHERE fqnHash LIKE :prefix AND id IN (<ids>)",
+      connectionType = MYSQL)
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, json->>'parentBusinessVersion' AS pbv FROM glossary_term_entity "
+              + "WHERE fqnHash LIKE :prefix AND id IN (<ids>)",
+      connectionType = POSTGRES)
+  @RegisterRowMapper(RecordIdentityMapper.class)
+  List<RecordIdentity> listRecordsByIds(
+      @Bind("prefix") String glossaryHashPrefix, @BindList("ids") List<String> termIds);
+
+  /** Keyset page of every record identity, ordered by id. */
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, JSON_UNQUOTE(JSON_EXTRACT(json, '$.parentBusinessVersion')) AS pbv "
+              + "FROM glossary_term_entity WHERE fqnHash LIKE :prefix AND id > :after "
+              + "ORDER BY id LIMIT :limit",
+      connectionType = MYSQL)
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, json->>'parentBusinessVersion' AS pbv FROM glossary_term_entity "
+              + "WHERE fqnHash LIKE :prefix AND id > :after ORDER BY id LIMIT :limit",
+      connectionType = POSTGRES)
+  @RegisterRowMapper(RecordIdentityMapper.class)
+  List<RecordIdentity> listRecordsAfter(
+      @Bind("prefix") String glossaryHashPrefix,
+      @Bind("after") String afterTermId,
+      @Bind("limit") int limit);
+
+  /** Keyset page of the record identities of one catalog version, ordered by id. */
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, JSON_UNQUOTE(JSON_EXTRACT(json, '$.parentBusinessVersion')) AS pbv "
+              + "FROM glossary_term_entity WHERE fqnHash LIKE :prefix "
+              + "AND JSON_UNQUOTE(JSON_EXTRACT(json, '$.parentBusinessVersion')) = :pbv "
+              + "AND id > :after ORDER BY id LIMIT :limit",
+      connectionType = MYSQL)
+  @ConnectionAwareSqlQuery(
+      value =
+          "SELECT id, name, json->>'parentBusinessVersion' AS pbv FROM glossary_term_entity "
+              + "WHERE fqnHash LIKE :prefix AND json->>'parentBusinessVersion' = :pbv "
+              + "AND id > :after ORDER BY id LIMIT :limit",
+      connectionType = POSTGRES)
+  @RegisterRowMapper(RecordIdentityMapper.class)
+  List<RecordIdentity> listRecordsInScopeAfter(
+      @Bind("prefix") String glossaryHashPrefix,
+      @Bind("pbv") String parentBusinessVersion,
+      @Bind("after") String afterTermId,
+      @Bind("limit") int limit);
+
   record SourceStateRecord(
       UUID technicalGlossaryId,
       String parentBusinessVersion,

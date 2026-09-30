@@ -10,11 +10,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { BulbOutlined, MoreOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Input, Select, Space, Switch } from 'antd';
+import {
+  BulbOutlined,
+  DownOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
+import { Button, Dropdown, Input, Popover, Select, Space } from 'antd';
 import { MenuProps } from 'antd/lib/menu';
-import React, { useMemo } from 'react';
+import classNames from 'classnames';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import CDEFilterDropdown, {
+  FilterOption,
+} from '../../components/Glossary/GlossaryTermTab/CDEFilterDropdown.component';
 import { Tag } from '../../generated/entity/classification/tag';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import {
@@ -24,7 +34,13 @@ import {
 
 const WORKFLOW_STATUSES = ['Draft', 'In Review', 'Rejected', 'Approved'];
 const SOURCE_STATUSES = ['Available', 'Unavailable', 'Changed'];
-const FILTER_WIDTH = 170;
+
+type SecondaryFilterKey =
+  | 'elementType'
+  | 'generationType'
+  | 'creationMethod'
+  | 'timeliness'
+  | 'systemOwnerIds';
 
 interface TechnicalDictionaryToolbarProps {
   filters: TechnicalDictionaryFilters;
@@ -33,6 +49,8 @@ interface TechnicalDictionaryToolbarProps {
   searchText: string;
   canImport: boolean;
   canBulk: boolean;
+  canAddColumn: boolean;
+  onAddColumn: () => void;
   onSearchText: (value: string) => void;
   onFilters: (patch: Partial<TechnicalDictionaryFilters>) => void;
   onExport: () => void;
@@ -40,11 +58,15 @@ interface TechnicalDictionaryToolbarProps {
   onBulk: () => void;
 }
 
-const tagOptions = (tags: Tag[]) =>
+const tagOptions = (tags: Tag[]): FilterOption[] =>
   tags.map((tag) => ({
     value: tag.fullyQualifiedName as string,
     label: tag.displayName || tag.name,
   }));
+
+// CDEFilterDropdown reports "all" when every option is checked; that is the
+// same as not filtering.
+const withoutAll = (values: string[]) => (values.includes('all') ? [] : values);
 
 const TechnicalDictionaryToolbar = ({
   filters,
@@ -53,6 +75,8 @@ const TechnicalDictionaryToolbar = ({
   searchText,
   canImport,
   canBulk,
+  canAddColumn,
+  onAddColumn,
   onSearchText,
   onFilters,
   onExport,
@@ -69,26 +93,95 @@ const TechnicalDictionaryToolbar = ({
     [capabilities.canViewWorking]
   );
 
-  const multi = (
-    testId: string,
-    placeholder: string,
-    value: string[],
-    selectOptions: Array<{ value: string; label: React.ReactNode }>,
-    onChange: (values: string[]) => void
-  ) => (
-    <Select
-      allowClear
-      showSearch
-      data-testid={testId}
-      maxTagCount="responsive"
-      mode="multiple"
-      optionFilterProp="label"
-      options={selectOptions}
-      placeholder={placeholder}
-      style={{ width: FILTER_WIDTH }}
-      value={value}
-      onChange={onChange}
-    />
+  const secondaryFilters: Array<{
+    key: SecondaryFilterKey;
+    testId: string;
+    label: string;
+    options: FilterOption[];
+  }> = [
+    {
+      key: 'elementType',
+      testId: 'technical-dictionary-filter-element-type',
+      label: t('label.data-element-type'),
+      options: tagOptions(options.elementTypes),
+    },
+    {
+      key: 'generationType',
+      testId: 'technical-dictionary-filter-generation-type',
+      label: t('label.generation-type'),
+      options: tagOptions(options.generationTypes),
+    },
+    {
+      key: 'creationMethod',
+      testId: 'technical-dictionary-filter-creation-method',
+      label: t('label.creation-method'),
+      options: tagOptions(options.creationMethods),
+    },
+    {
+      key: 'timeliness',
+      testId: 'technical-dictionary-filter-timeliness',
+      label: t('label.timeliness'),
+      options: tagOptions(options.timeliness),
+    },
+    {
+      key: 'systemOwnerIds',
+      testId: 'technical-dictionary-filter-system-owner',
+      label: t('label.system-owner'),
+      options: options.teams.map((team) => ({
+        value: team.id,
+        label: team.displayName || team.name,
+      })),
+    },
+  ];
+
+  const secondaryCount = secondaryFilters.filter(
+    ({ key }) => filters[key].length > 0
+  ).length;
+
+  const secondaryContent = (
+    <div className="tech-dict-more-filters">
+      {secondaryFilters.map((filter) => (
+        <div className="tech-dict-more-filters-item" key={filter.key}>
+          <span className="tech-dict-more-filters-label">{filter.label}</span>
+          <Select
+            allowClear
+            showSearch
+            data-testid={filter.testId}
+            getPopupContainer={(trigger) =>
+              trigger.parentElement ?? document.body
+            }
+            maxTagCount="responsive"
+            mode="multiple"
+            optionFilterProp="label"
+            options={filter.options}
+            placeholder={t('label.all')}
+            value={filters[filter.key]}
+            onChange={(values: string[]) =>
+              onFilters({
+                [filter.key]: values,
+              } as Partial<TechnicalDictionaryFilters>)
+            }
+          />
+        </div>
+      ))}
+      <div className="tech-dict-more-filters-footer">
+        <Button
+          disabled={secondaryCount === 0}
+          size="small"
+          type="link"
+          onClick={() =>
+            onFilters({
+              elementType: [],
+              generationType: [],
+              creationMethod: [],
+              timeliness: [],
+              systemOwnerIds: [],
+            })
+          }>
+          {t('label.clear')}
+        </Button>
+      </div>
+    </div>
   );
 
   const menuItems: MenuProps['items'] = [
@@ -104,120 +197,109 @@ const TechnicalDictionaryToolbar = ({
       : []),
   ];
 
+  // Rendered as direct children of the table toolbar so the filters share one
+  // row with the table's column customisation control.
   return (
-    <Space wrap className="tech-dict-toolbar" size={8}>
-      <Input.Search
+    <>
+      <Input
         allowClear
         data-testid="technical-dictionary-search"
         placeholder={t('label.search-technical-dictionary')}
+        prefix={<SearchOutlined className="text-grey-muted" />}
         style={{ width: 280 }}
         value={searchText}
         onChange={(event) => onSearchText(event.target.value)}
       />
-      {multi(
-        'technical-dictionary-filter-status',
-        t('label.status'),
-        filters.statuses,
-        statusOptions,
-        (statuses) => onFilters({ statuses })
-      )}
-      {multi(
-        'technical-dictionary-filter-source',
-        t('label.source'),
-        filters.sourceServices,
-        options.services.map((service) => ({ value: service, label: service })),
-        (sourceServices) => onFilters({ sourceServices })
-      )}
-      {multi(
-        'technical-dictionary-filter-cde',
-        t('label.cde-code-ref'),
-        filters.cdeMapping,
-        [
+      <CDEFilterDropdown
+        dataTestId="technical-dictionary-filter-status"
+        label={t('label.status')}
+        options={statusOptions}
+        selectedValues={filters.statuses}
+        onChange={(values) => onFilters({ statuses: withoutAll(values) })}
+      />
+      <CDEFilterDropdown
+        dataTestId="technical-dictionary-filter-source"
+        label={t('label.source')}
+        options={options.services.map((service) => ({
+          value: service,
+          label: service,
+        }))}
+        selectedValues={filters.sourceServices}
+        onChange={(values) => onFilters({ sourceServices: withoutAll(values) })}
+      />
+      <CDEFilterDropdown
+        dataTestId="technical-dictionary-filter-cde"
+        label={t('label.cde-code-ref')}
+        options={[
           { value: 'MAPPED', label: t('label.cde-mapped') },
           { value: 'UNMAPPED', label: t('label.cde-unmapped') },
-        ],
-        (cdeMapping) => onFilters({ cdeMapping })
-      )}
-      {multi(
-        'technical-dictionary-filter-element-type',
-        t('label.data-element-type'),
-        filters.elementType,
-        tagOptions(options.elementTypes),
-        (elementType) => onFilters({ elementType })
-      )}
-      {multi(
-        'technical-dictionary-filter-generation-type',
-        t('label.generation-type'),
-        filters.generationType,
-        tagOptions(options.generationTypes),
-        (generationType) => onFilters({ generationType })
-      )}
-      {multi(
-        'technical-dictionary-filter-creation-method',
-        t('label.creation-method'),
-        filters.creationMethod,
-        tagOptions(options.creationMethods),
-        (creationMethod) => onFilters({ creationMethod })
-      )}
-      {multi(
-        'technical-dictionary-filter-timeliness',
-        t('label.timeliness'),
-        filters.timeliness,
-        tagOptions(options.timeliness),
-        (timeliness) => onFilters({ timeliness })
-      )}
-      {multi(
-        'technical-dictionary-filter-system-owner',
-        t('label.system-owner'),
-        filters.systemOwnerIds,
-        options.teams.map((team) => ({
-          value: team.id,
-          label: team.displayName || team.name,
-        })),
-        (systemOwnerIds) => onFilters({ systemOwnerIds })
-      )}
-      {multi(
-        'technical-dictionary-filter-source-status',
-        t('label.source-status'),
-        filters.sourceStatuses,
-        SOURCE_STATUSES.map((status) => ({
+        ]}
+        selectedValues={filters.cdeMapping}
+        onChange={(values) => onFilters({ cdeMapping: withoutAll(values) })}
+      />
+      <CDEFilterDropdown
+        dataTestId="technical-dictionary-filter-source-status"
+        label={t('label.source-status')}
+        options={SOURCE_STATUSES.map((status) => ({
           value: status,
           label: t(`label.source-status-${status.toLowerCase()}`),
-        })),
-        (sourceStatuses) => onFilters({ sourceStatuses })
-      )}
-      {capabilities.canViewWorking && (
-        <Space size={4}>
-          <Switch
-            checked={filters.versionView === 'ALL'}
-            data-testid="technical-dictionary-all-versions"
-            size="small"
-            onChange={(checked) =>
-              onFilters({ versionView: checked ? 'ALL' : 'LATEST' })
-            }
-          />
-          <span>{t('label.all-versions')}</span>
-        </Space>
-      )}
-      {canBulk && (
+        }))}
+        selectedValues={filters.sourceStatuses}
+        onChange={(values) => onFilters({ sourceStatuses: withoutAll(values) })}
+      />
+      <Popover
+        content={secondaryContent}
+        overlayClassName="tech-dict-more-filters-overlay"
+        placement="bottomLeft"
+        trigger="click">
         <Button
-          data-testid="technical-dictionary-bulk"
-          icon={<BulbOutlined />}
-          onClick={onBulk}>
-          {t('label.bulk-actions')}
+          className={classNames(
+            'tech-dict-more-filters-button text-primary remove-button-background-hover',
+            { active: secondaryCount > 0 }
+          )}
+          data-testid="technical-dictionary-more-filters"
+          size="small"
+          type="text">
+          <Space size={4}>
+            <span>{t('label.more-technical-filters')}</span>
+            {secondaryCount > 0 && (
+              <span className="font-semibold">({secondaryCount})</span>
+            )}
+            <DownOutlined />
+          </Space>
         </Button>
-      )}
-      <Dropdown
-        menu={{ items: menuItems }}
-        placement="bottomRight"
-        trigger={['click']}>
-        <Button
-          aria-label={t('label.more-actions')}
-          data-testid="technical-dictionary-more-actions"
-          icon={<MoreOutlined />}
-        />
-      </Dropdown>
-    </Space>
+      </Popover>
+      <div className="tech-dict-toolbar-actions">
+        {canAddColumn && (
+          <Button
+            data-testid="technical-dictionary-add-column"
+            icon={<PlusOutlined />}
+            type="primary"
+            onClick={onAddColumn}>
+            {t('label.add-column')}
+          </Button>
+        )}
+        {canBulk && (
+          <Button
+            data-testid="technical-dictionary-bulk"
+            icon={<BulbOutlined />}
+            onClick={onBulk}>
+            {t('label.bulk-actions')}
+          </Button>
+        )}
+        <Dropdown
+          menu={{ items: menuItems }}
+          placement="bottomRight"
+          trigger={['click']}>
+          <Button
+            aria-label={t('label.more-actions')}
+            className="tech-dict-more-actions-button"
+            data-testid="technical-dictionary-more-actions"
+            icon={<MoreOutlined />}
+          />
+        </Dropdown>
+      </div>
+    </>
   );
 };
 
