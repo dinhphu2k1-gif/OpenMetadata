@@ -26,17 +26,17 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.jsoup.Jsoup;
 import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.TagLabel;
 import org.openmetadata.schema.utils.JsonUtils;
-import org.jsoup.Jsoup;
 
 /** Writes the authorized F11 presentation rows to a bounded-memory XLSX workbook. */
 public final class CdeExcelExporter {
   public static final String XLSX_MEDIA_TYPE =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  static final int EXCEL_MAX_DATA_ROWS = 1_048_575;
+  public static final int EXCEL_MAX_DATA_ROWS = 1_048_575;
   private static final int ROW_WINDOW = 100;
   private static final String[] HEADERS = {
     "Mã CDE",
@@ -64,8 +64,7 @@ public final class CdeExcelExporter {
 
   public static ExportedWorkbook write(
       List<Map<String, Object>> authorizedRows, String parentBusinessVersion) throws IOException {
-    Path directory =
-        Path.of(System.getProperty("java.io.tmpdir"), "openmetadata", "cde-exports");
+    Path directory = Path.of(System.getProperty("java.io.tmpdir"), "openmetadata", "cde-exports");
     Files.createDirectories(directory);
     Path file = Files.createTempFile(directory, "cde-v" + parentBusinessVersion + "-", ".xlsx");
     boolean complete = false;
@@ -77,10 +76,12 @@ public final class CdeExcelExporter {
       int exported = 0;
       for (Map<String, Object> row : authorizedRows) {
         if (sheetState.dataRows() == EXCEL_MAX_DATA_ROWS) {
-          sheetState = newSheet(workbook, parentBusinessVersion, sheetState.index() + 1, headerStyle);
+          sheetState =
+              newSheet(workbook, parentBusinessVersion, sheetState.index() + 1, headerStyle);
         }
         writeRow(sheetState.sheet(), sheetState.dataRows() + 1, row, wrappedStyle);
-        sheetState = new SheetState(sheetState.sheet(), sheetState.index(), sheetState.dataRows() + 1);
+        sheetState =
+            new SheetState(sheetState.sheet(), sheetState.index(), sheetState.dataRows() + 1);
         exported++;
       }
       try (OutputStream output = Files.newOutputStream(file)) {
@@ -128,9 +129,7 @@ public final class CdeExcelExporter {
     presentationPayload.remove("scopeType");
     GlossaryTerm term = JsonUtils.convertValue(presentationPayload, GlossaryTerm.class);
     Map<String, Object> extension =
-        term.getExtension() instanceof Map<?, ?> values
-            ? (Map<String, Object>) values
-            : Map.of();
+        term.getExtension() instanceof Map<?, ?> values ? (Map<String, Object>) values : Map.of();
     List<String> values =
         List.of(
             text(term.getName()),
@@ -144,12 +143,8 @@ public final class CdeExcelExporter {
             tags(term.getTags(), "PersonalData"),
             markdown(
                 extensionValue(
-                    extension,
-                    "relatedRegulatoryDocuments",
-                    "van_ban_quy_dinh_lien_quan")),
-            quality(
-                extensionValue(
-                    extension, "dataQualityRules", "quy_dinh_chat_luong_du_lieu")),
+                    extension, "relatedRegulatoryDocuments", "van_ban_quy_dinh_lien_quan")),
+            quality(extensionValue(extension, "dataQualityRules", "quy_dinh_chat_luong_du_lieu")),
             text(source.get("businessVersion")),
             CdeReleaseVersionType.fromBusinessVersion(
                 String.valueOf(source.get("businessVersion"))),
@@ -233,9 +228,7 @@ public final class CdeExcelExporter {
     Object candidate = value;
     if (value instanceof List<?> list && !list.isEmpty()) candidate = list.get(0);
     String normalized = String.valueOf(candidate).trim().toUpperCase(Locale.ROOT);
-    return List.of("TRUE", "1", "Y", "YES", "CO", "CÓ").contains(normalized)
-        ? "Có"
-        : "Không";
+    return List.of("TRUE", "1", "Y", "YES", "CO", "CÓ").contains(normalized) ? "Có" : "Không";
   }
 
   private static String releaseLevel(Object value) {
@@ -264,11 +257,16 @@ public final class CdeExcelExporter {
     }
   }
 
-  static String safeText(String value) {
+  public static String safeText(String value) {
     if (value == null || value.isEmpty()) return "";
     char first = value.charAt(0);
-    return first == '=' || first == '+' || first == '-' || first == '@' || first == '\t'
-            || first == '\r' || first == '\n'
+    return first == '='
+            || first == '+'
+            || first == '-'
+            || first == '@'
+            || first == '\t'
+            || first == '\r'
+            || first == '\n'
         ? "'" + value
         : value;
   }

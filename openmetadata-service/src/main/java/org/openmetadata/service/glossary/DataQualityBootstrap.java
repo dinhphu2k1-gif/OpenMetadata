@@ -59,7 +59,8 @@ public final class DataQualityBootstrap {
                       .withTermRevisions(new ArrayList<>());
               collectionDAO.glossaryDAO().insert(glossary, glossary.getFullyQualifiedName());
 
-              Glossary payload = JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
+              Glossary payload =
+                  JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
               payload.withBusinessVersion(INITIAL_VERSION).withWorkingRevision(null);
               versionDAO.insertWorking(
                   UUID.randomUUID(),

@@ -35,6 +35,8 @@ const NO_ACTIVE_DICTIONARY_MESSAGE =
   'Chưa có phiên bản Data Dictionary được phê duyệt trong cùng scope.';
 
 interface CDESelectorProps {
+  /** Only offer CDEs while the scoped Data Dictionary version is still active. */
+  requireActive?: boolean;
   disabled?: boolean;
   parentBusinessVersion?: string;
   selectedCde?: GlossaryTerm;
@@ -49,8 +51,8 @@ const isApprovedDictionaryVersionForScope = (
   parentBusinessVersion?: string
 ) =>
   snapshot?.businessVersion === parentBusinessVersion &&
-  (snapshot.entityStatus === GlossaryStatus.Approved ||
-    snapshot.entityStatus === GlossaryStatus.Archived);
+  (snapshot?.entityStatus === GlossaryStatus.Approved ||
+    snapshot?.entityStatus === GlossaryStatus.Archived);
 
 const getCdeVersionKey = (
   cde: Pick<
@@ -117,6 +119,7 @@ const CDEOptionLabel = ({
 );
 
 const CDESelector: FC<CDESelectorProps> = ({
+  requireActive = false,
   disabled,
   onChange,
   parentBusinessVersion,
@@ -190,11 +193,16 @@ const CDESelector: FC<CDESelectorProps> = ({
           ? await getGlossaryVersion(dictionary.id, parentBusinessVersion)
           : undefined;
         if (mounted) {
-          setActiveDictionary(
-            isApprovedDictionaryVersionForScope(snapshot, parentBusinessVersion)
-              ? snapshot
-              : undefined
-          );
+          const usable =
+            isApprovedDictionaryVersionForScope(
+              snapshot,
+              parentBusinessVersion
+            ) &&
+            !(
+              requireActive &&
+              snapshot?.entityStatus === GlossaryStatus.Archived
+            );
+          setActiveDictionary(usable ? snapshot : undefined);
           setIsDictionaryResolved(true);
         }
       } catch {
@@ -212,7 +220,7 @@ const CDESelector: FC<CDESelectorProps> = ({
       mounted = false;
       requestSequence.current += 1;
     };
-  }, [parentBusinessVersion]);
+  }, [parentBusinessVersion, requireActive]);
 
   useEffect(() => {
     if (activeDictionary) {

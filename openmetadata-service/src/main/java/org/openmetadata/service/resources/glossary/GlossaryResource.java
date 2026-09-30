@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.api.VoteRequest;
 import org.openmetadata.schema.api.data.CreateGlossary;
 import org.openmetadata.schema.api.data.DataDictionaryCreateVersionRequest;
@@ -72,6 +73,11 @@ import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
+import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
+import org.openmetadata.service.glossary.technical.search.TechnicalIndexUnavailableException;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -97,6 +103,7 @@ import org.openmetadata.service.util.CSVExportResponse;
 @Collection(
     name = "glossaries",
     order = 6) // Initialize before GlossaryTerm and after Classification and Tags
+@Slf4j
 public class GlossaryResource extends EntityResource<Glossary, GlossaryRepository> {
   public static final String COLLECTION_PATH = "/v1/glossaries/";
   static final String FIELDS = "owners,tags,reviewers,usageCount,termCount,domains,extension";
@@ -112,6 +119,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     super.initialize(config);
     DataDictionaryBootstrap.initialize();
     DataQualityBootstrap.initialize();
+    TechnicalDictionaryBootstrap.initialize();
     versioningService.processPendingOutbox();
   }
 
@@ -320,15 +328,17 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
     requireExpectedRevision(request);
-    return GlossaryVersionResponses.published(
+    String actor = securityContext.getUserPrincipal().getName();
+    PublishedSnapshotRecord published =
         versioningService.publish(
             GlossaryVersioningService.GLOSSARY,
             id,
             request.getExpectedRevision(),
-            securityContext.getUserPrincipal().getName(),
+            actor,
             working ->
                 GlossaryAuthorizationResolver.requireReview(
-                    capabilitiesForWorking(securityContext, working))));
+                    capabilitiesForWorking(securityContext, working)));
+    return GlossaryVersionResponses.published(published);
   }
 
   @GET
@@ -357,12 +367,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    Glossary glossary = getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
     GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord snapshot =
-        versioningService.getPublished(
-            GlossaryVersioningService.GLOSSARY, id, businessVersion);
+        versioningService.getPublished(GlossaryVersioningService.GLOSSARY, id, businessVersion);
     Map<String, Object> response = GlossaryVersionResponses.published(snapshot);
     int termCount = versioningService.listPublishedGlossaryTerms(id, businessVersion).size();
     if (snapshot.archivedAt() == null
@@ -386,12 +394,10 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @PathParam("businessVersion") String businessVersion) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
+    Glossary glossary = getInternal(uriInfo, securityContext, id, "id", Include.NON_DELETED, null);
     GovernedGlossaryProfileRegistry.require(glossary);
     PublishedSnapshotRecord glossarySnapshot =
-        versioningService.getPublished(
-            GlossaryVersioningService.GLOSSARY, id, businessVersion);
+        versioningService.getPublished(GlossaryVersioningService.GLOSSARY, id, businessVersion);
     List<Map<String, Object>> terms =
         new java.util.ArrayList<>(
             versioningService.listPublishedGlossaryTerms(id, businessVersion).stream()
@@ -428,6 +434,29 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     return GlossaryVersionResponses.working(
         versioningService.revokeLatestToRejectedWorking(
             GlossaryVersioningService.GLOSSARY, id, securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/{id}/technical-index/rebuild")
+  @Operation(
+      operationId = "rebuildTechnicalDictionaryIndex",
+      summary = "Rebuild the Technical Dictionary search index from the database",
+      description =
+          "Admin only. Fills a new physical index from the declared records and then moves the "
+              + "alias, so readers keep using the previous index while it runs.")
+  public Map<String, Object> rebuildTechnicalIndex(
+      @Context SecurityContext securityContext, @PathParam("id") UUID id) {
+    authorizer.authorizeAdmin(securityContext);
+    if (!TechnicalCatalog.isTechnicalGlossary(id)) {
+      throw new NotFoundException("Technical Dictionary glossary was not found");
+    }
+    Map<String, Object> result;
+    try {
+      result = TechnicalIndexRebuilder.rebuild();
+    } catch (TechnicalIndexUnavailableException exception) {
+      throw TechnicalDictionaryErrors.indexUnavailable(exception.getMessage());
+    }
+    return result;
   }
 
   @GET

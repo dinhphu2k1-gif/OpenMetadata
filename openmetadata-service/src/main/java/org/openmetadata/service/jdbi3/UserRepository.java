@@ -248,7 +248,10 @@ public class UserRepository extends EntityRepository<User> {
             Entity.getEntityReferenceByName(Entity.ROLE, BASIC_CONSUMER_ROLE, NON_DELETED);
         user.setRoles(new ArrayList<>(List.of(defaultRole)));
       } catch (Exception e) {
-        LOG.warn("Default role {} not found when preparing user {}", BASIC_CONSUMER_ROLE, user.getName());
+        LOG.warn(
+            "Default role {} not found when preparing user {}",
+            BASIC_CONSUMER_ROLE,
+            user.getName());
       }
     }
     validateRoles(user.getRoles());
@@ -697,8 +700,7 @@ public class UserRepository extends EntityRepository<User> {
       return Entity.getEntityReferenceByName(Entity.PERSONA, personaName, NON_DELETED);
     } catch (EntityNotFoundException e) {
       LOG.warn(
-          "Persona {} is not initialized; users will use the regular default persona",
-          personaName);
+          "Persona {} is not initialized; users will use the regular default persona", personaName);
       return null;
     }
   }

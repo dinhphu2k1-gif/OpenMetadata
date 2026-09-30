@@ -506,10 +506,10 @@ Tiêu đề modal tạo mới là **Thêm Thuật ngữ** và nút xác nhận l
 Hành vi:
 
 - Chọn CDE bằng selector/async search chuẩn của OpenMetadata; không tạo dropdown style riêng và không tải cứng 1.000 CDE.
-- Trước khi tải option, client resolve Data Dictionary `Approved` chưa Archived có business version mới nhất; request CDE luôn scope bằng ID + `parentBusinessVersion` và status `Approved`.
+- Option CDE lấy từ Data Dictionary scope có cùng số version `N` với catalog DQ đang mở (§5.4); request CDE luôn scope bằng ID + `parentBusinessVersion = N` và status `Approved`.
 - Placeholder là **“Tìm theo mã hoặc tên CDE”**; không hiển thị UUID. Mỗi option hiển thị `Mã CDE · Tên thành tố · v<businessVersion>`; không lặp badge `Approved` trên từng dòng. Phần đầu dropdown hiển thị `Data Dictionary: <tên> · v<version> · Approved`.
 - Search theo mã/tên, debounce và bỏ response quá hạn để tránh kết quả cũ ghi đè query mới. Loading, empty và error state phải tách biệt.
-- Nếu không có Data Dictionary `Approved` còn hiệu lực, disable chọn mới và hiển thị: **“Chưa có phiên bản Data Dictionary được phê duyệt và còn hiệu lực.”** Không fallback sang Draft, Archived hoặc version Approved cũ không còn hiệu lực.
+- Nếu Data Dictionary scope `N` chưa `Approved` hoặc đã `Archived`, disable chọn mới và hiển thị: **“Chưa có phiên bản Data Dictionary được phê duyệt và còn hiệu lực.”** Không fallback sang Data Dictionary scope khác, Draft hoặc Archived.
 - Tên CDE là read-only từ reference; không cho người dùng gõ một tên khác với CDE đã chọn.
 - Tên quy tắc ánh xạ trực tiếp tới `displayName`, do người dùng nhập và có thể để trống; UI trim trước khi gửi, bảng và chi tiết hiển thị `--` khi thiếu.
 - Mã quy tắc chính là `name`, tạo identity/FQN và không được sửa sau khi tạo; business version và trạng thái không chỉnh trực tiếp.
@@ -630,7 +630,7 @@ Migration phải idempotent, có dry-run, marker, rollback theo toàn glossary v
 | ADR-DQ-08 | DQ Rule v1 tham chiếu một CDE | Phù hợp dữ liệu/form hiện tại; có đường nâng cấp rõ |
 | ADR-DQ-09 | UI dùng đúng 19 trường nghiệp vụ đã chốt | Bổ sung Tên quy tắc (`displayName`), hiển thị business version và loại phát hành nhưng không bổ sung Owner/Reviewer/technical identity vào bảng nghiệp vụ |
 | ADR-DQ-10 | Hai trường ngày dùng contract CDE | Đồng nhất format, validation và import/export |
-| ADR-DQ-11 | CDE selector hiển thị từng Approved snapshot trong Data Dictionary Approved còn hiệu lực mới nhất | Cho người dùng chọn rõ version và ngăn relation tới Draft/Archived |
+| ADR-DQ-11 | CDE selector hiển thị Approved snapshot trong Data Dictionary scope cùng số version `N` với catalog DQ, khi scope đó đang active | Cho người dùng chọn rõ version, ngăn relation tới Draft/Archived và không chọn chéo scope |
 | ADR-DQ-12 | Archive không rewrite relation DQ lịch sử | Bảo toàn audit, khả năng truy vết và tính bất biến của snapshot |
 | ADR-DQ-13 | Relation DQ→CDE lưu version context | `termId` dùng chung giữa các version nên không đủ để khôi phục lựa chọn |
 

@@ -24,8 +24,10 @@ class CdeImportServiceTest {
       assertEquals("Import CDE", workbook.getSheetAt(0).getSheetName());
       assertEquals(14, workbook.getSheetAt(0).getRow(0).getLastCellNum());
       assertEquals("Mã CDE", workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
-      assertEquals("Cấp phát hành", workbook.getSheetAt(0).getRow(0).getCell(7).getStringCellValue());
-      assertEquals("Ngày hết hiệu lực", workbook.getSheetAt(0).getRow(0).getCell(13).getStringCellValue());
+      assertEquals(
+          "Cấp phát hành", workbook.getSheetAt(0).getRow(0).getCell(7).getStringCellValue());
+      assertEquals(
+          "Ngày hết hiệu lực", workbook.getSheetAt(0).getRow(0).getCell(13).getStringCellValue());
     }
   }
 
@@ -33,10 +35,15 @@ class CdeImportServiceTest {
   void duplicateNormalizedNamesBlockCommitWithoutMutation() throws Exception {
     CdeImportService service = new CdeImportService();
     byte[] workbook = workbook("CUSTOMER_ID", " customer_id ");
-    CdeImportService.Preview preview = service.preview(
-        new ByteArrayInputStream(workbook), workbook.length, "maker", UUID.randomUUID(), "2",
-        CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
-        row -> valid(row.rowNumber(), row.value(0)));
+    CdeImportService.Preview preview =
+        service.preview(
+            new ByteArrayInputStream(workbook),
+            workbook.length,
+            "maker",
+            UUID.randomUUID(),
+            "2",
+            CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
+            row -> valid(row.rowNumber(), row.value(0)));
     assertFalse(preview.canCommit());
     assertEquals(1, preview.summary().get("error"));
     assertThrows(
@@ -48,15 +55,21 @@ class CdeImportServiceTest {
   void sessionsAreActorBoundAndSingleUse() throws Exception {
     CdeImportService service = new CdeImportService();
     byte[] workbook = workbook("CUSTOMER_ID");
-    CdeImportService.Preview preview = service.preview(
-        new ByteArrayInputStream(workbook), workbook.length, "maker", UUID.randomUUID(), "2",
-        CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
-        row -> valid(row.rowNumber(), row.value(0)));
+    CdeImportService.Preview preview =
+        service.preview(
+            new ByteArrayInputStream(workbook),
+            workbook.length,
+            "maker",
+            UUID.randomUUID(),
+            "2",
+            CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
+            row -> valid(row.rowNumber(), row.value(0)));
     assertTrue(preview.canCommit());
     assertThrows(
         ClientErrorException.class,
         () -> service.commit(preview.importSessionId(), "other", ignored -> "bad"));
-    assertEquals("committed", service.commit(preview.importSessionId(), "maker", ignored -> "committed"));
+    assertEquals(
+        "committed", service.commit(preview.importSessionId(), "maker", ignored -> "committed"));
     assertThrows(
         ClientErrorException.class,
         () -> service.commit(preview.importSessionId(), "maker", ignored -> "again"));
@@ -68,14 +81,20 @@ class CdeImportServiceTest {
     byte[] workbook = workbook("=HYPERLINK(\"https://example.test\")");
     assertThrows(
         RuntimeException.class,
-        () -> service.preview(
-            new ByteArrayInputStream(workbook), workbook.length, "maker", UUID.randomUUID(), "2",
-            CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
-            row -> valid(row.rowNumber(), row.value(0))));
+        () ->
+            service.preview(
+                new ByteArrayInputStream(workbook),
+                workbook.length,
+                "maker",
+                UUID.randomUUID(),
+                "2",
+                CdeImportService.ExistingCodePolicy.OVERWRITE_EXISTING,
+                row -> valid(row.rowNumber(), row.value(0))));
   }
 
   private static PlannedRow valid(int row, String name) {
-    return new PlannedRow(row, name, "CREATE", UUID.randomUUID(), "2.0", null, null, Map.of(), List.of(), List.of());
+    return new PlannedRow(
+        row, name, "CREATE", UUID.randomUUID(), "2.0", null, null, Map.of(), List.of(), List.of());
   }
 
   private static byte[] workbook(String... names) throws Exception {

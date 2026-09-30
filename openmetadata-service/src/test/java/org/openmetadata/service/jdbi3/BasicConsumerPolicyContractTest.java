@@ -100,7 +100,8 @@ class BasicConsumerPolicyContractTest {
                 "thread",
                 "role",
                 "policy")
-            .stream().allMatch(deniedResources::contains));
+            .stream()
+            .allMatch(deniedResources::contains));
     assertTrue(BUSINESS_RESOURCES.stream().noneMatch(deniedResources::contains));
   }
 

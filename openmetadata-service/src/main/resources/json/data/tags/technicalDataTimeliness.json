@@ -1,0 +1,31 @@
+{
+  "createClassification": {
+    "name": "DataTimeliness",
+    "displayName": "Thời gian",
+    "description": "Thời gian cần thiết để dữ liệu sẵn sàng trong hệ thống, dạng T+X với X là số ngày kể từ ngày giao dịch.",
+    "provider": "system",
+    "mutuallyExclusive": "true"
+  },
+  "createTags": [
+    {
+      "name": "T0",
+      "displayName": "T",
+      "description": "Dữ liệu sẵn sàng trong ngày giao dịch."
+    },
+    {
+      "name": "T1",
+      "displayName": "T+1",
+      "description": "Dữ liệu sẵn sàng sau 1 ngày kể từ ngày giao dịch."
+    },
+    {
+      "name": "T2",
+      "displayName": "T+2",
+      "description": "Dữ liệu sẵn sàng sau 2 ngày kể từ ngày giao dịch."
+    },
+    {
+      "name": "T3",
+      "displayName": "T+3",
+      "description": "Dữ liệu sẵn sàng sau 3 ngày kể từ ngày giao dịch."
+    }
+  ]
+}

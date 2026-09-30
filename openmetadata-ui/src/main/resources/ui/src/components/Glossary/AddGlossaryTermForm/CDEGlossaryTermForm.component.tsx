@@ -7,7 +7,13 @@ import { DownOutlined } from '@ant-design/icons';
 import { Form, FormInstance, Input, Select, Tag } from 'antd';
 import { isEmpty } from 'lodash';
 import { DateTime } from 'luxon';
-import { forwardRef, HTMLAttributes, useEffect, useState } from 'react';
+import {
+  forwardRef,
+  HTMLAttributes,
+  ReactNode,
+  useEffect,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCDEReleaseLevelValue } from '../../../constants/CDEReleaseLevel.constants';
 import { EntityType } from '../../../enums/entity.enum';
@@ -33,6 +39,7 @@ import {
   GlossaryTermForm,
 } from './AddGlossaryTermForm.interface';
 import GlossaryTermFormSection from './GlossaryTermFormSection.component';
+import GovernedVersionFields from './GovernedVersionFields.component';
 
 export interface CDEGlossaryTermFormValues {
   name?: string;
@@ -409,20 +416,13 @@ const CDEGlossaryTermForm = ({
             )}
           />
         </Form.Item>
-        <Form.Item
-          required
-          className="cde-form-version"
-          label={t('cde.version')}
-          name="version"
-          rules={[{ required: true, whitespace: true }]}>
-          <Input disabled data-testid="cde-version" placeholder="1.0" />
-        </Form.Item>
-        <Form.Item
-          className="cde-form-release-version-type"
-          label={t('cde.release-version-type')}
-          name="releaseVersionType">
-          <Input disabled data-testid="cde-release-version-type" />
-        </Form.Item>
+        <GovernedVersionFields
+          versionRequired
+          releaseVersionTypeLabel={t('cde.release-version-type')}
+          releaseVersionTypeTestId="cde-release-version-type"
+          versionLabel={t('cde.version')}
+          versionTestId="cde-version"
+        />
         <Form.Item
           required
           className="cde-form-business-meaning cde-form-field-full"

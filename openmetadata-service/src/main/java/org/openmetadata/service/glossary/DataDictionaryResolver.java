@@ -25,9 +25,7 @@ public final class DataDictionaryResolver {
 
   public static boolean isDataDictionary(Glossary glossary) {
     return GovernedGlossaryProfileRegistry.find(glossary)
-        .filter(
-            profile ->
-                profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY)
+        .filter(profile -> profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY)
         .isPresent();
   }
 
@@ -112,8 +110,7 @@ public final class DataDictionaryResolver {
         "relatedTerms", create.getRelatedTerms() != null && !create.getRelatedTerms().isEmpty());
     rejectUnsupportedCreateField(
         "versionedRelatedTerms",
-        create.getVersionedRelatedTerms() != null
-            && !create.getVersionedRelatedTerms().isEmpty());
+        create.getVersionedRelatedTerms() != null && !create.getVersionedRelatedTerms().isEmpty());
     rejectUnsupportedCreateField(
         "references", create.getReferences() != null && !create.getReferences().isEmpty());
     rejectUnsupportedCreateField(

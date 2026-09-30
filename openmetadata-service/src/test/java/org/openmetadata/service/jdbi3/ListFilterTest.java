@@ -56,9 +56,7 @@ class ListFilterTest {
 
     String condition = filter.getCondition("glossary_entity");
 
-    assertTrue(
-        condition.contains(
-            "glossary_entity.name IN (:exactName_0,:exactName_1)"));
+    assertTrue(condition.contains("glossary_entity.name IN (:exactName_0,:exactName_1)"));
     assertEquals("Data Dictionary", filter.getQueryParams().get("exactName_0"));
     assertEquals("Data Quality", filter.getQueryParams().get("exactName_1"));
   }

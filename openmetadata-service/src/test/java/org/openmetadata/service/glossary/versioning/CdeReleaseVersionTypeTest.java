@@ -17,8 +17,7 @@ class CdeReleaseVersionTypeTest {
   @Test
   void derivesReleaseTypeFromCanonicalBusinessVersion() {
     assertEquals(CdeReleaseVersionType.MAIN, CdeReleaseVersionType.fromBusinessVersion("2.0"));
-    assertEquals(
-        CdeReleaseVersionType.SECONDARY, CdeReleaseVersionType.fromBusinessVersion("2.1"));
+    assertEquals(CdeReleaseVersionType.SECONDARY, CdeReleaseVersionType.fromBusinessVersion("2.1"));
   }
 
   @Test

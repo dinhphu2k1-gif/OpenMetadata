@@ -163,9 +163,9 @@ class MergeChildTagsTest {
         new TagLabel().withTagFQN("PII.Email").withSource(TagLabel.TagSource.CLASSIFICATION);
     Column col =
         new Column()
-              .withName("email")
-              .withDataType(ColumnDataType.VARCHAR)
-              .withTags(List.of(colTag));
+            .withName("email")
+            .withDataType(ColumnDataType.VARCHAR)
+            .withTags(List.of(colTag));
 
     Table table =
         new Table()

@@ -95,8 +95,8 @@ import org.openmetadata.schema.type.ChangeDescription;
 import org.openmetadata.schema.type.ChangeEvent;
 import org.openmetadata.schema.type.Column;
 import org.openmetadata.schema.type.EntityReference;
-import org.openmetadata.schema.type.EntityVersionContext;
 import org.openmetadata.schema.type.EntityStatus;
+import org.openmetadata.schema.type.EntityVersionContext;
 import org.openmetadata.schema.type.EventType;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.ProviderType;
@@ -113,6 +113,7 @@ import org.openmetadata.schema.type.csv.CsvImportResult;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.cache.ListCountCache;
 import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
@@ -120,11 +121,11 @@ import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.CdeImportService.PlannedRow;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
-import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
-import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
 import org.openmetadata.service.jdbi3.FeedRepository.TaskWorkflow;
 import org.openmetadata.service.jdbi3.FeedRepository.ThreadContext;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.rdf.RdfUpdater;
 import org.openmetadata.service.resources.feeds.MessageParser;
 import org.openmetadata.service.resources.feeds.MessageParser.EntityLink;
@@ -265,8 +266,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                       JsonUtils.pojoToJson(payload),
                       now,
                       actor);
-                  return versions.findWorking(
-                      GLOSSARY_TERM, term.getId(), parentBusinessVersion);
+                  return versions.findWorking(GLOSSARY_TERM, term.getId(), parentBusinessVersion);
                 });
     postCreate(identity);
     writeThroughCache(identity, false);
@@ -331,52 +331,82 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                               .withDomains(null)
                               .withTags(null)
                               .withExtension(null);
-                      collection.glossaryTermDAO().insert(identity, identity.getFullyQualifiedName());
-                      collection.relationshipDAO().insert(
-                          glossaryId,
-                          identity.getId(),
-                          GLOSSARY,
-                          GLOSSARY_TERM,
-                          Relationship.CONTAINS.ordinal());
+                      collection
+                          .glossaryTermDAO()
+                          .insert(identity, identity.getFullyQualifiedName());
+                      collection
+                          .relationshipDAO()
+                          .insert(
+                              glossaryId,
+                              identity.getId(),
+                              GLOSSARY,
+                              GLOSSARY_TERM,
+                              Relationship.CONTAINS.ordinal());
                       insertImportRelationships(collection, payload);
                       versions.insertWorking(
-                          UUID.randomUUID(), GLOSSARY_TERM, identity.getId(), glossaryId,
-                          parentBusinessVersion, row.businessVersion(), EntityStatus.DRAFT.value(),
-                          payload.getVersion(), JsonUtils.pojoToJson(payload), now, actor);
+                          UUID.randomUUID(),
+                          GLOSSARY_TERM,
+                          identity.getId(),
+                          glossaryId,
+                          parentBusinessVersion,
+                          row.businessVersion(),
+                          EntityStatus.DRAFT.value(),
+                          payload.getVersion(),
+                          JsonUtils.pojoToJson(payload),
+                          now,
+                          actor);
                       newIdentities.add(identity);
                     } else if ("CREATE_VERSION".equals(row.action())) {
-                      if (versions.lockWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion) != null) {
+                      if (versions.lockWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion)
+                          != null) {
                         throw importConflict("A working version was created after preview");
                       }
                       PublishedSnapshotRecord latest =
                           versions.lockLatestPublishedByParent(
                               GLOSSARY_TERM, row.termId(), parentBusinessVersion);
-                      if (latest == null || !latest.businessVersion().equals(row.expectedPublishedVersion())) {
+                      if (latest == null
+                          || !latest.businessVersion().equals(row.expectedPublishedVersion())) {
                         throw importConflict("Approved CDE changed after preview");
                       }
                       versions.insertWorking(
-                          UUID.randomUUID(), GLOSSARY_TERM, row.termId(), glossaryId,
-                          parentBusinessVersion, row.businessVersion(), EntityStatus.DRAFT.value(),
-                          payload.getVersion(), JsonUtils.pojoToJson(payload), now, actor);
+                          UUID.randomUUID(),
+                          GLOSSARY_TERM,
+                          row.termId(),
+                          glossaryId,
+                          parentBusinessVersion,
+                          row.businessVersion(),
+                          EntityStatus.DRAFT.value(),
+                          payload.getVersion(),
+                          JsonUtils.pojoToJson(payload),
+                          now,
+                          actor);
                     } else {
                       WorkingVersionRecord current =
                           versions.lockWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion);
-                      if (current == null || row.expectedRevision() == null
+                      if (current == null
+                          || row.expectedRevision() == null
                           || current.revision() != row.expectedRevision()) {
                         throw importConflict("CDE working revision changed after preview");
                       }
-                      int updated = versions.updateWorking(
-                          GLOSSARY_TERM, row.termId(), parentBusinessVersion, row.expectedRevision(),
-                          EntityStatus.DRAFT.value(), current.nativeVersion(),
-                          JsonUtils.pojoToJson(payload), now, actor);
-                      if (updated != 1) throw importConflict("CDE changed while import was committing");
+                      int updated =
+                          versions.updateWorking(
+                              GLOSSARY_TERM,
+                              row.termId(),
+                              parentBusinessVersion,
+                              row.expectedRevision(),
+                              EntityStatus.DRAFT.value(),
+                              current.nativeVersion(),
+                              JsonUtils.pojoToJson(payload),
+                              now,
+                              actor);
+                      if (updated != 1)
+                        throw importConflict("CDE changed while import was committing");
                     }
                     committed.add(
                         versions.findWorking(GLOSSARY_TERM, row.termId(), parentBusinessVersion));
                     processedRows++;
                     if (progressCallback != null
-                        && (processedRows == totalRows
-                            || processedRows % progressInterval == 0)) {
+                        && (processedRows == totalRows || processedRows % progressInterval == 0)) {
                       progressCallback.accept(processedRows, totalRows);
                     }
                   }
@@ -389,29 +419,47 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     return result;
   }
 
-  private static GlossaryTerm withReleaseVersionType(
-      GlossaryTerm payload, String businessVersion) {
+  private static GlossaryTerm withReleaseVersionType(GlossaryTerm payload, String businessVersion) {
     return JsonUtils.convertValue(
         CdeReleaseVersionType.apply(payload, businessVersion), GlossaryTerm.class);
   }
 
   private static void insertImportRelationships(CollectionDAO collection, GlossaryTerm term) {
     for (EntityReference owner : listOrEmpty(term.getOwners())) {
-      collection.relationshipDAO().insert(
-          owner.getId(), term.getId(), owner.getType(), GLOSSARY_TERM, Relationship.OWNS.ordinal());
+      collection
+          .relationshipDAO()
+          .insert(
+              owner.getId(),
+              term.getId(),
+              owner.getType(),
+              GLOSSARY_TERM,
+              Relationship.OWNS.ordinal());
     }
     for (EntityReference reviewer : listOrEmpty(term.getReviewers())) {
-      collection.relationshipDAO().insert(
-          reviewer.getId(), term.getId(), reviewer.getType(), GLOSSARY_TERM, Relationship.REVIEWS.ordinal());
+      collection
+          .relationshipDAO()
+          .insert(
+              reviewer.getId(),
+              term.getId(),
+              reviewer.getType(),
+              GLOSSARY_TERM,
+              Relationship.REVIEWS.ordinal());
     }
     for (EntityReference domain : listOrEmpty(term.getDomains())) {
-      collection.relationshipDAO().insert(
-          domain.getId(), term.getId(), Entity.DOMAIN, GLOSSARY_TERM, Relationship.HAS.ordinal());
+      collection
+          .relationshipDAO()
+          .insert(
+              domain.getId(),
+              term.getId(),
+              Entity.DOMAIN,
+              GLOSSARY_TERM,
+              Relationship.HAS.ordinal());
     }
   }
 
   private static jakarta.ws.rs.ClientErrorException importConflict(String message) {
-    return new jakarta.ws.rs.ClientErrorException(message, jakarta.ws.rs.core.Response.Status.CONFLICT);
+    return new jakarta.ws.rs.ClientErrorException(
+        message, jakarta.ws.rs.core.Response.Status.CONFLICT);
   }
 
   public ResultList<EntityReference> getGlossaryTermAssets(
@@ -905,8 +953,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
       validateRelationType(relationType);
       UUID toId = termRelation.getTerm().getId();
       String canonicalType = computeCanonicalRelationType(entity.getId(), toId, relationType);
-      String json =
-          relationJson(canonicalType, toId, termRelation.getVersionContext());
+      String json = relationJson(canonicalType, toId, termRelation.getVersionContext());
       addRelationship(
           entity.getId(),
           toId,
@@ -1340,9 +1387,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   static String buildScopedCdeFqn(
       String glossaryFullyQualifiedName, String termName, String parentBusinessVersion) {
     String scopedName =
-        parentBusinessVersion == null
-            ? termName
-            : termName + "@v" + parentBusinessVersion;
+        parentBusinessVersion == null ? termName : termName + "@v" + parentBusinessVersion;
     return FullyQualifiedName.build(glossaryFullyQualifiedName, scopedName);
   }
 
@@ -1785,7 +1830,19 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
 
   @Override
   protected void postCreate(GlossaryTerm entity) {
-    super.postCreate(entity);
+    if (isTechnicalDictionaryRecord(entity)) {
+      // TDX-11: a Technical Dictionary identity is indexed only in its own search index.
+      RdfUpdater.updateEntity(entity);
+      ListCountCache.invalidate(entityType);
+    } else {
+      super.postCreate(entity);
+    }
+  }
+
+  private static boolean isTechnicalDictionaryRecord(GlossaryTerm term) {
+    return term.getGlossary() != null
+        && GovernedGlossaryProfileRegistry.findByName(term.getGlossary().getName()).orElse(null)
+            == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
   }
 
   @Override

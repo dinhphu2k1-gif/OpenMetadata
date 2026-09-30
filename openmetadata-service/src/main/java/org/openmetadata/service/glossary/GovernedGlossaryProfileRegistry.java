@@ -17,7 +17,8 @@ public final class GovernedGlossaryProfileRegistry {
 
   public enum Profile {
     DATA_DICTIONARY("Data Dictionary"),
-    DATA_QUALITY("Data Quality");
+    DATA_QUALITY("Data Quality"),
+    TECHNICAL_DICTIONARY("Technical Dictionary");
 
     private final String glossaryName;
 

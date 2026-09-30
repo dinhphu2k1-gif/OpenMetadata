@@ -12,17 +12,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.openmetadata.schema.entity.Type;
 import org.openmetadata.schema.entity.data.Glossary;
-import org.openmetadata.schema.entity.type.CustomProperty;
-import org.openmetadata.schema.type.CustomPropertyConfig;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.ProviderType;
 import org.openmetadata.schema.type.customProperties.EnumConfig;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.TypeRegistry;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
@@ -104,7 +100,8 @@ public final class DataDictionaryBootstrap {
                       .withTermRevisions(new ArrayList<>());
               collectionDAO.glossaryDAO().insert(glossary, glossary.getFullyQualifiedName());
 
-              Glossary payload = JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
+              Glossary payload =
+                  JsonUtils.readValue(JsonUtils.pojoToJson(glossary), Glossary.class);
               payload.withBusinessVersion(INITIAL_VERSION).withWorkingRevision(null);
               versionDAO.insertWorking(
                   UUID.randomUUID(),
@@ -126,9 +123,7 @@ public final class DataDictionaryBootstrap {
       Map<String, Object> payload = JsonUtils.readValue(working.payload(), Map.class);
       Object extensionValue = payload.get("extension");
       Map<String, Object> extension =
-          extensionValue instanceof Map<?, ?> values
-              ? (Map<String, Object>) values
-              : Map.of();
+          extensionValue instanceof Map<?, ?> values ? (Map<String, Object>) values : Map.of();
       String expected = CdeReleaseVersionType.fromBusinessVersion(working.businessVersion());
       if (List.of(expected).equals(extension.get(CdeReleaseVersionType.PROPERTY))) {
         continue;
@@ -152,43 +147,23 @@ public final class DataDictionaryBootstrap {
   }
 
   private static void ensureReleaseVersionTypeProperty() {
-    final String propertyName = "releaseVersionType";
-    final List<String> expectedValues = List.of("Bản chính", "Bản phụ");
-    try {
-      String propertyType = TypeRegistry.getCustomPropertyType(Entity.GLOSSARY_TERM, propertyName);
-      String config = TypeRegistry.getCustomPropertyConfig(Entity.GLOSSARY_TERM, propertyName);
-      EnumConfig enumConfig = JsonUtils.readValue(config, EnumConfig.class);
-      if (!"enum".equals(propertyType)
-          || Boolean.TRUE.equals(enumConfig.getMultiSelect())
-          || !expectedValues.equals(enumConfig.getValues())) {
-        throw inconsistent("custom property " + propertyName + " has schema drift");
-      }
-      return;
-    } catch (EntityNotFoundException ignored) {
-      // Created once below. Existing definitions are validated above instead of silently changed.
-    }
-
-    Type glossaryTermType =
-        Entity.getTypeRepository().findByName(Entity.GLOSSARY_TERM, Include.NON_DELETED);
-    CustomProperty property =
-        new CustomProperty()
-            .withName(propertyName)
-            .withDisplayName("Loại phiên bản phát hành")
-            .withDescription("Phân loại phiên bản CDE do hệ thống xác định")
-            .withPropertyType(
-                Entity.getEntityReferenceByName(Entity.TYPE, "enum", Include.NON_DELETED))
-            .withCustomPropertyConfig(
-                new CustomPropertyConfig()
-                    .withConfig(
-                        new EnumConfig().withMultiSelect(false).withValues(expectedValues)));
-    Entity.getTypeRepository()
-        .addCustomProperty(null, ADMIN_USER_NAME, glossaryTermType.getId(), property);
+    GovernedCustomPropertyBootstrap.ensure(
+        new GovernedCustomPropertyBootstrap.PropertyDefinition(
+            CdeReleaseVersionType.PROPERTY,
+            "Loại phiên bản phát hành",
+            "Phân loại phiên bản CDE do hệ thống xác định",
+            "enum",
+            new EnumConfig()
+                .withMultiSelect(false)
+                .withValues(List.of(CdeReleaseVersionType.MAIN, CdeReleaseVersionType.SECONDARY))));
   }
 
   private static Glossary findIdentity(CollectionDAO dao) {
     try {
-      return dao.glossaryDAO().findEntityByName(
-          FullyQualifiedName.quoteName(DataDictionaryResolver.DATA_DICTIONARY_NAME), Include.ALL);
+      return dao.glossaryDAO()
+          .findEntityByName(
+              FullyQualifiedName.quoteName(DataDictionaryResolver.DATA_DICTIONARY_NAME),
+              Include.ALL);
     } catch (EntityNotFoundException ignored) {
       return null;
     }

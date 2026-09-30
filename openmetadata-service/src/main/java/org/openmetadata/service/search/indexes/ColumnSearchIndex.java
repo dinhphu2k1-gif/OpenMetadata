@@ -40,12 +40,7 @@ public class ColumnSearchIndex implements SearchIndex {
   @Override
   public Set<String> getExcludedFields() {
     return Set.of(
-        "children",
-        "profile",
-        "customMetrics",
-        "jsonSchema",
-        "precision",
-        "arrayDataType");
+        "children", "profile", "customMetrics", "jsonSchema", "precision", "arrayDataType");
   }
 
   @Override

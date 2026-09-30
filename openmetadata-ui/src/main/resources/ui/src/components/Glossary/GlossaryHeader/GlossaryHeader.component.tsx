@@ -18,7 +18,6 @@ import {
   Input,
   Modal,
   Space,
-  Tag,
   Tooltip,
   Typography,
 } from 'antd';
@@ -95,10 +94,7 @@ import {
   compareBusinessVersions,
   getBusinessVersion,
 } from '../../../utils/BusinessVersionUtils';
-import {
-  getCDEReleaseVersionType,
-  getCDEReleaseVersionTypeClassName,
-} from '../../../utils/CDEReleaseVersionTypeUtils';
+import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
@@ -122,6 +118,7 @@ import {
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
+import GovernedEntityHeaderBadges from '../GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
 
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
@@ -1384,7 +1381,6 @@ const GlossaryHeader = ({
     if (isCustomManagedTerm || isCustomManagedGlossary) {
       const rawVersion = String(businessVersion ?? '1.0').trim();
       const cleanVersion = rawVersion.replace(/^(version:?\s*)/i, '');
-      const versionLabel = `${t('label.version')}: ${cleanVersion}`;
       const releaseVersionType = isCDEGlossaryTerm
         ? getCDEReleaseVersionType(
             (selectedData as GlossaryTerm).extension?.releaseVersionType,
@@ -1395,16 +1391,6 @@ const GlossaryHeader = ({
             (selectedData as GlossaryTerm).extension?.releaseVersionType ?? ''
           ).trim() || undefined
         : undefined;
-      const releaseVersionTypeBadge = releaseVersionType ? (
-        <Tag
-          className={`cde-value-pill cde-header-release-version-type ${getCDEReleaseVersionTypeClassName(
-            releaseVersionType
-          )}`}
-          data-testid="cde-header-release-version-type">
-          {releaseVersionType}
-        </Tag>
-      ) : null;
-
       const currentVersionItem = {
         label: cleanVersion,
         snapshotVersion: cleanVersion,
@@ -1413,66 +1399,33 @@ const GlossaryHeader = ({
       const versionList =
         availableVersions.length > 0 ? availableVersions : [currentVersionItem];
 
-      if (isWorkflowPermissionLoading) {
-        return (
-          <Space align="center" size={8}>
-            <StatusBadge label={entityStatus} status={statusClass} />
-            <span
-              className={`status-badge cde-header-version-badge ${statusClass}`}>
-              <span className={`status-badge-label ${statusClass}`}>
-                {versionLabel}
-              </span>
-            </span>
-            {releaseVersionTypeBadge}
-          </Space>
-        );
-      }
-
       return (
-        <Space align="center" size={8}>
-          <StatusBadge label={entityStatus} status={statusClass} />
-          <Dropdown
-            menu={{
-              items: isLoadingVersions
-                ? [
-                    {
-                      key: 'loading',
-                      label: t('label.loading'),
-                      disabled: true,
-                    },
-                  ]
-                : versionList.map((availableVersion) => ({
-                    key: availableVersion.snapshotVersion,
-                    label: isGlossary
-                      ? `${t('label.version')}: ${
-                          availableVersion.label
-                        } — ${getEntityStatusLabel(
-                          (availableVersion.snapshot?.entityStatus ??
-                            (availableVersion.snapshot?.archivedAt != null
-                              ? EntityStatus.Archived
-                              : EntityStatus.Approved)) as EntityStatus
-                        )}`
-                      : `${t('label.version')}: ${availableVersion.label}`,
-                  })),
-              onClick: ({ key }) => selectVersion(key),
-            }}
-            trigger={['click']}
-            onOpenChange={loadAvailableVersions}>
-            <button
-              className={classNames(
-                'status-badge cde-header-version-badge',
-                statusClass
-              )}
-              data-testid="version-button"
-              type="button">
-              <span className={`status-badge-label ${statusClass}`}>
-                {versionLabel}
-              </span>
-              <DownOutlined />
-            </button>
-          </Dropdown>
-          {releaseVersionTypeBadge}
-        </Space>
+        <GovernedEntityHeaderBadges
+          businessVersion={cleanVersion}
+          isLoadingVersions={isLoadingVersions}
+          loadingLabel={t('label.loading')}
+          releaseVersionType={releaseVersionType}
+          releaseVersionTypeTestId="cde-header-release-version-type"
+          status={entityStatus}
+          versionButtonTestId="version-button"
+          versionItems={versionList.map((availableVersion) => ({
+            key: availableVersion.snapshotVersion,
+            label: isGlossary
+              ? `${t('label.version')}: ${
+                  availableVersion.label
+                } — ${getEntityStatusLabel(
+                  (availableVersion.snapshot?.entityStatus ??
+                    (availableVersion.snapshot?.archivedAt != null
+                      ? EntityStatus.Archived
+                      : EntityStatus.Approved)) as EntityStatus
+                )}`
+              : `${t('label.version')}: ${availableVersion.label}`,
+          }))}
+          versionLabel={t('label.version')}
+          versionSelectionDisabled={isWorkflowPermissionLoading}
+          onVersionMenuOpen={loadAvailableVersions}
+          onVersionSelect={selectVersion}
+        />
       );
     }
 

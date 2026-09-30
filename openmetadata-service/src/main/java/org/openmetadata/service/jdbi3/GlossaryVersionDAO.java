@@ -208,10 +208,10 @@ public interface GlossaryVersionDAO {
 
   @SqlUpdate(
       "UPDATE glossary_business_working SET entityStatus = :entityStatus, revision = revision + 1, updatedAt = :now, updatedBy = :actor, "
-          + "submittedAt = CASE WHEN :entityStatus = 'InReview' THEN :now ELSE submittedAt END, "
-          + "submittedBy = CASE WHEN :entityStatus = 'InReview' THEN :actor ELSE submittedBy END, "
-          + "rejectedAt = CASE WHEN :entityStatus = 'Rejected' THEN :now ELSE rejectedAt END, "
-          + "rejectedBy = CASE WHEN :entityStatus = 'Rejected' THEN :actor ELSE rejectedBy END "
+          + "submittedAt = CASE WHEN :entityStatus = :inReviewStatus THEN :now ELSE submittedAt END, "
+          + "submittedBy = CASE WHEN :entityStatus = :inReviewStatus THEN :actor ELSE submittedBy END, "
+          + "rejectedAt = CASE WHEN :entityStatus = :rejectedStatus THEN :now ELSE rejectedAt END, "
+          + "rejectedBy = CASE WHEN :entityStatus = :rejectedStatus THEN :actor ELSE rejectedBy END "
           + "WHERE entityType = :entityType AND entityId = :entityId AND COALESCE(parentBusinessVersion, '') = COALESCE(:parentBusinessVersion, '') AND entityStatus = :expectedStatus AND revision = :expectedRevision")
   int transitionWorking(
       @Bind("entityType") String entityType,
@@ -220,6 +220,8 @@ public interface GlossaryVersionDAO {
       @Bind("expectedRevision") long expectedRevision,
       @Bind("expectedStatus") String expectedStatus,
       @Bind("entityStatus") String entityStatus,
+      @Bind("inReviewStatus") String inReviewStatus,
+      @Bind("rejectedStatus") String rejectedStatus,
       @Bind("now") long now,
       @Bind("actor") String actor);
 
@@ -229,10 +231,21 @@ public interface GlossaryVersionDAO {
       long expectedRevision,
       String expectedStatus,
       String entityStatus,
+      String inReviewStatus,
+      String rejectedStatus,
       long now,
       String actor) {
     return transitionWorking(
-        entityType, entityId, null, expectedRevision, expectedStatus, entityStatus, now, actor);
+        entityType,
+        entityId,
+        null,
+        expectedRevision,
+        expectedStatus,
+        entityStatus,
+        inReviewStatus,
+        rejectedStatus,
+        now,
+        actor);
   }
 
   @SqlUpdate(
@@ -405,8 +418,7 @@ public interface GlossaryVersionDAO {
     return EntityDAO.queryInChunks(
         entityIds,
         chunk ->
-            findLatestPublishedBatchByParentInternal(
-                entityType, chunk, parentBusinessVersion));
+            findLatestPublishedBatchByParentInternal(entityType, chunk, parentBusinessVersion));
   }
 
   @SqlQuery(
@@ -504,8 +516,7 @@ public interface GlossaryVersionDAO {
       @BindUUID("termSnapshotId") UUID termSnapshotId,
       @Bind("displayOrder") int displayOrder);
 
-  @SqlUpdate(
-      "DELETE FROM glossary_snapshot_term WHERE glossarySnapshotId = :glossarySnapshotId")
+  @SqlUpdate("DELETE FROM glossary_snapshot_term WHERE glossarySnapshotId = :glossarySnapshotId")
   int deleteSnapshotTerms(@BindUUID("glossarySnapshotId") UUID glossarySnapshotId);
 
   @SqlQuery(

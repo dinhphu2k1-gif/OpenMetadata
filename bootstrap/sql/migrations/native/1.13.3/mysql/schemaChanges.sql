@@ -98,3 +98,32 @@ CREATE TABLE IF NOT EXISTS `glossary_snapshot_outbox` (
   UNIQUE KEY `uq_glossary_outbox_snapshot_event` (`snapshotId`, `eventType`),
   KEY `idx_glossary_outbox_pending` (`processedAt`, `createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Technical Dictionary records use the shared governed working/snapshot stores; Columns without
+-- a record are read from the Column search index, so there is no bootstrap job table.
+DROP TABLE IF EXISTS `technical_projection_outbox`;
+DROP TABLE IF EXISTS `technical_record_column_binding`;
+DROP TABLE IF EXISTS `technical_dictionary_scope`;
+
+DROP TABLE IF EXISTS `technical_bootstrap_job`;
+
+-- Operational availability of source Columns; published snapshots stay immutable.
+CREATE TABLE IF NOT EXISTS `technical_source_state` (
+  `technicalGlossaryId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) NOT NULL,
+  `columnKey` varchar(36) NOT NULL,
+  `status` varchar(32) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `detectedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`technicalGlossaryId`, `parentBusinessVersion`, `columnKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Technical Dictionary records whose search document must be rebuilt from the database.
+CREATE TABLE IF NOT EXISTS `technical_index_outbox` (
+  `termId` varchar(36) NOT NULL,
+  `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `lastError` text,
+  PRIMARY KEY (`termId`),
+  KEY `idx_technical_index_outbox_enqueued` (`enqueuedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

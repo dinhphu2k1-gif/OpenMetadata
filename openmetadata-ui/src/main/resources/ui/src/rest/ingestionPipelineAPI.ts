@@ -120,11 +120,21 @@ export const updateIngestionPipeline = async (
 };
 
 export const getAirflowStatus = async () => {
-  const response = await APIClient.get<PipelineServiceClientResponse>(
-    '/services/ingestionPipelines/status'
-  );
+  const response = await APIClient.get<
+    PipelineServiceClientResponse & { message?: string }
+  >('/services/ingestionPipelines/status', {
+    // An unavailable orchestration service is represented by this endpoint
+    // as HTTP 400. Treat it as a health result so it does not enter the
+    // application's generic request-error flow.
+    validateStatus: (status) => status === 200 || status === 400,
+  });
+  const status = response.data;
 
-  return response.data;
+  return {
+    ...status,
+    platform: status.platform ?? 'unknown',
+    reason: status.reason ?? status.message,
+  };
 };
 
 export const getPipelineServiceHostIp = async () => {

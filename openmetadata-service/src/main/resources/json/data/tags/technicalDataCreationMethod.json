@@ -1,0 +1,26 @@
+{
+  "createClassification": {
+    "name": "DataCreationMethod",
+    "displayName": "Phương thức tạo dữ liệu",
+    "description": "Cách thức cấu hình hoặc xử lý giá trị của trường kỹ thuật.",
+    "provider": "system",
+    "mutuallyExclusive": "true"
+  },
+  "createTags": [
+    {
+      "name": "Parameterised",
+      "displayName": "Tham số",
+      "description": "Cấu hình qua bảng tham số."
+    },
+    {
+      "name": "Hardcoded",
+      "displayName": "Mã cứng",
+      "description": "Gán cố định trong mã nguồn."
+    },
+    {
+      "name": "NotApplicable",
+      "displayName": "N/A",
+      "description": "Không áp dụng."
+    }
+  ]
+}

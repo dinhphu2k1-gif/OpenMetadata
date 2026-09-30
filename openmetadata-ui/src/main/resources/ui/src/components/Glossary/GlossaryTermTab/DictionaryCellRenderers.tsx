@@ -17,7 +17,10 @@ import classNames from 'classnames';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
-import { EntityReference, EntityStatus } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityReference,
+  EntityStatus,
+} from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { EntityStatusClass } from '../../../utils/EntityStatusUtils';
@@ -25,7 +28,9 @@ import { getGlossaryPath } from '../../../utils/RouterUtils';
 import ProfilePicture from '../../common/ProfilePicture/ProfilePicture';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 
-export const getDictionaryReferenceLabel = (reference: EntityReference): string =>
+export const getDictionaryReferenceLabel = (
+  reference: EntityReference
+): string =>
   getEntityName(reference) ||
   reference.fullyQualifiedName ||
   NO_DATA_PLACEHOLDER;
@@ -158,7 +163,14 @@ export const renderDictionaryPastelTag = (
 export const renderDictionaryClassificationTags = (
   tags: TagLabel[] = [],
   classification: string,
-  variant: 'source' | 'classification' | 'personal' | 'population' | 'method' | 'frequency' | 'neutral' = 'neutral'
+  variant:
+    | 'source'
+    | 'classification'
+    | 'personal'
+    | 'population'
+    | 'method'
+    | 'frequency'
+    | 'neutral' = 'neutral'
 ): React.ReactNode => {
   const matchingTags = tags.filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
@@ -182,36 +194,11 @@ export const renderDictionaryClassificationTags = (
 };
 
 export const parseDictionaryEntityStatus = (
-  rawStatus?: string | EntityStatus
-): EntityStatus => {
-  if (!rawStatus) {
-    return EntityStatus.Approved;
-  }
-
-  const s = String(rawStatus).trim();
-  if (s === 'Draft' || s === EntityStatus.Draft) {
-    return EntityStatus.Draft;
-  }
-  if (
-    s === 'In Review' ||
-    s === 'InReview' ||
-    s === 'Pending' ||
-    s === EntityStatus.InReview
-  ) {
-    return EntityStatus.InReview;
-  }
-  if (s === 'Rejected' || s === EntityStatus.Rejected) {
-    return EntityStatus.Rejected;
-  }
-  if (s === 'Deprecated' || s === EntityStatus.Deprecated) {
-    return EntityStatus.Deprecated;
-  }
-
-  return EntityStatus.Approved;
-};
+  rawStatus?: EntityStatus
+): EntityStatus => rawStatus ?? EntityStatus.Approved;
 
 export const renderDictionaryStatusBadge = (
-  status?: string | EntityStatus,
+  status?: EntityStatus,
   dataTestId?: string
 ): React.ReactNode => {
   if (!status) {

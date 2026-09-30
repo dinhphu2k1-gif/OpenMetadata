@@ -16,12 +16,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.openmetadata.schema.type.EntityStatus;
 
 /** Search and filter boundary over the authoritative governed-glossary flat read model. */
 public class GlossaryBusinessVersionSearchService {
   private static final Set<Integer> PAGE_SIZES = Set.of(10, 15, 25, 50);
   private static final Set<String> STATUSES =
-      Set.of("Draft", "In Review", "Rejected", "Approved", "Archived");
+      Set.of(
+          EntityStatus.DRAFT.value(),
+          EntityStatus.IN_REVIEW.value(),
+          EntityStatus.REJECTED.value(),
+          EntityStatus.APPROVED.value(),
+          EntityStatus.ARCHIVED.value());
   private static final Set<String> SORT_FIELDS =
       Set.of("name", "displayName", "businessVersion", "entityStatus");
   private static final int MAX_QUERY_LENGTH = 200;
@@ -48,12 +54,24 @@ public class GlossaryBusinessVersionSearchService {
         Map.of("total", total, "limit", validated.limit(), "offset", validated.offset()));
   }
 
+  /** Every row matching the criteria in stable order, without pagination. */
+  public List<Map<String, Object>> filterAll(
+      Criteria criteria,
+      List<Map<String, Object>> authorizedDatabaseRows,
+      boolean consumerOnly,
+      boolean archivedScope) {
+    final Criteria validated = validate(criteria, consumerOnly, archivedScope);
+    return authorizedDatabaseRows.stream()
+        .filter(row -> matches(row, validated))
+        .sorted(comparator(validated))
+        .toList();
+  }
+
   public static Criteria validate(Criteria criteria, boolean consumerOnly) {
     return validate(criteria, consumerOnly, false);
   }
 
-  public static Criteria validate(
-      Criteria criteria, boolean consumerOnly, boolean archivedScope) {
+  public static Criteria validate(Criteria criteria, boolean consumerOnly, boolean archivedScope) {
     if (criteria == null) {
       throw new BadRequestException("Search criteria are required");
     }
@@ -83,7 +101,8 @@ public class GlossaryBusinessVersionSearchService {
       throw new BadRequestException("statuses contains an unsupported value");
     }
     if (consumerOnly) {
-      statuses = List.of(archivedScope ? "Archived" : "Approved");
+      statuses =
+          List.of(archivedScope ? EntityStatus.ARCHIVED.value() : EntityStatus.APPROVED.value());
     }
     List<String> domainIds = parseUuids(criteria.domainIds(), "domainIds");
     List<String> ownerIds = parseUuids(criteria.ownerIds(), "ownerIds");
@@ -116,17 +135,19 @@ public class GlossaryBusinessVersionSearchService {
         criteria.offset());
   }
 
+  private static boolean matchesQuery(Map<String, Object> row, String q) {
+    final String needle = searchable(q);
+    return searchable(row.get("name")).contains(needle)
+        || searchable(row.get("displayName")).contains(needle);
+  }
+
   private static boolean matches(Map<String, Object> row, Criteria criteria) {
     if (!criteria.statuses().isEmpty()
         && !criteria.statuses().contains(String.valueOf(row.get("entityStatus")))) {
       return false;
     }
-    if (criteria.q() != null) {
-      String needle = searchable(criteria.q());
-      if (!searchable(row.get("name")).contains(needle)
-          && !searchable(row.get("displayName")).contains(needle)) {
-        return false;
-      }
+    if (criteria.q() != null && !matchesQuery(row, criteria.q())) {
+      return false;
     }
     return matchesReferences(row.get("domains"), criteria.domainIds(), "id")
         && matchesReferences(row.get("owners"), criteria.ownerIds(), "id")
@@ -155,12 +176,12 @@ public class GlossaryBusinessVersionSearchService {
         switch (criteria.sortField() == null ? "name" : criteria.sortField()) {
           case "displayName" -> Comparator.comparing(row -> searchable(row.get("displayName")));
           case "entityStatus" -> Comparator.comparing(row -> searchable(row.get("entityStatus")));
-          case "businessVersion" ->
-              (left, right) ->
-                  compareNumericVersion(
-                      String.valueOf(left.get("businessVersion")),
-                      String.valueOf(right.get("businessVersion")));
-          default -> Comparator.comparing(row -> searchable(row.get("name")));
+          case "businessVersion" -> (left, right) ->
+              compareNumericVersion(
+                  String.valueOf(left.get("businessVersion")),
+                  String.valueOf(right.get("businessVersion")));
+          default -> Comparator.comparing(
+              row -> searchable(row.get("name")));
         };
     if (criteria.sortField() == null) {
       primary =
@@ -249,8 +270,7 @@ public class GlossaryBusinessVersionSearchService {
   }
 
   private static String searchable(Object value) {
-    return Normalizer.normalize(
-            value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
+    return Normalizer.normalize(value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT);
   }
 

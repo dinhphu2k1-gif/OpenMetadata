@@ -83,8 +83,7 @@ final class GlossaryVersionResponses {
     }
     Object name = payload.get("name");
     Object glossary = payload.get("glossary");
-    if (!(name instanceof String termName)
-        || !(glossary instanceof Map<?, ?> glossaryValues)) {
+    if (!(name instanceof String termName) || !(glossary instanceof Map<?, ?> glossaryValues)) {
       return;
     }
     Object glossaryFqn = glossaryValues.get("fullyQualifiedName");
@@ -93,8 +92,7 @@ final class GlossaryVersionResponses {
     }
     payload.put(
         "fullyQualifiedName",
-        FullyQualifiedName.build(
-            parentFqn, termName + "@v" + parentBusinessVersion));
+        FullyQualifiedName.build(parentFqn, termName + "@v" + parentBusinessVersion));
   }
 
   private static void projectCdeReleaseVersionType(
@@ -131,8 +129,7 @@ final class GlossaryVersionResponses {
                   parentBusinessVersion);
       Map<String, Object> latestPayload = payload(latest.payload());
       if (!hasGlossaryName(
-          latestPayload,
-          GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY.glossaryName())) {
+          latestPayload, GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY.glossaryName())) {
         return;
       }
 

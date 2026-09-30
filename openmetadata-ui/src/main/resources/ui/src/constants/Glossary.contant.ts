@@ -80,7 +80,11 @@ export const DATA_QUALITY_GLOSSARY_DISPLAY_NAME = 'Chất lượng dữ liệu';
 export enum GovernedGlossaryProfileKey {
   DataDictionary = 'DATA_DICTIONARY',
   DataQuality = 'DATA_QUALITY',
+  TechnicalDictionary = 'TECHNICAL_DICTIONARY',
 }
+
+export const TECHNICAL_DICTIONARY_GLOSSARY_NAME = 'Technical Dictionary';
+export const TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME = 'Từ điển kỹ thuật';
 
 export const GOVERNED_GLOSSARY_PROFILES = {
   [GovernedGlossaryProfileKey.DataDictionary]: {
@@ -89,6 +93,10 @@ export const GOVERNED_GLOSSARY_PROFILES = {
   },
   [GovernedGlossaryProfileKey.DataQuality]: {
     name: DATA_QUALITY_GLOSSARY_NAME,
+    schemaVersion: 1,
+  },
+  [GovernedGlossaryProfileKey.TechnicalDictionary]: {
+    name: TECHNICAL_DICTIONARY_GLOSSARY_NAME,
     schemaVersion: 1,
   },
 } as const;
@@ -113,9 +121,6 @@ export const isDataQualityGlossary = (
       (alias) => identifier === alias || identifier.startsWith(`${alias}.`)
     );
   });
-
-export const TECHNICAL_DICTIONARY_GLOSSARY_NAME = 'Technical Dictionary';
-export const TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME = 'Từ điển kỹ thuật';
 
 export const isTechnicalDictionaryGlossary = (
   ...identifiers: Array<string | undefined>
