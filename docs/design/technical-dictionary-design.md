@@ -368,7 +368,7 @@ Checkbox chọn hàng không còn (không có bulk). Cột **Hành động** là
 | --- | --- | --- | --- |
 | 1–4 | Tên cơ sở dữ liệu, Tên Schema, Tên Bảng, Tên cột | Hệ thống | Cố định trái |
 | 5 | Nguồn | Hệ thống | `service` |
-| 6 | Mã CDE quy chiếu | Người dùng | Tùy chọn |
+| 6 | Mã CDE quy chiếu | Người dùng | Tùy chọn. Là liên kết: bấm vào sẽ tra FQN của CDE theo `termId` (`GET /v1/glossaryTerms/{id}`) rồi mở trang chi tiết thuật ngữ |
 | 7 | Tên thành tố CDE | Suy ra | Read-only |
 | 8 | Thứ hạng | Người dùng | §7.2 |
 | 9 | Loại dữ liệu | Hệ thống | Kèm length/precision/scale |
@@ -379,7 +379,7 @@ Checkbox chọn hàng không còn (không có bulk). Cột **Hành động** là
 | 14 | Mô tả | Hệ thống | TD-D13 |
 
 - **Không có** cột Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống (TD-D17). Modal cũng không hiển thị hai
-  thông tin này; chúng chỉ còn trong Import/Export (§12) và dữ liệu.
+  thông tin này; chúng chỉ còn trong template Import (Chủ sở hữu hệ thống, §12.2) và dữ liệu. File Export cũng không có hai cột này (§12.1).
 - Thứ tự dòng cố định do server: Thứ hạng tăng dần (chưa có Thứ hạng xếp cuối), rồi `columnFqn` (§5.3). Thứ hạng chỉ
   duy nhất trong cùng CDE nên các CDE khác nhau có cùng hạng sẽ đứng cạnh nhau. Bấm tiêu đề cột không đổi thứ tự.
 - Cột tùy chọn, mặc định ẩn: **Cập nhật lúc**, **Cập nhật bởi**.
@@ -434,6 +434,7 @@ báo hàng loạt dùng Import. Tìm Column dùng `column_search_index` (chỉ �
 - Chỉ đọc: không có nút thêm/gỡ tài sản; việc gán CDE thực hiện ở Từ điển kỹ thuật.
 - Tối đa 100 Column mỗi CDE (giới hạn của endpoint), hiển thị một trang. Ô tìm kiếm và bộ lọc nhanh chưa tác động
   lên danh sách nạp sẵn. Thứ tự theo rule survivorship của CDE rồi tên, như tab gốc.
+- **Badge Hạng N** trên từng Column: với thuật ngữ thuộc glossary Data Dictionary, `AssetsTabs` gọi `technicalAssets` và gộp `rank` của từng bản ghi TD vào danh sách rule survivorship (bên cạnh `extension.survivorshipRules` cũ), nên badge hiện và danh sách xếp theo hạng ở cả tab gốc lẫn tab TD thêm vào (tab TD gắn `rank` vào `extension.survivorshipRank` của document).
 - Không còn các cột Gán lúc, Gán bởi và badge **Nguồn không còn**; Column có nguồn `Unavailable` được đánh dấu đã xóa.
 - Panel tóm tắt Column bên phải là của OpenMetadata; các chip **Nhãn** và **Mục thuật ngữ** trong `TagsSection` và
   `GlossaryTermsSection` có tooltip (thuộc tính `title`) hiện tên và mô tả của tag. Thay đổi này dùng chung cho
@@ -447,13 +448,22 @@ báo hàng loạt dùng Import. Tìm Column dùng `column_search_index` (chỉ �
   Thứ tự dòng của file vẫn theo `columnFqn`, không theo Thứ hạng như bảng trên giao diện.
 - Tên file `TuDienKyThuat_Agribank_TDDLv{N}_YYYYMMDD_HHmm.xlsx`, sheet `Technical Dictionary`; `v{N}` là phiên
   bản DD đang gắn để file tự nói rõ mã CDE thuộc DD nào. Không chứa UUID, `columnKey` hoặc FQN kỹ thuật.
-- File Export dùng trực tiếp làm file Import được. File Excel gồm cả hai cột **Chủ sở hữu dữ liệu** và
-  **Chủ sở hữu hệ thống** (16 cột) dù bảng trên UI chỉ có 14 trường.
+- File Excel gồm **14 cột**, đúng 14 trường của bảng (§11.2); không có cột Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống (TD-D17).
+  File Export vẫn Import được vì Import chỉ cập nhật các cột editable có mặt trong file (§12.2); tuy nhiên không
+  còn cách đổi Chủ sở hữu hệ thống qua file Export, chỉ qua template Import hoặc modal.
 
 ### 12.2. Import
 
 Khung session: template → preview → commit, dùng một lần, gắn actor, TTL 30 phút, file hash, commit nguyên
-tử, kiểm tra lại quyền. Dùng **modal** trong trang danh sách, không có route riêng.
+tử, kiểm tra lại quyền. Dùng **trang riêng** `/technical-dictionary/import` (nút Nhập Excel ở menu `⋯` điều hướng tới),
+cùng bố cục với trang nhập CDE của Từ điển dữ liệu dùng chung: breadcrumb, stepper 3 bước.
+
+1. **Tải lên Tệp Excel**: cảnh báo mô tả, nút Tải template, vùng kéo thả `.xlsx`. File được đọc ở trình duyệt (`xlsx`).
+2. **Xem trước & Sửa**: lưới `react-data-grid` (style `om-rdg`) có thể sửa, copy/paste, undo/redo, **Thêm hàng**. **Tiếp theo**
+   đóng các dòng đã sửa (bỏ dòng trống) thành file Excel mới và gọi preview của server.
+3. **Cập nhật**: dải tóm tắt số dòng lỗi/hợp lệ, bộ lọc Tất cả/Bị lỗi/Hợp lệ, lưới chỉ đọc thêm cột Trạng thái và Chi tiết
+   (lỗi, cảnh báo hoặc nhãn action). Dòng ghép với kết quả server theo số dòng trong file gửi đi (dòng dữ liệu đầu là 2).
+   **Cập nhật** chỉ bật khi `canCommit`; commit một lần cho cả file rồi hiện màn hình kết quả.
 
 - Match theo `Tên cơ sở dữ liệu + Tên Schema + Tên Bảng + Tên cột` (và `Nguồn` nếu có). Match nhiều bản ghi là lỗi dòng.
 - Action preview: `CREATE_RECORD` (Column chưa khai báo, tra qua `column_search_index`), `UPDATE`, `NO_CHANGE`, `ERROR`.
