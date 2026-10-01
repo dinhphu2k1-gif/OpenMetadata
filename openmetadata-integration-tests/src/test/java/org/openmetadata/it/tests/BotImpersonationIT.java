@@ -406,7 +406,7 @@ public class BotImpersonationIT {
   private User createRegularUser(TestNamespace ns, String suffix) {
     String uniqueId = UUID.randomUUID().toString().substring(0, 8);
     String userName = ns.prefix("imptarget_" + suffix + "_" + uniqueId);
-    Role dataConsumer = SdkClients.adminClient().roles().getByName("DataConsumer");
+    Role dataConsumer = SdkClients.adminClient().roles().getByName("DATA_CONSUMER");
 
     CreateUser request =
         new CreateUser()

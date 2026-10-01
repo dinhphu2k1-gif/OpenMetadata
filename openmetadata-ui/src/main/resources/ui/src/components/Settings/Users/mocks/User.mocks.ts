@@ -65,7 +65,7 @@ export const mockUserData = {
     {
       id: 'ce4df2a5-aaf5-4580-8556-254f42574aa7',
       type: 'role',
-      name: 'DataConsumer',
+      name: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
@@ -77,8 +77,8 @@ export const mockUserData = {
     {
       id: '3fa30148-72f6-4205-8cab-56696cc23440',
       type: 'role',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
@@ -131,8 +131,8 @@ export const mockUsersTabData = {
     {
       id: 'e4b20aef-c6c4-4416-aaae-f60185c7cac0',
       type: 'role',
-      name: 'DataSteward',
-      fullyQualifiedName: 'DataSteward',
+      name: 'DATA_STEWARD',
+      fullyQualifiedName: 'DATA_STEWARD',
       description: 'Users with Data Steward',
       displayName: 'Data Steward',
       deleted: false,
@@ -143,8 +143,8 @@ export const mockUsersTabData = {
     {
       id: '5f1445a7-c299-4dde-8c5b-704c6cd68ee6',
       type: 'role',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
@@ -158,8 +158,8 @@ export const mockUserRole = {
   data: [
     {
       id: '3ed7b995-ce8b-4720-9beb-6f4a9c626920',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       displayName: 'Data Consumer',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',

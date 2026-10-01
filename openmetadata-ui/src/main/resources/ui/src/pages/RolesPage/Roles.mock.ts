@@ -15,8 +15,8 @@
 export const ROLES_LIST = [
   {
     id: '789005ee-ff13-4b58-9ec1-7c4172b40aac',
-    name: 'DataConsumer',
-    fullyQualifiedName: 'DataConsumer',
+    name: 'DATA_CONSUMER',
+    fullyQualifiedName: 'DATA_CONSUMER',
     displayName: 'Data Consumer',
     description:
       'Users with Data Consumer role use different data assets for their day to day work.',
@@ -55,8 +55,8 @@ export const ROLES_LIST = [
   },
   {
     id: '91379f25-d737-4b6e-833c-e87ace7bf84d',
-    name: 'DataSteward',
-    fullyQualifiedName: 'DataSteward',
+    name: 'DATA_STEWARD',
+    fullyQualifiedName: 'DATA_STEWARD',
     displayName: 'Data Steward',
     description:
       'Users with Data Steward role are responsible for ensuring correctness of metadata for data assets, thereby facilitating data governance principles within the organization.<br/>Data Stewards can update metadata for any entity.',
@@ -150,8 +150,8 @@ export const ROLES_LIST_WITH_PAGING = {
 
 export const ROLE_DATA = {
   id: '789005ee-ff13-4b58-9ec1-7c4172b40aac',
-  name: 'DataConsumer',
-  fullyQualifiedName: 'DataConsumer',
+  name: 'DATA_CONSUMER',
+  fullyQualifiedName: 'DATA_CONSUMER',
   displayName: 'Data Consumer',
   description:
     'Users with Data Consumer role use different data assets for their day to day work.',

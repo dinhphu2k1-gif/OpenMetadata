@@ -967,7 +967,7 @@ describe('GlossaryHeader component', () => {
       currentUser: {
         ...mockUserData,
         isAdmin: false,
-        roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+        roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
       },
       selectedPersona: { name: 'DataProposerPersona' },
     }));
@@ -1033,7 +1033,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+          roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
         },
         selectedPersona: { name: 'DataProposerPersona' },
       }));
@@ -1140,7 +1140,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-steward', name: 'DataSteward' }],
+          roles: [{ id: 'role-steward', name: 'DATA_STEWARD' }],
         },
         selectedPersona: { name: 'DataStewardPersona' },
       }));
@@ -1178,7 +1178,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+          roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
         },
         selectedPersona: { name: 'DataProposerPersona' },
       }));
@@ -1216,7 +1216,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+          roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
         },
         selectedPersona: { name: 'DataProposerPersona' },
       }));
@@ -1373,7 +1373,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-consumer', name: 'DataConsumer' }],
+          roles: [{ id: 'role-consumer', name: 'DATA_CONSUMER' }],
         },
         selectedPersona: { name: 'DataConsumerPersona' },
       }));
@@ -1441,7 +1441,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+          roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
         },
         selectedPersona: { name: 'DataProposerPersona' },
       }));
@@ -1475,7 +1475,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-steward', name: 'DataSteward' }],
+          roles: [{ id: 'role-steward', name: 'DATA_STEWARD' }],
         },
         selectedPersona: { name: 'DataStewardPersona' },
       }));
@@ -1518,7 +1518,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-consumer', name: 'DataConsumer' }],
+          roles: [{ id: 'role-consumer', name: 'DATA_CONSUMER' }],
         },
         selectedPersona: { name: 'DataConsumerPersona' },
       }));
@@ -1586,7 +1586,7 @@ describe('GlossaryHeader component', () => {
         currentUser: {
           ...mockUserData,
           isAdmin: false,
-          roles: [{ id: 'role-proposer', name: 'DataProposer' }],
+          roles: [{ id: 'role-proposer', name: 'DATA_PROPOSER' }],
         },
         selectedPersona: { name: 'DataProposerPersona' },
       }));

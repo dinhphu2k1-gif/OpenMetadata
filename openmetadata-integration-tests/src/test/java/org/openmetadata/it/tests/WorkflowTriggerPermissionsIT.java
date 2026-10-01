@@ -149,7 +149,7 @@ public class WorkflowTriggerPermissionsIT {
     HttpResponse<String> response = triggerWorkflow(workflow.getId(), dataConsumerToken());
 
     assertEquals(
-        403, response.statusCode(), "DataConsumer must be denied on TEST_CONNECTION with service");
+        403, response.statusCode(), "DATA_CONSUMER must be denied on TEST_CONNECTION with service");
   }
 
   @Test
@@ -164,7 +164,7 @@ public class WorkflowTriggerPermissionsIT {
     assertEquals(
         403,
         response.statusCode(),
-        "DataConsumer must be denied on TEST_CONNECTION without serviceName "
+        "DATA_CONSUMER must be denied on TEST_CONNECTION without serviceName "
             + "(falls back to INGESTION_PIPELINE CREATE)");
   }
 
@@ -264,7 +264,7 @@ public class WorkflowTriggerPermissionsIT {
     return JwtAuthProvider.tokenFor(
         "data-consumer@open-metadata.org",
         "data-consumer@open-metadata.org",
-        new String[] {"DataConsumer"},
+        new String[] {"DATA_CONSUMER"},
         TOKEN_TTL_SECONDS);
   }
 

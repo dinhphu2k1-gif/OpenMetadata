@@ -867,7 +867,7 @@ export const expectSettingEntityNotVisible = async (
   await expect(page.getByTestId(path[0])).not.toBeVisible();
 };
 
-// Check the permissions for the settings page for DataSteward and DataConsumer
+// Check the permissions for the settings page for DATA_STEWARD and DATA_CONSUMER
 export const settingPageOperationPermissionCheck = async (page: Page) => {
   await redirectToHomePage(page);
 

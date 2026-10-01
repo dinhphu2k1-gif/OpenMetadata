@@ -160,7 +160,7 @@ public class SdkClients {
                 createClient(
                     "data-steward@open-metadata.org",
                     "data-steward@open-metadata.org",
-                    new String[] {"DataSteward"}));
+                    new String[] {"DATA_STEWARD"}));
 
     return DATA_STEWARD_CLIENT.client;
   }
@@ -174,7 +174,7 @@ public class SdkClients {
                 createClient(
                     "data-consumer@open-metadata.org",
                     "data-consumer@open-metadata.org",
-                    new String[] {"DataConsumer"}));
+                    new String[] {"DATA_CONSUMER"}));
 
     return DATA_CONSUMER_CLIENT.client;
   }

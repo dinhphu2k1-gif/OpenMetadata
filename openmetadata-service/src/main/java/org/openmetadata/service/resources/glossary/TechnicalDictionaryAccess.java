@@ -22,7 +22,7 @@ import org.openmetadata.service.security.policyevaluator.SubjectContext;
  * at once, is allowed to editors of the dictionary and to the Data Steward role.
  */
 public final class TechnicalDictionaryAccess {
-  private static final String DATA_STEWARD_ROLE = "DataSteward";
+  private static final String DATA_STEWARD_ROLE = "DATA_STEWARD";
 
   private final GovernedScopeAuthorizer policies;
 

@@ -4272,7 +4272,7 @@ public abstract class BaseEntityIT<T extends EntityInterface, K> {
   }
 
   /**
-   * Test: DataConsumer cannot bulk create entities
+   * Test: DATA_CONSUMER cannot bulk create entities
    */
   @Test
   void test_bulkCreate_dataConsumer_denied(TestNamespace ns) throws Exception {
@@ -4296,7 +4296,7 @@ public abstract class BaseEntityIT<T extends EntityInterface, K> {
   }
 
   /**
-   * Test: DataConsumer cannot bulk update existing entities
+   * Test: DATA_CONSUMER cannot bulk update existing entities
    */
   @Test
   void test_bulkUpdate_dataConsumer_denied(TestNamespace ns) throws Exception {
@@ -4313,7 +4313,7 @@ public abstract class BaseEntityIT<T extends EntityInterface, K> {
         JsonUtils.readValue(createResponse.body(), BulkOperationResult.class);
     assertEquals(1, createResult.getNumberOfRowsPassed());
 
-    // Attempt update as DataConsumer using same request with changed description
+    // Attempt update as DATA_CONSUMER using same request with changed description
     setDescription(createRequests.get(0), "Consumer tried to update");
 
     String consumerToken = getDataConsumerToken();
@@ -4602,7 +4602,7 @@ public abstract class BaseEntityIT<T extends EntityInterface, K> {
     return org.openmetadata.it.auth.JwtAuthProvider.tokenFor(
         "data-consumer@open-metadata.org",
         "data-consumer@open-metadata.org",
-        new String[] {"DataConsumer"},
+        new String[] {"DATA_CONSUMER"},
         3600);
   }
 

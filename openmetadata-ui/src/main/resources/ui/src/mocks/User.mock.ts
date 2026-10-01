@@ -82,8 +82,8 @@ export const USER_DATA: User = {
     {
       id: 'ed94fd7c-0974-4b87-9295-02b36c4c6bcd',
       type: 'role',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
@@ -93,8 +93,8 @@ export const USER_DATA: User = {
     {
       id: 'a24f61cc-be15-411a-aaf6-28a8c8029728',
       type: 'role',
-      name: 'DataSteward',
-      fullyQualifiedName: 'DataSteward',
+      name: 'DATA_STEWARD',
+      fullyQualifiedName: 'DATA_STEWARD',
       description: 'this is test description',
       displayName: 'Data Steward',
       deleted: false,
@@ -115,8 +115,8 @@ export const USER_DATA: User = {
     {
       id: 'ed94fd7c-0974-4b87-9295-02b36c4c6bcd',
       type: 'role',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
@@ -167,8 +167,8 @@ export const MOCK_USER_ROLE = [
   {
     id: 'afc5583c-e268-4f6c-a638-a876d04ebaa1',
     type: 'role',
-    name: 'DataConsumer',
-    fullyQualifiedName: 'DataConsumer',
+    name: 'DATA_CONSUMER',
+    fullyQualifiedName: 'DATA_CONSUMER',
     description:
       'Users with Data Consumer role use different data assets for their day to day work.',
     displayName: 'Data Consumer',
@@ -188,8 +188,8 @@ export const MOCK_USER_ROLE = [
   {
     id: 'dd72bae6-1835-4ba9-9532-aaa4b648d3e8',
     type: 'role',
-    name: 'DataSteward',
-    fullyQualifiedName: 'DataSteward',
+    name: 'DATA_STEWARD',
+    fullyQualifiedName: 'DATA_STEWARD',
     description:
       'Users with Data Steward role are responsible for ensuring correctness of metadata for data assets, thereby facilitating data governance principles within the organization.',
     displayName: 'Data Steward',
@@ -273,10 +273,10 @@ export const UPDATED_USER_DATA = {
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',
-      fullyQualifiedName: 'DataConsumer',
+      fullyQualifiedName: 'DATA_CONSUMER',
       href: 'http://localhost:8585/api/v1/roles/ed94fd7c-0974-4b87-9295-02b36c4c6bcd',
       id: 'ed94fd7c-0974-4b87-9295-02b36c4c6bcd',
-      name: 'DataConsumer',
+      name: 'DATA_CONSUMER',
       type: 'role',
     },
   ],

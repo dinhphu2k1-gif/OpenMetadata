@@ -1,6 +1,6 @@
 {
   "name": "DataStewardPersona",
   "displayName": "Data Steward Persona",
-  "description": "Navigation persona for DataSteward users",
+  "description": "Navigation persona for DATA_STEWARD users",
   "default": false
 }

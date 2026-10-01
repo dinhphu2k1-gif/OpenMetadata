@@ -29,8 +29,8 @@ const mockGetRoles = getRoles as jest.Mock;
 const mockRolesResponse = {
   data: [
     { name: 'Admin', displayName: 'Administrator' },
-    { name: 'DataSteward', displayName: 'Data Steward' },
-    { name: 'DataConsumer', displayName: '' },
+    { name: 'DATA_STEWARD', displayName: 'Data Steward' },
+    { name: 'DATA_CONSUMER', displayName: '' },
   ],
   paging: { total: 3 },
 };

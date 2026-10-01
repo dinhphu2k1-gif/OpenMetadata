@@ -113,7 +113,7 @@ public class BulkOperationPermissionsIT {
     assertEquals(200, response.statusCode(), "Bulk endpoint returns 200 with results");
 
     BulkOperationResult result = JsonUtils.readValue(response.body(), BulkOperationResult.class);
-    assertEquals(0, result.getNumberOfRowsPassed(), "DataConsumer cannot create tables");
+    assertEquals(0, result.getNumberOfRowsPassed(), "DATA_CONSUMER cannot create tables");
     assertEquals(1, result.getNumberOfRowsFailed(), "Should have 1 failed request");
 
     assertNotNull(result.getFailedRequest());
@@ -254,7 +254,7 @@ public class BulkOperationPermissionsIT {
     assertEquals(200, response.statusCode());
 
     BulkOperationResult result = JsonUtils.readValue(response.body(), BulkOperationResult.class);
-    assertEquals(0, result.getNumberOfRowsPassed(), "DataConsumer cannot update tables");
+    assertEquals(0, result.getNumberOfRowsPassed(), "DATA_CONSUMER cannot update tables");
     assertEquals(1, result.getNumberOfRowsFailed());
     assertTrue(
         result.getFailedRequest().get(0).getStatus() == 403
@@ -532,7 +532,7 @@ public class BulkOperationPermissionsIT {
     return JwtAuthProvider.tokenFor(
         "data-consumer@open-metadata.org",
         "data-consumer@open-metadata.org",
-        new String[] {"DataConsumer"},
+        new String[] {"DATA_CONSUMER"},
         3600);
   }
 

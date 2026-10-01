@@ -49,7 +49,7 @@ class UserRepositoryDefaultPersonaTest {
 
   @Test
   void nonBasicConsumerDoesNotKeepAStaleBasicConsumerPersona() {
-    EntityReference dataConsumerRole = reference("role", "DataConsumer");
+    EntityReference dataConsumerRole = reference("role", "DATA_CONSUMER");
     EntityReference staleBasicPersona = reference("persona", UserRepository.BASIC_CONSUMER_PERSONA);
 
     assertNull(
@@ -59,7 +59,7 @@ class UserRepositoryDefaultPersonaTest {
 
   @Test
   void nonBasicConsumerKeepsAnExplicitCustomPersona() {
-    EntityReference dataStewardRole = reference("role", "DataSteward");
+    EntityReference dataStewardRole = reference("role", "DATA_STEWARD");
     EntityReference customPersona = reference("persona", "DataStewardPersona");
     EntityReference basicPersona = reference("persona", UserRepository.BASIC_CONSUMER_PERSONA);
 

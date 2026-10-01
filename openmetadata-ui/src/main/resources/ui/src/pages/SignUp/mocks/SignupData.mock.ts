@@ -49,8 +49,8 @@ export const mockCreateUser = {
       {
         id: '4509b668-2882-45c3-90e1-4551043f8cbd',
         type: 'role',
-        name: 'DataConsumer',
-        fullyQualifiedName: 'DataConsumer',
+        name: 'DATA_CONSUMER',
+        fullyQualifiedName: 'DATA_CONSUMER',
         description:
           'Users with Data Consumer role use different data assets for their day to day work.',
         displayName: 'Data Consumer',

@@ -1,7 +1,7 @@
 {
   "name": "BasicConsumerPersona-BasicConsumerPersona",
   "displayName": "Basic Consumer Persona Navigation",
-  "description": "Restricted navigation for users with the BasicConsumer role",
+  "description": "Restricted navigation for users with the BASIC_CONSUMER role",
   "entityType": "page",
   "fullyQualifiedName": "persona.BasicConsumerPersona",
   "data": {

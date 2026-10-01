@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS data_insight_chart (
 
 UPDATE role_entity
 SET json = JSON_INSERT(json, '$.provider', 'system')
-WHERE name in ('DataConsumer', 'DataSteward');
+WHERE name in ('DATA_CONSUMER', 'DATA_STEWARD');
 
 UPDATE policy_entity
 SET json = JSON_INSERT(json, '$.provider', 'system')

@@ -78,7 +78,7 @@ entities.forEach((EntityClass) => {
       await user.create(apiContext);
 
       const dataStewardRoleResponse = await apiContext.get(
-        '/api/v1/roles/name/DataSteward'
+        '/api/v1/roles/name/DATA_STEWARD'
       );
 
       const dataStewardRole = await dataStewardRoleResponse.json();

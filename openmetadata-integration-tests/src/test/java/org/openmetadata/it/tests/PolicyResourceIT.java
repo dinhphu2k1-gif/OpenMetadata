@@ -960,7 +960,7 @@ public class PolicyResourceIT extends BaseEntityIT<Policy, CreatePolicy> {
             .roles()
             .create(
                 new CreateRole()
-                    .withName(ns.prefix("DataSteward"))
+                    .withName(ns.prefix("DATA_STEWARD"))
                     .withPolicies(List.of(helperPolicy.getFullyQualifiedName()))
                     .withDescription("Steward role"));
 

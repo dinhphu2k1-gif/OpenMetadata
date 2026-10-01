@@ -368,7 +368,7 @@ public class McpIntegrationIT extends McpTestBase {
                 "policies",
                 List.of(policy.get("fullyQualifiedName").asText())),
             JsonNode.class);
-    JsonNode dataConsumer = get("roles/name/DataConsumer", JsonNode.class);
+    JsonNode dataConsumer = get("roles/name/DATA_CONSUMER", JsonNode.class);
     JsonNode team =
         post(
             "teams",

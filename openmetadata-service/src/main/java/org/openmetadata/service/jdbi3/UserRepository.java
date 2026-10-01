@@ -104,13 +104,13 @@ import org.openmetadata.service.util.UserUtil;
 
 @Slf4j
 public class UserRepository extends EntityRepository<User> {
-  static final String BASIC_CONSUMER_ROLE = "BasicConsumer";
+  static final String BASIC_CONSUMER_ROLE = "BASIC_CONSUMER";
   static final String BASIC_CONSUMER_PERSONA = "BasicConsumerPersona";
-  static final String DATA_CONSUMER_ROLE = "DataConsumer";
+  static final String DATA_CONSUMER_ROLE = "DATA_CONSUMER";
   static final String DATA_CONSUMER_PERSONA = "DataConsumerPersona";
-  static final String DATA_PROPOSER_ROLE = "DataProposer";
+  static final String DATA_PROPOSER_ROLE = "DATA_PROPOSER";
   static final String DATA_PROPOSER_PERSONA = "DataProposerPersona";
-  static final String DATA_STEWARD_ROLE = "DataSteward";
+  static final String DATA_STEWARD_ROLE = "DATA_STEWARD";
   static final String DATA_STEWARD_PERSONA = "DataStewardPersona";
 
   static final Map<String, String> ROLE_TO_PERSONA_NAME_MAP =

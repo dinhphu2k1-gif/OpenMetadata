@@ -1,7 +1,7 @@
 {
   "name": "DataConsumerPersona-DataConsumerPersona",
   "displayName": "Data Consumer Persona Navigation",
-  "description": "Restricted navigation for users with the DataConsumer role",
+  "description": "Restricted navigation for users with the DATA_CONSUMER role",
   "entityType": "page",
   "fullyQualifiedName": "persona.DataConsumerPersona",
   "data": {

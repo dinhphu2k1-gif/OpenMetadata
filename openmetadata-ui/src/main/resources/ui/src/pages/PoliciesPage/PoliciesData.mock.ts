@@ -58,8 +58,8 @@ export const POLICY_DATA = {
     {
       id: 'a65a6133-501b-4d73-82b7-aa5b5182c67d',
       type: 'role',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',
       displayName: 'Data Consumer',

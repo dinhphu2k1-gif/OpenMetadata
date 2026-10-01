@@ -20,8 +20,8 @@ const mockUserRole = {
   data: [
     {
       id: '3ed7b995-ce8b-4720-9beb-6f4a9c626920',
-      name: 'DataConsumer',
-      fullyQualifiedName: 'DataConsumer',
+      name: 'DATA_CONSUMER',
+      fullyQualifiedName: 'DATA_CONSUMER',
       displayName: 'Data Consumer',
       description:
         'Users with Data Consumer role use different data assets for their day to day work.',

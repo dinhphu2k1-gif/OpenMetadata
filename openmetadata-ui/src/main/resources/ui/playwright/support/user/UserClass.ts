@@ -47,7 +47,7 @@ export class UserClass {
 
   async create(apiContext: APIRequestContext, assignRole = true) {
     const dataConsumerRoleResponse = await apiContext.get(
-      '/api/v1/roles/name/DataConsumer'
+      '/api/v1/roles/name/DATA_CONSUMER'
     );
 
     const dataConsumerRole = await dataConsumerRoleResponse.json();

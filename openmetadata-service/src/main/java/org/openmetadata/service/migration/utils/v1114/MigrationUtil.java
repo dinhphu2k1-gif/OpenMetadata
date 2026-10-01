@@ -49,8 +49,8 @@ public class MigrationUtil {
 
   private static final Map<String, List<String>> ROLE_POLICY_MAPPING =
       Map.ofEntries(
-          Map.entry("DataConsumer", List.of("DataConsumerPolicy")),
-          Map.entry("DataSteward", List.of("DataStewardPolicy")),
+          Map.entry("DATA_CONSUMER", List.of("DataConsumerPolicy")),
+          Map.entry("DATA_STEWARD", List.of("DataStewardPolicy")),
           Map.entry("DefaultBotRole", List.of("DefaultBotPolicy", "DataConsumerPolicy")),
           Map.entry("DomainOnlyAccessRole", List.of("DomainAccessPolicy")),
           Map.entry("IngestionBotRole", List.of("DefaultBotPolicy", "IngestionBotPolicy")),
@@ -85,8 +85,8 @@ public class MigrationUtil {
 
   private static final List<String> SYSTEM_ROLES =
       Arrays.asList(
-          "DataConsumer",
-          "DataSteward",
+          "DATA_CONSUMER",
+          "DATA_STEWARD",
           "ApplicationBotRole",
           "AutoClassificationBotRole",
           "DataQualityBotRole",

@@ -84,8 +84,8 @@ class MigrationUtilTest {
 
   private static final List<String> SYSTEM_ROLES =
       List.of(
-          "DataConsumer",
-          "DataSteward",
+          "DATA_CONSUMER",
+          "DATA_STEWARD",
           "ApplicationBotRole",
           "AutoClassificationBotRole",
           "DataQualityBotRole",

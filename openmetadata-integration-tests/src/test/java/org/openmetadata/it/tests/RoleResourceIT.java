@@ -208,12 +208,12 @@ public class RoleResourceIT extends BaseEntityIT<Role, CreateRole> {
     assertThrows(
         Exception.class,
         () -> deleteEntity(dataSteward.getId().toString()),
-        "Deleting system role DataSteward should not be allowed");
+        "Deleting system role DATA_STEWARD should not be allowed");
 
     assertThrows(
         Exception.class,
         () -> deleteEntity(dataConsumer.getId().toString()),
-        "Deleting system role DataConsumer should not be allowed");
+        "Deleting system role DATA_CONSUMER should not be allowed");
   }
 
   @Test

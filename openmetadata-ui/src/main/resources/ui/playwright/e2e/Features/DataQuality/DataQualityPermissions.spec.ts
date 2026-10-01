@@ -209,7 +209,7 @@ test.describe(
 
       // 2. Setup Data Steward
       await dataStewardUser.create(apiContext, false);
-      const dsRoleRes = await apiContext.get('/api/v1/roles/name/DataSteward');
+      const dsRoleRes = await apiContext.get('/api/v1/roles/name/DATA_STEWARD');
       const dsRole = await dsRoleRes.json();
       await dataStewardUser.patch({
         apiContext,
@@ -217,7 +217,7 @@ test.describe(
           {
             op: 'add',
             path: '/roles/0',
-            value: { id: dsRole.id, type: 'role', name: 'DataSteward' },
+            value: { id: dsRole.id, type: 'role', name: 'DATA_STEWARD' },
           },
         ],
       });

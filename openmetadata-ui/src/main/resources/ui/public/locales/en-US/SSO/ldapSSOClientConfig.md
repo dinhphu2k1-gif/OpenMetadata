@@ -218,7 +218,7 @@ $$section
 ## Auth Reassign Roles $(id="authReassignRoles")
 
 - **Definition:** Roles that should be reassigned every time user logs in.
-- **Example:** ["Admin", "DataConsumer"]
+- **Example:** ["Admin", "DATA_CONSUMER"]
 - **Why it matters:** Ensures role assignments stay synchronized with LDAP.
 - **Note:** Leave empty to only assign roles on first login
 

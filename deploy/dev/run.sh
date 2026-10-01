@@ -33,7 +33,7 @@ elif [ "$choice" = "2" ]; then
     echo ">> [1/3] Dang build Backend Java qua Maven..."
     cd "$PROJECT_ROOT"
     export MAVEN_OPTS="-Xmx4096m -XX:+UseG1GC"
-    mvn install \
+    mvn clean install \
         -pl :openmetadata-dist \
         -am \
         -T 1C \
@@ -63,7 +63,7 @@ elif [ "$choice" = "3" ]; then
     echo ">> [1/4] Dang build Backend..."
     cd "$PROJECT_ROOT"
     export MAVEN_OPTS="-Xmx4096m -XX:+UseG1GC"
-    mvn install \
+    mvn clean install \
         -pl :openmetadata-dist \
         -am \
         -T 1C \

@@ -1600,7 +1600,7 @@ public class ColumnBulkUpdateIT {
         JwtAuthProvider.tokenFor(
             "data-consumer@open-metadata.org",
             "data-consumer@open-metadata.org",
-            new String[] {"DataConsumer"},
+            new String[] {"DATA_CONSUMER"},
             3600);
 
     HttpRequest request =
@@ -1615,7 +1615,7 @@ public class ColumnBulkUpdateIT {
 
     assertTrue(
         response.statusCode() == 200 || response.statusCode() == 403,
-        "DataConsumer should either succeed or get forbidden based on permissions");
+        "DATA_CONSUMER should either succeed or get forbidden based on permissions");
   }
 
   @Test

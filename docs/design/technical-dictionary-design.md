@@ -322,7 +322,7 @@ Lỗi ở bất kỳ bước nào làm rollback toàn bộ phê duyệt DD. Kh�
 | `canImport` | Import | Bằng `canEdit` |
 | `canExport` | Export danh sách và bản chụp | Theo quyền Export chung (API spec §2.1) |
 
-- Mọi người xem thấy cùng một dữ liệu. Mặc định `canEdit` cấp cho `DataProposer`, `DataSteward` và `Admin`;
+- Mọi người xem thấy cùng một dữ liệu. Mặc định `canEdit` cấp cho `DATA_PROPOSER`, `DATA_STEWARD` và `Admin`;
   vì không có bước duyệt, thay đổi có hiệu lực ngay và lịch sử thay đổi là cơ chế truy vết.
 - Quyền ghi luôn được kiểm tra lại trên Postgres; nút Sửa trên UI không phải căn cứ cho phép ghi.
 - `GET /v1/glossaryTerms/technical/context` trả capability, DD đang gắn và `resetAt`.
@@ -568,7 +568,7 @@ Mã chung (`WORKING_REVISION_CONFLICT`, ...) của Governed Glossary không áp 
 12. Đọc danh sách/export không quét Postgres; ghi luôn kiểm tra trên Postgres rồi đồng bộ index.
 13. Bảng đúng 14 trường và thứ tự §11.2, không có cột Chủ sở hữu; header không có thẻ thống kê; bốn cột trái
     và cột Hành động cố định; scrollbar đúng thiết kế.
-14. `DataProposer` sửa được bản ghi và thay đổi có hiệu lực ngay.
+14. `DATA_PROPOSER` sửa được bản ghi và thay đổi có hiệu lực ngay.
 
 ## 16. Hiện trạng triển khai
 

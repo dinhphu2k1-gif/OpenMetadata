@@ -433,10 +433,10 @@ export class RightPanelPageObject {
 
   /**
    * Set role permissions for permission-based testing
-   * @param role - User role (Admin, DataSteward, DataConsumer)
+   * @param role - User role (Admin, DATA_STEWARD, DATA_CONSUMER)
    */
   public setRolePermissions(
-    role: 'Admin' | 'DataSteward' | 'DataConsumer'
+    role: 'Admin' | 'DATA_STEWARD' | 'DATA_CONSUMER'
   ): void {
     switch (role) {
       case 'Admin':
@@ -455,7 +455,7 @@ export class RightPanelPageObject {
           canViewCustomProperties: true,
         };
         break;
-      case 'DataSteward':
+      case 'DATA_STEWARD':
         this.rolePermissions = {
           canEditDescription: true,
           canEditOwners: true,
@@ -471,7 +471,7 @@ export class RightPanelPageObject {
           canViewCustomProperties: true,
         };
         break;
-      case 'DataConsumer':
+      case 'DATA_CONSUMER':
         this.rolePermissions = {
           canEditDescription: true,
           canEditOwners: false,

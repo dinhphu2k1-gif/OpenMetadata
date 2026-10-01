@@ -55,7 +55,7 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DataConsumer should not be able to trigger applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to trigger applications, got: " + response.statusCode());
   }
 
   @Test
@@ -79,7 +79,7 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DataConsumer should not be able to deploy applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to deploy applications, got: " + response.statusCode());
   }
 
   @Test
@@ -103,7 +103,7 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DataConsumer should not be able to stop applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to stop applications, got: " + response.statusCode());
   }
 
   @Test
@@ -127,7 +127,7 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DataConsumer should not be able to schedule applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to schedule applications, got: " + response.statusCode());
   }
 
   @Test
@@ -151,14 +151,14 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DataConsumer should not be able to configure applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to configure applications, got: " + response.statusCode());
   }
 
   private static String getDataConsumerToken() {
     return JwtAuthProvider.tokenFor(
         "data-consumer@open-metadata.org",
         "data-consumer@open-metadata.org",
-        new String[] {"DataConsumer"},
+        new String[] {"DATA_CONSUMER"},
         3600);
   }
 

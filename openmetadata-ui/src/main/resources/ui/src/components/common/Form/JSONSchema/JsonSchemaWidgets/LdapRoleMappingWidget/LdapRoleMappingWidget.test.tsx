@@ -34,8 +34,8 @@ const mockSearchRoles = searchRoles as jest.Mock;
 
 const mockRoles = [
   { name: 'Admin', displayName: 'Administrator' },
-  { name: 'DataSteward', displayName: 'Data Steward' },
-  { name: 'DataConsumer', displayName: 'Data Consumer' },
+  { name: 'DATA_STEWARD', displayName: 'Data Steward' },
+  { name: 'DATA_CONSUMER', displayName: 'Data Consumer' },
 ];
 
 const mockOnChange = jest.fn();
@@ -81,8 +81,8 @@ describe('LdapRoleMappingWidget', () => {
 
     it('should render with existing mappings', async () => {
       const existingMappings = JSON.stringify({
-        'cn=admins,dc=company,dc=com': ['Admin', 'DataSteward'],
-        'cn=users,dc=company,dc=com': ['DataConsumer'],
+        'cn=admins,dc=company,dc=com': ['Admin', 'DATA_STEWARD'],
+        'cn=users,dc=company,dc=com': ['DATA_CONSUMER'],
       });
 
       await act(async () => {
@@ -229,7 +229,7 @@ describe('LdapRoleMappingWidget', () => {
   describe('Data Synchronization Tests', () => {
     it('should parse JSON string value correctly', async () => {
       const validJson = JSON.stringify({
-        'cn=admins,dc=company,dc=com': ['Admin', 'DataSteward'],
+        'cn=admins,dc=company,dc=com': ['Admin', 'DATA_STEWARD'],
       });
 
       await act(async () => {
@@ -586,7 +586,7 @@ describe('LdapRoleMappingWidget', () => {
   describe('Incomplete Mapping Tests', () => {
     it('should keep mapping visible when ldapGroup is cleared but roles are selected', async () => {
       const existingMappings = JSON.stringify({
-        'cn=admins,dc=company,dc=com': ['Admin', 'DataSteward'],
+        'cn=admins,dc=company,dc=com': ['Admin', 'DATA_STEWARD'],
       });
 
       await act(async () => {

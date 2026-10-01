@@ -38,11 +38,11 @@ public class ExpressionValidatorTest {
       "matchAnyCertification('Certification.Silver', 'Certification.Gold')",
       "matchTeam()",
       "inAnyTeam('marketing')",
-      "hasAnyRole('DataSteward', 'DataEngineer')",
+      "hasAnyRole('DATA_STEWARD', 'DataEngineer')",
       "noOwner() && !isOwner()",
       "noOwner() || isOwner()",
       "!noOwner() && isOwner()",
-      "matchAllTags('PersonalData.Personal') && hasAnyRole('DataSteward')"
+      "matchAllTags('PersonalData.Personal') && hasAnyRole('DATA_STEWARD')"
     };
 
     for (String expression : validExpressions) {

@@ -3378,7 +3378,7 @@ public class WorkflowDefinitionResourceIT {
       String workflowFqn = createdWorkflow.getFullyQualifiedName();
 
       // Use the predefined Data Consumer client - has View permissions but not Edit/Suspend
-      // The JWT token for dataConsumerClient includes "DataConsumer" role
+      // The JWT token for dataConsumerClient includes "DATA_CONSUMER" role
       OpenMetadataClient testUserClient = SdkClients.user3Client();
 
       // Try to suspend without proper authorization

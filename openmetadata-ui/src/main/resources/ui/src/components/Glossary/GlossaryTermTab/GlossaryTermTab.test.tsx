@@ -846,7 +846,7 @@ describe('Test GlossaryTermTab component', () => {
         paging: { total: 1 },
       });
       (useApplicationStore as unknown as jest.Mock).mockReturnValue({
-        currentUser: { id: 'consumer-id', roles: [{ name: 'BasicConsumer' }] },
+        currentUser: { id: 'consumer-id', roles: [{ name: 'BASIC_CONSUMER' }] },
       });
       mockGetGlossaryVersionPermissions.mockResolvedValue({
         canViewWorking: false,
@@ -2118,9 +2118,9 @@ describe('Test GlossaryTermTab component', () => {
           id: 'user-steward',
           name: 'steward',
           isAdmin: false,
-          roles: [{ name: 'DataSteward' }],
+          roles: [{ name: 'DATA_STEWARD' }],
         },
-        selectedPersona: { name: 'DataSteward' },
+        selectedPersona: { name: 'DATA_STEWARD' },
       });
 
       const { container } = render(<GlossaryTermTab isGlossary={false} />, {
@@ -2270,9 +2270,9 @@ describe('Test GlossaryTermTab component', () => {
           id: 'steward-id',
           name: 'steward',
           isAdmin: false,
-          roles: [{ name: 'DataSteward' }],
+          roles: [{ name: 'DATA_STEWARD' }],
         },
-        selectedPersona: { name: 'DataSteward' },
+        selectedPersona: { name: 'DATA_STEWARD' },
       });
 
       const { container } = render(<GlossaryTermTab isGlossary />, {

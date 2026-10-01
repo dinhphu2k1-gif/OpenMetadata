@@ -34,8 +34,8 @@ const mockShowErrorToast = showErrorToast as jest.Mock;
 
 const mockRolesResponse = [
   { name: 'Admin', displayName: 'Administrator' },
-  { name: 'DataSteward', displayName: 'Data Steward' },
-  { name: 'DataConsumer', displayName: '' },
+  { name: 'DATA_STEWARD', displayName: 'Data Steward' },
+  { name: 'DATA_CONSUMER', displayName: '' },
 ];
 
 const mockOnChange = jest.fn();
@@ -110,7 +110,7 @@ describe('SsoRolesSelectField', () => {
 
   it('falls back to name as option label when displayName is empty', async () => {
     mockSearchRoles.mockResolvedValue([
-      { name: 'DataConsumer', displayName: '' },
+      { name: 'DATA_CONSUMER', displayName: '' },
     ]);
 
     render(<SsoRolesSelectField {...rolesSelectProps} />);

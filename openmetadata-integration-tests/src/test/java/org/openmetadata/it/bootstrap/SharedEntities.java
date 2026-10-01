@@ -220,8 +220,8 @@ public final class SharedEntities {
     try {
       // Get existing system roles (created by seed data)
       RoleService roleService = new RoleService(adminClient.getHttpClient());
-      Role dataStewardRole = roleService.getByName("DataSteward", "policies");
-      Role dataConsumerRole = roleService.getByName("DataConsumer", "policies");
+      Role dataStewardRole = roleService.getByName("DATA_STEWARD", "policies");
+      Role dataConsumerRole = roleService.getByName("DATA_CONSUMER", "policies");
 
       // Create policies
       PolicyService policyService = new PolicyService(adminClient.getHttpClient());

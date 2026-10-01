@@ -27,7 +27,7 @@ export interface TestOptions {
   skipTabs?: string[];
   onlyTabs?: string[];
   skipCRUD?: boolean;
-  role?: 'Admin' | 'DataSteward' | 'DataConsumer';
+  role?: 'Admin' | 'DATA_STEWARD' | 'DATA_CONSUMER';
 }
 
 export class RightPanelTestSuite {
@@ -178,7 +178,7 @@ export class RightPanelTestSuite {
   }
 
   async testAsRole(
-    role: 'Admin' | 'DataSteward' | 'DataConsumer'
+    role: 'Admin' | 'DATA_STEWARD' | 'DATA_CONSUMER'
   ): Promise<void> {
     this.rightPanel.setRolePermissions(role);
     await this.rightPanel.verifyPermissions();

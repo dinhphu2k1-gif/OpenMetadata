@@ -461,7 +461,7 @@ public class RuleEvaluator {
       description =
           "Returns true if the user (either direct or inherited from the parent teams) has one or more roles "
               + "from the list.",
-      examples = {"hasAnyRole('DataSteward', 'DataEngineer')"})
+      examples = {"hasAnyRole('DATA_STEWARD', 'DataEngineer')"})
   @SuppressWarnings("unused")
   public boolean hasAnyRole(String... roles) {
     if (expressionValidation) {

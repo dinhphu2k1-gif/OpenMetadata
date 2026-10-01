@@ -7,7 +7,7 @@ IMAGE_NAME="openmetadata/server:custom-1.13.3"
 
 cd "$PROJECT_ROOT"
 export MAVEN_OPTS="-Xmx4096m -XX:+UseG1GC"
-mvn install \
+mvn clean install \
     -pl :openmetadata-dist \
     -am \
     -T 1C \

@@ -62,7 +62,7 @@ class PolicyConditionUpdaterTest {
   void renameInCondition_role() {
     String result =
         PolicyConditionUpdater.renameInCondition(
-            "hasAnyRole('DataSteward')", "DataSteward", "DataCurator", ROLE_FUNCTIONS);
+            "hasAnyRole('DATA_STEWARD')", "DATA_STEWARD", "DataCurator", ROLE_FUNCTIONS);
     assertEquals("hasAnyRole('DataCurator')", result);
   }
 

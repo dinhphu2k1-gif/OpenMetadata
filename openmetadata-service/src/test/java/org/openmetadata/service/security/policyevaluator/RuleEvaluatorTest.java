@@ -59,7 +59,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 @Slf4j
 class RuleEvaluatorTest {
-  private static final String DATA_CONSUMER_ROLE_NAME = "DataConsumer";
+  private static final String DATA_CONSUMER_ROLE_NAME = "DATA_CONSUMER";
   private static final Table table =
       new Table().withId(UUID.randomUUID()).withName("table").withFullyQualifiedName("test.table");
   private static User user;

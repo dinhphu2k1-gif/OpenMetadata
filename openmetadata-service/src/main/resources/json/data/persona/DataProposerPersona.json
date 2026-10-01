@@ -1,6 +1,6 @@
 {
   "name": "DataProposerPersona",
   "displayName": "Data Proposer Persona",
-  "description": "Navigation persona for DataProposer users",
+  "description": "Navigation persona for DATA_PROPOSER users",
   "default": false
 }

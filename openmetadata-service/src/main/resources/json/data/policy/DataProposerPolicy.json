@@ -8,7 +8,7 @@
   "provider": "system",
   "rules": [
     {
-      "name": "DataProposer-ViewAllRule",
+      "name": "DATA_PROPOSER-ViewAllRule",
       "description": "Allow read-only view on all metadata assets",
       "resources": [
         "all"
@@ -20,7 +20,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataProposer-CreateRule",
+      "name": "DATA_PROPOSER-CreateRule",
       "description": "Allow creating new glossary terms, test suites, and test cases",
       "resources": [
         "glossaryTerm",
@@ -33,7 +33,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataProposer-CreateDraftFromApprovedRule",
+      "name": "DATA_PROPOSER-CreateDraftFromApprovedRule",
       "description": "Allow Data Proposers to create drafts and upgrade versions for glossary terms and glossaries",
       "resources": [
         "glossary",
@@ -48,7 +48,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataProposer-ManageUnapprovedRule",
+      "name": "DATA_PROPOSER-ManageUnapprovedRule",
       "description": "Allow editing/deleting draft/unapproved glossaries, glossary terms and test cases",
       "resources": [
         "glossary",
@@ -63,7 +63,7 @@
       "condition": "notApproved()"
     },
     {
-      "name": "DataProposer-CollaborativeEditRule",
+      "name": "DATA_PROPOSER-CollaborativeEditRule",
       "description": "Allow proposing metadata contributions (descriptions, tags, custom fields, glossary terms)",
       "resources": [
         "apiEndpoint",
@@ -90,7 +90,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataProposer-FeedAndTaskRule",
+      "name": "DATA_PROPOSER-FeedAndTaskRule",
       "description": "Allow creating and participating in discussion threads and approval tasks",
       "resources": [
         "feed",
@@ -104,7 +104,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataProposer-DenySelfApprovalAndCertification",
+      "name": "DATA_PROPOSER-DenySelfApprovalAndCertification",
       "description": "Explicitly deny self-approving, changing status to Approved, or certifying metadata assets",
       "resources": [
         "classification",
@@ -126,7 +126,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataProposer-DenyAdminAndSecurityResources",
+      "name": "DATA_PROPOSER-DenyAdminAndSecurityResources",
       "description": "Explicitly deny managing platform security, roles, policies, bots, and app definitions",
       "resources": [
         "agentExecution",
@@ -152,7 +152,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataProposer-DenyDestructiveInfrastructureOps",
+      "name": "DATA_PROPOSER-DenyDestructiveInfrastructureOps",
       "description": "Explicitly deny destructive operations on core infrastructure services and schemas",
       "resources": [
         "apiService",
@@ -176,7 +176,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataProposer-DenyDangerousGlobalOps",
+      "name": "DATA_PROPOSER-DenyDangerousGlobalOps",
       "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
       "resources": [
         "all"

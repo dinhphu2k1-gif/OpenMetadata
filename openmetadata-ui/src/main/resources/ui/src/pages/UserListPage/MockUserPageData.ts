@@ -42,8 +42,8 @@ export const MOCK_USER_DATA = {
         {
           id: '8ca4fb74-ee36-453c-91ec-7bd5fc361e00',
           type: 'role',
-          name: 'DataConsumer',
-          fullyQualifiedName: 'DataConsumer',
+          name: 'DATA_CONSUMER',
+          fullyQualifiedName: 'DATA_CONSUMER',
           displayName: 'Data Consumer',
           deleted: false,
           href: 'http://localhost:8585/api/v1/roles/8ca4fb74-ee36-453c-91ec-7bd5fc361e00',

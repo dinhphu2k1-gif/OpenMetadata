@@ -12,7 +12,7 @@
             "isAdmin": false,
             "teams": "Sales",
             "roles": [
-                "DataSteward"
+                "DATA_STEWARD"
             ],
             "owns": [],
             "follows": [],

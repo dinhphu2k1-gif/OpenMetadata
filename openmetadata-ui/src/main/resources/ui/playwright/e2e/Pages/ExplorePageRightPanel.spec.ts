@@ -53,7 +53,7 @@ import { SchemaPageObject } from '../PageObject/Explore/SchemaPageObject';
 
 const domainEntity = new Domain();
 const user1 = new UserClass();
-// Dedicated entity for the DataConsumer owner-restriction test.
+// Dedicated entity for the DATA_CONSUMER owner-restriction test.
 // Keeping it separate prevents race conditions with parallel tests that add/remove
 // owners on the shared entityMap entities.
 const dcOwnerTestTable = new TableClass();
@@ -1244,12 +1244,12 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.navigateToOverviewTab();
 
-            const descriptionToUpdate = `DataSteward description - ${uuid()}`;
+            const descriptionToUpdate = `DATA_STEWARD description - ${uuid()}`;
             await overviewDS.editDescription(descriptionToUpdate);
             await overviewDS.shouldShowDescriptionWithText(descriptionToUpdate);
           });
@@ -1272,7 +1272,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.addOwnerWithoutValidation(
@@ -1299,7 +1299,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.editTags(tagToUpdate);
@@ -1324,7 +1324,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.editGlossaryTerms(glossaryTermToUpdate);
@@ -1349,7 +1349,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.assignTier(testTier);
@@ -1374,7 +1374,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             if (rightPanelDS.isTabAvailable('schema')) {
               const schemaDS = new SchemaPageObject(rightPanelDS);
@@ -1419,12 +1419,12 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDS = new RightPanelPageObject(dataStewardPage);
             rightPanelDS.setEntityConfig(entityInstance);
-            rightPanelDS.setRolePermissions('DataSteward');
+            rightPanelDS.setRolePermissions('DATA_STEWARD');
 
             const overviewDS = new OverviewPageObject(rightPanelDS);
             await overviewDS.navigateToOverviewTab();
 
-            // DataSteward: canEditDomains=false, canEditDataProducts=false
+            // DATA_STEWARD: canEditDomains=false, canEditDataProducts=false
             await rightPanelDS.verifyPermissions();
           });
         }
@@ -1492,12 +1492,12 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             const overviewDC = new OverviewPageObject(rightPanelDC);
             await overviewDC.navigateToOverviewTab();
 
-            const descriptionToUpdate = `DataConsumer description - ${uuid()}`;
+            const descriptionToUpdate = `DATA_CONSUMER description - ${uuid()}`;
             await overviewDC.editDescription(descriptionToUpdate);
             await overviewDC.shouldShowDescriptionWithText(descriptionToUpdate);
           });
@@ -1520,7 +1520,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             const overviewDC = new OverviewPageObject(rightPanelDC);
             await overviewDC.editTags(tagToUpdate);
@@ -1545,7 +1545,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             const overviewDC = new OverviewPageObject(rightPanelDC);
             await overviewDC.editGlossaryTerms(glossaryTermToUpdate);
@@ -1570,7 +1570,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             const overviewDC = new OverviewPageObject(rightPanelDC);
             await overviewDC.assignTier(testTier);
@@ -1595,7 +1595,7 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             if (rightPanelDC.isTabAvailable('schema')) {
               const schemaDC = new SchemaPageObject(rightPanelDC);
@@ -1627,7 +1627,7 @@ test.describe('Right Panel Test Suite', () => {
           test(`Should follow Data Consumer role policies for ownerless ${entityType}`, async ({
             dataConsumerPage,
           }) => {
-            // Use the pre-configured DataConsumer fixture user (NOT user1).
+            // Use the pre-configured DATA_CONSUMER fixture user (NOT user1).
             // user1 is assigned as owner by the parallel "remove owner" tests,
             // which would grant elevated permissions and make domain buttons
             // visible unexpectedly. The fixture user is never set as owner.
@@ -1644,12 +1644,12 @@ test.describe('Right Panel Test Suite', () => {
 
             const rightPanelDC = new RightPanelPageObject(dataConsumerPage);
             rightPanelDC.setEntityConfig(entityInstance);
-            rightPanelDC.setRolePermissions('DataConsumer');
+            rightPanelDC.setRolePermissions('DATA_CONSUMER');
 
             const overviewDC = new OverviewPageObject(rightPanelDC);
             await overviewDC.navigateToOverviewTab();
 
-            // DataConsumer: canEditDomains=false, canEditDataProducts=false
+            // DATA_CONSUMER: canEditDomains=false, canEditDataProducts=false
             await rightPanelDC.verifyPermissions();
           });
         }
@@ -1659,7 +1659,7 @@ test.describe('Right Panel Test Suite', () => {
     // Standalone test using a dedicated entity (dcOwnerTestTable) that no other
     // parallel test touches. This prevents the race condition where a parallel
     // "remove owner" test strips the owner between admin assignment and the
-    // DataConsumer navigation, making the entity ownerless and granting
+    // DATA_CONSUMER navigation, making the entity ownerless and granting
     // EditOwners to all users again.
     test.describe('Data Consumer User - Owner Restriction', () => {
       test('Should NOT allow Data Consumer to edit owners when entity has owner', async ({
@@ -1670,7 +1670,7 @@ test.describe('Right Panel Test Suite', () => {
 
         // Admin assigns user1 as owner so the entity is no longer ownerless.
         // When an entity has an owner, EditOwners is no longer granted to all
-        // users — DataConsumer (which lacks EditOwners / EditAll) cannot see
+        // users — DATA_CONSUMER (which lacks EditOwners / EditAll) cannot see
         // the edit-owners button.
         await navigateToExploreAndSelectEntity({
           page: adminPage,
@@ -1689,7 +1689,7 @@ test.describe('Right Panel Test Suite', () => {
         );
         await adminOverview.shouldShowOwner(user1.getUserDisplayName());
 
-        // The pre-configured DataConsumer fixture user (NOT user1, NOT the owner)
+        // The pre-configured DATA_CONSUMER fixture user (NOT user1, NOT the owner)
         // navigates to the same entity and verifies that edit-owners is NOT
         // visible (restricted by role when the entity already has an owner).
         await navigateToExploreAndSelectEntity({
@@ -2209,7 +2209,7 @@ test.describe('Right Panel Test Suite', () => {
             viewBasicPolicy.responseData.name,
           ]);
 
-          // Create user WITHOUT the default DataConsumer role
+          // Create user WITHOUT the default DATA_CONSUMER role
           await viewBasicUser.create(apiContext, false);
 
           await viewBasicUser.patch({

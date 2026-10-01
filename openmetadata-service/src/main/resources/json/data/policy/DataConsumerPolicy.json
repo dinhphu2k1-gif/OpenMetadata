@@ -9,7 +9,7 @@
   "rules": [
 
     {
-      "name": "DataConsumer-ViewAllRule",
+      "name": "DATA_CONSUMER-ViewAllRule",
       "description": "Allow read-only view on all metadata assets",
       "resources": [
         "all"
@@ -21,7 +21,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataConsumer-ViewCollaborationRule",
+      "name": "DATA_CONSUMER-ViewCollaborationRule",
       "description": "Allow read-only view on discussion feeds and threads",
       "resources": [
         "feed",
@@ -34,7 +34,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataConsumer-DenyAllNonReadOperations",
+      "name": "DATA_CONSUMER-DenyAllNonReadOperations",
       "description": "Explicitly deny all mutating, editing, deleting, deploying, and triggering operations when not owner",
       "resources": [
         "all"
@@ -89,7 +89,7 @@
       "condition": "!isOwner()"
     },
     {
-      "name": "DataConsumer-DenyAdminAndSecurityResources",
+      "name": "DATA_CONSUMER-DenyAdminAndSecurityResources",
       "description": "Explicitly deny access to platform security, roles, policies, bots, and app definitions",
       "resources": [
         "agentExecution",
@@ -115,7 +115,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataConsumer-DenyDangerousGlobalOps",
+      "name": "DATA_CONSUMER-DenyDangerousGlobalOps",
       "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
       "resources": [
         "all"

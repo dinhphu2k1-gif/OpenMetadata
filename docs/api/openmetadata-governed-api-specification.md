@@ -974,7 +974,7 @@ PostgreSQL (`technical_record`) là nguồn sự thật cho ghi; `technical_dict
 
 | Capability | Điều kiện |
 | :--- | :--- |
-| `canEdit` | Admin, role `DataSteward`, hoặc policy `EditWorking` trên glossary `Technical Dictionary` (role `DataProposer` có policy này) |
+| `canEdit` | Admin, role `DATA_STEWARD`, hoặc policy `EditWorking` trên glossary `Technical Dictionary` (role `DATA_PROPOSER` có policy này) |
 | `canView` | `canEdit` hoặc policy `ViewBasic` trên glossary `Technical Dictionary` |
 | `canImport` | Bằng `canEdit` |
 | `canExport` | Bằng `canView` |

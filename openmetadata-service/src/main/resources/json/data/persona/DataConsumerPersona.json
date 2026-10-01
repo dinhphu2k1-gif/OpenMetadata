@@ -1,6 +1,6 @@
 {
   "name": "DataConsumerPersona",
   "displayName": "Data Consumer Persona",
-  "description": "Navigation persona for DataConsumer users",
+  "description": "Navigation persona for DATA_CONSUMER users",
   "default": false
 }

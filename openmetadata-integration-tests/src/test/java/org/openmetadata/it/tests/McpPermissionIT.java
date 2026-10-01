@@ -239,14 +239,14 @@ public class McpPermissionIT {
     assertEquals("Updated by user1", updated.getDescription());
   }
 
-  // ==================== DataConsumer Policy Tests ====================
-  // The Organization team has DataConsumer as default role, which grants:
+  // ==================== DATA_CONSUMER Policy Tests ====================
+  // The Organization team has DATA_CONSUMER as default role, which grants:
   // ViewAll, EditDescription, EditTags, EditGlossaryTerms, EditTier, EditCertification
-  // User2 (no explicit roles) inherits DataConsumer from Organization
+  // User2 (no explicit roles) inherits DATA_CONSUMER from Organization
 
   @Test
   void testUser2WithDataConsumerCanEditDescription(TestNamespace ns) throws Exception {
-    // User2 inherits DataConsumer role from Organization, which allows EditDescription
+    // User2 inherits DATA_CONSUMER role from Organization, which allows EditDescription
     CreateMcpServer create =
         new CreateMcpServer()
             .withName(ns.prefix("dataconsumer-edit-desc"))
@@ -257,17 +257,17 @@ public class McpPermissionIT {
     McpServer created = createMcpServer(SdkClients.adminClient(), create);
 
     String patchJson =
-        "[{\"op\": \"replace\", \"path\": \"/description\", \"value\": \"Updated by user2 via DataConsumer\"}]";
+        "[{\"op\": \"replace\", \"path\": \"/description\", \"value\": \"Updated by user2 via DATA_CONSUMER\"}]";
 
     patchMcpServer(SdkClients.user2Client(), created.getId(), patchJson);
 
     McpServer updated = getMcpServer(SdkClients.adminClient(), created.getId());
-    assertEquals("Updated by user2 via DataConsumer", updated.getDescription());
+    assertEquals("Updated by user2 via DATA_CONSUMER", updated.getDescription());
   }
 
   @Test
   void testUser2WithDataConsumerCanEditTags(TestNamespace ns) throws Exception {
-    // User2 inherits DataConsumer role from Organization, which allows EditTags
+    // User2 inherits DATA_CONSUMER role from Organization, which allows EditTags
     SharedEntities shared = SharedEntities.get();
 
     CreateMcpServer create =
@@ -288,12 +288,12 @@ public class McpPermissionIT {
 
     McpServer updated = getMcpServerWithFields(SdkClients.adminClient(), created.getId(), "tags");
     assertNotNull(updated.getTags(), "Tags field should be returned");
-    assertTrue(updated.getTags().size() > 0, "Tags should be added by DataConsumer user");
+    assertTrue(updated.getTags().size() > 0, "Tags should be added by DATA_CONSUMER user");
   }
 
   @Test
   void testUser2WithDataConsumerCannotEditDisplayName(TestNamespace ns) throws Exception {
-    // EditDisplayName is NOT in DataConsumer policy - should fail
+    // EditDisplayName is NOT in DATA_CONSUMER policy - should fail
     CreateMcpServer create =
         new CreateMcpServer()
             .withName(ns.prefix("no-displayname-edit"))
@@ -309,7 +309,7 @@ public class McpPermissionIT {
     assertThrows(
         Exception.class,
         () -> patchMcpServer(SdkClients.user2Client(), created.getId(), patchJson),
-        "DataConsumer should not be able to edit displayName (not in policy)");
+        "DATA_CONSUMER should not be able to edit displayName (not in policy)");
   }
 
   @Test

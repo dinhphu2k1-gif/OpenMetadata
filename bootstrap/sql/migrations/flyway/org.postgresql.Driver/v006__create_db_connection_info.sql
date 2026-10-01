@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS name_index ON web_analytic_event(name);
 
 UPDATE role_entity
 SET json = JSONB_SET(json::jsonb, '{provider}', '"system"', true)
-WHERE name in ('DataConsumer', 'DataSteward');
+WHERE name in ('DATA_CONSUMER', 'DATA_STEWARD');
 
 UPDATE policy_entity
 SET json = JSONB_SET(json::jsonb, '{provider}', '"system"', true)

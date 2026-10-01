@@ -94,7 +94,7 @@ class SearchClusterFitnessResourceIT {
         JwtAuthProvider.tokenFor(
             "data-consumer@open-metadata.org",
             "data-consumer@open-metadata.org",
-            new String[] {"DataConsumer"},
+            new String[] {"DATA_CONSUMER"},
             3600);
     HttpRequest request =
         HttpRequest.newBuilder()
@@ -106,7 +106,7 @@ class SearchClusterFitnessResourceIT {
     // Admin-only endpoints deny non-admins with 403, or 404 to avoid leaking endpoint existence
     // (same convention as AppOperationPermissionsIT). 401 covers token-rejection paths.
     assertThat(response.statusCode())
-        .as("DataConsumer must not be able to call admin-only fitness endpoint")
+        .as("DATA_CONSUMER must not be able to call admin-only fitness endpoint")
         .isIn(401, 403, 404);
   }
 

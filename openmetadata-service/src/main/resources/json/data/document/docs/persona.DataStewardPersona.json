@@ -1,7 +1,7 @@
 {
   "name": "DataStewardPersona-DataStewardPersona",
   "displayName": "Data Steward Persona Navigation",
-  "description": "Restricted navigation for users with the DataSteward role",
+  "description": "Restricted navigation for users with the DATA_STEWARD role",
   "entityType": "page",
   "fullyQualifiedName": "persona.DataStewardPersona",
   "data": {

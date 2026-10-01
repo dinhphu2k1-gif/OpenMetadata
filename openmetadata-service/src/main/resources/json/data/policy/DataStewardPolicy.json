@@ -8,7 +8,7 @@
   "provider": "system",
   "rules": [
     {
-      "name": "DataSteward-ViewAllRule",
+      "name": "DATA_STEWARD-ViewAllRule",
       "description": "Allow read-only view on all metadata assets",
       "resources": [
         "all"
@@ -20,7 +20,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataSteward-ApprovalAndStatusRule",
+      "name": "DATA_STEWARD-ApprovalAndStatusRule",
       "description": "Allow Data Steward to review, approve, reject, revoke glossary and metadata status. Explicitly restricted from editing content.",
       "resources": [
         "apiEndpoint",
@@ -54,7 +54,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataSteward-DenyEditOperations",
+      "name": "DATA_STEWARD-DenyEditOperations",
       "description": "Explicitly deny all editing and creation operations for Data Steward (Checker role: only review, approve, reject, revoke)",
       "resources": [
         "all"
@@ -75,7 +75,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataSteward-TaskAndWorkflowRule",
+      "name": "DATA_STEWARD-TaskAndWorkflowRule",
       "description": "Allow managing and resolving approval tasks and workflows",
       "resources": [
         "feed",
@@ -92,7 +92,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataSteward-TriggerRule",
+      "name": "DATA_STEWARD-TriggerRule",
       "description": "Allow triggering metadata automations",
       "resources": [
         "all"
@@ -103,7 +103,7 @@
       "effect": "allow"
     },
     {
-      "name": "DataSteward-DenyAdminAndSecurityResources",
+      "name": "DATA_STEWARD-DenyAdminAndSecurityResources",
       "description": "Explicitly deny managing platform security, roles, policies, bots, and app definitions",
       "resources": [
         "agentExecution",
@@ -129,7 +129,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataSteward-DenyDestructiveInfrastructureOps",
+      "name": "DATA_STEWARD-DenyDestructiveInfrastructureOps",
       "description": "Explicitly deny destructive operations on core infrastructure services and schemas",
       "resources": [
         "apiService",
@@ -153,7 +153,7 @@
       "effect": "deny"
     },
     {
-      "name": "DataSteward-DenyDangerousGlobalOps",
+      "name": "DATA_STEWARD-DenyDangerousGlobalOps",
       "description": "Explicitly deny token generation, SCIM manipulation, role modification, and impersonation",
       "resources": [
         "all"

@@ -372,11 +372,11 @@ class ElasticSearchRBACConditionEvaluatorTest {
   @Test
   void testComplexConditionWithRolesDomainTagsTeams() {
     setupMockPolicies(
-        "hasAnyRole('Admin', 'DataSteward') && hasDomain() && (matchAnyTag('Sensitive') || inAnyTeam('Interns'))",
+        "hasAnyRole('Admin', 'DATA_STEWARD') && hasDomain() && (matchAnyTag('Sensitive') || inAnyTeam('Interns'))",
         "ALLOW");
 
     EntityReference role = new EntityReference();
-    role.setName("DataSteward");
+    role.setName("DATA_STEWARD");
     when(mockUser.getRoles()).thenReturn(List.of(role));
 
     EntityReference domain = new EntityReference();
@@ -436,9 +436,9 @@ class ElasticSearchRBACConditionEvaluatorTest {
 
   @Test
   void testConditionUserDoesNotHaveRole() {
-    setupMockPolicies("hasAnyRole('Admin', 'DataSteward') && isOwner()", "ALLOW");
+    setupMockPolicies("hasAnyRole('Admin', 'DATA_STEWARD') && isOwner()", "ALLOW");
     EntityReference role = new EntityReference();
-    role.setName("DataConsumer");
+    role.setName("DATA_CONSUMER");
     when(mockUser.getRoles()).thenReturn(List.of(role));
     OMQueryBuilder finalQuery = evaluator.evaluateConditions(mockSubjectContext);
     Query elasticQuery = ((ElasticQueryBuilder) finalQuery).build();
@@ -748,11 +748,11 @@ class ElasticSearchRBACConditionEvaluatorTest {
   @Test
   void testMultipleOrConditionsWithNestedAnd() {
     setupMockPolicies(
-        "(hasAnyRole('Admin') || hasAnyRole('DataSteward')) && (matchAnyTag('Finance') || matchAllTags('Confidential', 'Internal')) && !inAnyTeam('Data')",
+        "(hasAnyRole('Admin') || hasAnyRole('DATA_STEWARD')) && (matchAnyTag('Finance') || matchAllTags('Confidential', 'Internal')) && !inAnyTeam('Data')",
         "ALLOW");
 
     EntityReference role = new EntityReference();
-    role.setName("DataSteward");
+    role.setName("DATA_STEWARD");
     when(mockUser.getRoles()).thenReturn(List.of(role));
 
     EntityReference team = new EntityReference();
@@ -765,7 +765,7 @@ class ElasticSearchRBACConditionEvaluatorTest {
     String generatedQuery = serializeQueryToJson(elasticQuery);
     DocumentContext jsonContext = JsonPath.parse(generatedQuery);
     // Assertions
-    // Assert that the `hasAnyRole` check results in `match_all` since the user has 'DataSteward'
+    // Assert that the `hasAnyRole` check results in `match_all` since the user has 'DATA_STEWARD'
     // role
     // Assert that the `hasAnyRole` check results in `match_all`
     assertFieldExists(jsonContext, "$.bool.must[?(@.match_all)]", "match_all for hasAnyRole");
@@ -989,7 +989,7 @@ class ElasticSearchRBACConditionEvaluatorTest {
         List.of(List.of(MetadataOperation.VIEW_BASIC)));
 
     EntityReference role = new EntityReference();
-    role.setName("DataSteward");
+    role.setName("DATA_STEWARD");
     when(mockUser.getRoles()).thenReturn(List.of(role));
 
     EntityReference team = new EntityReference();
@@ -1367,7 +1367,7 @@ class ElasticSearchRBACConditionEvaluatorTest {
 
   @Test
   void testHasAnyRoleWithInheritedRoleFromTeam() {
-    setupMockPolicies("hasAnyRole('DataSteward') && matchAnyTag('Sensitive')", "ALLOW");
+    setupMockPolicies("hasAnyRole('DATA_STEWARD') && matchAnyTag('Sensitive')", "ALLOW");
 
     when(mockUser.getRoles()).thenReturn(List.of());
 
@@ -1379,7 +1379,7 @@ class ElasticSearchRBACConditionEvaluatorTest {
 
     Team mockTeam = mock(Team.class);
     EntityReference inheritedRole = new EntityReference();
-    inheritedRole.setName("DataSteward");
+    inheritedRole.setName("DATA_STEWARD");
     when(mockTeam.getDefaultRoles()).thenReturn(List.of(inheritedRole));
     when(mockTeam.getParents()).thenReturn(List.of());
 
@@ -1402,7 +1402,7 @@ class ElasticSearchRBACConditionEvaluatorTest {
 
       assertTrue(
           generatedQuery.contains("match_all"),
-          "Query should contain match_all since user inherits DataSteward role from team");
+          "Query should contain match_all since user inherits DATA_STEWARD role from team");
       assertTrue(generatedQuery.contains("Sensitive"), "Query should contain tag condition");
       assertFalse(generatedQuery.contains("match_none"), "Query should not be match_none");
     }

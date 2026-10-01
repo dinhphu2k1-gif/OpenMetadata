@@ -1,7 +1,7 @@
 {
   "name": "DataProposerPersona-DataProposerPersona",
   "displayName": "Data Proposer Persona Navigation",
-  "description": "Restricted navigation for users with the DataProposer role",
+  "description": "Restricted navigation for users with the DATA_PROPOSER role",
   "entityType": "page",
   "fullyQualifiedName": "persona.DataProposerPersona",
   "data": {

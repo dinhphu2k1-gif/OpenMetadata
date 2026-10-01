@@ -395,10 +395,10 @@ class UserUtilTest {
   void getRolesFromAuthorizationTokenReturnsContextRoles() {
     CatalogSecurityContext catalogSecurityContext =
         new CatalogSecurityContext(
-            () -> "alice", "https", CatalogSecurityContext.OPENID_AUTH, Set.of("DataSteward"));
+            () -> "alice", "https", CatalogSecurityContext.OPENID_AUTH, Set.of("DATA_STEWARD"));
 
     assertEquals(
-        Set.of("DataSteward"), UserUtil.getRolesFromAuthorizationToken(catalogSecurityContext));
+        Set.of("DATA_STEWARD"), UserUtil.getRolesFromAuthorizationToken(catalogSecurityContext));
   }
 
   @Test
@@ -472,10 +472,10 @@ class UserUtilTest {
         new User()
             .withRoles(
                 List.of(
-                    new EntityReference().withName("DataConsumer"),
-                    new EntityReference().withName("DataSteward")));
+                    new EntityReference().withName("DATA_CONSUMER"),
+                    new EntityReference().withName("DATA_STEWARD")));
 
-    assertEquals(Set.of("DataConsumer", "DataSteward"), UserUtil.getRoleListFromUser(user));
+    assertEquals(Set.of("DATA_CONSUMER", "DATA_STEWARD"), UserUtil.getRoleListFromUser(user));
     assertTrue(UserUtil.getRoleListFromUser(new User()).isEmpty());
   }
 
@@ -484,22 +484,22 @@ class UserUtilTest {
     Role dataConsumerRole =
         new Role()
             .withId(UUID.randomUUID())
-            .withName("DataConsumer")
-            .withFullyQualifiedName("DataConsumer");
+            .withName("DATA_CONSUMER")
+            .withFullyQualifiedName("DATA_CONSUMER");
 
     try (MockedStatic<Entity> mockedEntity = mockStatic(Entity.class)) {
       mockedEntity
-          .when(() -> Entity.getEntityByName(Entity.ROLE, "DataConsumer", "id", NON_DELETED, true))
+          .when(() -> Entity.getEntityByName(Entity.ROLE, "DATA_CONSUMER", "id", NON_DELETED, true))
           .thenReturn(dataConsumerRole);
       mockedEntity
           .when(() -> Entity.getEntityByName(Entity.ROLE, "MissingRole", "id", NON_DELETED, true))
           .thenThrow(new EntityNotFoundException("role"));
 
       List<EntityReference> references =
-          UserUtil.validateAndGetRolesRef(Set.of(ADMIN_ROLE, "DataConsumer", "MissingRole"));
+          UserUtil.validateAndGetRolesRef(Set.of(ADMIN_ROLE, "DATA_CONSUMER", "MissingRole"));
 
       assertEquals(1, references.size());
-      assertEquals("DataConsumer", references.get(0).getName());
+      assertEquals("DATA_CONSUMER", references.get(0).getName());
       assertEquals(dataConsumerRole.getId(), references.get(0).getId());
     }
   }
@@ -517,8 +517,8 @@ class UserUtilTest {
     Role dataConsumerRole =
         new Role()
             .withId(UUID.randomUUID())
-            .withName("DataConsumer")
-            .withFullyQualifiedName("DataConsumer");
+            .withName("DATA_CONSUMER")
+            .withFullyQualifiedName("DATA_CONSUMER");
     UserRepository userRepository = mock(UserRepository.class);
     UriInfo uriInfo = mock(UriInfo.class);
     User user =
@@ -532,16 +532,16 @@ class UserUtilTest {
     try (MockedStatic<Entity> mockedEntity = mockStatic(Entity.class)) {
       mockedEntity.when(() -> Entity.getEntityRepository(Entity.USER)).thenReturn(userRepository);
       mockedEntity
-          .when(() -> Entity.getEntityByName(Entity.ROLE, "DataConsumer", "id", NON_DELETED, true))
+          .when(() -> Entity.getEntityByName(Entity.ROLE, "DATA_CONSUMER", "id", NON_DELETED, true))
           .thenReturn(dataConsumerRole);
 
       boolean changed =
-          UserUtil.reSyncUserRolesFromToken(uriInfo, user, Set.of(ADMIN_ROLE, "DataConsumer"));
+          UserUtil.reSyncUserRolesFromToken(uriInfo, user, Set.of(ADMIN_ROLE, "DATA_CONSUMER"));
 
       assertTrue(changed);
       assertTrue(user.getIsAdmin());
       assertEquals(1, user.getRoles().size());
-      assertEquals("DataConsumer", user.getRoles().get(0).getName());
+      assertEquals("DATA_CONSUMER", user.getRoles().get(0).getName());
       verify(userRepository).patch(eq(uriInfo), eq(userId), eq("alice"), any());
     }
   }
@@ -555,12 +555,12 @@ class UserUtilTest {
             .withName("alice")
             .withFullyQualifiedName("alice")
             .withIsAdmin(false)
-            .withRoles(List.of(new EntityReference().withName("DataConsumer")));
+            .withRoles(List.of(new EntityReference().withName("DATA_CONSUMER")));
 
     try (MockedStatic<Entity> mockedEntity = mockStatic(Entity.class)) {
       mockedEntity.when(() -> Entity.getEntityRepository(Entity.USER)).thenReturn(userRepository);
 
-      boolean changed = UserUtil.reSyncUserRolesFromToken(null, user, Set.of("DataConsumer"));
+      boolean changed = UserUtil.reSyncUserRolesFromToken(null, user, Set.of("DATA_CONSUMER"));
 
       assertFalse(changed);
       verifyNoInteractions(userRepository);

@@ -36,13 +36,13 @@ const userUUID = uuid();
 // Create and setup all users
 const dataConsumer = new UserClass({
   firstName: 'PW ',
-  lastName: `DataConsumer ${userUUID}`,
+  lastName: `DATA_CONSUMER ${userUUID}`,
   email: `pw-data-consumer-${userUUID}@gmail.com`,
   password: 'User@OMD123',
 });
 const dataSteward = new UserClass({
   firstName: 'PW ',
-  lastName: `DataSteward ${userUUID}`,
+  lastName: `DATA_STEWARD ${userUUID}`,
   email: `pw-data-steward-${userUUID}@gmail.com`,
   password: 'User@OMD123',
 });

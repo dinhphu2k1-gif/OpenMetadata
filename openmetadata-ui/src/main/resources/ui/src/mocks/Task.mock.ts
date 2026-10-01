@@ -214,8 +214,8 @@ export const MOCK_ASSIGNEE_DATA = {
               {
                 id: 'f8239edf-4f55-43a4-8d6e-a34e4fadee25',
                 type: 'role',
-                name: 'DataConsumer',
-                fullyQualifiedName: 'DataConsumer',
+                name: 'DATA_CONSUMER',
+                fullyQualifiedName: 'DATA_CONSUMER',
                 description:
                   'Users with Data Consumer role use different data assets for their day to day work.',
                 displayName: 'Data Consumer',
@@ -282,8 +282,8 @@ export const MOCK_ASSIGNEE_DATA = {
               {
                 id: 'f8239edf-4f55-43a4-8d6e-a34e4fadee25',
                 type: 'role',
-                name: 'DataConsumer',
-                fullyQualifiedName: 'DataConsumer',
+                name: 'DATA_CONSUMER',
+                fullyQualifiedName: 'DATA_CONSUMER',
                 description:
                   'Users with Data Consumer role use different data assets for their day to day work.',
                 displayName: 'Data Consumer',

@@ -146,7 +146,7 @@ public class PermissionsResourceIT {
     TestNamespace ns = new TestNamespace("PermissionsResourceIT");
 
     Policy dataConsumerPolicy = PolicyTestFactory.getDataConsumerPolicy(ns);
-    assertNotNull(dataConsumerPolicy, "DataConsumer policy should exist");
+    assertNotNull(dataConsumerPolicy, "DATA_CONSUMER policy should exist");
 
     List<ResourcePermission> permissions =
         getPermissionsForPolicies(client, List.of(dataConsumerPolicy.getId()));
@@ -162,7 +162,7 @@ public class PermissionsResourceIT {
   }
 
   @Test
-  @org.junit.jupiter.api.Disabled("Requires DataConsumer/DataSteward users that may not exist")
+  @org.junit.jupiter.api.Disabled("Requires DATA_CONSUMER/DATA_STEWARD users that may not exist")
   void testDataConsumerPermissionsOnNonOwnedTable() throws Exception {
     OpenMetadataClient dataConsumerClient = SdkClients.dataConsumerClient();
     OpenMetadataClient adminClient = SdkClients.adminClient();
@@ -183,7 +183,7 @@ public class PermissionsResourceIT {
                 p ->
                     p.getOperation() == MetadataOperation.VIEW_ALL
                         && p.getAccess() == Permission.Access.ALLOW);
-    assertTrue(hasViewPermission, "DataConsumer should have VIEW permission on non-owned table");
+    assertTrue(hasViewPermission, "DATA_CONSUMER should have VIEW permission on non-owned table");
 
     boolean hasEditAllPermission =
         permission.getPermissions().stream()
@@ -193,13 +193,13 @@ public class PermissionsResourceIT {
                         && p.getAccess() == Permission.Access.ALLOW);
     assertFalse(
         hasEditAllPermission,
-        "DataConsumer should NOT have EDIT_ALL permission on non-owned table");
+        "DATA_CONSUMER should NOT have EDIT_ALL permission on non-owned table");
 
     cleanupTable(adminClient, table);
   }
 
   @Test
-  @org.junit.jupiter.api.Disabled("Requires DataConsumer/DataSteward users that may not exist")
+  @org.junit.jupiter.api.Disabled("Requires DATA_CONSUMER/DATA_STEWARD users that may not exist")
   void testDataConsumerPermissionsOnOwnedTable() throws Exception {
     OpenMetadataClient dataConsumerClient = SdkClients.dataConsumerClient();
     OpenMetadataClient adminClient = SdkClients.adminClient();
@@ -220,7 +220,7 @@ public class PermissionsResourceIT {
                 p ->
                     p.getOperation() == MetadataOperation.VIEW_ALL
                         && p.getAccess() == Permission.Access.ALLOW);
-    assertTrue(hasViewPermission, "DataConsumer should have VIEW permission on owned table");
+    assertTrue(hasViewPermission, "DATA_CONSUMER should have VIEW permission on owned table");
 
     boolean hasEditDescriptionPermission =
         permission.getPermissions().stream()
@@ -230,13 +230,13 @@ public class PermissionsResourceIT {
                         && p.getAccess() == Permission.Access.ALLOW);
     assertTrue(
         hasEditDescriptionPermission,
-        "DataConsumer should have EDIT_DESCRIPTION permission on owned table");
+        "DATA_CONSUMER should have EDIT_DESCRIPTION permission on owned table");
 
     cleanupTable(adminClient, table);
   }
 
   @Test
-  @org.junit.jupiter.api.Disabled("Requires DataConsumer/DataSteward users that may not exist")
+  @org.junit.jupiter.api.Disabled("Requires DATA_CONSUMER/DATA_STEWARD users that may not exist")
   void testNonAdminCannotGetAnotherUserPermissions() {
     OpenMetadataClient dataConsumerClient = SdkClients.dataConsumerClient();
     TestNamespace ns = new TestNamespace("PermissionsResourceIT");

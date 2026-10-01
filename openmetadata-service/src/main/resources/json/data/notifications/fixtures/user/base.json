@@ -21,8 +21,8 @@
     {
       "id": "8f7e6d5c-4b3a-2f1e-0d9c-8b7a6f5e4d3c",
       "type": "role",
-      "name": "DataConsumer",
-      "fullyQualifiedName": "DataConsumer",
+      "name": "DATA_CONSUMER",
+      "fullyQualifiedName": "DATA_CONSUMER",
       "deleted": false
     }
   ],

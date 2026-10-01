@@ -338,7 +338,7 @@ authorizerConfiguration:
   enforcePrincipalDomain: ${AUTHORIZER_ENFORCE_PRINCIPAL_DOMAIN:-false}
   enableSecureSocketConnection : ${AUTHORIZER_ENABLE_SECURE_SOCKET:-false}
   useRolesFromProvider: ${AUTHORIZER_USE_ROLES_FROM_PROVIDER:-false}
-  # For MCP OAuth: Default role assigned to new OAuth users (e.g., "DataConsumer")
+  # For MCP OAuth: Default role assigned to new OAuth users (e.g., "DATA_CONSUMER")
   defaultOAuthRole: ${AUTHORIZER_DEFAULT_OAUTH_ROLE:-null}
 
 authenticationConfiguration:
