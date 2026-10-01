@@ -96,6 +96,7 @@ services:
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS:-[email,preferred_username,sub]}
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING:-[]}
       AUTHENTICATION_ENABLE_SELF_SIGNUP: ${AUTHENTICATION_ENABLE_SELF_SIGNUP:-true}
+      AUTHENTICATION_ENABLE_AUTO_REDIRECT: ${AUTHENTICATION_ENABLE_AUTO_REDIRECT:-false}
       AUTHENTICATION_CLIENT_TYPE: ${AUTHENTICATION_CLIENT_TYPE:-public}
       #For OIDC Authentication, when client is confidential
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-""}
@@ -323,6 +324,7 @@ services:
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS:-[email,preferred_username,sub]}
       AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING: ${AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING:-[]}
       AUTHENTICATION_ENABLE_SELF_SIGNUP: ${AUTHENTICATION_ENABLE_SELF_SIGNUP:-true}
+      AUTHENTICATION_ENABLE_AUTO_REDIRECT: ${AUTHENTICATION_ENABLE_AUTO_REDIRECT:-false}
       AUTHENTICATION_CLIENT_TYPE: ${AUTHENTICATION_CLIENT_TYPE:-public}
       #For OIDC Authentication, when client is confidential
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-""}
@@ -482,9 +484,9 @@ services:
       - "8585:8585"
       - "8586:8586"
       - "5005:5005"
-    # volumes:
-    #   # Mount Java Truststore chứa CA nội bộ Agribank để JVM tin cậy SSL của IAM IdP
-    #   - ./certs/cacerts:/etc/ssl/certs/java/cacerts:ro
+    volumes:
+      # Mount Java Truststore chứa CA nội bộ Agribank để JVM tin cậy SSL của IAM IdP
+      - ./certs/cacerts:/etc/ssl/certs/java/cacerts:ro
     depends_on:
       opensearch:
         condition: service_healthy

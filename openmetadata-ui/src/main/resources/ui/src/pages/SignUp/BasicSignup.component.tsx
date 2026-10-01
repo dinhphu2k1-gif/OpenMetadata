@@ -79,11 +79,10 @@ const BasicSignUp = () => {
         className="login-form-container signup-page"
         data-testid="signin-page">
         <div className="login-box">
-          <BrandImage isMonoGram height="auto" width={50} />
+          <BrandImage height="auto" width={260} />
           <Typography.Title className="header-text display-sm" level={3}>
             {t('label.welcome-to-data-dictionary-management', {
-              defaultValue:
-                'Chào mừng đến với phần mềm quản lý Từ điển dữ liệu',
+              defaultValue: 'Phần mềm quản lý Từ điển dữ liệu',
             })}
           </Typography.Title>
 
