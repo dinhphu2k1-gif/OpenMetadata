@@ -3205,10 +3205,16 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
     boolean elevated =
         subject.isAdmin()
             || subject.isBot()
+            || subject.hasAnyRole("DATA_STEWARD")
+            || subject.hasAnyRole("DATA_PROPOSER")
             || subject.hasAnyRole("DataSteward")
             || subject.hasAnyRole("DataProposer")
             || subject.hasAnyRole("Admin");
-    return !elevated && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
+    return !elevated
+        && (subject.hasAnyRole("BASIC_CONSUMER")
+            || subject.hasAnyRole("DATA_CONSUMER")
+            || subject.hasAnyRole("BasicConsumer")
+            || subject.hasAnyRole("DataConsumer"));
   }
 
   @Override

@@ -39,10 +39,15 @@ public final class GlossaryAuthorizationResolver {
     }
     boolean managesContent =
         subject.hasAnyRole("Admin")
+            || subject.hasAnyRole("DATA_STEWARD")
+            || subject.hasAnyRole("DATA_PROPOSER")
             || subject.hasAnyRole("DataSteward")
             || subject.hasAnyRole("DataProposer");
     return !managesContent
-        && (subject.hasAnyRole("BasicConsumer") || subject.hasAnyRole("DataConsumer"));
+        && (subject.hasAnyRole("BASIC_CONSUMER")
+            || subject.hasAnyRole("DATA_CONSUMER")
+            || subject.hasAnyRole("BasicConsumer")
+            || subject.hasAnyRole("DataConsumer"));
   }
 
   /** Consumer access is always limited to immutable published representations. */

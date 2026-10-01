@@ -112,7 +112,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 **Phạm vi**
 
-- Chỉ Consumer-only (`canViewPublished = true`, `canViewWorking = false`) bị giới hạn published-only. Không phân loại published-only chỉ dựa trên việc người dùng có role `BasicConsumer`/`DataConsumer` nếu họ đồng thời có quyền quản trị, soạn thảo, owner hoặc Reviewer assignment.
+- Chỉ Consumer-only (`canViewPublished = true`, `canViewWorking = false`) bị giới hạn published-only. Không phân loại published-only chỉ dựa trên việc người dùng có role `BASIC_CONSUMER`/`DATA_CONSUMER` nếu họ đồng thời có quyền quản trị, soạn thảo, owner hoặc Reviewer assignment.
 - GET mặc định resolve published head cho Consumer-only; entity chưa publish không được fallback sang identity hoặc working payload.
 - Sidebar của Consumer-only chỉ trả Data Dictionary đã có published snapshot.
 - Với người dùng không phải Consumer-only, GET/list và UI giữ nguyên hành vi identity/working/published và route mặc định của OpenMetadata; khi chưa có bản Approved, người có quyền working nhận Data Dictionary Draft `1` đã bootstrap.

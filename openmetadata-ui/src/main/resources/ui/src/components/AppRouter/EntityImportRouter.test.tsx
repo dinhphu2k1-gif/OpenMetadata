@@ -170,7 +170,7 @@ describe('EntityImportRouter', () => {
       mockCurrentUser = {
         id: 'proposer-id',
         isAdmin: false,
-        roles: [{ name: 'DataProposer' }],
+        roles: [{ name: 'DATA_PROPOSER' }],
       };
       mockGetEntityPermissionByFqn.mockResolvedValue({
         ...DEFAULT_ENTITY_PERMISSION,
@@ -194,7 +194,7 @@ describe('EntityImportRouter', () => {
       mockCurrentUser = {
         id: 'proposer-id',
         isAdmin: false,
-        roles: [{ name: 'DataProposer' }],
+        roles: [{ name: 'DATA_PROPOSER' }],
       };
       mockGetEntityPermissionByFqn.mockResolvedValue({
         ...DEFAULT_ENTITY_PERMISSION,

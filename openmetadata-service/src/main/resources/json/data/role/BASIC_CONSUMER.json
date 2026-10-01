@@ -1,5 +1,5 @@
 {
-  "name": "BasicConsumer",
+  "name": "BASIC_CONSUMER",
   "displayName": "Basic Consumer",
   "description": "Enterprise-wide standard user role with access restricted to glossaries.",
   "allowDelete": false,

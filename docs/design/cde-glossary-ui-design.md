@@ -104,7 +104,7 @@ Quy tắc:
 
 Quyền thực tế phải được backend xác định từ Role, policy và quyền trên entity, hoàn toàn độc lập với `releaseLevel`. Frontend chỉ dùng kết quả quyền từ backend để điều khiển giao diện.
 
-Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BasicConsumer` hoặc `DataConsumer`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc người được policy cấp quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
+Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BASIC_CONSUMER` hoặc `DATA_CONSUMER`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc người được policy cấp quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
 
 ### 4.2. Ma trận nội dung được nhìn thấy
 

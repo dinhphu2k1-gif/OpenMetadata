@@ -8346,6 +8346,7 @@ public abstract class EntityRepository<T extends EntityInterface> {
       if (subjectContext != null
           && (subjectContext.isAdmin()
               || subjectContext.isBot()
+              || subjectContext.hasAnyRole("DATA_PROPOSER")
               || subjectContext.hasAnyRole("DataProposer"))) {
         return;
       }

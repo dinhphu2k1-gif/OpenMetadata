@@ -1,5 +1,5 @@
 {
-  "name": "DataSteward",
+  "name": "DATA_STEWARD",
   "displayName": "Data Steward",
   "description": "Users with the Data Steward role ensure metadata quality through review, approval, rejection, and approval revocation. Their effective permissions remain governed by the attached policies.",
   "allowDelete": false,
