@@ -45,7 +45,6 @@ const BasicSignUp = () => {
   const [form] = Form.useForm();
   const password = Form.useWatch('password', form);
 
-  const brandName = t('label.brand-name');
 
   const { isAuthProviderBasic } = useMemo(() => {
     return {
@@ -82,7 +81,10 @@ const BasicSignUp = () => {
         <div className="login-box">
           <BrandImage isMonoGram height="auto" width={50} />
           <Typography.Title className="header-text display-sm" level={3}>
-            {t('label.welcome-to')} {brandName}
+            {t('label.welcome-to-data-dictionary-management', {
+              defaultValue:
+                'Chào mừng đến với phần mềm quản lý Từ điển dữ liệu',
+            })}
           </Typography.Title>
 
           {alert && (

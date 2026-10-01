@@ -54,7 +54,6 @@ const SignInPage = () => {
 
   const { t } = useTranslation();
 
-  const brandName = t('label.brand-name');
 
   const { isAuthProviderBasic, isAuthProviderLDAP } = useMemo(() => {
     return {
@@ -203,7 +202,10 @@ const SignInPage = () => {
           })}>
           <BrandImage isMonoGram height="auto" width={50} />
           <Typography.Title className="header-text display-sm" level={3}>
-            {t('label.welcome-to')} {brandName}
+            {t('label.welcome-to-data-dictionary-management', {
+              defaultValue:
+                'Chào mừng đến với phần mềm quản lý Từ điển dữ liệu',
+            })}
           </Typography.Title>
           {alert && (
             <div className="login-alert">

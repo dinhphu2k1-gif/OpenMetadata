@@ -10,48 +10,31 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Col, Grid, Layout, Row } from 'antd';
+import { Col, Layout, Row } from 'antd';
 import { Content } from 'antd/lib/layout/layout';
-import classNames from 'classnames';
-import { lazy, ReactNode } from 'react';
-import withSuspenseFallback from '../../AppRouter/withSuspenseFallback';
+import { ReactNode } from 'react';
 import DocumentTitle from '../../common/DocumentTitle/DocumentTitle';
 import './carousel-layout.less';
-
-const LoginCarousel = withSuspenseFallback(
-  lazy(() => import('../../../pages/LoginPage/LoginCarousel'))
-);
 
 export const CarouselLayout = ({
   pageTitle,
   children,
-  carouselClassName,
 }: {
   pageTitle: string;
   children: ReactNode;
   carouselClassName?: string;
 }) => {
-  const { xl } = Grid.useBreakpoint();
-
   return (
     <Layout>
       <DocumentTitle title={pageTitle} />
       <Content className="p-md">
-        <Row data-testid="signin-page" gutter={[48, 0]} wrap={false}>
-          <Col className="carousel-left-side-container" span={xl ? 10 : 24}>
+        <Row
+          align="middle"
+          data-testid="signin-page"
+          justify="center">
+          <Col className="carousel-left-side-container" span={24}>
             {children}
           </Col>
-          {xl && (
-            <Col span={14}>
-              <div
-                className={classNames(
-                  'form-carousel-container',
-                  carouselClassName
-                )}>
-                <LoginCarousel />
-              </div>
-            </Col>
-          )}
         </Row>
       </Content>
     </Layout>
