@@ -11,44 +11,79 @@
  *  limitations under the License.
  */
 import { AxiosResponse } from 'axios';
-import {
-  EntityReference,
-  TagLabel,
-  TermRelation,
-} from '../generated/entity/data/glossaryTerm';
 import APIClient from './index';
 
-export type TechnicalSourceStatus = 'Available' | 'Unavailable' | 'Changed';
-export type TechnicalRecordType = 'working' | 'published' | 'archived';
-export type TechnicalBulkAction = 'submit' | 'approve' | 'reject';
-export type TechnicalImportPolicy = 'DRAFT_ONLY' | 'ALL_EDITABLE';
+export type TechnicalSourceStatus = 'Available' | 'Unavailable';
+export type TechnicalAssetSource = 'CURRENT' | 'SNAPSHOT' | 'NONE';
+
+export interface TechnicalTagValue {
+  fqn: string;
+  label: string;
+}
+
+export interface TechnicalNamedReference {
+  id: string;
+  name: string;
+}
+
+export interface TechnicalCdeValue {
+  id: string;
+  code: string;
+  name: string;
+  businessVersion?: string;
+  assignedAt?: number;
+  assignedBy?: string;
+}
+
 /** A flat row of the Technical Dictionary index, as returned by /glossaryTerms/technical/search. */
 export interface TechnicalRecordApiRow {
   termId: string;
-  name: string;
-  displayName?: string;
+  columnKey: string;
+  columnFqn: string;
+  service?: string;
+  database?: string;
+  schema?: string;
+  table?: string;
+  column?: string;
+  dataType?: string;
   description?: string;
-  businessVersion: string;
-  parentBusinessVersion: string;
-  entityStatus: string;
-  recordType: TechnicalRecordType;
-  workingRevision?: number;
-  snapshotId?: string;
-  tags?: TagLabel[];
-  relatedTerms?: TermRelation[];
-  extension?: Record<string, unknown>;
   sourceStatus: TechnicalSourceStatus;
-  cdeCode: string;
-  cdeName: string;
-  dataOwners: EntityReference[];
-  hasPublished: boolean;
+  dataDictionaryVersion?: string;
+  revision: number;
+  cde?: TechnicalCdeValue;
+  dataOwners?: TechnicalNamedReference[];
+  rank?: number;
+  elementType?: TechnicalTagValue;
+  generationType?: TechnicalTagValue;
+  creationMethod?: TechnicalTagValue;
+  timeliness?: TechnicalTagValue;
+  systemOwner?: TechnicalNamedReference;
+  createdAt?: number;
+  createdBy?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+}
+
+export interface TechnicalCapabilities {
+  canView: boolean;
+  canEdit: boolean;
+  canImport: boolean;
+  canExport: boolean;
+}
+
+/** The Data Dictionary version the dictionary is bound to and what the caller may do. */
+export interface TechnicalContext {
+  glossaryId: string;
+  /** Null while no Data Dictionary version is Approved and active. */
+  dataDictionaryVersion: string | null;
+  previousDataDictionaryVersion?: string | null;
+  resetAt?: number | null;
+  resetBy?: string | null;
+  capabilities: TechnicalCapabilities;
 }
 
 export interface TechnicalRecordQuery {
-  glossary: string;
-  parentBusinessVersion: string;
   q?: string;
-  statuses?: string[];
   sourceServices?: string[];
   cdeMapping?: string[];
   cdeTermIds?: string[];
@@ -71,7 +106,7 @@ export interface TechnicalStats {
   totalColumns: number;
   totalTables: number;
   totalSources: number;
-  approved: number;
+  mapped: number;
 }
 
 /** A physical Column returned by the Add column picker. */
@@ -89,9 +124,8 @@ export interface TechnicalColumnCandidate {
   sourceDataType?: string;
 }
 
-/** Initial values sent when declaring a Column; every value but the Column is optional. */
-export interface TechnicalDeclarationRequest {
-  columnFqn: string;
+/** The editable values of a record; a missing value clears the stored one. */
+export interface TechnicalRecordValues {
   cde?: string;
   rank?: number;
   elementType?: string;
@@ -101,27 +135,19 @@ export interface TechnicalDeclarationRequest {
   systemOwnerId?: string;
 }
 
-export interface TechnicalBulkRequest {
-  glossaryId: string;
-  parentBusinessVersion: string;
-  termIds?: string[];
-  criteria?: Record<string, string>;
-  dryRun?: boolean;
-  offset?: number;
-  limit?: number;
+/** Initial values sent when declaring a Column; every value but the Column is optional. */
+export interface TechnicalDeclarationRequest extends TechnicalRecordValues {
+  columnFqn: string;
 }
 
-export interface TechnicalBulkResult {
-  action: string;
-  dryRun: boolean;
-  matched: number;
-  eligible: number;
-  ineligible: number;
-  attempted: number;
-  succeeded: number;
-  failedCount: number;
-  failures: Array<{ termId: string; code: string; message: string }>;
-  remaining: number;
+export interface TechnicalRecordUpdateRequest extends TechnicalRecordValues {
+  expectedRevision: number;
+}
+
+export interface TechnicalSnapshotSummary {
+  dataDictionaryVersion: string;
+  bindings: number;
+  frozenAt: number;
 }
 
 export interface TechnicalImportIssue {
@@ -142,9 +168,7 @@ export interface TechnicalImportPreview {
   importSessionId: string;
   expiresAt: string;
   fileHash: string;
-  glossaryId: string;
-  parentBusinessVersion: string;
-  updatePolicy: TechnicalImportPolicy;
+  dataDictionaryVersion: string;
   summary: Record<string, number>;
   rows: TechnicalImportPreviewRow[];
   truncated: boolean;
@@ -156,8 +180,29 @@ export interface TechnicalExcelFile {
   fileName: string;
 }
 
+export interface TechnicalAssetsPage {
+  source: TechnicalAssetSource;
+  dataDictionaryVersion: string;
+  frozenAt?: number | null;
+  data: TechnicalRecordApiRow[];
+  paging: { total: number; limit: number; offset: number };
+}
+
 const csv = (values?: string[]) =>
   values && values.length > 0 ? values.join(',') : undefined;
+
+const fileNameOf = (
+  disposition: string | undefined,
+  fallback: string
+): string => disposition?.match(/filename="?([^";]+)"?/i)?.[1] ?? fallback;
+
+export const getTechnicalContext = async (): Promise<TechnicalContext> => {
+  const response = await APIClient.get<TechnicalContext>(
+    '/glossaryTerms/technical/context'
+  );
+
+  return response.data;
+};
 
 export const searchTechnicalRecords = async (
   query: TechnicalRecordQuery,
@@ -167,10 +212,7 @@ export const searchTechnicalRecords = async (
     '/glossaryTerms/technical/search',
     {
       params: {
-        glossary: query.glossary,
-        parentBusinessVersion: query.parentBusinessVersion,
         q: query.q || undefined,
-        statuses: csv(query.statuses),
         sourceServices: csv(query.sourceServices),
         cdeMapping: csv(query.cdeMapping),
         cdeTermIds: csv(query.cdeTermIds),
@@ -190,86 +232,109 @@ export const searchTechnicalRecords = async (
   return response.data;
 };
 
-export const getTechnicalStats = async (
-  glossary: string,
-  parentBusinessVersion: string
-): Promise<TechnicalStats> => {
+export const getTechnicalStats = async (): Promise<TechnicalStats> => {
   const response = await APIClient.get<TechnicalStats>(
-    '/glossaryTerms/technical/stats',
-    { params: { glossary, parentBusinessVersion } }
+    '/glossaryTerms/technical/stats'
   );
 
   return response.data;
 };
 
 export const searchTechnicalColumns = async (
-  glossary: string,
-  parentBusinessVersion: string,
   q: string,
   limit: number,
   signal?: AbortSignal
 ): Promise<TechnicalColumnCandidate[]> => {
   const response = await APIClient.get<{ data: TechnicalColumnCandidate[] }>(
     '/glossaryTerms/technical/columns',
-    { params: { glossary, parentBusinessVersion, q: q || undefined, limit }, signal }
+    { params: { q: q || undefined, limit }, signal }
   );
 
   return response.data.data;
 };
 
 export const declareTechnicalColumn = async (
-  glossary: string,
-  parentBusinessVersion: string,
   request: TechnicalDeclarationRequest
 ): Promise<TechnicalRecordApiRow> => {
   const response = await APIClient.post<
     TechnicalDeclarationRequest,
     AxiosResponse<TechnicalRecordApiRow>
-  >('/glossaryTerms/technical/records', request, {
-    params: { glossary, parentBusinessVersion },
+  >('/glossaryTerms/technical/records', request);
+
+  return response.data;
+};
+
+export const updateTechnicalRecord = async (
+  termId: string,
+  request: TechnicalRecordUpdateRequest
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.patch<
+    TechnicalRecordUpdateRequest,
+    AxiosResponse<TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}`, request, {
+    // The client sends PATCH as JSON Patch by default; this body is a plain JSON update request.
+    headers: { 'Content-Type': 'application/json' },
   });
 
   return response.data;
 };
 
-export const deleteTechnicalDraft = async (
+export const deleteTechnicalRecord = async (
   termId: string,
-  parentBusinessVersion: string
+  expectedRevision: number
 ): Promise<void> => {
   await APIClient.delete(`/glossaryTerms/technical/records/${termId}`, {
-    params: { parentBusinessVersion },
+    params: { expectedRevision },
   });
 };
 
-export const exportTechnicalDictionary = async (
-  glossary: string,
-  parentBusinessVersion: string
+export const exportTechnicalDictionary =
+  async (): Promise<TechnicalExcelFile> => {
+    const response = await APIClient.get<Blob>(
+      '/glossaryTerms/technical/export',
+      { responseType: 'blob' }
+    );
+
+    return {
+      blob: response.data,
+      fileName: fileNameOf(
+        response.headers['content-disposition'] as string | undefined,
+        'TuDienKyThuat.xlsx'
+      ),
+    };
+  };
+
+export const listTechnicalSnapshots = async (): Promise<
+  TechnicalSnapshotSummary[]
+> => {
+  const response = await APIClient.get<{ data: TechnicalSnapshotSummary[] }>(
+    '/glossaryTerms/technical/snapshots'
+  );
+
+  return response.data.data;
+};
+
+export const exportTechnicalSnapshot = async (
+  dataDictionaryVersion: string
 ): Promise<TechnicalExcelFile> => {
-  const response = await APIClient.get<Blob>('/glossaryTerms/export', {
-    params: { glossary, parentBusinessVersion },
-    responseType: 'blob',
-  });
-  const disposition = response.headers['content-disposition'] as
-    | string
-    | undefined;
-  const match = disposition?.match(/filename="?([^";]+)"?/i);
+  const response = await APIClient.get<Blob>(
+    `/glossaryTerms/technical/snapshots/${encodeURIComponent(
+      dataDictionaryVersion
+    )}/export`,
+    { responseType: 'blob' }
+  );
 
   return {
     blob: response.data,
-    fileName: match?.[1] ?? `TuDienKyThuat_v${parentBusinessVersion}.xlsx`,
+    fileName: fileNameOf(
+      response.headers['content-disposition'] as string | undefined,
+      `TuDienKyThuat_banchup_v${dataDictionaryVersion}.xlsx`
+    ),
   };
 };
 
-export const runTechnicalBulkWorkflow = async (
-  action: TechnicalBulkAction,
-  request: TechnicalBulkRequest
-): Promise<TechnicalBulkResult> => {
-  const response = await APIClient.post<
-    TechnicalBulkRequest,
-    AxiosResponse<TechnicalBulkResult>
-  >(`/glossaryTerms/bulk/${action}`, request);
-
-  return response.data;
+export const rebuildTechnicalIndex = async (): Promise<void> => {
+  await APIClient.post('/glossaryTerms/technical/index/rebuild');
 };
 
 export const downloadTechnicalImportTemplate = async (): Promise<Blob> => {
@@ -282,9 +347,6 @@ export const downloadTechnicalImportTemplate = async (): Promise<Blob> => {
 };
 
 export const previewTechnicalImport = async (
-  glossary: string,
-  parentBusinessVersion: string,
-  updatePolicy: TechnicalImportPolicy,
   file: File
 ): Promise<TechnicalImportPreview> => {
   const data = new FormData();
@@ -293,7 +355,6 @@ export const previewTechnicalImport = async (
     FormData,
     AxiosResponse<TechnicalImportPreview>
   >('/glossaryTerms/import/technical/preview', data, {
-    params: { glossary, parentBusinessVersion, updatePolicy },
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
@@ -303,6 +364,20 @@ export const previewTechnicalImport = async (
 export const commitTechnicalImport = async (importSessionId: string) => {
   const response = await APIClient.post<{ committed: number }>(
     `/glossaryTerms/import/technical/${importSessionId}/commit`
+  );
+
+  return response.data;
+};
+
+/** Columns the Technical Dictionary binds to one CDE, for the CDE Assets tab. */
+export const getCdeTechnicalAssets = async (
+  cdeId: string,
+  limit: number,
+  offset: number
+): Promise<TechnicalAssetsPage> => {
+  const response = await APIClient.get<TechnicalAssetsPage>(
+    `/glossaryTerms/${cdeId}/technicalAssets`,
+    { params: { limit, offset } }
   );
 
   return response.data;

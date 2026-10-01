@@ -92,8 +92,7 @@ export type GlossaryWorkflowAction =
   | 'submit'
   | 'approve'
   | 'reject'
-  | 'reopen'
-  | 'revoke';
+  | 'reopen';
 
 export interface GlossaryDraftPayload {
   description: string;
@@ -289,13 +288,6 @@ export const transitionGlossaryWorkflow = async (
   action: GlossaryWorkflowAction,
   request: GlossaryWorkflowRequest | GlossaryWorkflowTransitionRequest
 ) => {
-  if (action === 'revoke') {
-    const response = await APIClient.post<undefined, AxiosResponse<Glossary>>(
-      `/glossaries/${id}/published/latest/archive`
-    );
-
-    return response.data;
-  }
   if (action !== 'createDraft') {
     request = { expectedRevision: request.expectedRevision as number };
   } else {
@@ -477,6 +469,59 @@ export const createGlossaryTermWorkingVersion = async (
   return response.data;
 };
 
+export const createGlossaryTermCorrection = async (
+  id: string,
+  businessVersion: string,
+  parentBusinessVersion: string
+) => {
+  const response = await APIClient.post<undefined, AxiosResponse<GlossaryTerm>>(
+    `/glossaryTerms/${id}/published/${encodeURIComponent(
+      businessVersion
+    )}/correction`,
+    undefined,
+    {
+      params: {
+        parentBusinessVersion:
+          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+          parentBusinessVersion,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export interface GlossaryTermCorrectionHistoryEntry extends GlossaryTerm {
+  historyId: string;
+  snapshotId: string;
+  contentHash: string;
+  publishedAt: number;
+  publishedBy: string;
+  supersededAt: number;
+  supersededBy: string;
+}
+
+export const getGlossaryTermCorrectionHistory = async (
+  id: string,
+  businessVersion: string,
+  parentBusinessVersion?: string
+) => {
+  const response = await APIClient.get<GlossaryTermCorrectionHistoryEntry[]>(
+    `/glossaryTerms/${id}/published/${encodeURIComponent(
+      businessVersion
+    )}/history`,
+    {
+      params: {
+        parentBusinessVersion:
+          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+          parentScopeFromRoute(),
+      },
+    }
+  );
+
+  return response.data;
+};
+
 export const updateGlossaryTermWorkingVersion = async (
   id: string,
   expectedRevision: number,
@@ -542,14 +587,6 @@ export async function transitionGlossaryTermWorkflow(
   request: GlossaryWorkflowRequest | CdeWorkflowTransitionRequest,
   parentBusinessVersion?: string
 ) {
-  if (action === 'revoke') {
-    const response = await APIClient.post<
-      undefined,
-      AxiosResponse<GlossaryTerm>
-    >(`/glossaryTerms/${id}/published/latest/archive`);
-
-    return response.data;
-  }
   const path = action === 'createDraft' ? 'working' : `working/${action}`;
   const resolvedParentBusinessVersion =
     normalizeCdeParentBusinessVersion(parentBusinessVersion) ??

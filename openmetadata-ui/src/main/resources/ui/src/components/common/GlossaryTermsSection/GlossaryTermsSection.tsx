@@ -230,7 +230,10 @@ const GlossaryTermsSection: React.FC<GlossaryTermsSectionProps> = ({
                 glossaryTerm.displayName ||
                 index
               }`}
-              key={glossaryTerm.tagFQN}>
+              key={glossaryTerm.tagFQN}
+              title={[getEntityName(glossaryTerm), glossaryTerm.description]
+                .filter(Boolean)
+                .join('\n')}>
               <GlossaryIcon className="glossary-term-icon" />
               <span className="glossary-term-name">
                 {getEntityName(glossaryTerm)}

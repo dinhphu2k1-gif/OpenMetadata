@@ -221,7 +221,10 @@ const TagsSectionV1: React.FC<TagsSectionProps> = ({
             <div
               className="tag-item"
               data-testid={`tag-${tag.tagFQN}`}
-              key={tag.tagFQN}>
+              key={tag.tagFQN}
+              title={[getEntityName(tag), tag.description]
+                .filter(Boolean)
+                .join('\n')}>
               <ClassificationIcon className="tag-icon" />
               <span className="tag-name">{getEntityName(tag)}</span>
             </div>

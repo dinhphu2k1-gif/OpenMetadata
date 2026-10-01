@@ -113,7 +113,6 @@ import org.openmetadata.schema.type.csv.CsvImportResult;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.cache.ListCountCache;
 import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
@@ -1826,23 +1825,6 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
   public EntityRepository<GlossaryTerm>.EntityUpdater getUpdater(
       GlossaryTerm original, GlossaryTerm updated, Operation operation, ChangeSource changeSource) {
     return new GlossaryTermUpdater(original, updated, operation);
-  }
-
-  @Override
-  protected void postCreate(GlossaryTerm entity) {
-    if (isTechnicalDictionaryRecord(entity)) {
-      // TDX-11: a Technical Dictionary identity is indexed only in its own search index.
-      RdfUpdater.updateEntity(entity);
-      ListCountCache.invalidate(entityType);
-    } else {
-      super.postCreate(entity);
-    }
-  }
-
-  private static boolean isTechnicalDictionaryRecord(GlossaryTerm term) {
-    return term.getGlossary() != null
-        && GovernedGlossaryProfileRegistry.findByName(term.getGlossary().getName()).orElse(null)
-            == GovernedGlossaryProfileRegistry.Profile.TECHNICAL_DICTIONARY;
   }
 
   @Override

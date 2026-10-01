@@ -278,7 +278,10 @@ const deduplicateCDETermVersions = (
   const uniqueTerms = new Map<string, ModifiedGlossaryTerm>();
 
   terms.forEach((term) => {
-    const rowKey = `${term.id}_${getBusinessVersion(term.businessVersion)}`;
+    const recordKind = term.workingRevision == null ? 'published' : 'working';
+    const rowKey = `${term.id}_${getBusinessVersion(
+      term.businessVersion
+    )}_${recordKind}`;
     if (!uniqueTerms.has(rowKey)) {
       uniqueTerms.set(rowKey, term);
     }
@@ -340,8 +343,11 @@ const expandCDETermVersions = async (
       );
     }
 
-    const currentVersion = getBusinessVersion(term.businessVersion);
-    versionSnapshots.delete(currentVersion);
+    // A working correction shares its businessVersion with the Approved
+    // snapshot it corrects; both rows stay visible until the correction is approved.
+    if (term.workingRevision == null) {
+      versionSnapshots.delete(getBusinessVersion(term.businessVersion));
+    }
 
     return [
       term,
@@ -484,21 +490,14 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     canMutate &&
     (Boolean(workflowPermissions?.canApprove) ||
       Boolean(workflowPermissions?.canReject));
-  const canRevokeApproval =
-    canMutate && Boolean(workflowPermissions?.canArchive);
 
   const canSelectRows = useMemo(() => {
     if (isConsumer) {
       return false;
     }
 
-    return canSubmitForReview || canApproveOrReject || canRevokeApproval;
-  }, [
-    isConsumer,
-    canSubmitForReview,
-    canApproveOrReject,
-    canRevokeApproval,
-  ]);
+    return canSubmitForReview || canApproveOrReject;
+  }, [isConsumer, canSubmitForReview, canApproveOrReject]);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedTermsMap, setSelectedTermsMap] = useState<
@@ -576,8 +575,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           const status = record.entityStatus ?? EntityStatus.Approved;
           const hasAvailableAction =
             (status === EntityStatus.Draft && canSubmitForReview) ||
-            (status === EntityStatus.InReview && canApproveOrReject) ||
-            (status === EntityStatus.Approved && canRevokeApproval);
+            (status === EntityStatus.InReview && canApproveOrReject);
 
           return {
             disabled: Boolean(record.isLoadMoreButton) || !hasAvailableAction,
@@ -590,7 +588,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       handleRowSelectionChange,
       canSubmitForReview,
       canApproveOrReject,
-      canRevokeApproval,
     ]);
 
   const handleBulkSubmitForReview = useCallback(
@@ -648,28 +645,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         open: true,
         actionType: 'reject',
         terms: inReviewTerms,
-      });
-    },
-    [selectedTerms]
-  );
-
-  const handleBulkRevoke = useCallback(
-    (termsToRevoke?: ModifiedGlossaryTerm[]) => {
-      const approvedTerms =
-        termsToRevoke && termsToRevoke.length > 0
-          ? termsToRevoke
-          : selectedTerms.filter(
-              (term) =>
-                (term.entityStatus ?? EntityStatus.Approved) ===
-                EntityStatus.Approved
-            );
-      if (approvedTerms.length === 0) {
-        return;
-      }
-      setBulkModalConfig({
-        open: true,
-        actionType: 'revoke',
-        terms: approvedTerms,
       });
     },
     [selectedTerms]
@@ -1304,6 +1279,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               termId,
               flatRow.parentBusinessVersion,
               getBusinessVersion(flatRow.businessVersion),
+              flatRow.recordType === 'working' ? 'working' : 'published',
             ].join('|'),
           } as ModifiedGlossary;
         });
@@ -3342,13 +3318,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           {canSelectRows && selectedRowKeys.length > 0 && (
             <GlossaryBulkActionBar
               canApproveOrReject={canApproveOrReject}
-              canRevokeApproval={canRevokeApproval}
               canSubmitForReview={canSubmitForReview}
               selectedTerms={selectedTerms}
               onApprove={handleBulkApprove}
               onClearSelection={handleClearSelection}
               onReject={handleBulkReject}
-              onRevokeApproval={handleBulkRevoke}
               onSubmitForReview={handleBulkSubmitForReview}
             />
           )}

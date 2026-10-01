@@ -23,11 +23,7 @@ import {
 import { showSuccessToast } from '../../../../utils/ToastUtils';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
-export type BulkActionType =
-  | 'submitForReview'
-  | 'approve'
-  | 'reject'
-  | 'revoke';
+export type BulkActionType = 'submitForReview' | 'approve' | 'reject';
 
 export interface GlossaryBulkActionModalProps {
   actionType: BulkActionType;
@@ -65,10 +61,6 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
       'message.confirm-bulk-reject-title',
       'Xác nhận từ chối hàng loạt'
     ),
-    revoke: t(
-      'message.confirm-bulk-revoke-title',
-      'Xác nhận hủy duyệt hàng loạt'
-    ),
   }[actionType];
 
   const modalDescription = {
@@ -85,11 +77,6 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     reject: t(
       'message.confirm-bulk-reject-desc',
       'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được giữ ở trạng thái Từ chối cho đến khi người đề xuất chọn Chỉnh sửa lại.',
-      { count: terms.length }
-    ),
-    revoke: t(
-      'message.confirm-bulk-revoke-desc',
-      'Bạn có chắc chắn muốn hủy duyệt {{count}} bản ghi đang ở trạng thái Đã duyệt? Các bản ghi này sẽ được chuyển về trạng thái Bản nháp để người đề xuất chỉnh sửa lại.',
       { count: terms.length }
     ),
   }[actionType];
@@ -185,15 +172,11 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
               </Button>,
               <Button
                 color={
-                  actionType === 'reject' || actionType === 'revoke'
-                    ? 'primary-destructive'
-                    : 'primary'
+                  actionType === 'reject' ? 'primary-destructive' : 'primary'
                 }
                 key="confirm"
                 onPress={handleExecute}>
-                {actionType === 'revoke'
-                  ? t('label.revoke-approval', 'Hủy duyệt')
-                  : t('label.confirm', 'Xác nhận')}
+                {t('label.confirm', 'Xác nhận')}
               </Button>,
             ]
       }

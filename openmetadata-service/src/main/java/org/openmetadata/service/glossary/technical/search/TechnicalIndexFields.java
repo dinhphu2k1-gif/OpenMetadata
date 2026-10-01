@@ -5,11 +5,9 @@
 
 package org.openmetadata.service.glossary.technical.search;
 
-/** Field names of a `technical_dictionary_search_index` document. */
+/** Field names of a `technical_dictionary_search_index` document and of a list row. */
 public final class TechnicalIndexFields {
   public static final String TERM_ID = "termId";
-  public static final String GLOSSARY_ID = "glossaryId";
-  public static final String PARENT_BUSINESS_VERSION = "parentBusinessVersion";
   public static final String COLUMN_KEY = "columnKey";
   public static final String COLUMN_FQN = "columnFqn";
   public static final String SERVICE = "service";
@@ -23,19 +21,9 @@ public final class TechnicalIndexFields {
   public static final String PRECISION = "precision";
   public static final String SCALE = "scale";
   public static final String DESCRIPTION = "description";
-  public static final String DISPLAY_NAME = "displayName";
   public static final String SOURCE_STATUS = "sourceStatus";
-  public static final String HAS_PUBLISHED = "hasPublished";
-
-  public static final String CURRENT = "current";
-  public static final String PUBLISHED = "published";
-
-  public static final String RECORD_TYPE = "recordType";
-  public static final String ENTITY_STATUS = "entityStatus";
-  public static final String BUSINESS_VERSION = "businessVersion";
-  public static final String RELEASE_VERSION_TYPE = "releaseVersionType";
-  public static final String WORKING_REVISION = "workingRevision";
-  public static final String SNAPSHOT_ID = "snapshotId";
+  public static final String DATA_DICTIONARY_VERSION = "dataDictionaryVersion";
+  public static final String REVISION = "revision";
   public static final String CDE = "cde";
   public static final String DATA_OWNERS = "dataOwners";
   public static final String RANK = "rank";
@@ -44,26 +32,25 @@ public final class TechnicalIndexFields {
   public static final String CREATION_METHOD = "creationMethod";
   public static final String TIMELINESS = "timeliness";
   public static final String SYSTEM_OWNER = "systemOwner";
+  public static final String CREATED_AT = "createdAt";
+  public static final String CREATED_BY = "createdBy";
   public static final String UPDATED_AT = "updatedAt";
   public static final String UPDATED_BY = "updatedBy";
 
   public static final String ID = "id";
   public static final String CODE = "code";
   public static final String NAME = "name";
-  public static final String TYPE = "type";
+  public static final String BUSINESS_VERSION = "businessVersion";
+  public static final String ASSIGNED_AT = "assignedAt";
+  public static final String ASSIGNED_BY = "assignedBy";
   public static final String FQN = "fqn";
   public static final String LABEL = "label";
-  public static final String FULLY_QUALIFIED_NAME = "fullyQualifiedName";
   public static final String NGRAM = "ngram";
-
-  public static final String RECORD_WORKING = "working";
-  public static final String RECORD_PUBLISHED = "published";
-  public static final String RECORD_ARCHIVED = "archived";
 
   private TechnicalIndexFields() {}
 
-  /** Field of one representation view, for example {@code current.cde.id}. */
-  public static String viewField(String view, String... path) {
-    return view + "." + String.join(".", path);
+  /** Dotted path of a nested field, for example {@code cde.id}. */
+  public static String path(String... segments) {
+    return String.join(".", segments);
   }
 }

@@ -10,31 +10,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { isEmpty } from 'lodash';
-import {
-  EntityReference,
-  TagLabel,
-} from '../../generated/entity/data/glossaryTerm';
-import { TECHNICAL_CLASSIFICATIONS } from '../../constants/TechnicalDictionary.constants';
 import {
   TechnicalColumnCandidate,
   TechnicalRecordApiRow,
+  TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
-import { getCDEReleaseVersionType } from '../../utils/CDEReleaseVersionTypeUtils';
 import Fqn from '../../utils/Fqn';
-import {
-  TechnicalDictionaryCapabilities,
-  TechnicalDictionaryRow,
-} from './technicalDictionary.interface';
+import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 
 const text = (value: unknown): string =>
   value === undefined || value === null ? '' : String(value);
-
-export const findClassificationTag = (
-  tags: TagLabel[] | undefined,
-  classification: string
-): TagLabel | undefined =>
-  tags?.find((tag) => tag.tagFQN?.startsWith(`${classification}.`));
 
 const parentFqn = (fqn: string, depth: number): string | undefined => {
   let result: string | undefined;
@@ -49,98 +34,56 @@ const parentFqn = (fqn: string, depth: number): string | undefined => {
   return result;
 };
 
-const asReference = (value: unknown): EntityReference | undefined =>
-  value && typeof value === 'object' && 'id' in value
-    ? (value as EntityReference)
-    : undefined;
-
-const asRank = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-
 /** Converts one flat read-model row into the table/modal view model. */
 export const toTechnicalDictionaryRow = (
   row: TechnicalRecordApiRow
 ): TechnicalDictionaryRow => {
-  const extension = row.extension ?? {};
-  const columnFqn = text(extension.sourceColumnFqn);
-  const relation = isEmpty(row.relatedTerms)
-    ? undefined
-    : row.relatedTerms?.[0];
+  const columnFqn = text(row.columnFqn);
 
   return {
-    key: `${row.termId}:${row.businessVersion}:${row.recordType}`,
+    key: row.termId,
     termId: row.termId,
-    businessVersion: row.businessVersion,
-    parentBusinessVersion: row.parentBusinessVersion,
-    status: row.entityStatus,
-    recordType: row.recordType,
-    workingRevision: row.workingRevision,
-    hasPublished: Boolean(row.hasPublished),
-    databaseName: text(extension.sourceDatabase),
+    revision: row.revision,
+    databaseName: text(row.database),
     databaseFqn: columnFqn ? parentFqn(columnFqn, 2) : undefined,
-    schemaName: text(extension.sourceSchema),
+    schemaName: text(row.schema),
     schemaFqn: columnFqn ? parentFqn(columnFqn, 3) : undefined,
-    tableName: text(extension.sourceTable),
+    tableName: text(row.table),
     tableFqn: columnFqn ? parentFqn(columnFqn, 4) : undefined,
-    columnName: text(extension.sourceColumn) || text(row.displayName),
+    columnName: text(row.column),
     columnFqn,
-    serviceName: text(extension.sourceService),
-    dataType: text(extension.sourceDataType),
+    serviceName: text(row.service),
+    dataType: text(row.dataType),
     description: text(row.description),
-    rank: asRank(extension.survivorshipRank),
-    cdeCode: row.cdeCode ?? '',
-    cdeName: row.cdeName ?? '',
-    cdeTermId: relation?.term?.id,
-    cdeRelation: relation,
+    rank: typeof row.rank === 'number' ? row.rank : undefined,
+    cdeCode: text(row.cde?.code),
+    cdeName: text(row.cde?.name),
+    cdeTermId: row.cde?.id,
     dataOwners: row.dataOwners ?? [],
-    elementType: findClassificationTag(
-      row.tags,
-      TECHNICAL_CLASSIFICATIONS.ELEMENT_TYPE
-    ),
-    generationType: findClassificationTag(
-      row.tags,
-      TECHNICAL_CLASSIFICATIONS.GENERATION_TYPE
-    ),
-    creationMethod: findClassificationTag(
-      row.tags,
-      TECHNICAL_CLASSIFICATIONS.CREATION_METHOD
-    ),
-    timeliness: findClassificationTag(
-      row.tags,
-      TECHNICAL_CLASSIFICATIONS.TIMELINESS
-    ),
-    systemOwner: asReference(extension.systemOwner),
-    releaseVersionType:
-      getCDEReleaseVersionType(
-        extension.releaseVersionType,
-        row.businessVersion
-      ) ?? '',
+    elementType: row.elementType,
+    generationType: row.generationType,
+    creationMethod: row.creationMethod,
+    timeliness: row.timeliness,
+    systemOwner: row.systemOwner,
     sourceStatus: row.sourceStatus ?? 'Available',
+    updatedAt: row.updatedAt,
+    updatedBy: row.updatedBy,
   };
 };
 
-export const getTagLabel = (tag?: TagLabel): string =>
-  tag ? tag.displayName || tag.name || tag.tagFQN.split('.').pop() || '' : '';
-
-/** Rows the user may edit: an unlocked Draft working representation. */
-export const isEditableRow = (row: TechnicalDictionaryRow): boolean =>
-  row.recordType === 'working' && row.status === 'Draft';
+export const getTagLabel = (tag?: TechnicalTagValue): string =>
+  tag ? tag.label || tag.fqn.split('.').pop() || '' : '';
 
 export const isSourceUnavailable = (row: TechnicalDictionaryRow): boolean =>
   row.sourceStatus === 'Unavailable';
 
-/** A not-yet-declared Column as the empty Draft row the create form starts from. */
+/** A not-yet-declared Column as the empty row the declaration form starts from. */
 export const candidateToRow = (
-  candidate: TechnicalColumnCandidate,
-  parentBusinessVersion: string
+  candidate: TechnicalColumnCandidate
 ): TechnicalDictionaryRow => ({
   key: candidate.columnKey,
   termId: '',
-  businessVersion: `${parentBusinessVersion}.0`,
-  parentBusinessVersion,
-  status: 'Draft',
-  recordType: 'working',
-  hasPublished: false,
+  revision: 0,
   databaseName: text(candidate.sourceDatabase),
   databaseFqn: parentFqn(candidate.columnFqn, 2),
   schemaName: text(candidate.sourceSchema),
@@ -155,17 +98,5 @@ export const candidateToRow = (
   cdeCode: '',
   cdeName: '',
   dataOwners: [],
-  releaseVersionType: '',
   sourceStatus: 'Available',
 });
-
-/** A Draft that was never Approved may be deleted by an editor of an open catalog (TDX-06). */
-export const canDeleteRow = (
-  row: TechnicalDictionaryRow,
-  capabilities: TechnicalDictionaryCapabilities,
-  isReadOnly: boolean
-): boolean =>
-  row.status === 'Draft' &&
-  !row.hasPublished &&
-  capabilities.canEditWorking &&
-  !isReadOnly;

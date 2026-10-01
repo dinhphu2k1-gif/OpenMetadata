@@ -20,7 +20,6 @@ import {
 } from '../../../generated/entity/data/glossary';
 import {
   EntityStatus as TermStatus,
-  EntityVersionContext,
   GlossaryTerm,
 } from '../../../generated/entity/data/glossaryTerm';
 import {
@@ -28,7 +27,6 @@ import {
   getGlossaryVersion,
   searchGlossaryTermsPaginated,
 } from '../../../rest/glossaryAPI';
-import { compareBusinessVersions } from '../../../utils/BusinessVersionUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 
 const NO_ACTIVE_DICTIONARY_MESSAGE =
@@ -37,10 +35,11 @@ const NO_ACTIVE_DICTIONARY_MESSAGE =
 interface CDESelectorProps {
   /** Only offer CDEs while the scoped Data Dictionary version is still active. */
   requireActive?: boolean;
+  className?: string;
   disabled?: boolean;
+  popupClassName?: string;
   parentBusinessVersion?: string;
   selectedCde?: GlossaryTerm;
-  selectedVersionContext?: EntityVersionContext;
   value?: string;
   width?: number | string;
   onChange: (value?: string, cde?: GlossaryTerm) => void;
@@ -54,19 +53,12 @@ const isApprovedDictionaryVersionForScope = (
   (snapshot?.entityStatus === GlossaryStatus.Approved ||
     snapshot?.entityStatus === GlossaryStatus.Archived);
 
-const getCdeVersionKey = (
-  cde: Pick<
-    GlossaryTerm,
-    'id' | 'snapshotId' | 'parentBusinessVersion' | 'businessVersion'
-  >
-) =>
-  cde.snapshotId ??
-  `${cde.id}:${cde.parentBusinessVersion ?? ''}:${cde.businessVersion ?? ''}`;
-
-const getSelectableCdeVersions = (
-  terms: GlossaryTerm[],
-  includeArchived = false
-) => {
+/**
+ * Deduplicates search results to one option per CDE identity. A relation targets the CDE
+ * identity, never a pinned version, so only one selectable row per `id` ever makes sense
+ * (DQ UI design §5.4).
+ */
+const getSelectableCdes = (terms: GlossaryTerm[], includeArchived = false) => {
   const identities = new Set<string>();
 
   return [...terms]
@@ -78,22 +70,12 @@ const getSelectableCdeVersions = (
         (includeArchived || !term.archivedAt) &&
         !term.deleted
     )
-    .sort((left, right) => {
-      const codeComparison = left.name.localeCompare(right.name);
-
-      return codeComparison !== 0
-        ? codeComparison
-        : compareBusinessVersions(
-            right.businessVersion ?? '0',
-            left.businessVersion ?? '0'
-          );
-    })
+    .sort((left, right) => left.name.localeCompare(right.name))
     .filter((term) => {
-      const key = term.id ?? getCdeVersionKey(term);
-      if (identities.has(key)) {
+      if (identities.has(term.id)) {
         return false;
       }
-      identities.add(key);
+      identities.add(term.id);
 
       return true;
     });
@@ -109,22 +91,18 @@ const CDEOptionLabel = ({
   <Space size={6}>
     <Typography.Text strong>{cde.name}</Typography.Text>
     <Typography.Text type="secondary">· {getEntityName(cde)}</Typography.Text>
-    {(cde.businessVersion || cde.parentBusinessVersion) && (
-      <Typography.Text type="secondary">
-        v{cde.businessVersion ?? cde.parentBusinessVersion}
-      </Typography.Text>
-    )}
     {archived && <Tag>Archived</Tag>}
   </Space>
 );
 
 const CDESelector: FC<CDESelectorProps> = ({
   requireActive = false,
+  className,
   disabled,
+  popupClassName,
   onChange,
   parentBusinessVersion,
   selectedCde,
-  selectedVersionContext,
   value,
   width = '100%',
 }) => {
@@ -156,9 +134,7 @@ const CDESelector: FC<CDESelectorProps> = ({
           limit: 50,
         });
         if (requestId === requestSequence.current) {
-          setOptions(
-            getSelectableCdeVersions(response.data ?? [], isArchivedScope)
-          );
+          setOptions(getSelectableCdes(response.data ?? [], isArchivedScope));
         }
       } catch {
         if (requestId === requestSequence.current) {
@@ -236,44 +212,17 @@ const CDESelector: FC<CDESelectorProps> = ({
         selectedCde.entityStatus !== TermStatus.Approved &&
         !isArchivedScope) ||
         (Boolean(selectedCde.archivedAt) && !isArchivedScope) ||
-        (selectedVersionContext?.parentBusinessVersion &&
-          selectedVersionContext.parentBusinessVersion !==
+        (selectedCde.parentBusinessVersion &&
+          selectedCde.parentBusinessVersion !==
             activeDictionary?.businessVersion))
   );
-  const selectedKey = selectedCde
-    ? selectedVersionContext?.snapshotId ??
-      getCdeVersionKey({
-        ...selectedCde,
-        businessVersion:
-          selectedVersionContext?.businessVersion ??
-          selectedCde.businessVersion,
-        parentBusinessVersion:
-          selectedVersionContext?.parentBusinessVersion ??
-          selectedCde.parentBusinessVersion,
-      })
-    : undefined;
+  const selectedKey = selectedCde?.id;
   const selectedIsMissing = Boolean(
-    selectedKey &&
-      !options.some((item) => getCdeVersionKey(item) === selectedKey)
+    selectedKey && !options.some((item) => item.id === selectedKey)
   );
-  const selectedOption = selectedCde
-    ? {
-        ...selectedCde,
-        snapshotId:
-          selectedVersionContext?.snapshotId ?? selectedCde.snapshotId,
-        businessVersion:
-          selectedVersionContext?.businessVersion ??
-          selectedCde.businessVersion,
-        parentBusinessVersion:
-          selectedVersionContext?.parentBusinessVersion ??
-          selectedCde.parentBusinessVersion,
-      }
-    : undefined;
 
   const availableOptions =
-    selectedIsMissing && selectedOption
-      ? [selectedOption, ...options]
-      : options;
+    selectedIsMissing && selectedCde ? [selectedCde, ...options] : options;
   const dropdownRender = (menu: ReactElement) => (
     <div className="cde-selector-dropdown">
       {activeDictionary && (
@@ -296,6 +245,7 @@ const CDESelector: FC<CDESelectorProps> = ({
       <Select
         allowClear
         showSearch
+        className={className}
         data-testid="dq-cde-select"
         disabled={disabled || (isDictionaryResolved && !activeDictionary)}
         dropdownRender={dropdownRender}
@@ -309,22 +259,22 @@ const CDESelector: FC<CDESelectorProps> = ({
             : NO_ACTIVE_DICTIONARY_MESSAGE
         }
         options={availableOptions.map((cde) => {
-          const key = getCdeVersionKey(cde);
-          const archived = key === selectedKey && selectedIsHistorical;
+          const archived = cde.id === selectedKey && selectedIsHistorical;
 
           return {
             disabled: archived,
             label: <CDEOptionLabel archived={archived} cde={cde} />,
-            value: key,
+            value: cde.id,
           };
         })}
         placeholder="Tìm theo mã hoặc tên CDE"
+        popupClassName={popupClassName}
         style={{ width: '100%' }}
         value={value ?? selectedKey}
         onChange={(key?: string) =>
           onChange(
             key,
-            availableOptions.find((cde) => getCdeVersionKey(cde) === key)
+            availableOptions.find((cde) => cde.id === key)
           )
         }
         onSearch={debouncedSearch}
@@ -339,7 +289,6 @@ const CDESelector: FC<CDESelectorProps> = ({
 export default CDESelector;
 export {
   NO_ACTIVE_DICTIONARY_MESSAGE,
-  getCdeVersionKey,
-  getSelectableCdeVersions,
+  getSelectableCdes,
   isApprovedDictionaryVersionForScope,
 };

@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import org.openmetadata.schema.entity.data.Table;
 import org.openmetadata.schema.type.Column;
@@ -54,16 +53,36 @@ public record TechnicalColumnSource(
         sourceExtension(column));
   }
 
-  /** True when the given payload already carries this Column snapshot. */
-  public boolean isSnapshotOf(Map<String, Object> extension, String payloadDescription) {
-    final boolean sameDescription =
-        Objects.equals(emptyToNull(description), emptyToNull(payloadDescription));
-    return sameDescription
-        && sourceExtension.entrySet().stream()
-            .allMatch(
-                entry ->
-                    Objects.equals(
-                        normalize(entry.getValue()), normalize(extension.get(entry.getKey()))));
+  /** Copies this Column snapshot into the source fields of a record. */
+  public TechnicalRecord.TechnicalRecordBuilder into(
+      TechnicalRecord.TechnicalRecordBuilder builder) {
+    return builder
+        .columnKey(columnKey)
+        .columnFqn(columnFqn)
+        .sourceService(text(TechnicalDictionaryProfile.SOURCE_SERVICE))
+        .sourceDatabase(text(TechnicalDictionaryProfile.SOURCE_DATABASE))
+        .sourceSchema(text(TechnicalDictionaryProfile.SOURCE_SCHEMA))
+        .sourceTable(text(TechnicalDictionaryProfile.SOURCE_TABLE))
+        .sourceColumn(text(TechnicalDictionaryProfile.SOURCE_COLUMN))
+        .dataType(text(TechnicalDictionaryProfile.SOURCE_DATA_TYPE))
+        .dataLength(number(TechnicalDictionaryProfile.SOURCE_DATA_LENGTH))
+        .dataPrecision(number(TechnicalDictionaryProfile.SOURCE_PRECISION))
+        .dataScale(number(TechnicalDictionaryProfile.SOURCE_SCALE))
+        .description(emptyToNull(description));
+  }
+
+  /** True when the record already carries this Column snapshot. */
+  public boolean isSnapshotOf(TechnicalRecord record) {
+    return into(record.toBuilder()).build().equals(record);
+  }
+
+  private String text(String key) {
+    final Object value = sourceExtension.get(key);
+    return value == null ? null : String.valueOf(value);
+  }
+
+  private Integer number(String key) {
+    return sourceExtension.get(key) instanceof Number value ? value.intValue() : null;
   }
 
   private static Map<String, Object> sourceExtension(Column column) {
@@ -111,10 +130,6 @@ public record TechnicalColumnSource(
     if (value != null) {
       values.put(key, value);
     }
-  }
-
-  private static Object normalize(Object value) {
-    return value instanceof Number number ? number.longValue() : value;
   }
 
   private static String emptyToNull(String value) {

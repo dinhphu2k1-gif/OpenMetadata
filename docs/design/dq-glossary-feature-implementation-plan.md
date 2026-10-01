@@ -1,5 +1,24 @@
 # Kế hoạch triển khai Chất lượng dữ liệu theo từng chức năng
 
+## Trạng thái thực hiện (cập nhật 2026-10-01)
+
+Đối chiếu bằng đọc mã nguồn, chưa build/test. Chi tiết khác biệt ở mục "Hiện trạng triển khai" của [thiết kế DQ](./dq-glossary-ui-design.md).
+
+| Chức năng | Trạng thái |
+| --- | --- |
+| DQ00 | Một phần: chưa có feature flag; chưa thấy characterization test riêng |
+| DQ01 | Đã có profile `DATA_QUALITY` trong `GovernedGlossaryProfileRegistry` |
+| DQ02 | Một phần: component UI DQ riêng (`DQGlossary*`) đã có; mức dùng chung shell cần rà lại |
+| DQ03 | Đã có `DataQualityBootstrap` |
+| DQ04–DQ05 | Một phần: dùng `GlossaryFlatListService` chung, cột DQ ở UI; chưa có read model DQ riêng |
+| DQ06 | Một phần: overview/summary UI; ràng buộc đúng 1 CDE ở backend |
+| DQ07 | **Chưa làm** (export DQ trả 400) |
+| DQ08–DQ09 | Một phần: tạo Draft và workflow dùng chung; bulk cho DQ chưa kiểm chứng |
+| DQ10–DQ11 | Chưa kiểm chứng |
+| DQ12 | Chưa làm đúng thiết kế: import chạy ở client, không nguyên tử |
+| DQ13–DQ16 | Chưa làm |
+
+
 ## 1. Tài liệu nguồn và mục tiêu bàn giao
 
 Kế hoạch này hiện thực [Thiết kế kỹ thuật và UI/UX Chất lượng dữ liệu](./dq-glossary-ui-design.md) trên nền [Thiết kế CDE](./cde-glossary-ui-design.md) và [kế hoạch triển khai CDE](./cde-glossary-feature-implementation-plan.md).
@@ -225,12 +244,13 @@ Với một backend engineer, một frontend engineer và QA tham gia liên tụ
 - Header hiển thị `Mã quy tắc`, `Phiên bản`, `Loại phiên bản phát hành`, `Trạng thái`; kèm action workflow theo capability. Technical name/UUID/revision không hiển thị.
 - Card `Liên kết CDE` hiển thị `Mã CDE` và `Tên thành tố`. Mã CDE là selector canonical đơn trị có thể sửa trong Draft theo capability; Tên thành tố read-only và tự resolve từ cùng reference. Navigation dùng term ID/FQN scoped, không lookup bằng chuỗi mã.
 - Selector dùng component/design system chuẩn của OpenMetadata. Nó resolve Data Dictionary business version cao nhất đang `Approved` và chưa Archived bằng numeric comparison, rồi query option bằng `glossaryId` + `parentBusinessVersion` + status CDE `Approved`; không phụ thuộc thứ tự response và không fallback sang Draft/Archived.
-- Option hiển thị `Mã CDE · Tên thành tố · v<businessVersion>`; không hiển thị badge `Approved` lặp lại trên từng option. Header dropdown hiển thị tên/version Data Dictionary. Placeholder là `Tìm theo mã hoặc tên CDE`; UUID không xuất hiện trên UI.
-- Server trả từng Approved snapshot đã scope/filter; client tiếp tục lọc phòng vệ nhưng không loại trùng theo `termId`. Mỗi option dùng `snapshotId` hoặc composite version key. Search có debounce, request sequence/cancellation để response cũ không ghi đè response mới, cùng loading/empty/error state rõ ràng.
-- Relation lưu `termId` và typed `versionContext` (`parentBusinessVersion`, `businessVersion`, `snapshotId`). Repository persistence/hydration, working payload và published DQ snapshot phải round-trip context này; đổi v2.0 sang v2.1 dù cùng `termId` vẫn được nhận diện là thay đổi.
-- CDE version mới không tự nâng relation hiện tại; nó chỉ trở thành option mới để người dùng chủ động chọn.
+- Mỗi CDE identity một option, hiển thị `Mã CDE · Tên thành tố`, không hiển thị version; không hiển thị badge `Approved` lặp lại trên từng option. Header dropdown hiển thị tên/version Data Dictionary. Placeholder là `Tìm theo mã hoặc tên CDE`; UUID không xuất hiện trên UI.
+- Server trả mỗi CDE identity một dòng đã scope/filter, nội dung resolve theo UI design §5.4; client lọc phòng vệ và dùng `termId` làm khóa option. Search có debounce, request sequence/cancellation để response cũ không ghi đè response mới, cùng loading/empty/error state rõ ràng.
+- Relation chỉ lưu `termId` của CDE, không lưu `versionContext`; request tạo/sửa không bắt buộc và không nhận context từ client. Scope kiểm tra bằng scope của chính CDE identity so với `parentBusinessVersion` của DQ Rule.
+- Liên kết bao trùm mọi version `N.x` của CDE: khi CDE version mới được duyệt, DQ Rule hiển thị theo bản mới mà không cần sửa relation. Relation chỉ thay đổi khi người dùng đổi sang CDE khác.
+- Relation cũ còn `versionContext` được bỏ qua khi đọc và không ghi lại ở lần lưu tiếp theo.
 - Nếu không có Data Dictionary `Approved` còn hiệu lực, disable liên kết mới và hiển thị `Chưa có phiên bản Data Dictionary được phê duyệt và còn hiệu lực.`
-- Relation hiện có nằm ngoài active scope vẫn được render cùng version và badge `Archived`, không có trong lựa chọn mới và không bị xóa/migrate khi Save Draft nếu người dùng không đổi. Người dùng chỉ có thể giữ nguyên hoặc chủ động thay bằng CDE hợp lệ.
+- Relation hiện có nằm ngoài active scope vẫn được render theo bản `Approved` cuối cùng của scope đó kèm badge `Archived`, không có trong lựa chọn mới và không bị xóa/migrate khi Save Draft nếu người dùng không đổi. Người dùng chỉ có thể giữ nguyên hoặc chủ động thay bằng CDE hợp lệ.
 - Card `Quy tắc nghiệp vụ` hiển thị `description` markdown toàn chiều rộng.
 - Card `Thông tin quản trị` chỉ hiển thị `Cấp phát hành`, `Ngày hiệu lực`, `Ngày hết hiệu lực`.
 - Card `Phân loại & kiểm soát` hiển thị `Tiêu chí chất lượng dữ liệu`, `Các tiêu chí cơ sở`, `Hình thức kiểm tra`, `Tần suất`, `Ngưỡng chất lượng dữ liệu`.
@@ -303,7 +323,7 @@ Với một backend engineer, một frontend engineer và QA tham gia liên tụ
 
 - Áp dụng state machine Draft → InReview → Approved/Rejected; Rejected → Draft.
 - Publish tạo immutable snapshot và outbox event trong cùng transaction.
-- Bulk submit/approve/reject/revoke dùng service chung, kiểm tra capability + revision từng row.
+- Bulk submit/approve/reject dùng service chung (không có revoke), kiểm tra capability + revision từng row.
 - UI preview row hợp lệ/không hợp lệ; trả result per row với mã lỗi.
 - Consumer giữ Approved head cũ khi minor working đang Draft/InReview/Rejected.
 
@@ -518,7 +538,7 @@ PR có thể tách backend/frontend nhưng không bật flag capability cho đ�
 | `name` suffix gây sai mã nghiệp vụ | Cao | `extension.ruleCode` để hiển thị, `termId` để định danh/update, conflict report, không parse tự động mù |
 | Dual source CDE relation và text | Cao | ID relation canonical, compatibility read có thời hạn |
 | Archive Data Dictionary/CDE làm mất hoặc trỏ sai liên kết lịch sử | Cao | Relation lưu identity + scope/snapshot; không auto-migrate; active selector tách khỏi historical renderer |
-| Dropdown không phân biệt nhiều version cùng CDE | Cao | Mỗi snapshot dùng `snapshotId`/composite key và relation lưu typed version context |
+| Dropdown hiển thị trùng CDE theo từng version | Cao | Server trả mỗi CDE identity một dòng, option khóa theo `termId`; relation không lưu version |
 | ES lag làm row biến mất/sai status | Cao | DB read model; ES chỉ discovery |
 | Client-side XLSX lộ dữ liệu/commit một phần | Cao | Backend authorize + preview session + atomic commit + streaming export |
 | Custom Property global đụng schema khác | Trung bình | Prefix/allowlist/manifest drift check và fail-fast |
@@ -552,7 +572,7 @@ PR có thể tách backend/frontend nhưng không bật flag capability cho đ�
 - [ ] `ruleCode` canonical; không parse technical name.
 - [ ] CDE link canonical bằng ID, đúng scope và quyền.
 - [ ] CDE selector hiển thị từng CDE version Approved của Data Dictionary Approved chưa Archived mới nhất; không có badge Approved lặp lại, không lộ UUID và có loading/empty/error/race handling.
-- [ ] Chọn CDE v2.1 được round-trip chính xác bằng version context; v2.2 phát sinh không tự thay đổi relation.
+- [ ] Gán CDE khi đang ở v2.1; sau khi v2.2 được duyệt, DQ Rule hiển thị theo v2.2 mà relation không đổi; thu hồi v2.2 thì hiển thị quay về v2.1.
 - [ ] Archive không xóa hoặc tự chuyển relation DQ lịch sử; liên kết cũ hiển thị version + `Archived` và không thể dùng cho liên kết mới.
 - [ ] DB là nguồn list/search nghiệp vụ; ES lag không ảnh hưởng workflow UI.
 - [ ] Consumer chỉ thấy Approved/Archived được phép.

@@ -6,6 +6,7 @@
 package org.openmetadata.service.glossary.technical;
 
 import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.WebApplicationException;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,20 +15,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Function;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.type.TermRelation;
 import org.openmetadata.service.glossary.technical.TechnicalImportLookups.LookupException;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.Field;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.ImportError;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.PlannedRow;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.RowPatch;
-import org.openmetadata.service.glossary.technical.TechnicalImportPlan.UpdatePolicy;
 
 /**
- * Turns a parsed import sheet into row plans. Rows are matched to existing records by source
- * location; only columns present in the file are applied, and an empty cell clears the value.
+ * Turns a parsed import sheet into row plans. Rows are matched to declared records by source
+ * location, or declare the Column when it has no record yet; only columns present in the file are
+ * applied, an empty cell clears the value, and ranks are checked on the final state of the file.
  */
 public final class TechnicalImportPlanner {
   public static final String DATABASE = "Tên cơ sở dữ liệu";
@@ -42,11 +40,6 @@ public final class TechnicalImportPlanner {
   public static final String CREATION_METHOD = "Phương thức tạo";
   public static final String TIMELINESS = "Thời gian";
   public static final String SYSTEM_OWNER = "Chủ sở hữu hệ thống";
-
-  private static final String RECORD_TYPE = "recordType";
-  private static final String EXTENSION = "extension";
-  private static final String UNDECLARED_RECORD_TYPE = "column";
-  private static final String COLUMN_SOURCE = "columnSource";
 
   static final List<String> LOCATION_HEADERS = List.of(DATABASE, SCHEMA, TABLE, COLUMN);
   static final Map<String, String> TAG_HEADERS = tagHeaders();
@@ -63,25 +56,24 @@ public final class TechnicalImportPlanner {
     return headers;
   }
 
-  private final Map<String, List<Map<String, Object>>> rowsByLocation;
+  private final Map<String, List<TechnicalRecord>> recordsByLocation;
   private final TechnicalImportLookups lookups;
-  private final UpdatePolicy policy;
+  private final TechnicalRecordValidator validator;
 
   public TechnicalImportPlanner(
-      Map<String, List<Map<String, Object>>> rowsByLocation,
+      Map<String, List<TechnicalRecord>> recordsByLocation,
       TechnicalImportLookups lookups,
-      UpdatePolicy policy) {
-    this.rowsByLocation = rowsByLocation;
+      TechnicalRecordValidator validator) {
+    this.recordsByLocation = recordsByLocation;
     this.lookups = lookups;
-    this.policy = policy;
+    this.validator = validator;
   }
 
-  /** Indexes the latest visible row of every record by normalized source location. */
-  public static Map<String, List<Map<String, Object>>> indexRows(
-      List<Map<String, Object>> latestRows) {
-    final Map<String, List<Map<String, Object>>> index = new HashMap<>();
-    for (Map<String, Object> row : latestRows) {
-      index.computeIfAbsent(locationOf(row), key -> new ArrayList<>()).add(row);
+  /** Indexes declared records by normalized source location. */
+  public static Map<String, List<TechnicalRecord>> indexRecords(List<TechnicalRecord> records) {
+    final Map<String, List<TechnicalRecord>> index = new HashMap<>();
+    for (TechnicalRecord record : records) {
+      index.computeIfAbsent(locationOf(record), key -> new ArrayList<>()).add(record);
     }
     return index;
   }
@@ -99,31 +91,43 @@ public final class TechnicalImportPlanner {
 
   public List<PlannedRow> plan(TechnicalImportSheet sheet) {
     requireHeaders(sheet.headers());
-    final List<PlannedRow> planned = new ArrayList<>(sheet.rows().size());
+    final List<Planned> planned = new ArrayList<>(sheet.rows().size());
     final Map<String, Integer> firstSeen = new HashMap<>();
     for (TechnicalImportSheet.Row row : sheet.rows()) {
       planned.add(planRow(row, firstSeen));
     }
-    return warnDuplicateRanks(planned);
+    return new RankCheck(planned, lookups).run();
   }
 
-  private PlannedRow planRow(TechnicalImportSheet.Row row, Map<String, Integer> firstSeen) {
+  /** A planned row with the final values it leaves behind, needed by the rank check. */
+  record Planned(PlannedRow row, TechnicalRecordValues finalValues) {}
+
+  private Planned planRow(TechnicalImportSheet.Row row, Map<String, Integer> firstSeen) {
     final String location = locationOf(row);
     final List<ImportError> errors = new ArrayList<>();
     final Integer earlier = firstSeen.putIfAbsent(location, row.rowNumber());
-    final Map<String, Object> target = earlier == null ? matchTarget(row, location, errors) : null;
+    Target target = null;
     if (earlier != null) {
       errors.add(error(row, COLUMN, "DUPLICATE_ROW", "Cột đã xuất hiện ở dòng " + earlier));
+    } else {
+      target = matchTarget(row, location, errors);
     }
     final RowPatch patch = errors.isEmpty() ? buildPatch(row, errors) : null;
-    return errors.isEmpty() ? decide(row, location, target, patch) : failed(row, location, errors);
+    return errors.isEmpty()
+        ? decide(row, location, target, patch, errors)
+        : failed(row, location, errors);
   }
 
-  private Map<String, Object> matchTarget(
+  /** A declared record or a physical Column that the row will declare. */
+  private record Target(TechnicalRecord record, TechnicalColumnSource column) {}
+
+  private Target matchTarget(
       TechnicalImportSheet.Row row, String location, List<ImportError> errors) {
-    List<Map<String, Object>> candidates = candidatesFor(row, location);
+    final List<Target> candidates = new ArrayList<>();
+    matchingService(row, recordsByLocation.getOrDefault(location, List.of()))
+        .forEach(record -> candidates.add(new Target(record, null)));
     if (candidates.isEmpty()) {
-      candidates = undeclaredCandidatesFor(row);
+      undeclaredCandidatesFor(row).forEach(column -> candidates.add(new Target(null, column)));
     }
     if (candidates.size() != 1) {
       errors.add(
@@ -132,54 +136,44 @@ public final class TechnicalImportPlanner {
               COLUMN,
               TechnicalDictionaryErrors.IMPORT_ROW_NOT_MATCHED,
               candidates.isEmpty()
-                  ? "Không tìm thấy cột trong Từ điển kỹ thuật"
+                  ? "Không tìm thấy cột trong hệ thống nguồn"
                   : "Có nhiều hơn một cột khớp; hãy bổ sung cột Nguồn"));
     }
     return candidates.size() == 1 ? candidates.getFirst() : null;
   }
 
-  private List<Map<String, Object>> candidatesFor(TechnicalImportSheet.Row row, String location) {
-    return matchingService(row, rowsByLocation.getOrDefault(location, List.of()));
-  }
-
   /** Physical Columns at the row location that have no record yet; the import declares them. */
-  private List<Map<String, Object>> undeclaredCandidatesFor(TechnicalImportSheet.Row row) {
+  private List<TechnicalColumnSource> undeclaredCandidatesFor(TechnicalImportSheet.Row row) {
     final String column = normalize(row.value(COLUMN));
-    final List<Map<String, Object>> columns =
-        lookups.columns(row.value(DATABASE), row.value(SCHEMA), row.value(TABLE)).stream()
-            .filter(source -> column.equals(normalize(source.columnName())))
-            .map(TechnicalImportPlanner::undeclaredTarget)
-            .toList();
-    return matchingService(row, columns);
+    final String service = normalize(row.value(SERVICE));
+    return lookups.columns(row.value(DATABASE), row.value(SCHEMA), row.value(TABLE)).stream()
+        .filter(source -> column.equals(normalize(source.columnName())))
+        .filter(
+            source ->
+                !row.has(SERVICE)
+                    || service.isEmpty()
+                    || service.equals(normalize(serviceOf(source))))
+        .toList();
   }
 
-  private static Map<String, Object> undeclaredTarget(TechnicalColumnSource source) {
-    final Map<String, Object> target = new HashMap<>();
-    target.put(RECORD_TYPE, UNDECLARED_RECORD_TYPE);
-    target.put(EXTENSION, source.sourceExtension());
-    target.put(COLUMN_SOURCE, source);
-    return target;
+  private static String serviceOf(TechnicalColumnSource source) {
+    return String.valueOf(source.sourceExtension().get(TechnicalDictionaryProfile.SOURCE_SERVICE));
   }
 
-  private static List<Map<String, Object>> matchingService(
-      TechnicalImportSheet.Row row, List<Map<String, Object>> candidates) {
+  private static List<TechnicalRecord> matchingService(
+      TechnicalImportSheet.Row row, List<TechnicalRecord> candidates) {
     final String service = normalize(row.value(SERVICE));
     return !row.has(SERVICE) || service.isEmpty()
         ? candidates
         : candidates.stream()
-            .filter(
-                candidate ->
-                    service.equals(
-                        normalize(
-                            TechnicalRowFields.extensionText(
-                                candidate, TechnicalDictionaryProfile.SOURCE_SERVICE))))
+            .filter(candidate -> service.equals(normalize(candidate.sourceService())))
             .toList();
   }
 
   private RowPatch buildPatch(TechnicalImportSheet.Row row, List<ImportError> errors) {
-    final Field<TermRelation> cde = resolve(row, CDE_CODE, errors, lookups::cde);
+    final Field<TechnicalCdeInfo> cde = resolve(row, CDE_CODE, errors, lookups::cde);
     final Field<Integer> rank = resolve(row, RANK, errors, TechnicalImportPlanner::parseRank);
-    final Map<String, Field<TagLabel>> tags = new LinkedHashMap<>();
+    final Map<String, Field<String>> tags = new LinkedHashMap<>();
     TAG_HEADERS.forEach(
         (header, classification) ->
             tags.put(
@@ -223,161 +217,83 @@ public final class TechnicalImportPlanner {
     }
   }
 
-  private PlannedRow decide(
-      TechnicalImportSheet.Row row, String location, Map<String, Object> target, RowPatch patch) {
-    return UNDECLARED_RECORD_TYPE.equals(target.get(RECORD_TYPE))
-        ? declare(row, location, (TechnicalColumnSource) target.get(COLUMN_SOURCE), patch)
-        : update(row, location, target, patch);
-  }
-
-  private static PlannedRow declare(
-      TechnicalImportSheet.Row row, String location, TechnicalColumnSource column, RowPatch patch) {
-    final String action =
-        isNoChange(Map.of(), patch)
-            ? TechnicalImportPlan.NO_CHANGE
-            : TechnicalImportPlan.CREATE_RECORD;
-    return new PlannedRow(
-        row.rowNumber(),
-        location,
-        action,
-        null,
-        null,
-        null,
-        null,
-        patch,
-        column,
-        List.of(),
-        new ArrayList<>());
-  }
-
-  private PlannedRow update(
-      TechnicalImportSheet.Row row, String location, Map<String, Object> target, RowPatch patch) {
-    final String status = TechnicalRowFields.text(target, "entityStatus");
-    final boolean working = "working".equals(target.get(RECORD_TYPE));
-    final String action =
-        isNoChange(target, patch) ? TechnicalImportPlan.NO_CHANGE : actionFor(working, status);
-    final List<String> warnings = new ArrayList<>();
-    if (TechnicalImportPlan.SKIP.equals(action)) {
-      warnings.add(
-          "Bản ghi ở trạng thái " + status + " nên không được cập nhật với chính sách hiện tại");
-    }
-    return new PlannedRow(
-        row.rowNumber(),
-        location,
-        action,
-        UUID.fromString(String.valueOf(target.get("termId"))),
-        working ? ((Number) target.get("workingRevision")).longValue() : null,
-        working ? null : String.valueOf(target.get("businessVersion")),
-        working ? null : nextMinor(String.valueOf(target.get("businessVersion"))),
-        patch,
-        null,
-        List.of(),
-        warnings);
-  }
-
-  private String actionFor(boolean working, String status) {
-    final boolean all = policy == UpdatePolicy.ALL_EDITABLE;
-    final String action;
-    if (working && "Draft".equals(status)) {
-      action = TechnicalImportPlan.UPDATE_DRAFT;
-    } else if (working && "In Review".equals(status)) {
-      action = all ? TechnicalImportPlan.REPLACE_IN_REVIEW_AND_REOPEN : TechnicalImportPlan.SKIP;
-    } else if (working) {
-      action = all ? TechnicalImportPlan.REPLACE_REJECTED_AND_REOPEN : TechnicalImportPlan.SKIP;
+  private Planned decide(
+      TechnicalImportSheet.Row row,
+      String location,
+      Target target,
+      RowPatch patch,
+      List<ImportError> errors) {
+    final TechnicalRecordValues current =
+        target.record() == null
+            ? TechnicalRecordValues.EMPTY
+            : TechnicalRecordValues.of(target.record());
+    final TechnicalRecordValues merged = TechnicalImportPatch.merge(current, patch);
+    final String invalid = validationError(merged);
+    Planned result;
+    if (invalid != null) {
+      errors.add(
+          error(
+              row,
+              COLUMN,
+              invalid.substring(0, invalid.indexOf('|')),
+              invalid.substring(invalid.indexOf('|') + 1)));
+      result = failed(row, location, errors);
     } else {
-      action = all ? TechnicalImportPlan.CREATE_VERSION : TechnicalImportPlan.SKIP;
-    }
-    return action;
-  }
-
-  static boolean isNoChange(Map<String, Object> current, RowPatch patch) {
-    return same(
-            patch.cde(),
-            TechnicalRowFields.cdeId(current),
-            relation -> relation.getTerm().getId().toString())
-        && same(patch.rank(), currentRank(current), rank -> rank)
-        && same(
-            patch.systemOwner(),
-            TechnicalRowFields.systemOwnerId(current),
-            owner -> owner.getId().toString())
-        && patch.tags().entrySet().stream()
-            .allMatch(
-                entry ->
-                    same(
-                        entry.getValue(),
-                        currentTag(current, entry.getKey()),
-                        TagLabel::getTagFQN));
-  }
-
-  private static <T, V> boolean same(Field<T> field, V current, Function<T, V> key) {
-    return !field.specified()
-        || Objects.equals(field.value() == null ? null : key.apply(field.value()), current);
-  }
-
-  private static Integer currentRank(Map<String, Object> row) {
-    return TechnicalRecordValidator.rank(TechnicalRowFields.extension(row));
-  }
-
-  private static String currentTag(Map<String, Object> row, String classification) {
-    String result = null;
-    if (row.get("tags") instanceof List<?> tags) {
-      for (Object raw : tags) {
-        if (raw instanceof Map<?, ?> tag
-            && String.valueOf(tag.get("tagFQN")).startsWith(classification + ".")) {
-          result = String.valueOf(tag.get("tagFQN"));
-        }
-      }
+      result = new Planned(planned(row, location, target, patch, current, merged), merged);
     }
     return result;
   }
 
-  private static List<PlannedRow> warnDuplicateRanks(List<PlannedRow> planned) {
-    final Map<String, Long> counts = new HashMap<>();
-    planned.stream()
-        .map(TechnicalImportPlanner::rankKey)
-        .filter(Objects::nonNull)
-        .forEach(key -> counts.merge(key, 1L, Long::sum));
-    final List<PlannedRow> result = new ArrayList<>(planned.size());
-    for (PlannedRow row : planned) {
-      final String key = rankKey(row);
-      if (key != null && counts.get(key) > 1) {
-        row.warnings().add("Thứ hạng bị trùng trong file cho cùng một CDE");
-      }
-      result.add(row);
-    }
-    return result;
-  }
-
-  private static String rankKey(PlannedRow row) {
-    final RowPatch patch = row.patch();
-    final boolean ranked =
-        patch != null
-            && patch.rank().specified()
-            && patch.rank().value() != null
-            && patch.cde().specified()
-            && patch.cde().value() != null;
-    return ranked ? patch.cde().value().getTerm().getId() + "#" + patch.rank().value() : null;
-  }
-
-  private static PlannedRow failed(
-      TechnicalImportSheet.Row row, String location, List<ImportError> errors) {
+  private PlannedRow planned(
+      TechnicalImportSheet.Row row,
+      String location,
+      Target target,
+      RowPatch patch,
+      TechnicalRecordValues current,
+      TechnicalRecordValues merged) {
+    final boolean unchanged = current.equals(merged);
+    final boolean declared = target.record() != null;
+    final String action =
+        unchanged
+            ? TechnicalImportPlan.NO_CHANGE
+            : declared ? TechnicalImportPlan.UPDATE : TechnicalImportPlan.CREATE_RECORD;
     return new PlannedRow(
         row.rowNumber(),
         location,
-        TechnicalImportPlan.ERROR,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        errors,
+        action,
+        declared ? target.record().id() : null,
+        declared ? target.record().revision() : null,
+        patch,
+        target.column(),
+        List.of(),
         new ArrayList<>());
   }
 
-  static String nextMinor(String businessVersion) {
-    final String[] parts = businessVersion.split("\\.");
-    return parts[0] + "." + (Long.parseLong(parts[1]) + 1);
+  /** {@code code|message} of the first value error, or null. */
+  private String validationError(TechnicalRecordValues values) {
+    String failure = null;
+    try {
+      validator.validate(values);
+    } catch (WebApplicationException exception) {
+      failure = TechnicalDictionaryErrors.codeOf(exception) + "|" + exception.getMessage();
+    }
+    return failure;
+  }
+
+  private static Planned failed(
+      TechnicalImportSheet.Row row, String location, List<ImportError> errors) {
+    return new Planned(
+        new PlannedRow(
+            row.rowNumber(),
+            location,
+            TechnicalImportPlan.ERROR,
+            null,
+            null,
+            null,
+            null,
+            errors,
+            new ArrayList<>()),
+        TechnicalRecordValues.EMPTY);
   }
 
   private static ImportError error(
@@ -394,21 +310,100 @@ public final class TechnicalImportPlanner {
         normalize(row.value(COLUMN)));
   }
 
-  private static String locationOf(Map<String, Object> record) {
+  private static String locationOf(TechnicalRecord record) {
     return String.join(
         "|",
-        normalize(
-            TechnicalRowFields.extensionText(record, TechnicalDictionaryProfile.SOURCE_DATABASE)),
-        normalize(
-            TechnicalRowFields.extensionText(record, TechnicalDictionaryProfile.SOURCE_SCHEMA)),
-        normalize(
-            TechnicalRowFields.extensionText(record, TechnicalDictionaryProfile.SOURCE_TABLE)),
-        normalize(
-            TechnicalRowFields.extensionText(record, TechnicalDictionaryProfile.SOURCE_COLUMN)));
+        normalize(record.sourceDatabase()),
+        normalize(record.sourceSchema()),
+        normalize(record.sourceTable()),
+        normalize(record.sourceColumn()));
   }
 
-  static String normalize(String value) {
+  public static String normalize(String value) {
     return Normalizer.normalize(value == null ? "" : value.trim(), Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * A rank of a CDE may be held by one record only. The check is made on the state the file leaves
+   * behind, so two records can swap ranks in one import.
+   */
+  private static final class RankCheck {
+    private final List<Planned> planned;
+    private final TechnicalImportLookups lookups;
+    private final Map<String, Planned> byRecordId = new HashMap<>();
+
+    private RankCheck(List<Planned> planned, TechnicalImportLookups lookups) {
+      this.planned = planned;
+      this.lookups = lookups;
+      planned.stream()
+          .filter(item -> item.row().recordId() != null)
+          .forEach(item -> byRecordId.put(item.row().recordId(), item));
+    }
+
+    private List<PlannedRow> run() {
+      final Map<String, Integer> firstRowOfRank = new HashMap<>();
+      final List<PlannedRow> result = new ArrayList<>(planned.size());
+      for (Planned item : planned) {
+        result.add(check(item, firstRowOfRank));
+      }
+      return result;
+    }
+
+    private PlannedRow check(Planned item, Map<String, Integer> firstRowOfRank) {
+      final String key = rankKey(item.finalValues());
+      PlannedRow row = item.row();
+      if (key != null && !row.hasErrors()) {
+        final Integer earlier = firstRowOfRank.putIfAbsent(key, row.rowNumber());
+        final String conflict =
+            earlier == null ? holderConflict(item) : "dòng " + earlier + " của file";
+        row = conflict == null ? row : rankError(row, conflict);
+      }
+      return row;
+    }
+
+    private String holderConflict(Planned item) {
+      final TechnicalRecord holder =
+          item.row().mutates()
+              ? lookups.rankHolder(item.finalValues().cde().toString(), item.finalValues().rank())
+              : null;
+      final boolean holdsAfterImport =
+          holder != null
+              && !Objects.equals(holder.id(), item.row().recordId())
+              && keepsRank(holder, item.finalValues());
+      return holdsAfterImport ? "cột " + holder.columnFqn() : null;
+    }
+
+    /** True unless the file changes the holder so it no longer has that CDE and rank. */
+    private boolean keepsRank(TechnicalRecord holder, TechnicalRecordValues wanted) {
+      final Planned inFile = byRecordId.get(holder.id());
+      return inFile == null
+          || (Objects.equals(inFile.finalValues().cde(), wanted.cde())
+              && Objects.equals(inFile.finalValues().rank(), wanted.rank()));
+    }
+
+    private static String rankKey(TechnicalRecordValues values) {
+      return values.cde() == null || values.rank() == null
+          ? null
+          : values.cde() + "#" + values.rank();
+    }
+
+    private static PlannedRow rankError(PlannedRow row, String holder) {
+      return new PlannedRow(
+          row.rowNumber(),
+          row.location(),
+          TechnicalImportPlan.ERROR,
+          row.recordId(),
+          row.expectedRevision(),
+          null,
+          null,
+          List.of(
+              new ImportError(
+                  row.rowNumber(),
+                  RANK,
+                  TechnicalDictionaryErrors.RANK_DUPLICATE,
+                  "Thứ hạng đã được giữ bởi " + holder)),
+          row.warnings());
+    }
   }
 }

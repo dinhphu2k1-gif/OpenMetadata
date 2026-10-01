@@ -27,16 +27,12 @@ import { toTechnicalDictionaryRow } from '../pages/TechnicalDictionaryPage/Techn
 import { searchTechnicalRecords } from '../rest/technicalDictionaryAPI';
 
 const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
-  'statuses',
   'sourceServices',
-  'cdeMapping',
   'cdeTermIds',
-  'sourceStatuses',
   'elementType',
   'generationType',
   'creationMethod',
   'timeliness',
-  'systemOwnerIds',
 ];
 const PAGE_PARAM = 'page';
 const PAGE_SIZE_PARAM = 'pageSize';
@@ -81,13 +77,15 @@ const parsePositive = (value: string | null, fallback: number) => {
 };
 
 interface UseRecordsInput {
-  glossaryId?: string;
-  businessVersion?: string;
+  /** The dictionary is bound to an active Data Dictionary version. */
+  enabled: boolean;
+  /** Reloads the list when the bound version changes. */
+  dataDictionaryVersion?: string;
 }
 
 export const useTechnicalDictionaryRecords = ({
-  glossaryId,
-  businessVersion,
+  enabled,
+  dataDictionaryVersion,
 }: UseRecordsInput) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
@@ -175,7 +173,7 @@ export const useTechnicalDictionaryRecords = ({
   );
 
   useEffect(() => {
-    if (!glossaryId || !businessVersion) {
+    if (!enabled) {
       return undefined;
     }
     const current = ++generation.current;
@@ -184,15 +182,9 @@ export const useTechnicalDictionaryRecords = ({
     setFailed(false);
     searchTechnicalRecords(
       {
-        glossary: glossaryId,
-        parentBusinessVersion: businessVersion,
         q: filters.q,
-        statuses: filters.statuses,
         sourceServices: filters.sourceServices,
-        cdeMapping: filters.cdeMapping,
         cdeTermIds: filters.cdeTermIds,
-        systemOwnerIds: filters.systemOwnerIds,
-        sourceStatuses: filters.sourceStatuses,
         elementTypes: filters.elementType,
         generationTypes: filters.generationType,
         creationMethods: filters.creationMethod,
@@ -222,7 +214,7 @@ export const useTechnicalDictionaryRecords = ({
       });
 
     return () => controller.abort();
-  }, [glossaryId, businessVersion, filters, page, pageSize, reloadKey]);
+  }, [enabled, dataDictionaryVersion, filters, page, pageSize, reloadKey]);
 
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 

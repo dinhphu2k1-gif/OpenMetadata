@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 
-import Icon, { CloseOutlined, UndoOutlined } from '@ant-design/icons';
+import Icon, { CloseOutlined } from '@ant-design/icons';
 import { Button, Typography } from '@openmetadata/ui-core-components';
 import { FC, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,10 +29,8 @@ export interface GlossaryBulkActionBarProps {
   onSubmitForReview: (draftTerms: ModifiedGlossaryTerm[]) => void;
   onApprove: (inReviewTerms: ModifiedGlossaryTerm[]) => void;
   onReject: (inReviewTerms: ModifiedGlossaryTerm[]) => void;
-  onRevokeApproval?: (approvedTerms: ModifiedGlossaryTerm[]) => void;
   canSubmitForReview: boolean;
   canApproveOrReject: boolean;
-  canRevokeApproval?: boolean;
 }
 
 export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
@@ -41,10 +39,8 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
   onSubmitForReview,
   onApprove,
   onReject,
-  onRevokeApproval,
   canSubmitForReview,
   canApproveOrReject,
-  canRevokeApproval = canApproveOrReject,
 }) => {
   const { t } = useTranslation();
 
@@ -179,19 +175,6 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
                 })}
               </Button>
             </>
-          )}
-
-          {canRevokeApproval && approvedTerms.length > 0 && onRevokeApproval && (
-            <Button
-              className="btn-bulk-revoke"
-              color="secondary"
-              data-testid="bulk-revoke-btn"
-              iconLeading={<UndoOutlined />}
-              onPress={() => onRevokeApproval(approvedTerms)}>
-              {t('label.bulk-revoke-count', 'Hủy duyệt ({{count}})', {
-                count: approvedTerms.length,
-              })}
-            </Button>
           )}
         </div>
       </div>

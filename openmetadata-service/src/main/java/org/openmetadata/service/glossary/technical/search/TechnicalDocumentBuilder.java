@@ -5,195 +5,234 @@
 
 package org.openmetadata.service.glossary.technical.search;
 
+import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import jakarta.ws.rs.NotFoundException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.openmetadata.schema.entity.data.Glossary;
+import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.schema.type.Include;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.technical.TechnicalCdeInfo;
-import org.openmetadata.service.glossary.technical.TechnicalDictionaryProfile;
-import org.openmetadata.service.glossary.technical.TechnicalSourceStates;
-import org.openmetadata.service.glossary.technical.search.TechnicalDocumentAssembler.RecordState;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
+import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex.IndexAction;
-import org.openmetadata.service.glossary.versioning.GlossaryFlatListService;
-import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Scope;
-import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.ScopeType;
-import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
-import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
-import org.openmetadata.service.jdbi3.TechnicalRecordQueryDAO;
-import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO;
-import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO.RecordIdentity;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 
 /**
- * Reads the complete state of Technical Dictionary records from the database and turns it into
- * index operations: an upsert for a record that has a representation, a delete otherwise.
+ * Builds the flat search documents of Technical Dictionary records. A document is always rebuilt
+ * as a whole from the database, so writing it again is safe. The same flat shape is the row of the
+ * list API and the payload of a Data Dictionary snapshot.
  */
 public final class TechnicalDocumentBuilder {
-  private static final int MAX_CACHED_CDES = 1_000;
+  private static final int MAX_CACHED_REFERENCES = 2_000;
 
-  private final GlossaryVersioningService versions = new GlossaryVersioningService();
-  private final GlossaryFlatListService scopes = new GlossaryFlatListService();
+  private final Cache<String, TechnicalCdeInfo> cdes =
+      Caffeine.newBuilder().maximumSize(MAX_CACHED_REFERENCES).build();
+  private final Cache<String, Optional<String>> tagLabels =
+      Caffeine.newBuilder().maximumSize(MAX_CACHED_REFERENCES).build();
+  private final Cache<String, Optional<EntityReference>> teams =
+      Caffeine.newBuilder().maximumSize(MAX_CACHED_REFERENCES).build();
 
-  /** Operations for the given record ids; ids that are not Technical Dictionary records are deleted. */
-  public List<IndexAction> build(Collection<UUID> termIds) {
-    final Map<UUID, RecordIdentity> identities =
-        TechnicalCatalog.findGlossary()
-            .map(technical -> identities(technical, termIds))
-            .orElse(Map.of());
-    final List<IndexAction> actions = new ArrayList<>(buildIdentities(identities.values()));
-    termIds.stream()
-        .filter(termId -> !identities.containsKey(termId))
-        .distinct()
-        .forEach(termId -> actions.add(IndexAction.delete(termId.toString())));
-    return actions;
-  }
-
-  /** Row of the current view of one record, read from the database rather than the index. */
-  public Optional<Map<String, Object>> currentRow(UUID termId) {
-    return build(List.of(termId)).stream()
-        .filter(action -> !action.isDelete())
-        .findFirst()
-        .map(action -> TechnicalRowMapper.toRow(action.document(), TechnicalIndexFields.CURRENT));
-  }
-
-  /** Operations for identities already read from the database. */
-  public List<IndexAction> buildIdentities(Collection<RecordIdentity> identities) {
+  /** One upsert per existing record and one delete per id that no longer has a record. */
+  public List<IndexAction> build(Collection<String> recordIds) {
+    final Map<String, TechnicalRecord> found = new LinkedHashMap<>();
+    if (!recordIds.isEmpty()) {
+      dao().findByIds(List.copyOf(recordIds)).forEach(record -> found.put(record.id(), record));
+    }
     final List<IndexAction> actions = new ArrayList<>();
-    final UUID glossaryId =
-        identities.isEmpty() ? null : TechnicalCatalog.requireGlossary().getId();
-    identities.stream()
-        .filter(identity -> identity.parentBusinessVersion() != null)
-        .collect(Collectors.groupingBy(RecordIdentity::parentBusinessVersion))
-        .forEach((scope, members) -> actions.addAll(buildScope(glossaryId, scope, members)));
+    final String version = TechnicalDictionaryState.row().dataDictionaryVersion();
+    for (String id : recordIds) {
+      final TechnicalRecord record = found.get(id);
+      actions.add(
+          record == null ? IndexAction.delete(id) : new IndexAction(id, row(record, version)));
+    }
     return actions;
   }
 
-  private static Map<UUID, RecordIdentity> identities(
-      Glossary technical, Collection<UUID> termIds) {
-    final List<String> ids = termIds.stream().map(UUID::toString).distinct().toList();
-    return ids.isEmpty()
-        ? Map.of()
-        : Entity.getJdbi()
-            .onDemand(TechnicalSourceStateDAO.class)
-            .listRecordsByIds(TechnicalCatalog.recordHashPrefix(technical), ids)
-            .stream()
-            .collect(
-                Collectors.toMap(RecordIdentity::termId, identity -> identity, (left, right) -> left));
-  }
-
-  private List<IndexAction> buildScope(
-      UUID glossaryId, String scope, List<RecordIdentity> members) {
-    final ScopeRepresentations representations = load(glossaryId, scope, members);
-    final Map<String, String> sourceStates = TechnicalSourceStates.statusesOf(glossaryId, scope);
-    final Function<UUID, TechnicalCdeInfo> cdes = cdeLookup(scope);
-    return members.stream()
-        .map(identity -> action(glossaryId, identity, representations, sourceStates, cdes))
+  /** Upserts for records already read, used by the index rebuild. */
+  public List<IndexAction> upserts(List<TechnicalRecord> records) {
+    final String version = TechnicalDictionaryState.row().dataDictionaryVersion();
+    return records.stream()
+        .map(record -> new IndexAction(record.id(), row(record, version)))
         .toList();
   }
 
-  private static IndexAction action(
-      UUID glossaryId,
-      RecordIdentity identity,
-      ScopeRepresentations representations,
-      Map<String, String> sourceStates,
-      Function<UUID, TechnicalCdeInfo> cdes) {
-    final TechnicalRepresentation published = representations.published().get(identity.termId());
-    final TechnicalRepresentation current =
-        representations.working().getOrDefault(identity.termId(), published);
-    final String sourceStatus =
-        sourceStates.getOrDefault(identity.columnKey(), TechnicalDictionaryProfile.SOURCE_AVAILABLE);
-    return current == null
-        ? IndexAction.delete(identity.termId().toString())
-        : new IndexAction(
-            identity.termId().toString(),
-            TechnicalDocumentAssembler.assemble(
-                stateOf(glossaryId, identity, current, published, sourceStatus), cdes));
+  /** The flat row of one record in the given Data Dictionary version. */
+  public Map<String, Object> row(TechnicalRecord record, String dataDictionaryVersion) {
+    final Map<String, Object> row = new LinkedHashMap<>();
+    row.put(TechnicalIndexFields.TERM_ID, record.id());
+    row.put(TechnicalIndexFields.COLUMN_KEY, record.columnKey());
+    row.put(TechnicalIndexFields.COLUMN_FQN, record.columnFqn());
+    putLocation(row, record);
+    putSource(row, record);
+    row.put(TechnicalIndexFields.DATA_DICTIONARY_VERSION, dataDictionaryVersion);
+    row.put(TechnicalIndexFields.REVISION, record.revision());
+    putCde(row, record, dataDictionaryVersion);
+    putIfPresent(row, TechnicalIndexFields.RANK, record.rank());
+    putTag(row, TechnicalIndexFields.ELEMENT_TYPE, record.elementType());
+    putTag(row, TechnicalIndexFields.GENERATION_TYPE, record.generationType());
+    putTag(row, TechnicalIndexFields.CREATION_METHOD, record.creationMethod());
+    putTag(row, TechnicalIndexFields.TIMELINESS, record.timeliness());
+    putSystemOwner(row, record.systemOwnerId());
+    row.put(TechnicalIndexFields.CREATED_AT, record.createdAt());
+    row.put(TechnicalIndexFields.CREATED_BY, record.createdBy());
+    row.put(TechnicalIndexFields.UPDATED_AT, record.updatedAt());
+    row.put(TechnicalIndexFields.UPDATED_BY, record.updatedBy());
+    return row;
   }
 
-  private static RecordState stateOf(
-      UUID glossaryId,
-      RecordIdentity identity,
-      TechnicalRepresentation current,
-      TechnicalRepresentation published,
-      String sourceStatus) {
-    return new RecordState(
-        identity.termId(),
-        glossaryId,
-        identity.parentBusinessVersion(),
-        identity.columnKey(),
-        current,
-        published,
-        sourceStatus);
+  private static void putLocation(Map<String, Object> row, TechnicalRecord record) {
+    putIfPresent(row, TechnicalIndexFields.SERVICE, record.sourceService());
+    putIfPresent(row, TechnicalIndexFields.DATABASE, record.sourceDatabase());
+    putIfPresent(row, TechnicalIndexFields.SCHEMA, record.sourceSchema());
+    putIfPresent(row, TechnicalIndexFields.TABLE, record.sourceTable());
+    putIfPresent(row, TechnicalIndexFields.COLUMN, record.sourceColumn());
+    row.put(TechnicalIndexFields.TABLE_KEY, tableKey(record));
   }
 
-  private ScopeRepresentations load(UUID glossaryId, String scope, List<RecordIdentity> members) {
-    final List<UUID> termIds = members.stream().map(RecordIdentity::termId).toList();
-    final Scope catalog = catalogScope(glossaryId, scope);
-    return catalog != null && catalog.type() == ScopeType.ARCHIVED
-        ? new ScopeRepresentations(archived(catalog, termIds), Map.of())
-        : new ScopeRepresentations(published(termIds, scope), working(termIds, scope));
+  private static void putSource(Map<String, Object> row, TechnicalRecord record) {
+    putIfPresent(row, TechnicalIndexFields.DATA_TYPE, record.dataType());
+    putIfPresent(row, TechnicalIndexFields.DATA_LENGTH, record.dataLength());
+    putIfPresent(row, TechnicalIndexFields.PRECISION, record.dataPrecision());
+    putIfPresent(row, TechnicalIndexFields.SCALE, record.dataScale());
+    putIfPresent(row, TechnicalIndexFields.DESCRIPTION, record.description());
+    row.put(TechnicalIndexFields.SOURCE_STATUS, record.sourceStatus());
   }
 
-  private Scope catalogScope(UUID glossaryId, String scope) {
-    Scope catalog = null;
-    try {
-      catalog = scopes.resolveScope(glossaryId, scope);
-    } catch (NotFoundException | IllegalArgumentException exception) {
-      catalog = null;
+  private void putCde(Map<String, Object> row, TechnicalRecord record, String version) {
+    if (record.hasCde()) {
+      final TechnicalCdeInfo info = cde(record.cdeTermId(), version);
+      final Map<String, Object> cde = new LinkedHashMap<>();
+      cde.put(TechnicalIndexFields.ID, record.cdeTermId());
+      cde.put(TechnicalIndexFields.CODE, info.code());
+      cde.put(TechnicalIndexFields.NAME, info.name());
+      cde.put(TechnicalIndexFields.BUSINESS_VERSION, info.businessVersion());
+      putIfPresent(cde, TechnicalIndexFields.ASSIGNED_AT, record.cdeAssignedAt());
+      putIfPresent(cde, TechnicalIndexFields.ASSIGNED_BY, record.cdeAssignedBy());
+      row.put(TechnicalIndexFields.CDE, cde);
+      row.put(TechnicalIndexFields.DATA_OWNERS, owners(info));
     }
-    return catalog;
   }
 
-  private static Map<UUID, TechnicalRepresentation> archived(Scope catalog, List<UUID> termIds) {
-    return Entity.getJdbi()
-        .onDemand(TechnicalRecordQueryDAO.class)
-        .listManifestSnapshots(
-            catalog.published().snapshotId(), termIds.stream().map(UUID::toString).toList())
-        .stream()
-        .collect(
-            Collectors.toMap(
-                PublishedSnapshotRecord::entityId,
-                TechnicalRepresentation::archived,
-                (left, right) -> left));
+  private static List<Map<String, Object>> owners(TechnicalCdeInfo info) {
+    return info.owners().stream()
+        .map(
+            owner -> {
+              final Map<String, Object> value = new LinkedHashMap<>();
+              value.put(TechnicalIndexFields.ID, String.valueOf(owner.getId()));
+              value.put(TechnicalIndexFields.NAME, label(owner));
+              return value;
+            })
+        .toList();
   }
 
-  private Map<UUID, TechnicalRepresentation> published(List<UUID> termIds, String scope) {
-    final Map<UUID, TechnicalRepresentation> result = new LinkedHashMap<>();
-    versions
-        .getLatestPublishedBatch(GlossaryVersioningService.GLOSSARY_TERM, termIds, scope)
-        .forEach(
-            (termId, snapshot) -> {
-              if (snapshot.archivedAt() == null) {
-                result.put(termId, TechnicalRepresentation.published(snapshot));
-              }
-            });
-    return result;
+  private void putTag(Map<String, Object> row, String field, String tagFqn) {
+    if (!nullOrEmpty(tagFqn)) {
+      final Map<String, Object> tag = new LinkedHashMap<>();
+      tag.put(TechnicalIndexFields.FQN, tagFqn);
+      tag.put(TechnicalIndexFields.LABEL, tagLabel(tagFqn));
+      row.put(field, tag);
+    }
   }
 
-  private Map<UUID, TechnicalRepresentation> working(List<UUID> termIds, String scope) {
-    final Map<UUID, TechnicalRepresentation> result = new LinkedHashMap<>();
-    versions
-        .getWorkingBatch(GlossaryVersioningService.GLOSSARY_TERM, termIds, scope)
-        .forEach((termId, working) -> result.put(termId, TechnicalRepresentation.working(working)));
-    return result;
+  private void putSystemOwner(Map<String, Object> row, String teamId) {
+    if (teamId != null) {
+      final Map<String, Object> owner = new LinkedHashMap<>();
+      owner.put(TechnicalIndexFields.ID, teamId);
+      owner.put(
+          TechnicalIndexFields.NAME,
+          team(teamId).map(TechnicalDocumentBuilder::label).orElse(teamId));
+      row.put(TechnicalIndexFields.SYSTEM_OWNER, owner);
+    }
   }
 
-  private static Function<UUID, TechnicalCdeInfo> cdeLookup(String scope) {
-    final Cache<UUID, TechnicalCdeInfo> cache =
-        Caffeine.newBuilder().maximumSize(MAX_CACHED_CDES).build();
-    return cdeId -> cache.get(cdeId, id -> TechnicalCdeInfo.resolve(id, scope));
+  private TechnicalCdeInfo cde(String cdeId, String version) {
+    return cdes.get(
+        cdeId + "@" + version, key -> TechnicalCdeInfo.resolve(UUID.fromString(cdeId), version));
   }
 
-  private record ScopeRepresentations(
-      Map<UUID, TechnicalRepresentation> published, Map<UUID, TechnicalRepresentation> working) {}
+  private String tagLabel(String tagFqn) {
+    return tagLabels
+        .get(tagFqn, key -> lookupTag(tagFqn).map(TechnicalDocumentBuilder::label))
+        .orElse(lastSegment(tagFqn));
+  }
+
+  private Optional<EntityReference> team(String teamId) {
+    return teams.get(teamId, key -> lookupTeam(teamId));
+  }
+
+  private static Optional<EntityReference> lookupTag(String tagFqn) {
+    Optional<EntityReference> tag = Optional.empty();
+    try {
+      tag = Optional.of(Entity.getEntityReferenceByName(Entity.TAG, tagFqn, Include.NON_DELETED));
+    } catch (EntityNotFoundException exception) {
+      tag = Optional.empty();
+    }
+    return tag;
+  }
+
+  private static Optional<EntityReference> lookupTeam(String teamId) {
+    Optional<EntityReference> team = Optional.empty();
+    try {
+      team =
+          Optional.of(
+              Entity.getEntityReferenceById(
+                  Entity.TEAM, UUID.fromString(teamId), Include.NON_DELETED));
+    } catch (EntityNotFoundException exception) {
+      team = Optional.empty();
+    }
+    return team;
+  }
+
+  static String tableKey(TechnicalRecord record) {
+    return String.join(
+            ".",
+            nullToEmpty(record.sourceDatabase()),
+            nullToEmpty(record.sourceSchema()),
+            nullToEmpty(record.sourceTable()))
+        .toLowerCase(Locale.ROOT);
+  }
+
+  private static String label(EntityReference reference) {
+    return nullOrEmpty(reference.getDisplayName())
+        ? reference.getName()
+        : reference.getDisplayName();
+  }
+
+  private static String lastSegment(String fqn) {
+    return fqn.substring(fqn.lastIndexOf('.') + 1);
+  }
+
+  private static String nullToEmpty(String value) {
+    return value == null ? "" : value;
+  }
+
+  private static void putIfPresent(Map<String, Object> target, String key, Object value) {
+    if (value != null) {
+      target.put(key, value);
+    }
+  }
+
+  /** Ids of every record referencing one of the CDEs, read from the database. */
+  public static Set<String> recordIdsOfCdes(Collection<UUID> cdeIds) {
+    return cdeIds.isEmpty()
+        ? Set.of()
+        : Set.copyOf(
+            dao().listIdsByCde(cdeIds.stream().map(UUID::toString).collect(Collectors.toList())));
+  }
+
+  private static TechnicalDictionaryDAO dao() {
+    return Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
+  }
 }

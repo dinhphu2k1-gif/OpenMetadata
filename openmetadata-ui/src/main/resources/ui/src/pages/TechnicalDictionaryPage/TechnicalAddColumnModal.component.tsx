@@ -10,7 +10,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Button, Modal, Select, Tag } from 'antd';
 import { AxiosError } from 'axios';
 import { debounce } from 'lodash';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,8 +32,7 @@ const COLUMN_PAGE_SIZE = 20;
 
 interface TechnicalAddColumnModalProps {
   open: boolean;
-  glossaryId: string;
-  businessVersion: string;
+  dataDictionaryVersion: string;
   options: TechnicalDictionaryOptions;
   onClose: () => void;
   onDone: () => void;
@@ -43,11 +41,10 @@ interface TechnicalAddColumnModalProps {
 const errorCodeOf = (error: unknown): string | undefined =>
   (error as AxiosError<{ code?: string }>)?.response?.data?.code;
 
-/** Step 1 picks a physical Column, step 2 fills the initial values; Save declares it once. */
+/** One form: pick a physical Column, which fills its identity fields, then fill the values; Save declares it once. */
 const TechnicalAddColumnModal = ({
   open,
-  glossaryId,
-  businessVersion,
+  dataDictionaryVersion,
   options,
   onClose,
   onDone,
@@ -57,29 +54,18 @@ const TechnicalAddColumnModal = ({
   const [selected, setSelected] = useState<TechnicalColumnCandidate>();
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isFormStep, setIsFormStep] = useState(false);
 
-  const search = useCallback(
-    async (text: string) => {
-      setIsSearching(true);
-      try {
-        setCandidates(
-          await searchTechnicalColumns(
-            glossaryId,
-            businessVersion,
-            text,
-            COLUMN_PAGE_SIZE
-          )
-        );
-      } catch (error) {
-        setCandidates([]);
-        showErrorToast(error as AxiosError);
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [businessVersion, glossaryId]
-  );
+  const search = useCallback(async (text: string) => {
+    setIsSearching(true);
+    try {
+      setCandidates(await searchTechnicalColumns(text, COLUMN_PAGE_SIZE));
+    } catch (error) {
+      setCandidates([]);
+      showErrorToast(error as AxiosError);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
   const debouncedSearch = useMemo(
     () => debounce(search, TECHNICAL_SEARCH_DEBOUNCE_MS),
@@ -91,17 +77,23 @@ const TechnicalAddColumnModal = ({
   useEffect(() => {
     if (open) {
       setSelected(undefined);
-      setIsFormStep(false);
       search('');
     }
   }, [open, search]);
 
   const shownCandidates = useMemo(
     () =>
-      selected && !candidates.some((item) => item.columnKey === selected.columnKey)
+      selected &&
+      !candidates.some((item) => item.columnKey === selected.columnKey)
         ? [selected, ...candidates]
         : candidates,
     [candidates, selected]
+  );
+
+  // Memoized so the modal's form only resets when another Column is picked.
+  const row = useMemo(
+    () => (selected ? candidateToRow(selected) : undefined),
+    [selected]
   );
 
   const handleSave = async (values: TechnicalRecordFormValues) => {
@@ -110,7 +102,7 @@ const TechnicalAddColumnModal = ({
     }
     setIsSaving(true);
     try {
-      await declareTechnicalColumn(glossaryId, businessVersion, {
+      await declareTechnicalColumn({
         columnFqn: selected.columnFqn,
         cde: values.cde?.id,
         rank: values.rank ?? undefined,
@@ -126,7 +118,7 @@ const TechnicalAddColumnModal = ({
     } catch (error) {
       if (errorCodeOf(error) === TECHNICAL_COLUMN_ALREADY_DECLARED) {
         showErrorToast(t('message.technical-column-already-declared'));
-        setIsFormStep(false);
+        setSelected(undefined);
         search('');
       } else {
         showErrorToast(error as AxiosError);
@@ -136,67 +128,24 @@ const TechnicalAddColumnModal = ({
     }
   };
 
-  if (isFormStep && selected) {
-    return (
-      <TechnicalRecordModal
-        isSaving={isSaving}
-        mode="create"
-        open={open}
-        options={options}
-        row={candidateToRow(selected, businessVersion)}
-        onCancel={onClose}
-        onSave={handleSave}
-      />
-    );
-  }
-
   return (
-    <Modal
-      destroyOnClose
-      centered
-      cancelText={t('label.cancel')}
-      data-testid="technical-add-column-modal"
-      footer={
-        <>
-          <Button onClick={onClose}>{t('label.cancel')}</Button>
-          <Button
-            data-testid="technical-add-column-next"
-            disabled={!selected}
-            type="primary"
-            onClick={() => setIsFormStep(true)}>
-            {t('label.next')}
-          </Button>
-        </>
-      }
+    <TechnicalRecordModal
+      columnPicker={{
+        candidates: shownCandidates,
+        isSearching,
+        selectedKey: selected?.columnKey,
+        onSearch: debouncedSearch,
+        onSelect: setSelected,
+      }}
+      dataDictionaryVersion={dataDictionaryVersion}
+      isSaving={isSaving}
+      mode="create"
       open={open}
-      title={t('label.add-column')}
-      width={640}
-      onCancel={onClose}>
-      <p>{t('message.technical-add-column-description')}</p>
-      <Select
-        showSearch
-        className="w-full"
-        data-testid="technical-add-column-select"
-        filterOption={false}
-        loading={isSearching}
-        placeholder={t('label.select-column')}
-        value={selected?.columnKey}
-        onChange={(key: string) =>
-          setSelected(shownCandidates.find((item) => item.columnKey === key))
-        }
-        onSearch={debouncedSearch}>
-        {shownCandidates.map((item) => (
-          <Select.Option
-            disabled={item.declared}
-            key={item.columnKey}
-            style={item.declared ? { opacity: 0.5 } : undefined}
-            value={item.columnKey}>
-            <span>{item.columnFqn}</span>{' '}
-            {item.declared && <Tag>{t('label.declared')}</Tag>}
-          </Select.Option>
-        ))}
-      </Select>
-    </Modal>
+      options={options}
+      row={row}
+      onCancel={onClose}
+      onSave={handleSave}
+    />
   );
 };
 

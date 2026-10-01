@@ -14,6 +14,7 @@ import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotHistoryRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.util.FullyQualifiedName;
 
@@ -62,6 +63,22 @@ final class GlossaryVersionResponses {
       payload.put("archivedAt", record.archivedAt());
       payload.put("archivedBy", record.archivedBy());
     }
+    return payload;
+  }
+
+  static Map<String, Object> history(SnapshotHistoryRecord record) {
+    final Map<String, Object> payload = payload(record.payload());
+    projectCdeReleaseVersionType(payload, record.entityType(), record.businessVersion());
+    normalizeScopedTermFqn(payload, record.parentBusinessVersion());
+    payload.put("historyId", record.historyId());
+    payload.put("snapshotId", record.snapshotId());
+    payload.put("businessVersion", record.businessVersion());
+    putIfPresent(payload, "parentBusinessVersion", record.parentBusinessVersion());
+    payload.put("contentHash", record.contentHash());
+    payload.put("publishedAt", record.publishedAt());
+    payload.put("publishedBy", record.publishedBy());
+    payload.put("supersededAt", record.supersededAt());
+    payload.put("supersededBy", record.supersededBy());
     return payload;
   }
 

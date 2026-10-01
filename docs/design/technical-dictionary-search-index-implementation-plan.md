@@ -1,8 +1,12 @@
 # Plan triển khai — Từ điển kỹ thuật: bản ghi theo khai báo, đọc qua index riêng
 
-> Trạng thái tài liệu: **Chờ review**.
+> Trạng thái tài liệu: **Phase 1–5 đã code (chưa build/test); Phase 6 (tài liệu) đang cập nhật.** Cập nhật 2026-10-01. Chưa có phần nào được kiểm chứng trên MySQL/PostgreSQL/OpenSearch thật.
 >
-> Thiết kế đích: [Bản ghi theo khai báo, đọc qua index riêng](./technical-dictionary-search-index-design.md) (Đã chốt, TDX-01…TDX-12).
+> Thiết kế đích: [Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) (Đã chốt, gồm TDX-01…TDX-11).
+>
+> **Lưu ý:** Thiết kế Từ điển kỹ thuật hợp nhất (không phiên bản) bỏ catalog version,
+> workflow và bảng governed của TD. Các bước của plan này có đụng tới version, workflow, bulk hoặc hai
+> view `current`/`published` cần lập lại theo thiết kế mới trước khi triển khai.
 >
 > Ràng buộc: **không build, không chạy test** trong phiên làm việc; mọi bước kiểm chứng ở cuối do bạn chạy.
 

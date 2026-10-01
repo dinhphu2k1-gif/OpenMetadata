@@ -24,9 +24,9 @@ import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Scop
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.ScopeType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
+import org.openmetadata.service.jdbi3.GlossaryTermRepository;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
-import org.openmetadata.service.jdbi3.GlossaryTermRepository;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.Authorizer;
 import org.openmetadata.service.security.DefaultAuthorizer;
@@ -81,7 +81,8 @@ public final class GovernedScopeAuthorizer {
             DefaultAuthorizer.getSubjectContext(securityContext));
     final GlossaryAuthorizationResolver.Capabilities capabilities =
         capabilitiesFor(securityContext, authorizationGlossary);
-    if (!canRead(securityContext, scope.type(), authorizationGlossary, consumerOnly, capabilities)) {
+    if (!canRead(
+        securityContext, scope.type(), authorizationGlossary, consumerOnly, capabilities)) {
       throw new NotFoundException(profile.glossaryName() + " scope was not found");
     }
     return new ScopeAccess(
@@ -141,7 +142,8 @@ public final class GovernedScopeAuthorizer {
    * Catalog payload that authorizes creating a record in {@code parentBusinessVersion}: the working
    * catalog version or the active Approved one.
    */
-  public Glossary resolveCreateScope(UUID glossaryId, String parentBusinessVersion, Profile profile) {
+  public Glossary resolveCreateScope(
+      UUID glossaryId, String parentBusinessVersion, Profile profile) {
     final Glossary working = workingCatalog(glossaryId, parentBusinessVersion);
     return working != null ? working : activeCatalog(glossaryId, parentBusinessVersion, profile);
   }

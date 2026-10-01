@@ -69,15 +69,13 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
+import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
-import org.openmetadata.service.glossary.technical.TechnicalCatalog;
-import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
-import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
-import org.openmetadata.service.glossary.technical.search.TechnicalIndexUnavailableException;
+import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
@@ -85,6 +83,7 @@ import org.openmetadata.service.jdbi3.GlossaryRepository.GlossaryCsv;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.ListFilter;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.limits.Limits;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.resources.EntityResource;
@@ -163,7 +162,22 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
         preview.data(),
         new PublishPreviewPaging(preview.after()),
         preview.termCount(),
-        preview.evaluatedAt());
+        preview.evaluatedAt(),
+        technicalDictionaryImpact(id));
+  }
+
+  /** Records the Technical Dictionary will lose, or null when this is not the Data Dictionary. */
+  private static TechnicalDictionaryImpact technicalDictionaryImpact(UUID glossaryId) {
+    TechnicalDictionaryImpact impact = null;
+    try {
+      if (TechnicalDictionaryState.dataDictionary().getId().equals(glossaryId)) {
+        final TechnicalDictionaryDAO dao = Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
+        impact = new TechnicalDictionaryImpact(dao.countRecords(), dao.countMappedRecords());
+      }
+    } catch (EntityNotFoundException exception) {
+      impact = null;
+    }
+    return impact;
   }
 
   @POST
@@ -415,50 +429,6 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     return terms;
   }
 
-  @POST
-  @Path("/{id}/published/latest/archive")
-  @Operation(
-      operationId = "archiveLatestPublishedGlossary",
-      summary = "Archive the latest published glossary snapshot")
-  public Map<String, Object> archiveLatestPublished(
-      @Context UriInfo uriInfo,
-      @Context SecurityContext securityContext,
-      @PathParam("id") UUID id) {
-    Glossary glossary =
-        getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    GlossaryAuthorizationResolver.Capabilities capabilities =
-        capabilities(securityContext, glossary);
-    if (!capabilities.canArchive()) {
-      throw new ForbiddenException("Not authorized to archive the published version");
-    }
-    return GlossaryVersionResponses.working(
-        versioningService.revokeLatestToRejectedWorking(
-            GlossaryVersioningService.GLOSSARY, id, securityContext.getUserPrincipal().getName()));
-  }
-
-  @POST
-  @Path("/{id}/technical-index/rebuild")
-  @Operation(
-      operationId = "rebuildTechnicalDictionaryIndex",
-      summary = "Rebuild the Technical Dictionary search index from the database",
-      description =
-          "Admin only. Fills a new physical index from the declared records and then moves the "
-              + "alias, so readers keep using the previous index while it runs.")
-  public Map<String, Object> rebuildTechnicalIndex(
-      @Context SecurityContext securityContext, @PathParam("id") UUID id) {
-    authorizer.authorizeAdmin(securityContext);
-    if (!TechnicalCatalog.isTechnicalGlossary(id)) {
-      throw new NotFoundException("Technical Dictionary glossary was not found");
-    }
-    Map<String, Object> result;
-    try {
-      result = TechnicalIndexRebuilder.rebuild();
-    } catch (TechnicalIndexUnavailableException exception) {
-      throw TechnicalDictionaryErrors.indexUnavailable(exception.getMessage());
-    }
-    return result;
-  }
-
   @GET
   @Path("/{id}/permissions")
   @Operation(
@@ -561,7 +531,11 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       List<GlossaryVersioningService.TermRevision> data,
       PublishPreviewPaging paging,
       int termCount,
-      long evaluatedAt) {}
+      long evaluatedAt,
+      TechnicalDictionaryImpact technicalDictionary) {}
+
+  /** What approving this Data Dictionary version does to the Technical Dictionary. */
+  public record TechnicalDictionaryImpact(long declaredColumns, long mappedColumns) {}
 
   public record PublishPreviewPaging(String after) {}
 

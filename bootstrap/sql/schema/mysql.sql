@@ -1199,6 +1199,27 @@ CREATE TABLE IF NOT EXISTS `glossary_business_snapshot` (
   KEY `idx_glossary_snapshot_scope` (`glossaryId`,`parentBusinessVersion`,`publishedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `glossary_business_snapshot_history` (
+  `historyId` varchar(36) NOT NULL,
+  `snapshotId` varchar(36) NOT NULL,
+  `entityType` varchar(32) NOT NULL,
+  `entityId` varchar(36) NOT NULL,
+  `glossaryId` varchar(36) DEFAULT NULL,
+  `parentBusinessVersion` varchar(64) DEFAULT NULL,
+  `businessVersion` varchar(64) NOT NULL,
+  `nativeVersion` double DEFAULT NULL,
+  `publicationSequence` bigint unsigned NOT NULL,
+  `payload` json NOT NULL,
+  `contentHash` varchar(64) NOT NULL,
+  `publishedAt` bigint unsigned NOT NULL,
+  `publishedBy` varchar(256) NOT NULL,
+  `supersededAt` bigint unsigned NOT NULL,
+  `supersededBy` varchar(256) NOT NULL,
+  PRIMARY KEY (`historyId`),
+  KEY `idx_glossary_snapshot_history_version` (`entityType`, `entityId`, `businessVersion`, `supersededAt`),
+  KEY `idx_glossary_snapshot_history_snapshot` (`snapshotId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS `glossary_published_head` (
   `entityType` varchar(32) NOT NULL, `entityId` varchar(36) NOT NULL,
   `parentBusinessVersion` varchar(64) DEFAULT NULL,
@@ -1224,15 +1245,86 @@ CREATE TABLE IF NOT EXISTS `glossary_snapshot_outbox` (
   KEY `idx_glossary_outbox_pending` (`processedAt`,`createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `technical_source_state` (
-  `technicalGlossaryId` varchar(36) NOT NULL, `parentBusinessVersion` varchar(64) NOT NULL,
-  `columnKey` varchar(36) NOT NULL, `status` varchar(32) NOT NULL, `columnFqn` text NOT NULL,
-  `detectedAt` bigint unsigned NOT NULL,
-  PRIMARY KEY (`technicalGlossaryId`,`parentBusinessVersion`,`columnKey`)
+CREATE TABLE IF NOT EXISTS `technical_dictionary_state` (
+  `id` int NOT NULL,
+  `dataDictionaryVersion` varchar(16) DEFAULT NULL,
+  `previousDataDictionaryVersion` varchar(16) DEFAULT NULL,
+  `resetAt` bigint unsigned DEFAULT NULL,
+  `resetBy` varchar(256) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+INSERT IGNORE INTO `technical_dictionary_state` (`id`) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS `technical_record` (
+  `id` varchar(36) NOT NULL,
+  `columnKey` varchar(36) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `sourceService` varchar(256) DEFAULT NULL,
+  `sourceDatabase` varchar(256) DEFAULT NULL,
+  `sourceSchema` varchar(256) DEFAULT NULL,
+  `sourceTable` varchar(256) DEFAULT NULL,
+  `sourceColumn` varchar(256) DEFAULT NULL,
+  `dataType` varchar(512) DEFAULT NULL,
+  `dataLength` int DEFAULT NULL,
+  `dataPrecision` int DEFAULT NULL,
+  `dataScale` int DEFAULT NULL,
+  `description` mediumtext,
+  `sourceStatus` varchar(16) NOT NULL,
+  `cdeTermId` varchar(36) DEFAULT NULL,
+  `cdeAssignedAt` bigint unsigned DEFAULT NULL,
+  `cdeAssignedBy` varchar(256) DEFAULT NULL,
+  `survivorshipRank` smallint DEFAULT NULL,
+  `elementType` varchar(256) DEFAULT NULL,
+  `generationType` varchar(256) DEFAULT NULL,
+  `creationMethod` varchar(256) DEFAULT NULL,
+  `timeliness` varchar(256) DEFAULT NULL,
+  `systemOwnerId` varchar(36) DEFAULT NULL,
+  `revision` bigint unsigned NOT NULL,
+  `createdAt` bigint unsigned NOT NULL,
+  `createdBy` varchar(256) NOT NULL,
+  `updatedAt` bigint unsigned NOT NULL,
+  `updatedBy` varchar(256) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_technical_record_column` (`columnKey`),
+  KEY `idx_technical_record_cde_rank` (`cdeTermId`, `survivorshipRank`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS `technical_index_outbox` (
-  `termId` varchar(36) NOT NULL, `enqueuedAt` bigint unsigned NOT NULL,
-  `attempts` int unsigned NOT NULL DEFAULT 0, `lastError` text,
-  PRIMARY KEY (`termId`), KEY `idx_technical_index_outbox_enqueued` (`enqueuedAt`)
+CREATE TABLE IF NOT EXISTS `technical_record_audit` (
+  `id` varchar(36) NOT NULL,
+  `recordId` varchar(36) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `dataDictionaryVersion` varchar(16) DEFAULT NULL,
+  `action` varchar(16) NOT NULL,
+  `changes` mediumtext,
+  `actor` varchar(256) NOT NULL,
+  `changedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_technical_audit_record` (`recordId`, `changedAt`),
+  KEY `idx_technical_audit_reset` (`action`, `dataDictionaryVersion`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `technical_binding_snapshot` (
+  `dataDictionaryVersion` varchar(16) NOT NULL,
+  `recordId` varchar(36) NOT NULL,
+  `columnKey` varchar(36) NOT NULL,
+  `cdeTermId` varchar(36) NOT NULL,
+  `cdeCode` varchar(256) DEFAULT NULL,
+  `cdeName` varchar(512) DEFAULT NULL,
+  `survivorshipRank` smallint DEFAULT NULL,
+  `columnFqn` text NOT NULL,
+  `payload` mediumtext NOT NULL,
+  `frozenAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`dataDictionaryVersion`, `recordId`),
+  KEY `idx_technical_snapshot_cde` (`cdeTermId`, `dataDictionaryVersion`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `technical_outbox` (
+  `kind` varchar(16) NOT NULL,
+  `subjectKey` varchar(64) NOT NULL,
+  `payload` mediumtext,
+  `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `lastError` text,
+  PRIMARY KEY (`kind`, `subjectKey`),
+  KEY `idx_technical_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -9,8 +9,8 @@ import java.util.UUID;
 
 /**
  * Body of `POST /v1/glossaryTerms/technical/records`: the Column to declare and its initial
- * editable values. Every value except {@code columnFqn} is optional (TDX-02); tag values are
- * classification tag FQNs.
+ * editable values. Every value except {@code columnFqn} is optional; tag values are classification
+ * tag FQNs.
  */
 public record TechnicalRecordDeclaration(
     String columnFqn,
@@ -20,4 +20,10 @@ public record TechnicalRecordDeclaration(
     String generationType,
     String creationMethod,
     String timeliness,
-    UUID systemOwnerId) {}
+    UUID systemOwnerId) {
+
+  public TechnicalRecordValues values() {
+    return new TechnicalRecordValues(
+        cde, rank, elementType, generationType, creationMethod, timeliness, systemOwnerId);
+  }
+}

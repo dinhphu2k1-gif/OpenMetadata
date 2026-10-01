@@ -38,55 +38,39 @@ jest.mock('../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
   showSuccessToast: jest.fn(),
 }));
-jest.mock('antd', () => {
-  const actual = jest.requireActual('antd');
-  const Select = ({
-    children,
-    onChange,
-    value,
-  }: {
-    children: React.ReactNode;
-    onChange: (value: string) => void;
-    value?: string;
-  }) => (
-    <select
-      data-testid="technical-add-column-select"
-      value={value ?? ''}
-      onChange={(event) => onChange(event.target.value)}>
-      <option value="" />
-      {children}
-    </select>
-  );
-  Select.Option = ({
-    disabled,
-    value,
-  }: {
-    disabled?: boolean;
-    value: string;
-  }) => (
-    <option disabled={disabled} value={value}>
-      {value}
-    </option>
-  );
-
-  return { ...actual, Select };
-});
 jest.mock('./TechnicalRecordModal.component', () => ({
   __esModule: true,
   default: ({
     mode,
     row,
+    columnPicker,
     onSave,
   }: {
     mode: string;
-    row: { columnFqn: string; termId: string };
+    row?: { columnFqn: string };
+    columnPicker?: {
+      candidates: Array<{ columnKey: string; declared: boolean }>;
+      onSelect: (candidate?: unknown) => void;
+    };
     onSave: (values: unknown) => void;
   }) => (
     <div data-testid={`record-modal-${mode}`}>
-      <span>{row.columnFqn}</span>
+      <span data-testid="picked-column">{row?.columnFqn ?? ''}</span>
+      {columnPicker?.candidates.map((candidate) => (
+        <button
+          disabled={candidate.declared}
+          key={candidate.columnKey}
+          onClick={() => columnPicker.onSelect(candidate)}>
+          {candidate.columnKey}
+        </button>
+      ))}
       <button
         onClick={() =>
-          onSave({ cde: { id: 'cde-1' }, rank: 1, timeliness: 'DataTimeliness.T0' })
+          onSave({
+            cde: { id: 'cde-1' },
+            rank: 1,
+            timeliness: 'DataTimeliness.T0',
+          })
         }>
         save
       </button>
@@ -98,8 +82,7 @@ const renderModal = (onDone = jest.fn(), onClose = jest.fn()) =>
   render(
     <TechnicalAddColumnModal
       open
-      businessVersion="2"
-      glossaryId="glossary-1"
+      dataDictionaryVersion="2"
       options={{} as never}
       onClose={onClose}
       onDone={onDone}
@@ -112,37 +95,40 @@ describe('TechnicalAddColumnModal', () => {
     (searchTechnicalColumns as jest.Mock).mockResolvedValue([DECLARED, FREE]);
   });
 
-  it('lists Columns of the version and disables the ones already declared', async () => {
+  it('offers the physical Columns and disables the ones already declared', async () => {
     renderModal();
 
-    const declared = await screen.findByRole('option', { name: DECLARED.columnKey });
+    const declared = await screen.findByRole('button', {
+      name: DECLARED.columnKey,
+    });
 
     expect(declared).toBeDisabled();
-    expect(screen.getByRole('option', { name: FREE.columnKey })).toBeEnabled();
-    expect(searchTechnicalColumns).toHaveBeenCalledWith(
-      'glossary-1',
-      '2',
-      '',
-      20
-    );
+    expect(screen.getByRole('button', { name: FREE.columnKey })).toBeEnabled();
+    expect(searchTechnicalColumns).toHaveBeenCalledWith('', 20);
   });
 
-  it('declares the selected Column once with the values of the form', async () => {
+  it('fills the form from the picked Column and declares it once with the form values', async () => {
     const onDone = jest.fn();
     const onClose = jest.fn();
     renderModal(onDone, onClose);
 
-    await screen.findByRole('option', { name: FREE.columnKey });
-    fireEvent.change(screen.getByTestId('technical-add-column-select'), {
-      target: { value: FREE.columnKey },
-    });
-    fireEvent.click(screen.getByTestId('technical-add-column-next'));
-    fireEvent.click(await screen.findByText('save'));
+    expect(screen.getByTestId('picked-column')).toHaveTextContent('');
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: FREE.columnKey })
+    );
+
+    expect(screen.getByTestId('picked-column')).toHaveTextContent(
+      FREE.columnFqn
+    );
+
+    fireEvent.click(screen.getByText('save'));
 
     await waitFor(() =>
       expect(declareTechnicalColumn).toHaveBeenCalledTimes(1)
     );
-    expect(declareTechnicalColumn).toHaveBeenCalledWith('glossary-1', '2', {
+
+    expect(declareTechnicalColumn).toHaveBeenCalledWith({
       columnFqn: FREE.columnFqn,
       cde: 'cde-1',
       rank: 1,
@@ -152,30 +138,45 @@ describe('TechnicalAddColumnModal', () => {
       timeliness: 'DataTimeliness.T0',
       systemOwnerId: undefined,
     });
+
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('explains a 409 TD_COLUMN_ALREADY_DECLARED and returns to the picker', async () => {
+  it('explains a 409 TD_COLUMN_ALREADY_DECLARED and clears the picked Column', async () => {
     (declareTechnicalColumn as jest.Mock).mockRejectedValue({
       response: { status: 409, data: { code: 'TD_COLUMN_ALREADY_DECLARED' } },
     });
     const onDone = jest.fn();
     renderModal(onDone);
 
-    await screen.findByRole('option', { name: FREE.columnKey });
-    fireEvent.change(screen.getByTestId('technical-add-column-select'), {
-      target: { value: FREE.columnKey },
-    });
-    fireEvent.click(screen.getByTestId('technical-add-column-next'));
-    fireEvent.click(await screen.findByText('save'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: FREE.columnKey })
+    );
+    fireEvent.click(screen.getByText('save'));
 
     await waitFor(() =>
       expect(showErrorToast).toHaveBeenCalledWith(
         'message.technical-column-already-declared'
       )
     );
+
     expect(onDone).not.toHaveBeenCalled();
-    expect(await screen.findByTestId('technical-add-column-select')).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('picked-column')).toHaveTextContent('')
+    );
+
+    expect(searchTechnicalColumns).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not declare anything before a Column is picked', async () => {
+    renderModal();
+
+    await screen.findByRole('button', { name: FREE.columnKey });
+    fireEvent.click(screen.getByText('save'));
+
+    expect(declareTechnicalColumn).not.toHaveBeenCalled();
   });
 });

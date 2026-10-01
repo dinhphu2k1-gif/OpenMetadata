@@ -7,22 +7,21 @@ package org.openmetadata.service.glossary.technical;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import jakarta.ws.rs.WebApplicationException;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import org.openmetadata.schema.EntityInterface;
 import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.Include;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.type.TermRelation;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.ListFilter;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 
 /**
  * Database-backed reference resolution for one import run. Tags, Teams and CDEs are loaded once
@@ -38,7 +37,6 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
   private Map<String, List<EntityReference>> tags;
   private Map<String, List<EntityReference>> teams;
   private Map<String, PublishedSnapshotRecord> cdes;
-  private WebApplicationException cdeFailure;
   private final Cache<String, List<TechnicalColumnSource>> tableColumns =
       Caffeine.newBuilder().maximumSize(MAX_CACHED_TABLES).build();
 
@@ -47,7 +45,7 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
   }
 
   @Override
-  public TagLabel tag(String classification, String displayName) {
+  public String tag(String classification, String displayName) {
     if (tags == null) {
       tags = load(Entity.TAG);
     }
@@ -55,35 +53,29 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
         tags.getOrDefault(normalize(displayName), List.of()).stream()
             .filter(reference -> reference.getFullyQualifiedName().startsWith(classification + "."))
             .toList();
-    final EntityReference tag = unique(matches, classification, displayName);
-    return new TagLabel()
-        .withTagFQN(tag.getFullyQualifiedName())
-        .withName(tag.getName())
-        .withDisplayName(tag.getDisplayName())
-        .withSource(TagLabel.TagSource.CLASSIFICATION)
-        .withLabelType(TagLabel.LabelType.MANUAL)
-        .withState(TagLabel.State.CONFIRMED);
+    return unique(matches, classification, displayName).getFullyQualifiedName();
   }
 
   @Override
-  public EntityReference team(String displayName) {
+  public UUID team(String displayName) {
     if (teams == null) {
       teams = load(Entity.TEAM);
     }
-    return unique(teams.getOrDefault(normalize(displayName), List.of()), Entity.TEAM, displayName);
+    return unique(teams.getOrDefault(normalize(displayName), List.of()), Entity.TEAM, displayName)
+        .getId();
   }
 
   @Override
-  public TermRelation cde(String code) {
+  public TechnicalCdeInfo cde(String code) {
     final PublishedSnapshotRecord snapshot = loadCdes().get(code.toLowerCase(Locale.ROOT));
     if (snapshot == null) {
       throw new LookupException(
-          TechnicalDictionaryErrors.CDE_SCOPE_MISMATCH,
+          TechnicalDictionaryErrors.CDE_SCOPE_NOT_ACTIVE,
           String.format(
               "CDE '%s' không phải CDE đã phê duyệt của Từ điển dữ liệu dùng chung phiên bản %s",
               code, scope));
     }
-    return TechnicalCdeReferenceResolver.relationTo(snapshot, scope);
+    return TechnicalCdeInfo.of(snapshot);
   }
 
   @Override
@@ -96,19 +88,21 @@ public final class TechnicalImportLookupsImpl implements TechnicalImportLookups 
                 .toList());
   }
 
+  @Override
+  public TechnicalRecord rankHolder(String cdeId, int rank) {
+    final String holderFqn = dao().findRankHolder(cdeId, rank, "");
+    return holderFqn == null ? null : dao().findByColumnFqn(holderFqn);
+  }
+
   private Map<String, PublishedSnapshotRecord> loadCdes() {
-    if (cdes == null && cdeFailure == null) {
-      try {
-        cdes = cdeResolver.activeCdesByCode(scope);
-      } catch (WebApplicationException exception) {
-        cdeFailure = exception;
-      }
-    }
-    if (cdeFailure != null) {
-      throw new LookupException(
-          TechnicalDictionaryErrors.codeOf(cdeFailure), cdeFailure.getMessage());
+    if (cdes == null) {
+      cdes = cdeResolver.activeCdesByCode(scope);
     }
     return cdes;
+  }
+
+  private static TechnicalDictionaryDAO dao() {
+    return Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
   }
 
   private static Map<String, List<EntityReference>> load(String type) {

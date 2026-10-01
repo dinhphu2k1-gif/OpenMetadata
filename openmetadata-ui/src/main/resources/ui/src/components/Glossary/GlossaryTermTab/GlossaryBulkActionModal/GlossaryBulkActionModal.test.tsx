@@ -190,36 +190,4 @@ describe('GlossaryBulkActionModal', () => {
       expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
-
-  it('should patch terms with Draft status when revoking approval', async () => {
-    render(
-      <GlossaryBulkActionModal
-        open
-        actionType="revoke"
-        terms={mockTerms}
-        onCancel={mockOnCancel}
-        onSuccess={mockOnSuccess}
-      />
-    );
-
-    expect(
-      screen.getByText('Xác nhận hủy duyệt hàng loạt')
-    ).toBeInTheDocument();
-
-    const confirmBtn = screen.getByText('Hủy duyệt');
-    await act(async () => {
-      fireEvent.click(confirmBtn);
-    });
-
-    await waitFor(() => {
-      expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
-        'term-1',
-        'revoke',
-        {
-          expectedRevision: 1.1,
-        }
-      );
-      expect(mockOnSuccess).toHaveBeenCalled();
-    });
-  });
 });

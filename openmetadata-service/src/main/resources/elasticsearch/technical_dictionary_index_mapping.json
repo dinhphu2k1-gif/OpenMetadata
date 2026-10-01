@@ -10,21 +10,28 @@
           "type": "ngram",
           "min_gram": 3,
           "max_gram": 10,
-          "token_chars": ["letter", "digit"]
+          "token_chars": [
+            "letter",
+            "digit"
+          ]
         }
       },
       "normalizer": {
         "lowercase_normalizer": {
           "type": "custom",
           "char_filter": [],
-          "filter": ["lowercase"]
+          "filter": [
+            "lowercase"
+          ]
         }
       },
       "analyzer": {
         "om_ngram": {
           "type": "custom",
           "tokenizer": "n_gram_tokenizer",
-          "filter": ["lowercase"]
+          "filter": [
+            "lowercase"
+          ]
         }
       }
     }
@@ -32,141 +39,204 @@
   "mappings": {
     "dynamic": false,
     "properties": {
-      "termId": { "type": "keyword" },
-      "glossaryId": { "type": "keyword" },
-      "parentBusinessVersion": { "type": "keyword" },
-      "columnKey": { "type": "keyword" },
+      "termId": {
+        "type": "keyword"
+      },
+      "columnKey": {
+        "type": "keyword"
+      },
       "columnFqn": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
+        }
       },
       "service": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
+        }
       },
       "database": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
+        }
       },
       "schema": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
+        }
       },
       "table": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
+        }
       },
       "column": {
         "type": "keyword",
         "normalizer": "lowercase_normalizer",
-        "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
-      },
-      "tableKey": { "type": "keyword", "normalizer": "lowercase_normalizer" },
-      "dataType": { "type": "keyword" },
-      "description": { "type": "text" },
-      "sourceStatus": { "type": "keyword" },
-      "hasPublished": { "type": "boolean" },
-      "current": {
-        "properties": {
-          "recordType": { "type": "keyword" },
-          "entityStatus": { "type": "keyword" },
-          "businessVersion": { "type": "keyword" },
-          "releaseVersionType": { "type": "keyword" },
-          "workingRevision": { "type": "long" },
-          "cde": {
-            "properties": {
-              "id": { "type": "keyword" },
-              "code": {
-                "type": "keyword",
-                "normalizer": "lowercase_normalizer",
-                "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
-              },
-              "name": {
-                "type": "keyword",
-                "normalizer": "lowercase_normalizer",
-                "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
-              },
-              "businessVersion": { "type": "keyword" }
-            }
-          },
-          "dataOwners": {
-            "properties": {
-              "id": { "type": "keyword" },
-              "name": { "type": "keyword" }
-            }
-          },
-          "rank": { "type": "integer" },
-          "elementType": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "generationType": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "creationMethod": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "timeliness": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "systemOwner": {
-            "properties": { "id": { "type": "keyword" }, "name": { "type": "keyword" } }
-          },
-          "updatedAt": { "type": "date", "format": "epoch_millis" },
-          "updatedBy": { "type": "keyword" }
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "om_ngram"
+          }
         }
       },
-      "published": {
+      "tableKey": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+      "dataType": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text"
+      },
+      "sourceStatus": {
+        "type": "keyword"
+      },
+      "dataDictionaryVersion": {
+        "type": "keyword"
+      },
+      "revision": {
+        "type": "long"
+      },
+      "cde": {
         "properties": {
-          "recordType": { "type": "keyword" },
-          "entityStatus": { "type": "keyword" },
-          "businessVersion": { "type": "keyword" },
-          "releaseVersionType": { "type": "keyword" },
-          "cde": {
-            "properties": {
-              "id": { "type": "keyword" },
-              "code": {
-                "type": "keyword",
-                "normalizer": "lowercase_normalizer",
-                "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
-              },
-              "name": {
-                "type": "keyword",
-                "normalizer": "lowercase_normalizer",
-                "fields": { "ngram": { "type": "text", "analyzer": "om_ngram" } }
-              },
-              "businessVersion": { "type": "keyword" }
+          "id": {
+            "type": "keyword"
+          },
+          "code": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer",
+            "fields": {
+              "ngram": {
+                "type": "text",
+                "analyzer": "om_ngram"
+              }
             }
           },
-          "dataOwners": {
-            "properties": {
-              "id": { "type": "keyword" },
-              "name": { "type": "keyword" }
+          "name": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer",
+            "fields": {
+              "ngram": {
+                "type": "text",
+                "analyzer": "om_ngram"
+              }
             }
           },
-          "rank": { "type": "integer" },
-          "elementType": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
+          "businessVersion": {
+            "type": "keyword"
           },
-          "generationType": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
+          "assignedAt": {
+            "type": "date",
+            "format": "epoch_millis"
           },
-          "creationMethod": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "timeliness": {
-            "properties": { "fqn": { "type": "keyword" }, "label": { "type": "keyword" } }
-          },
-          "systemOwner": {
-            "properties": { "id": { "type": "keyword" }, "name": { "type": "keyword" } }
-          },
-          "updatedAt": { "type": "date", "format": "epoch_millis" },
-          "updatedBy": { "type": "keyword" }
+          "assignedBy": {
+            "type": "keyword"
+          }
         }
+      },
+      "dataOwners": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          }
+        }
+      },
+      "rank": {
+        "type": "integer"
+      },
+      "elementType": {
+        "properties": {
+          "fqn": {
+            "type": "keyword"
+          },
+          "label": {
+            "type": "keyword"
+          }
+        }
+      },
+      "generationType": {
+        "properties": {
+          "fqn": {
+            "type": "keyword"
+          },
+          "label": {
+            "type": "keyword"
+          }
+        }
+      },
+      "creationMethod": {
+        "properties": {
+          "fqn": {
+            "type": "keyword"
+          },
+          "label": {
+            "type": "keyword"
+          }
+        }
+      },
+      "timeliness": {
+        "properties": {
+          "fqn": {
+            "type": "keyword"
+          },
+          "label": {
+            "type": "keyword"
+          }
+        }
+      },
+      "systemOwner": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          }
+        }
+      },
+      "createdAt": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "createdBy": {
+        "type": "keyword"
+      },
+      "updatedAt": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "updatedBy": {
+        "type": "keyword"
       }
     }
   }

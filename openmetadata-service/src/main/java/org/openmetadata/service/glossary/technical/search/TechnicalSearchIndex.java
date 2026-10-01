@@ -133,7 +133,9 @@ public final class TechnicalSearchIndex {
     requireSuccess(
         execute(POST, "/_aliases", JsonUtils.pojoToJson(Map.of("actions", actions))),
         "switch alias to " + physicalIndex);
-    previous.stream().filter(index -> !index.equals(physicalIndex)).forEach(TechnicalSearchIndex::deleteIndex);
+    previous.stream()
+        .filter(index -> !index.equals(physicalIndex))
+        .forEach(TechnicalSearchIndex::deleteIndex);
   }
 
   private static List<String> aliasedIndices() {
@@ -151,7 +153,8 @@ public final class TechnicalSearchIndex {
 
   /** Writes through the alias; returns the term ids whose operation failed. */
   public static List<String> bulk(Collection<IndexAction> actions, boolean waitForRefresh) {
-    final String parameters = waitForRefresh ? REQUIRE_ALIAS + "&" + WAIT_FOR_REFRESH : REQUIRE_ALIAS;
+    final String parameters =
+        waitForRefresh ? REQUIRE_ALIAS + "&" + WAIT_FOR_REFRESH : REQUIRE_ALIAS;
     return bulk(alias(), actions, parameters);
   }
 
@@ -222,7 +225,8 @@ public final class TechnicalSearchIndex {
       }
       content = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
     } catch (IOException exception) {
-      throw new IllegalStateException("Unable to read index mapping " + MAPPING_RESOURCE, exception);
+      throw new IllegalStateException(
+          "Unable to read index mapping " + MAPPING_RESOURCE, exception);
     }
     return content;
   }

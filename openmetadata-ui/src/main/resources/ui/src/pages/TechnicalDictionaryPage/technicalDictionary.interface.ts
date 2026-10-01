@@ -11,25 +11,17 @@
  *  limitations under the License.
  */
 import {
-  EntityReference,
-  TagLabel,
-  TermRelation,
-} from '../../generated/entity/data/glossaryTerm';
-import {
-  TechnicalRecordType,
+  TechnicalCapabilities,
+  TechnicalNamedReference,
   TechnicalSourceStatus,
+  TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
 
-/** One Technical Dictionary record representation, shaped for the table and modal. */
+/** One declared Column, shaped for the table and modal. */
 export interface TechnicalDictionaryRow {
   key: string;
   termId: string;
-  businessVersion: string;
-  parentBusinessVersion: string;
-  status: string;
-  recordType: TechnicalRecordType;
-  workingRevision?: number;
-  hasPublished: boolean;
+  revision: number;
   databaseName: string;
   databaseFqn?: string;
   schemaName: string;
@@ -45,61 +37,44 @@ export interface TechnicalDictionaryRow {
   cdeCode: string;
   cdeName: string;
   cdeTermId?: string;
-  cdeRelation?: TermRelation;
-  dataOwners: EntityReference[];
-  elementType?: TagLabel;
-  generationType?: TagLabel;
-  creationMethod?: TagLabel;
-  timeliness?: TagLabel;
-  systemOwner?: EntityReference;
-  releaseVersionType: string;
+  dataOwners: TechnicalNamedReference[];
+  elementType?: TechnicalTagValue;
+  generationType?: TechnicalTagValue;
+  creationMethod?: TechnicalTagValue;
+  timeliness?: TechnicalTagValue;
+  systemOwner?: TechnicalNamedReference;
   sourceStatus: TechnicalSourceStatus;
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 /** Filters that are reflected in the URL and sent to the server. */
 export interface TechnicalDictionaryFilters {
   q: string;
-  statuses: string[];
   sourceServices: string[];
-  cdeMapping: string[];
   cdeTermIds: string[];
-  sourceStatuses: string[];
   elementType: string[];
   generationType: string[];
   creationMethod: string[];
   timeliness: string[];
-  systemOwnerIds: string[];
 }
 
 export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
   q: '',
-  statuses: [],
   sourceServices: [],
-  cdeMapping: [],
   cdeTermIds: [],
-  sourceStatuses: [],
   elementType: [],
   generationType: [],
   creationMethod: [],
   timeliness: [],
-  systemOwnerIds: [],
 };
 
 /** What the signed-in user may do; the backend remains the authority. */
-export interface TechnicalDictionaryCapabilities {
-  canViewWorking: boolean;
-  canEditWorking: boolean;
-  canSubmit: boolean;
-  canApprove: boolean;
-  canReject: boolean;
-  canCreateVersion: boolean;
-  canArchive: boolean;
-}
+export type TechnicalDictionaryCapabilities = TechnicalCapabilities;
 
-export interface TechnicalCatalogState {
-  businessVersion: string;
-  status: string;
-  workingRevision?: number;
-  isWorking: boolean;
-  isReadOnly: boolean;
-}
+export const NO_TECHNICAL_CAPABILITIES: TechnicalDictionaryCapabilities = {
+  canView: false,
+  canEdit: false,
+  canImport: false,
+  canExport: false,
+};

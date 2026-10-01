@@ -15,32 +15,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.openmetadata.service.glossary.technical.TechnicalImportPlan.UpdatePolicy;
 import org.openmetadata.service.glossary.technical.TechnicalImportService.PreviewScope;
 
 class TechnicalImportServiceTest {
   private static final List<String> HEADERS =
-      List.of("Tên cơ sở dữ liệu", "Tên Schema", "Tên Bảng", "Tên cột", "Mã CDE quy chiếu");
+      List.of(
+          "Tên cơ sở dữ liệu", "Tên Schema", "Tên Bảng", "Tên cột", "Mã CDE quy chiếu", "Thứ hạng");
 
   private final TechnicalImportService service = new TechnicalImportService();
-  private final UUID glossaryId = UUID.randomUUID();
 
   private Map<String, Object> preview(String actor, List<String> row) {
     byte[] file = TechnicalImportTestSupport.workbook(HEADERS, List.of(row));
     return service.preview(
         file,
-        new PreviewScope(glossaryId, "1", UpdatePolicy.DRAFT_ONLY, actor),
-        List.of(TechnicalImportTestSupport.record("T", "NAME", "Draft", "working")),
+        new PreviewScope("1", actor),
+        sheet -> List.of(TechnicalImportTestSupport.record("T", "NAME")),
         TechnicalImportTestSupport.lookups());
   }
 
   @Test
   void previewSummarizesActionsAndAllowsCommitWhenThereAreNoErrors() {
-    Map<String, Object> preview = preview("proposer", List.of("core", "dbo", "T", "NAME", "CDE1"));
+    Map<String, Object> preview =
+        preview("proposer", List.of("core", "dbo", "T", "NAME", "CDE1", "1"));
 
     @SuppressWarnings("unchecked")
     Map<String, Long> summary = (Map<String, Long>) preview.get("summary");
-    assertEquals(1L, summary.get("UPDATE_DRAFT"));
+    assertEquals(1L, summary.get("UPDATE"));
     assertEquals(0L, summary.get("error"));
     assertEquals(true, preview.get("canCommit"));
     assertEquals(64, String.valueOf(preview.get("fileHash")).length());
@@ -50,7 +50,8 @@ class TechnicalImportServiceTest {
   void aSessionCommitsOnceAndOnlyForItsActor() {
     UUID id =
         (UUID)
-            preview("proposer", List.of("core", "dbo", "T", "NAME", "CDE1")).get("importSessionId");
+            preview("proposer", List.of("core", "dbo", "T", "NAME", "CDE1", "1"))
+                .get("importSessionId");
 
     assertThrows(
         WebApplicationException.class, () -> service.commit(id, "someone-else", session -> "x"));
@@ -62,7 +63,7 @@ class TechnicalImportServiceTest {
   @Test
   void aSessionWithRowErrorsCannotBeCommitted() {
     Map<String, Object> preview =
-        preview("proposer", List.of("core", "dbo", "T", "MISSING", "CDE1"));
+        preview("proposer", List.of("core", "dbo", "T", "MISSING", "CDE1", "1"));
     UUID id = (UUID) preview.get("importSessionId");
 
     assertEquals(false, preview.get("canCommit"));

@@ -28,6 +28,7 @@ import { mockUserData } from '../../../mocks/MyDataPage.mock';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import {
+  createGlossaryTermCorrection,
   getGlossaryTermsVersionsList,
   getGlossaryVersionPermissions,
   getGlossaryVersionsList,
@@ -244,7 +245,6 @@ jest.mock('../../../rest/glossaryAPI', () => ({
         approve: EntityStatus.Approved,
         reject: EntityStatus.Rejected,
         reopen: EntityStatus.Draft,
-        revoke: EntityStatus.Rejected,
       };
 
       return Promise.resolve({
@@ -255,6 +255,16 @@ jest.mock('../../../rest/glossaryAPI', () => ({
       });
     }),
   transitionGlossaryWorkflow: jest.fn(),
+  createGlossaryTermCorrection: jest
+    .fn()
+    .mockImplementation((_id, businessVersion) =>
+      Promise.resolve({
+        ...mockedGlossaryTerms[0],
+        entityStatus: EntityStatus.Draft,
+        businessVersion,
+        workingRevision: 1,
+      })
+    ),
 }));
 
 const mockOnDelete = jest.fn();
@@ -580,7 +590,7 @@ describe('GlossaryHeader component', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('should render revoke approval action for approved glossary term and handle confirm', async () => {
+  it('should not render a revoke approval action for an approved term', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({
       data: {
         ...mockedGlossaryTerms[0],
@@ -604,24 +614,137 @@ describe('GlossaryHeader component', () => {
       />
     );
 
-    expect(screen.getByText('label.revoke-approval')).toBeInTheDocument();
+    expect(screen.queryByText('label.revoke-approval')).not.toBeInTheDocument();
+  });
+
+  it('should open a correction draft for the viewed Approved CDE version', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
+        entityStatus: EntityStatus.Approved,
+        businessVersion: '1.1',
+        parentBusinessVersion: '1',
+        workingRevision: undefined,
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true },
+      isVersionView: false,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+        onWorkflowTransition={mockOnWorkflowTransition}
+      />
+    );
+
+    const correctButton = await screen.findByTestId('create-correction-button');
 
     await act(async () => {
-      fireEvent.click(screen.getByText('label.revoke-approval'));
+      fireEvent.click(correctButton);
     });
 
-    // ConfirmationModal should be visible
     expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('save-button'));
     });
 
+    expect(createGlossaryTermCorrection).toHaveBeenCalledWith(
+      mockedGlossaryTerms[0].id,
+      '1.1',
+      '1'
+    );
     expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityStatus: EntityStatus.Rejected,
+        entityStatus: EntityStatus.Draft,
+        businessVersion: '1.1',
       }),
-      'revoke'
+      'createDraft'
+    );
+  });
+
+  it.each([
+    [EntityStatus.Approved, undefined, true],
+    [EntityStatus.Draft, 1, false],
+  ])(
+    'should toggle the correction history button for %s CDE (working revision %s)',
+    async (entityStatus, workingRevision, isVisible) => {
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: {
+            name: 'Data Dictionary',
+            displayName: 'Từ điển dữ liệu dùng chung',
+          },
+          entityStatus,
+          businessVersion: '1.1',
+          parentBusinessVersion: '1',
+          workingRevision,
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      await waitFor(() =>
+        expect(
+          Boolean(screen.queryByTestId('correction-history-button'))
+        ).toBe(isVisible)
+      );
+    }
+  );
+
+  it('should not offer a correction for an archived CDE version', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: {
+          name: 'Data Dictionary',
+          displayName: 'Từ điển dữ liệu dùng chung',
+        },
+        entityStatus: EntityStatus.Approved,
+        businessVersion: '1.1',
+        parentBusinessVersion: '1',
+        archivedAt: 1,
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true },
+      isVersionView: false,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('create-correction-button')
+      ).not.toBeInTheDocument()
     );
   });
 
@@ -874,7 +997,9 @@ describe('GlossaryHeader component', () => {
 
     expect(screen.queryByText('label.approve')).not.toBeInTheDocument();
     expect(screen.queryByText('label.reject')).not.toBeInTheDocument();
-    expect(screen.queryByText('label.revoke-approval')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('create-correction-button')
+    ).not.toBeInTheDocument();
   });
 
   describe('suggestNextVersion', () => {

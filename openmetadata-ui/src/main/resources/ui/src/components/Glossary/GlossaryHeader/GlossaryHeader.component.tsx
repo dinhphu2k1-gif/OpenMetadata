@@ -68,6 +68,7 @@ import {
 import {
   exportDataDictionaryVersion,
   exportGlossaryInCSVFormat,
+  createGlossaryTermCorrection,
   createGlossaryTermWorkingVersion,
   getGlossariesById,
   getGlossaryTermVersionPermissions,
@@ -124,10 +125,13 @@ import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
 import StyleModal from '../../Modals/StyleModal/StyleModal.component';
 import { useGlossaryStore } from '../useGlossary.store';
+import CorrectionHistoryModal from './CorrectionHistoryModal.component';
 import { GlossaryHeaderProps } from './GlossaryHeader.interface';
 import './glossery-header.less';
 
 export { getCreatedDraftSearch } from '../../../utils/routing/cdeRoutingHelper';
+
+const CORRECTION_DRAFT_KEY_SUFFIX = '#correction';
 
 export const suggestNextVersion = (ver: string, isGlossary = false): string => {
   const trimmed = ver.trim();
@@ -216,8 +220,12 @@ const GlossaryHeader = ({
   const [isStyleEditing, setIsStyleEditing] = useState(false);
   const [openChangeParentHierarchyModal, setOpenChangeParentHierarchyModal] =
     useState(false);
-  const [isRevokeModalOpen, setIsRevokeModalOpen] = useState<boolean>(false);
-  const [isRevoking, setIsRevoking] = useState<boolean>(false);
+  const [isCorrectionHistoryOpen, setIsCorrectionHistoryOpen] =
+    useState<boolean>(false);
+  const [isCorrectionModalOpen, setIsCorrectionModalOpen] =
+    useState<boolean>(false);
+  const [isCreatingCorrection, setIsCreatingCorrection] =
+    useState<boolean>(false);
   const [isSubmitForReviewModalOpen, setIsSubmitForReviewModalOpen] =
     useState<boolean>(false);
   const [isSubmittingForReview, setIsSubmittingForReview] =
@@ -239,6 +247,7 @@ const GlossaryHeader = ({
       label: string;
       snapshotVersion: string;
       snapshot?: Glossary | GlossaryTerm;
+      isCorrectionDraft?: boolean;
     }[]
   >([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
@@ -596,6 +605,7 @@ const GlossaryHeader = ({
         label: string;
         snapshotVersion: string;
         snapshot?: Glossary | GlossaryTerm;
+        isCorrectionDraft?: boolean;
       }[] = (history?.versions ?? [])
         .map((snapshot) => {
           if (typeof snapshot !== 'string') {
@@ -683,14 +693,17 @@ const GlossaryHeader = ({
           )
             .trim()
             .replace(/^(version:?\s*|v)/i, '');
-          if (
-            workingBusinessVersion &&
-            !versions.some((item) => item.label === workingBusinessVersion)
-          ) {
+          const isCorrectionDraft = versions.some(
+            (item) => item.label === workingBusinessVersion
+          );
+          if (workingBusinessVersion) {
             versions.unshift({
               label: workingBusinessVersion,
-              snapshotVersion: workingBusinessVersion,
+              snapshotVersion: isCorrectionDraft
+                ? `${workingBusinessVersion}${CORRECTION_DRAFT_KEY_SUFFIX}`
+                : workingBusinessVersion,
               snapshot: working,
+              isCorrectionDraft,
             });
           }
         } catch (error) {
@@ -734,14 +747,23 @@ const GlossaryHeader = ({
       const currentIsArchived =
         selectedData.entityStatus === EntityStatus.Archived ||
         selectedData.archivedAt != null;
-      if (
-        (!currentIsArchived || canViewHistory) &&
-        !versions.some((v) => v.label === currentVerClean)
-      ) {
+      const currentIsWorking = selectedData.workingRevision != null;
+      const isCurrentListed = versions.some(
+        (v) =>
+          v.label === currentVerClean &&
+          (v.snapshot?.workingRevision != null) === currentIsWorking
+      );
+      if ((!currentIsArchived || canViewHistory) && !isCurrentListed) {
+        const isCorrectionDraft =
+          currentIsWorking &&
+          versions.some((v) => v.label === currentVerClean);
         versions.unshift({
           label: currentVerClean,
-          snapshotVersion: currentVerClean,
+          snapshotVersion: isCorrectionDraft
+            ? `${currentVerClean}${CORRECTION_DRAFT_KEY_SUFFIX}`
+            : currentVerClean,
           snapshot: selectedData,
+          isCorrectionDraft,
         });
       }
 
@@ -749,11 +771,15 @@ const GlossaryHeader = ({
         versions
           .filter(
             (item, index) =>
-              versions.findIndex((version) => version.label === item.label) ===
-              index
+              versions.findIndex(
+                (version) => version.snapshotVersion === item.snapshotVersion
+              ) === index
           )
-          .sort((first, second) =>
-            compareBusinessVersions(second.label, first.label)
+          .sort(
+            (first, second) =>
+              compareBusinessVersions(second.label, first.label) ||
+              Number(Boolean(second.isCorrectionDraft)) -
+                Number(Boolean(first.isCorrectionDraft))
           )
       );
     } catch (error) {
@@ -849,13 +875,39 @@ const GlossaryHeader = ({
     setIsStyleEditing(false);
   };
 
-  const canRevokeApproval = useMemo(() => {
-    if (isVersionView || glossaryTermStatus !== EntityStatus.Approved) {
+  const canCreateCorrection = useMemo(() => {
+    const isArchivedSnapshot = selectedData.archivedAt != null;
+    if (
+      isVersionView ||
+      isGlossary ||
+      glossaryTermStatus !== EntityStatus.Approved ||
+      isArchivedSnapshot ||
+      selectedData.workingRevision != null
+    ) {
       return false;
     }
 
-    return Boolean(workflowPermissions?.canArchive);
-  }, [isVersionView, glossaryTermStatus, workflowPermissions]);
+    return (
+      (isCDEGlossaryTerm || isDQGlossaryTerm) &&
+      Boolean(workflowPermissions?.canCreateVersion)
+    );
+  }, [
+    isVersionView,
+    isGlossary,
+    isCDEGlossaryTerm,
+    isDQGlossaryTerm,
+    glossaryTermStatus,
+    workflowPermissions,
+    selectedData.archivedAt,
+    selectedData.workingRevision,
+  ]);
+
+  const canViewCorrectionHistory =
+    !isVersionView &&
+    !isGlossary &&
+    isCustomManagedTerm &&
+    selectedData.workingRevision == null &&
+    [EntityStatus.Approved, EntityStatus.Archived].includes(glossaryTermStatus);
 
   const canCreateDraft = useMemo(() => {
     const hasWorkingCopy = selectedData.workingRevision != null;
@@ -886,11 +938,7 @@ const GlossaryHeader = ({
     options?: { businessVersion?: string }
   ) => {
     const expectedRevision = Number(selectedData.workingRevision);
-    if (
-      action !== 'createDraft' &&
-      action !== 'revoke' &&
-      !Number.isFinite(expectedRevision)
-    ) {
+    if (action !== 'createDraft' && !Number.isFinite(expectedRevision)) {
       throw new Error(
         'Working version revision is required for workflow actions'
       );
@@ -925,46 +973,44 @@ const GlossaryHeader = ({
           cdeRoute.parentBusinessVersion ?? selectedData.parentBusinessVersion
         );
     if (!isGlossary && action === 'createDraft') {
-      const createdBusinessVersion = getBusinessVersion(
-        updated.businessVersion,
-        options?.businessVersion ?? ''
+      navigateToWorkingDraft(
+        getBusinessVersion(
+          updated.businessVersion,
+          options?.businessVersion ?? ''
+        )
       );
-
-      const parentVersion =
-        cdeRoute.parentBusinessVersion ??
-        selectedData.parentBusinessVersion ??
-        getBusinessVersion(activeGlossary?.businessVersion, '');
-
-      if (isDQGlossaryTerm) {
-        navigate(
-          getGovernedTermDetailPath({
-            fqn: getScopedGovernedTermFqn(
-              selectedData.fullyQualifiedName ?? selectedData.name,
-              parentVersion
-            ),
-            businessVersion: createdBusinessVersion,
-            parentBusinessVersion: parentVersion,
-            termId: selectedData.id,
-            isWorkingDraft: true,
-          }),
-          { replace: true }
-        );
-      } else {
-        navigate(
-          getCdeDetailPath({
-            fqn: selectedData.fullyQualifiedName ?? selectedData.name,
-            businessVersion: createdBusinessVersion,
-            parentBusinessVersion: parentVersion,
-            isWorkingDraft: true,
-          }),
-          { replace: true }
-        );
-      }
     }
     await onWorkflowTransition?.(updated, action);
     setHasWorkflowConflict(false);
 
     return updated;
+  };
+
+  const getParentBusinessVersion = () =>
+    cdeRoute.parentBusinessVersion ??
+    selectedData.parentBusinessVersion ??
+    getBusinessVersion(activeGlossary?.businessVersion, '');
+
+  const navigateToWorkingDraft = (createdBusinessVersion: string) => {
+    const parentVersion = getParentBusinessVersion();
+    const path = isDQGlossaryTerm
+      ? getGovernedTermDetailPath({
+          fqn: getScopedGovernedTermFqn(
+            selectedData.fullyQualifiedName ?? selectedData.name,
+            parentVersion
+          ),
+          businessVersion: createdBusinessVersion,
+          parentBusinessVersion: parentVersion,
+          termId: selectedData.id,
+          isWorkingDraft: true,
+        })
+      : getCdeDetailPath({
+          fqn: selectedData.fullyQualifiedName ?? selectedData.name,
+          businessVersion: createdBusinessVersion,
+          parentBusinessVersion: parentVersion,
+          isWorkingDraft: true,
+        });
+    navigate(path, { replace: true });
   };
 
   const handleWorkflowError = (error: unknown) => {
@@ -1043,16 +1089,28 @@ const GlossaryHeader = ({
     }
   };
 
-  const handleRevokeApproval = async () => {
+  const handleCreateCorrection = async () => {
+    if (isCreatingCorrection) {
+      return;
+    }
+    const correctedVersion = getBusinessVersion(businessVersion ?? undefined, '');
     try {
-      setIsRevoking(true);
-      await runWorkflowAction('revoke');
-      showSuccessToast(t('message.revoke-approval-success'));
-      setIsRevokeModalOpen(false);
+      setIsCreatingCorrection(true);
+      const created = await createGlossaryTermCorrection(
+        selectedData.id,
+        correctedVersion,
+        getParentBusinessVersion()
+      );
+      navigateToWorkingDraft(
+        getBusinessVersion(created.businessVersion, correctedVersion)
+      );
+      await onWorkflowTransition?.(created, 'createDraft');
+      showSuccessToast(t('message.create-correction-draft-success'));
+      setIsCorrectionModalOpen(false);
     } catch (error) {
-      showErrorToast(error as AxiosError);
+      handleWorkflowError(error);
     } finally {
-      setIsRevoking(false);
+      setIsCreatingCorrection(false);
     }
   };
 
@@ -1395,6 +1453,7 @@ const GlossaryHeader = ({
         label: cleanVersion,
         snapshotVersion: cleanVersion,
         snapshot: selectedData,
+        isCorrectionDraft: false,
       };
       const versionList =
         availableVersions.length > 0 ? availableVersions : [currentVersionItem];
@@ -1419,7 +1478,11 @@ const GlossaryHeader = ({
                       ? EntityStatus.Archived
                       : EntityStatus.Approved)) as EntityStatus
                 )}`
-              : `${t('label.version')}: ${availableVersion.label}`,
+              : `${t('label.version')}: ${availableVersion.label}${
+                  availableVersion.isCorrectionDraft
+                    ? ` — ${t('label.correction-draft')}`
+                    : ''
+                }`,
           }))}
           versionLabel={t('label.version')}
           versionSelectionDisabled={isWorkflowPermissionLoading}
@@ -1572,12 +1635,12 @@ const GlossaryHeader = ({
           </Button>
         )}
 
-        {canRevokeApproval && glossaryTermStatus === EntityStatus.Approved && (
+        {canCreateCorrection && (
           <Button
-            danger
             className="m-l-xs"
-            onClick={() => setIsRevokeModalOpen(true)}>
-            {t('label.revoke-approval')}
+            data-testid="create-correction-button"
+            onClick={() => setIsCorrectionModalOpen(true)}>
+            {t('label.correct-version')}
           </Button>
         )}
       </Space>
@@ -1592,7 +1655,7 @@ const GlossaryHeader = ({
     canReopen,
     isReopening,
     canCreateDraft,
-    canRevokeApproval,
+    canCreateCorrection,
     glossaryTermStatus,
     selectedData,
     businessVersion,
@@ -1703,6 +1766,14 @@ const GlossaryHeader = ({
         </div>
         <div className="flex items-center">
           <div className="d-flex gap-3 justify-end items-center">
+            {canViewCorrectionHistory && (
+              <Button
+                className="m-l-xs"
+                data-testid="correction-history-button"
+                onClick={() => setIsCorrectionHistoryOpen(true)}>
+                {t('label.correction-history')}
+              </Button>
+            )}
             {!isVersionView && approvalActionButtons}
             {!isVersionView && createButtons}
 
@@ -1833,15 +1904,29 @@ const GlossaryHeader = ({
         />
       )}
 
+      {canViewCorrectionHistory && (
+        <CorrectionHistoryModal
+          businessVersion={getBusinessVersion(businessVersion ?? undefined, '')}
+          open={isCorrectionHistoryOpen}
+          parentBusinessVersion={getParentBusinessVersion()}
+          termId={selectedData.id}
+          onClose={() => setIsCorrectionHistoryOpen(false)}
+        />
+      )}
+
       <ConfirmationModal
-        bodyText={t('message.confirm-revoke-approval-message')}
+        bodyText={t('message.confirm-correct-version-message', {
+          version: getBusinessVersion(businessVersion ?? undefined, ''),
+        })}
         cancelText={t('label.cancel')}
-        confirmText={t('label.revoke-approval')}
-        header={t('message.confirm-revoke-approval-title')}
-        isLoading={isRevoking}
-        visible={isRevokeModalOpen}
-        onCancel={() => setIsRevokeModalOpen(false)}
-        onConfirm={handleRevokeApproval}
+        confirmText={t('label.correct-version')}
+        header={t('message.confirm-correct-version-title', {
+          version: getBusinessVersion(businessVersion ?? undefined, ''),
+        })}
+        isLoading={isCreatingCorrection}
+        visible={isCorrectionModalOpen}
+        onCancel={() => setIsCorrectionModalOpen(false)}
+        onConfirm={handleCreateCorrection}
       />
 
       {hasWorkflowConflict && !isGlossary && (

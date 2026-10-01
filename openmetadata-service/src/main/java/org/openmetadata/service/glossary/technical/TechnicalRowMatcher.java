@@ -33,8 +33,7 @@ public final class TechnicalRowMatcher {
   private static final Set<String> SOURCE_STATUS_VALUES =
       Set.of(
           TechnicalDictionaryProfile.SOURCE_AVAILABLE,
-          TechnicalDictionaryProfile.SOURCE_UNAVAILABLE,
-          TechnicalDictionaryProfile.SOURCE_CHANGED);
+          TechnicalDictionaryProfile.SOURCE_UNAVAILABLE);
   private static final int MAX_VALUES = 50;
   private static final Map<String, String> TAG_FILTERS = tagFilters();
 

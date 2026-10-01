@@ -8,48 +8,17 @@ package org.openmetadata.service.glossary.technical;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import org.openmetadata.schema.type.EntityReference;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.type.TermRelation;
 
 /** Value types of a Technical Dictionary import plan. */
 public final class TechnicalImportPlan {
-  public static final String UPDATE_DRAFT = "UPDATE_DRAFT";
-  public static final String REPLACE_IN_REVIEW_AND_REOPEN = "REPLACE_IN_REVIEW_AND_REOPEN";
-  public static final String REPLACE_REJECTED_AND_REOPEN = "REPLACE_REJECTED_AND_REOPEN";
-  public static final String CREATE_VERSION = "CREATE_VERSION";
   public static final String CREATE_RECORD = "CREATE_RECORD";
-  public static final String SKIP = "SKIP";
+  public static final String UPDATE = "UPDATE";
   public static final String NO_CHANGE = "NO_CHANGE";
   public static final String ERROR = "ERROR";
 
-  public static final List<String> ACTIONS =
-      List.of(
-          UPDATE_DRAFT,
-          REPLACE_IN_REVIEW_AND_REOPEN,
-          REPLACE_REJECTED_AND_REOPEN,
-          CREATE_VERSION,
-          CREATE_RECORD,
-          SKIP,
-          NO_CHANGE);
+  public static final List<String> ACTIONS = List.of(CREATE_RECORD, UPDATE, NO_CHANGE);
 
   private TechnicalImportPlan() {}
-
-  /** Update policy chosen before the preview. */
-  public enum UpdatePolicy {
-    DRAFT_ONLY,
-    ALL_EDITABLE;
-
-    public static UpdatePolicy from(String value) {
-      try {
-        return value == null || value.isBlank() ? DRAFT_ONLY : valueOf(value);
-      } catch (IllegalArgumentException exception) {
-        throw new jakarta.ws.rs.BadRequestException(
-            "updatePolicy must be DRAFT_ONLY or ALL_EDITABLE");
-      }
-    }
-  }
 
   /** A column of the file that was present: `value == null` clears the stored value. */
   public record Field<T>(boolean specified, T value) {
@@ -62,12 +31,12 @@ public final class TechnicalImportPlan {
     }
   }
 
-  /** Editable changes requested by one row. */
+  /** Editable changes requested by one row; tags are keyed by classification. */
   public record RowPatch(
-      Field<TermRelation> cde,
+      Field<TechnicalCdeInfo> cde,
       Field<Integer> rank,
-      Map<String, Field<TagLabel>> tags,
-      Field<EntityReference> systemOwner) {}
+      Map<String, Field<String>> tags,
+      Field<java.util.UUID> systemOwner) {}
 
   public record ImportError(int rowNumber, String column, String code, String message) {}
 
@@ -75,10 +44,8 @@ public final class TechnicalImportPlan {
       int rowNumber,
       String location,
       String action,
-      UUID termId,
+      String recordId,
       Long expectedRevision,
-      String expectedPublishedVersion,
-      String newBusinessVersion,
       @JsonIgnore RowPatch patch,
       @JsonIgnore TechnicalColumnSource column,
       List<ImportError> errors,
@@ -89,13 +56,7 @@ public final class TechnicalImportPlan {
     }
 
     public boolean mutates() {
-      return List.of(
-              UPDATE_DRAFT,
-              REPLACE_IN_REVIEW_AND_REOPEN,
-              REPLACE_REJECTED_AND_REOPEN,
-              CREATE_VERSION,
-              CREATE_RECORD)
-          .contains(action);
+      return CREATE_RECORD.equals(action) || UPDATE.equals(action);
     }
   }
 }

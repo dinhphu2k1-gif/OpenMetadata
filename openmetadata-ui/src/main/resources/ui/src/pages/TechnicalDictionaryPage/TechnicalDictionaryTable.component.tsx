@@ -10,31 +10,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import {
-  CheckOutlined,
-  CloseOutlined,
-  DeleteOutlined,
-  EyeOutlined,
-  PlusOutlined,
-  RollbackOutlined,
-  SendOutlined,
-} from '@ant-design/icons';
+import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { Button, Tag, Tooltip } from 'antd';
+import { AxiosError } from 'axios';
 import { ColumnsType } from 'antd/lib/table';
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ReactComponent as EditIcon } from '../../assets/svg/edit-new.svg';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import Table from '../../components/common/Table/Table';
 import {
   renderDictionaryMarkdown,
-  renderDictionaryOwnerList,
   renderDictionaryPastelTag,
-  renderDictionaryStatusBadge,
 } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
-import { renderCDEReleaseVersionType } from '../../components/Glossary/GlossaryTermTab/CDEGlossaryTableColumns';
 import { NO_DATA_PLACEHOLDER } from '../../constants/constants';
 import {
   TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY,
@@ -44,20 +34,18 @@ import {
   TECHNICAL_PAGE_SIZE_OPTIONS,
 } from '../../constants/TechnicalDictionary.constants';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
-import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
-import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
-import { getEntityDetailsPath } from '../../utils/RouterUtils';
+import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
+import { getGlossaryTermsById } from '../../rest/glossaryAPI';
 import {
-  TechnicalCatalogState,
+  getEntityDetailsPath,
+  getGlossaryTermDetailsPath,
+} from '../../utils/RouterUtils';
+import { showErrorToast } from '../../utils/ToastUtils';
+import {
   TechnicalDictionaryCapabilities,
   TechnicalDictionaryRow,
 } from './technicalDictionary.interface';
-import {
-  canDeleteRow,
-  getTagLabel,
-  isEditableRow,
-  isSourceUnavailable,
-} from './TechnicalDictionaryRows';
+import { getTagLabel } from './TechnicalDictionaryRows';
 
 export interface TechnicalDictionaryTableProps {
   rows: TechnicalDictionaryRow[];
@@ -66,20 +54,12 @@ export interface TechnicalDictionaryTableProps {
   page: number;
   pageSize: number;
   capabilities: TechnicalDictionaryCapabilities;
-  catalog?: TechnicalCatalogState;
-  selectedKeys: string[];
   extraTableFilters?: React.ReactNode;
   emptyContent?: React.ReactNode;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onSelectionChange: (keys: string[]) => void;
   onView: (row: TechnicalDictionaryRow) => void;
   onEdit: (row: TechnicalDictionaryRow) => void;
-  onSubmit: (row: TechnicalDictionaryRow) => void;
-  onApprove: (row: TechnicalDictionaryRow) => void;
-  onReject: (row: TechnicalDictionaryRow) => void;
-  onReopen: (row: TechnicalDictionaryRow) => void;
-  onCreateVersion: (row: TechnicalDictionaryRow) => void;
   onDelete: (row: TechnicalDictionaryRow) => void;
 }
 
@@ -101,25 +81,31 @@ const TechnicalDictionaryTable = ({
   page,
   pageSize,
   capabilities,
-  catalog,
-  selectedKeys,
   extraTableFilters,
   emptyContent,
   onPageChange,
   onPageSizeChange,
-  onSelectionChange,
   onView,
   onEdit,
-  onSubmit,
-  onApprove,
-  onReject,
-  onReopen,
-  onCreateVersion,
   onDelete,
 }: TechnicalDictionaryTableProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const isReadOnly = catalog?.isReadOnly ?? true;
+
+  const handleCdeClick = useCallback(
+    async (termId: string) => {
+      try {
+        const term = await getGlossaryTermsById(termId);
+        if (term.fullyQualifiedName) {
+          navigate(getGlossaryTermDetailsPath(term.fullyQualifiedName));
+        }
+      } catch (error) {
+        showErrorToast(error as AxiosError);
+      }
+    },
+    [navigate]
+  );
 
   const renderTag = useCallback(
     (
@@ -159,136 +145,48 @@ const TechnicalDictionaryTable = ({
   );
 
   const renderActions = useCallback(
-    (row: TechnicalDictionaryRow) => {
-      const unavailable = isSourceUnavailable(row);
-      const isWorking = row.recordType === 'working';
-      const canWrite = !isReadOnly && isWorking;
-
-      return (
-        <div className="d-flex items-center gap-2">
-          <Tooltip title={t('label.view')}>
+    (row: TechnicalDictionaryRow) => (
+      <div className="d-flex items-center gap-2">
+        <Tooltip title={t('label.view')}>
+          <Button
+            aria-label={t('label.view')}
+            className="text-grey-muted flex-center"
+            data-testid={`view-btn-${row.columnName}`}
+            icon={<EyeOutlined />}
+            size="small"
+            type="text"
+            onClick={() => onView(row)}
+          />
+        </Tooltip>
+        {capabilities.canEdit && (
+          <Tooltip title={t('label.edit')}>
             <Button
-              aria-label={t('label.view')}
-              data-testid={`view-btn-${row.columnName}`}
-              icon={<EyeOutlined />}
+              aria-label={t('label.edit')}
+              className="text-grey-muted flex-center"
+              data-testid={`edit-btn-${row.columnName}`}
+              icon={<EditIcon height={14} width={14} />}
               size="small"
               type="text"
-              onClick={() => onView(row)}
+              onClick={() => onEdit(row)}
             />
           </Tooltip>
-          {capabilities.canEditWorking && isEditableRow(row) && !isReadOnly && (
-            <Tooltip title={t('label.edit')}>
-              <Button
-                aria-label={t('label.edit')}
-                data-testid={`edit-btn-${row.columnName}`}
-                icon={<EditIcon height={14} width={14} />}
-                size="small"
-                type="text"
-                onClick={() => onEdit(row)}
-              />
-            </Tooltip>
-          )}
-          {capabilities.canSubmit &&
-            canWrite &&
-            row.status === 'Draft' &&
-            !unavailable && (
-              <Tooltip title={t('label.submit-for-review')}>
-                <Button
-                  aria-label={t('label.submit-for-review')}
-                  data-testid={`submit-btn-${row.columnName}`}
-                  icon={<SendOutlined />}
-                  size="small"
-                  type="text"
-                  onClick={() => onSubmit(row)}
-                />
-              </Tooltip>
-            )}
-          {capabilities.canApprove &&
-            canWrite &&
-            row.status === 'In Review' &&
-            !unavailable && (
-              <Tooltip title={t('label.approve')}>
-                <Button
-                  aria-label={t('label.approve')}
-                  className="text-success"
-                  data-testid={`approve-btn-${row.columnName}`}
-                  icon={<CheckOutlined />}
-                  size="small"
-                  type="text"
-                  onClick={() => onApprove(row)}
-                />
-              </Tooltip>
-            )}
-          {capabilities.canReject && canWrite && row.status === 'In Review' && (
-            <Tooltip title={t('label.reject')}>
-              <Button
-                aria-label={t('label.reject')}
-                className="text-danger"
-                data-testid={`reject-btn-${row.columnName}`}
-                icon={<CloseOutlined />}
-                size="small"
-                type="text"
-                onClick={() => onReject(row)}
-              />
-            </Tooltip>
-          )}
-          {capabilities.canEditWorking &&
-            canWrite &&
-            row.status === 'Rejected' && (
-              <Tooltip title={t('label.reopen')}>
-                <Button
-                  aria-label={t('label.reopen')}
-                  icon={<RollbackOutlined />}
-                  size="small"
-                  type="text"
-                  onClick={() => onReopen(row)}
-                />
-              </Tooltip>
-            )}
-          {canDeleteRow(row, capabilities, isReadOnly) && (
-            <Tooltip title={t('label.delete-declaration')}>
-              <Button
-                aria-label={t('label.delete-declaration')}
-                className="text-danger"
-                data-testid={`delete-btn-${row.columnName}`}
-                icon={<DeleteOutlined />}
-                size="small"
-                type="text"
-                onClick={() => onDelete(row)}
-              />
-            </Tooltip>
-          )}
-          {capabilities.canCreateVersion &&
-            !isReadOnly &&
-            row.recordType === 'published' &&
-            row.status === 'Approved' && (
-              <Tooltip title={t('label.create-new-version')}>
-                <Button
-                  aria-label={t('label.create-new-version')}
-                  data-testid={`create-version-btn-${row.columnName}`}
-                  icon={<PlusOutlined />}
-                  size="small"
-                  type="text"
-                  onClick={() => onCreateVersion(row)}
-                />
-              </Tooltip>
-            )}
-        </div>
-      );
-    },
-    [
-      capabilities,
-      isReadOnly,
-      onApprove,
-      onCreateVersion,
-      onDelete,
-      onEdit,
-      onReject,
-      onReopen,
-      onSubmit,
-      onView,
-      t,
-    ]
+        )}
+        {capabilities.canEdit && (
+          <Tooltip title={t('label.delete-declaration')}>
+            <Button
+              aria-label={t('label.delete-declaration')}
+              className="text-danger"
+              data-testid={`delete-btn-${row.columnName}`}
+              icon={<DeleteOutlined />}
+              size="small"
+              type="text"
+              onClick={() => onDelete(row)}
+            />
+          </Tooltip>
+        )}
+      </div>
+    ),
+    [capabilities.canEdit, onDelete, onEdit, onView, t]
   );
 
   const columns: ColumnsType<TechnicalDictionaryRow> = useMemo(
@@ -338,14 +236,6 @@ const TechnicalDictionaryTable = ({
         ),
       },
       {
-        title: t('label.data-owner'),
-        dataIndex: KEYS.DATA_OWNER,
-        key: KEYS.DATA_OWNER,
-        width: 180,
-        render: (_, row) =>
-          renderDictionaryOwnerList(row.dataOwners, 'tech-owner'),
-      },
-      {
         title: t('label.source'),
         dataIndex: KEYS.SERVICE_NAME,
         key: KEYS.SERVICE_NAME,
@@ -364,13 +254,6 @@ const TechnicalDictionaryTable = ({
                 {t('label.source-unavailable')}
               </Tag>
             )}
-            {row.sourceStatus === 'Changed' && (
-              <Tag
-                color="warning"
-                data-testid={`source-changed-${row.columnName}`}>
-                {t('label.source-changed')}
-              </Tag>
-            )}
           </>
         ),
       },
@@ -381,11 +264,14 @@ const TechnicalDictionaryTable = ({
         width: 150,
         render: (_, row) =>
           row.cdeCode ? (
-            <span
+            <Button
+              className="p-0 h-auto tech-entity-link"
               data-testid={`cde-code-${row.cdeCode}`}
-              title={row.cdeName || row.cdeCode}>
+              title={row.cdeName || row.cdeCode}
+              type="link"
+              onClick={() => row.cdeTermId && handleCdeClick(row.cdeTermId)}>
               {row.cdeCode}
-            </span>
+            </Button>
           ) : (
             <Placeholder />
           ),
@@ -455,18 +341,6 @@ const TechnicalDictionaryTable = ({
         render: (_, row) => renderTag(row.timeliness, TAG_VARIANTS.timeliness),
       },
       {
-        title: t('label.system-owner'),
-        dataIndex: KEYS.SYSTEM_OWNER,
-        key: KEYS.SYSTEM_OWNER,
-        width: 180,
-        render: (_, row) =>
-          row.systemOwner ? (
-            renderDictionaryOwnerList([row.systemOwner], 'tech-system-owner')
-          ) : (
-            <Placeholder />
-          ),
-      },
-      {
         title: t('label.description'),
         dataIndex: KEYS.DESCRIPTION,
         key: KEYS.DESCRIPTION,
@@ -474,44 +348,30 @@ const TechnicalDictionaryTable = ({
         render: (_, row) => renderDictionaryMarkdown(row.description),
       },
       {
-        title: t('label.version'),
-        dataIndex: KEYS.VERSION,
-        key: KEYS.VERSION,
-        width: 110,
-        render: (_, row) => getBusinessVersion(row.businessVersion),
-      },
-      {
-        title: t('label.release-version-type'),
-        dataIndex: KEYS.RELEASE_VERSION_TYPE,
-        key: KEYS.RELEASE_VERSION_TYPE,
-        width: 190,
+        title: t('label.updated-at'),
+        dataIndex: KEYS.UPDATED_AT,
+        key: KEYS.UPDATED_AT,
+        width: 170,
         render: (_, row) =>
-          renderCDEReleaseVersionType(
-            row.releaseVersionType,
-            row.businessVersion
-          ),
+          row.updatedAt ? formatDateTime(row.updatedAt) : <Placeholder />,
       },
       {
-        title: t('label.status'),
-        dataIndex: KEYS.STATUS,
-        key: KEYS.STATUS,
+        title: t('label.updated-by'),
+        dataIndex: KEYS.UPDATED_BY,
+        key: KEYS.UPDATED_BY,
         width: 140,
-        render: (_, row) =>
-          renderDictionaryStatusBadge(
-            row.status as EntityStatus,
-            `${row.columnName}-status`
-          ),
+        render: (_, row) => row.updatedBy || <Placeholder />,
       },
       {
         title: t('label.action-plural'),
         dataIndex: KEYS.ACTIONS,
         key: KEYS.ACTIONS,
         fixed: 'right',
-        width: 150,
+        width: 110,
         render: (_, row) => renderActions(row),
       },
     ],
-    [renderActions, renderLink, renderTag, t]
+    [handleCdeClick, renderActions, renderLink, renderTag, t]
   );
 
   const paginationProps = useMemo(
@@ -566,13 +426,6 @@ const TechnicalDictionaryTable = ({
         locale={emptyContent ? { emptyText: emptyContent } : undefined}
         pagination={false}
         rowKey="key"
-        rowSelection={{
-          selectedRowKeys: selectedKeys,
-          onChange: (keys) => onSelectionChange(keys.map(String)),
-          getCheckboxProps: (row) => ({
-            disabled: row.recordType !== 'working',
-          }),
-        }}
         size="small"
         staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
         sticky={{

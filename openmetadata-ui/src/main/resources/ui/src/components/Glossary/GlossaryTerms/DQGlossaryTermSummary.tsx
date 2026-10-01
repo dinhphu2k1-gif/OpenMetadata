@@ -21,10 +21,7 @@ import {
   GlossaryTerm,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
-import {
-  getGlossaryTermsById,
-  getGlossaryTermsVersion,
-} from '../../../rest/glossaryAPI';
+import { getLatestPublishedGlossaryTerm } from '../../../rest/glossaryAPI';
 import { TagSource } from '../../../generated/type/tagLabel';
 import { createTagObject } from '../../../utils/TagsUtils';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
@@ -78,29 +75,16 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
 
       return;
     }
-    const versionContext = relation?.versionContext;
-    const request = versionContext
-      ? getGlossaryTermsVersion(
-          selectedCde.id,
-          versionContext.businessVersion,
-          versionContext.parentBusinessVersion
-        )
-      : getGlossaryTermsById(selectedCde.id, { fields: ['displayName'] });
-    request
+    getLatestPublishedGlossaryTerm(selectedCde.id)
       .then(setResolvedCde)
       .catch(() => setResolvedCde(undefined));
-  }, [relation?.versionContext, selectedCde?.id]);
+  }, [selectedCde?.id]);
 
   const handleSelect = async (_id?: string, selected?: GlossaryTerm) => {
     if (isSavingCde) {
       return;
     }
-    const selectedKey = selected?.snapshotId;
-    const currentKey = relation?.versionContext?.snapshotId;
-    if (
-      selected?.id === selectedCde?.id &&
-      ((!selectedKey && !currentKey) || selectedKey === currentKey)
-    ) {
+    if (selected?.id === selectedCde?.id) {
       setIsEditorOpen(false);
 
       return;
@@ -120,16 +104,6 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
               displayName: selected.displayName,
               fullyQualifiedName: selected.fullyQualifiedName,
             },
-            versionContext:
-              selected.snapshotId &&
-              selected.parentBusinessVersion &&
-              selected.businessVersion
-                ? {
-                    snapshotId: selected.snapshotId,
-                    parentBusinessVersion: selected.parentBusinessVersion,
-                    businessVersion: selected.businessVersion,
-                  }
-                : undefined,
           },
         ]
       : [];
@@ -159,12 +133,8 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
               content={
                 <CDESelector
                   disabled={isSavingCde}
-                  parentBusinessVersion={
-                    currentTerm.parentBusinessVersion ??
-                    relation?.versionContext?.parentBusinessVersion
-                  }
+                  parentBusinessVersion={currentTerm.parentBusinessVersion}
                   selectedCde={resolvedCde ?? selectedCde}
-                  selectedVersionContext={relation?.versionContext}
                   width={520}
                   onChange={handleSelect}
                 />
@@ -184,14 +154,6 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
         {displayedCde ? (
           <Space size={6}>
             <Typography.Text>{displayedCde.name}</Typography.Text>
-            {(resolvedCde?.businessVersion ||
-              resolvedCde?.parentBusinessVersion) && (
-              <Typography.Text type="secondary">
-                v
-                {resolvedCde.businessVersion ??
-                  resolvedCde.parentBusinessVersion}
-              </Typography.Text>
-            )}
             {isHistoricalCde && <Tag>Archived</Tag>}
           </Space>
         ) : (

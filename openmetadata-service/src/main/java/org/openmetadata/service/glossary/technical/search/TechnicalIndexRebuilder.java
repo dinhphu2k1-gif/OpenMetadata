@@ -10,13 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
-import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.glossary.technical.TechnicalCatalog;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.glossary.technical.TechnicalOutbox;
+import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex.IndexAction;
-import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO;
-import org.openmetadata.service.jdbi3.TechnicalSourceStateDAO.RecordIdentity;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 
 /**
  * Rebuilds `technical_dictionary_search_index` from the database into a new physical index and
@@ -65,7 +64,7 @@ public final class TechnicalIndexRebuilder {
 
   private static Map<String, Object> rebuildLocked() {
     final String physicalIndex = TechnicalSearchIndex.createPhysicalIndex();
-    TechnicalIndexSync.markRebuilding(true);
+    TechnicalOutbox.markRebuilding(true);
     long indexed = 0;
     try {
       indexed = fill(physicalIndex);
@@ -75,44 +74,33 @@ public final class TechnicalIndexRebuilder {
       TechnicalSearchIndex.deleteIndex(physicalIndex);
       throw exception;
     } finally {
-      TechnicalIndexSync.markRebuilding(false);
+      TechnicalOutbox.markRebuilding(false);
     }
-    TechnicalIndexSync.drainPending();
+    TechnicalOutbox.drainPending();
     LOG.info("Technical Dictionary index rebuilt into {} with {} records", physicalIndex, indexed);
     return summary(physicalIndex, indexed);
   }
 
   private static long fill(String physicalIndex) {
+    final TechnicalDocumentBuilder builder = new TechnicalDocumentBuilder();
     long indexed = 0;
-    final Glossary technical = TechnicalCatalog.findGlossary().orElse(null);
-    if (technical != null) {
-      final String prefix = TechnicalCatalog.recordHashPrefix(technical);
-      List<RecordIdentity> page = dao().listRecordsAfter(prefix, FIRST_KEY, TechnicalIndexSync.BATCH_SIZE);
-      while (!page.isEmpty()) {
-        indexed += write(physicalIndex, page);
-        page = nextPage(prefix, page);
-      }
+    List<TechnicalRecord> page = dao().listAfter(FIRST_KEY, TechnicalOutboxBatch.SIZE);
+    while (!page.isEmpty()) {
+      indexed += write(physicalIndex, builder.upserts(page));
+      page =
+          page.size() < TechnicalOutboxBatch.SIZE
+              ? List.of()
+              : dao().listAfter(page.getLast().id(), TechnicalOutboxBatch.SIZE);
     }
     return indexed;
   }
 
-  private static List<RecordIdentity> nextPage(String prefix, List<RecordIdentity> page) {
-    return page.size() < TechnicalIndexSync.BATCH_SIZE
-        ? List.of()
-        : dao().listRecordsAfter(
-            prefix, page.getLast().termId().toString(), TechnicalIndexSync.BATCH_SIZE);
-  }
-
-  private static long write(String physicalIndex, List<RecordIdentity> page) {
-    final List<IndexAction> upserts =
-        new TechnicalDocumentBuilder()
-            .buildIdentities(page).stream()
-                .filter(action -> !action.isDelete())
-                .toList();
+  private static long write(String physicalIndex, List<IndexAction> upserts) {
     final List<String> failed = TechnicalSearchIndex.bulkInto(physicalIndex, upserts);
     if (!failed.isEmpty()) {
       throw new TechnicalIndexUnavailableException(
-          String.format("Rebuild rejected %d documents, for example %s", failed.size(), failed.getFirst()));
+          String.format(
+              "Rebuild rejected %d documents, for example %s", failed.size(), failed.getFirst()));
     }
     return upserts.size();
   }
@@ -122,11 +110,18 @@ public final class TechnicalIndexRebuilder {
     summary.put("index", physicalIndex);
     summary.put("alias", TechnicalSearchIndex.alias());
     summary.put("indexed", indexed);
-    summary.put("pending", TechnicalIndexSync.pendingCount());
+    summary.put("pending", TechnicalOutbox.pendingCount());
     return summary;
   }
 
-  private static TechnicalSourceStateDAO dao() {
-    return Entity.getJdbi().onDemand(TechnicalSourceStateDAO.class);
+  private static TechnicalDictionaryDAO dao() {
+    return Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
+  }
+
+  /** Page size of a rebuild read. */
+  private static final class TechnicalOutboxBatch {
+    private static final int SIZE = 500;
+
+    private TechnicalOutboxBatch() {}
   }
 }

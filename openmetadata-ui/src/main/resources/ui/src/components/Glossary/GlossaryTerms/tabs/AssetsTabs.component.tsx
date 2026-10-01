@@ -71,6 +71,8 @@ import {
   getGlossaryTermByFQN,
   removeAssetsFromGlossaryTerm,
 } from '../../../../rest/glossaryAPI';
+import { getCdeTechnicalAssets } from '../../../../rest/technicalDictionaryAPI';
+import { isDataDictionaryGlossary } from '../../../../constants/Glossary.contant';
 import { showErrorToast } from '../../../../utils/ToastUtils';
 import {
   findSurvivorshipRule,
@@ -134,6 +136,7 @@ const AssetsTabs = forwardRef(
       assetCount,
       preloadedData,
       skipSearch = false,
+      selectFirstAsset = true,
       activeEntity: propsActiveEntity,
     }: AssetsTabsProps,
     ref
@@ -185,14 +188,57 @@ const AssetsTabs = forwardRef(
       }
     }, [propsActiveEntity]);
 
+    // Ranks of a CDE live on its Technical Dictionary bindings, not on the term's extension.
+    const [technicalRules, setTechnicalRules] = useState<SurvivorshipRule[]>(
+      []
+    );
+
+    useEffect(() => {
+      const term = activeEntity as GlossaryTerm | undefined;
+      if (
+        type !== AssetsOfEntity.GLOSSARY ||
+        !term?.id ||
+        !isDataDictionaryGlossary(
+          term.fullyQualifiedName,
+          term.glossary?.name,
+          term.glossary?.displayName
+        )
+      ) {
+        setTechnicalRules([]);
+
+        return undefined;
+      }
+      let active = true;
+      getCdeTechnicalAssets(term.id, 100, 0)
+        .then((page) => {
+          active &&
+            setTechnicalRules(
+              page.data
+                .filter((row) => row.rank && row.columnFqn)
+                .map((row) => ({
+                  assetFqn: row.columnFqn,
+                  rank: row.rank as number,
+                }))
+            );
+        })
+        .catch(() => active && setTechnicalRules([]));
+
+      return () => {
+        active = false;
+      };
+    }, [type, activeEntity]);
+
     const survivorshipRules = useMemo<SurvivorshipRule[]>(() => {
       if (type !== AssetsOfEntity.GLOSSARY || !activeEntity) {
         return [];
       }
       const glossary = activeEntity as GlossaryTerm;
 
-      return parseSurvivorshipRules(glossary.extension?.survivorshipRules);
-    }, [type, activeEntity]);
+      return [
+        ...parseSurvivorshipRules(glossary.extension?.survivorshipRules),
+        ...technicalRules,
+      ];
+    }, [type, activeEntity, technicalRules]);
 
     const survivorshipRulesMap = useMemo<Map<string, SurvivorshipRule>>(() => {
       const map = new Map<string, SurvivorshipRule>();
@@ -334,7 +380,7 @@ const AssetsTabs = forwardRef(
           setData(preloadedData);
           handlePagingChange({ total: assetCount ?? preloadedData.length });
           setIsLoading(false);
-          if (preloadedData[0]) {
+          if (selectFirstAsset && preloadedData[0]) {
             setSelectedCard(preloadedData[0]._source);
           } else {
             setSelectedCard(undefined);
@@ -461,6 +507,7 @@ const AssetsTabs = forwardRef(
         assetCount,
         skipSearch,
         preloadedData,
+        selectFirstAsset,
         sortAssetsWithRules,
         type,
       ]

@@ -7,16 +7,12 @@ package org.openmetadata.service.glossary.technical;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.openmetadata.schema.type.EntityReference;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.type.TermRelation;
 
 /** Builders shared by the Technical Dictionary import tests. */
 final class TechnicalImportTestSupport {
@@ -46,62 +42,100 @@ final class TechnicalImportTestSupport {
     }
   }
 
-  static Map<String, Object> record(String table, String column, String status, String recordType) {
-    Map<String, Object> row = new LinkedHashMap<>();
-    row.put("termId", UUID.nameUUIDFromBytes((table + column).getBytes()).toString());
-    row.put("businessVersion", "1.0");
-    row.put("recordType", recordType);
-    row.put("entityStatus", status);
-    row.put("workingRevision", 3);
-    row.put(
-        "extension",
-        Map.of(
-            TechnicalDictionaryProfile.SOURCE_DATABASE, "core",
-            TechnicalDictionaryProfile.SOURCE_SCHEMA, "dbo",
-            TechnicalDictionaryProfile.SOURCE_TABLE, table,
-            TechnicalDictionaryProfile.SOURCE_COLUMN, column,
-            TechnicalDictionaryProfile.SOURCE_SERVICE, "ipcas"));
-    return row;
+  /** A declared record at {@code core.dbo.<table>.<column>} of service ipcas, at revision 3. */
+  static TechnicalRecord record(String table, String column) {
+    return record(table, column, "ipcas");
   }
 
-  static TagLabel tag(String fqn) {
-    return new TagLabel()
-        .withTagFQN(fqn)
-        .withSource(TagLabel.TagSource.CLASSIFICATION)
-        .withLabelType(TagLabel.LabelType.MANUAL)
-        .withState(TagLabel.State.CONFIRMED);
+  static TechnicalRecord record(String table, String column, String service) {
+    return TechnicalRecord.builder()
+        .id(UUID.nameUUIDFromBytes((service + table + column).getBytes()).toString())
+        .columnKey(UUID.nameUUIDFromBytes((table + column).getBytes()).toString())
+        .columnFqn(service + ".core.dbo." + table + "." + column)
+        .sourceService(service)
+        .sourceDatabase("core")
+        .sourceSchema("dbo")
+        .sourceTable(table)
+        .sourceColumn(column)
+        .sourceStatus(TechnicalDictionaryProfile.SOURCE_AVAILABLE)
+        .revision(3)
+        .build();
   }
 
-  static TermRelation relation(UUID cde) {
-    return new TermRelation().withTerm(new EntityReference().withId(cde).withType("glossaryTerm"));
+  static TechnicalRecord withCde(TechnicalRecord record, int rank) {
+    return record.toBuilder().cdeTermId(CDE_ID.toString()).rank(rank).build();
   }
 
-  /** Lookups that know one CDE, one Team and the tags whose display name is a known label. */
+  /** A physical Column of ipcas.core.dbo.<table> that no record declares yet. */
+  static TechnicalColumnSource undeclared(String table, String column) {
+    String fqn = "ipcas.core.dbo." + table + "." + column;
+    return new TechnicalColumnSource(
+        TechnicalColumnSource.columnKey(fqn),
+        fqn,
+        column,
+        "Mô tả",
+        TechnicalColumnSource.sourceExtension(fqn, "varchar(10)", 10, null, null));
+  }
+
+  static TechnicalRecordValidator validator() {
+    return new TechnicalRecordValidator(
+        new TechnicalRecordValidator.ReferenceLookup() {
+          @Override
+          public boolean tagExists(String tagFqn) {
+            return true;
+          }
+
+          @Override
+          public boolean teamExists(UUID teamId) {
+            return true;
+          }
+        });
+  }
+
   static TechnicalImportLookups lookups() {
+    return lookups(Map.of(), List.of());
+  }
+
+  /**
+   * Lookups that know one CDE, one Team and the tags whose display name is a known label.
+   * {@code holders} maps {@code "<cde>#<rank>"} to the record that holds that rank.
+   */
+  static TechnicalImportLookups lookups(
+      Map<String, TechnicalRecord> holders, List<TechnicalColumnSource> columns) {
     return new TechnicalImportLookups() {
       @Override
-      public TagLabel tag(String classification, String displayName) {
+      public String tag(String classification, String displayName) {
         if (!"T+1".equals(displayName) && !"Dữ liệu nguyên tố".equals(displayName)) {
           throw new LookupException("TD_REFERENCE_NOT_FOUND", "Không tìm thấy tag " + displayName);
         }
-        return TechnicalImportTestSupport.tag(
-            classification + ("T+1".equals(displayName) ? ".T1" : ".AtomicDataElement"));
+        return classification + ("T+1".equals(displayName) ? ".T1" : ".AtomicDataElement");
       }
 
       @Override
-      public EntityReference team(String displayName) {
+      public UUID team(String displayName) {
         if (!"Ban KHCL".equals(displayName)) {
           throw new LookupException("TD_REFERENCE_NOT_FOUND", "Không tìm thấy Team " + displayName);
         }
-        return new EntityReference().withId(TEAM_ID).withType("team").withName("khcl");
+        return TEAM_ID;
       }
 
       @Override
-      public TermRelation cde(String code) {
+      public TechnicalCdeInfo cde(String code) {
         if (!"CDE1".equalsIgnoreCase(code)) {
-          throw new LookupException("TD_CDE_SCOPE_MISMATCH", "CDE không hợp lệ " + code);
+          throw new LookupException(TechnicalDictionaryErrors.CDE_SCOPE_NOT_ACTIVE, "CDE " + code);
         }
-        return relation(CDE_ID);
+        return new TechnicalCdeInfo(
+            CDE_ID.toString(), "CDE1", "Tên", "1.0", "Data Dictionary.CDE1@v1", List.of());
+      }
+
+      @Override
+      public List<TechnicalColumnSource> columns(String database, String schema, String table) {
+        return columns;
+      }
+
+      @Override
+      public TechnicalRecord rankHolder(String cdeId, int rank) {
+        return holders.get(cdeId + "#" + rank);
       }
     };
   }

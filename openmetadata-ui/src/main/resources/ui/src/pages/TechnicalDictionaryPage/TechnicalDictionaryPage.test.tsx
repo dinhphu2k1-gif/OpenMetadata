@@ -12,56 +12,57 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
-  createGlossaryTermWorkingVersion,
-  transitionGlossaryTermWorkflow,
-  updateGlossaryTermWorkingVersion,
-} from '../../rest/glossaryAPI';
-import { deleteTechnicalDraft } from '../../rest/technicalDictionaryAPI';
+  deleteTechnicalRecord,
+  exportTechnicalSnapshot,
+  updateTechnicalRecord,
+} from '../../rest/technicalDictionaryAPI';
+import { showErrorToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
-import TechnicalDictionaryPage from './TechnicalDictionaryPage.component';
+import TechnicalDictionaryPage, {
+  isResetBannerVisible,
+} from './TechnicalDictionaryPage.component';
 
 const ROW = {
-  key: 'term-1:2.0:working',
+  key: 'term-1',
   termId: 'term-1',
-  businessVersion: '2.0',
-  parentBusinessVersion: '2',
-  status: 'Draft',
-  recordType: 'working',
-  workingRevision: 3,
+  revision: 3,
   columnName: 'NAME',
   columnFqn: 'ipcas.core.dbo.CUSTOMER.NAME',
   description: 'Tên khách hàng',
-  cdeRelation: undefined,
+  cdeTermId: 'cde-1',
+  cdeCode: 'CDE1',
+  cdeName: 'Tên khách hàng',
 } as unknown as TechnicalDictionaryRow;
 
-const mockCatalogState = {
-  glossary: { id: 'glossary-1' },
-  catalog: {
-    businessVersion: '2',
-    status: 'Draft',
-    isWorking: true,
-    isReadOnly: false,
-    workingRevision: 1,
+const mockContextState = {
+  context: {
+    glossaryId: 'glossary-1',
+    dataDictionaryVersion: '2' as string | null,
+    previousDataDictionaryVersion: '1',
+    resetAt: undefined as number | undefined,
   },
-  versions: ['2'],
+  dataDictionaryVersion: '2' as string | undefined,
   capabilities: {
-    canViewWorking: true,
-    canEditWorking: true,
-    canSubmit: true,
-    canApprove: true,
-    canReject: true,
-    canCreateVersion: true,
-    canArchive: false,
+    canView: true,
+    canEdit: true,
+    canImport: true,
+    canExport: true,
   },
   isLoading: false,
   error: undefined as string | undefined,
-  selectVersion: jest.fn(),
   reload: jest.fn().mockResolvedValue(undefined),
 };
 const mockReloadRecords = jest.fn();
 
-jest.mock('../../hooks/useTechnicalDictionaryCatalog', () => ({
-  useTechnicalDictionaryCatalog: () => mockCatalogState,
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => jest.fn(),
+}));
+
+jest.mock('../../hooks/authHooks', () => ({
+  useAuth: () => ({ isAdminUser: false }),
+}));
+jest.mock('../../hooks/useTechnicalDictionaryContext', () => ({
+  useTechnicalDictionaryContext: () => mockContextState,
 }));
 jest.mock('../../hooks/useTechnicalDictionaryOptions', () => ({
   useTechnicalDictionaryOptions: () => ({
@@ -91,22 +92,20 @@ jest.mock('../../hooks/useTechnicalDictionaryRecords', () => ({
     reload: mockReloadRecords,
   }),
 }));
-jest.mock('../../rest/glossaryAPI', () => ({
-  createGlossaryTermWorkingVersion: jest.fn().mockResolvedValue({}),
-  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
-  transitionGlossaryWorkflow: jest.fn().mockResolvedValue({}),
-  updateGlossaryTermWorkingVersion: jest.fn().mockResolvedValue({}),
-}));
 jest.mock('../../rest/technicalDictionaryAPI', () => ({
-  deleteTechnicalDraft: jest.fn().mockResolvedValue(undefined),
+  deleteTechnicalRecord: jest.fn().mockResolvedValue(undefined),
   exportTechnicalDictionary: jest.fn(),
-  getTechnicalStats: jest.fn().mockResolvedValue({ totalColumns: 1 }),
-}));
-jest.mock('antd', () => ({
-  ...jest.requireActual('antd'),
-  Modal: Object.assign(jest.requireActual('antd').Modal, {
-    confirm: jest.fn((config: { onOk: () => void }) => config.onOk()),
+  exportTechnicalSnapshot: jest
+    .fn()
+    .mockResolvedValue({ blob: new Blob(), fileName: 'snapshot.xlsx' }),
+  getTechnicalStats: jest.fn().mockResolvedValue({
+    totalColumns: 1,
+    totalTables: 1,
+    totalSources: 1,
+    mapped: 1,
   }),
+  rebuildTechnicalIndex: jest.fn(),
+  updateTechnicalRecord: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
@@ -115,41 +114,57 @@ jest.mock('../../utils/ToastUtils', () => ({
 jest.mock('../../components/common/Loader/Loader', () => () => (
   <div>loader</div>
 ));
+jest.mock(
+  '../../components/Modals/ConfirmationModal/ConfirmationModal',
+  () => ({
+    __esModule: true,
+    default: ({
+      visible,
+      header,
+      bodyText,
+      confirmText,
+      onConfirm,
+    }: {
+      visible: boolean;
+      header: string;
+      bodyText: string;
+      confirmText: string;
+      onConfirm: () => void;
+    }) =>
+      visible ? (
+        <div data-testid="confirmation">
+          <span>{header}</span>
+          <span>{bodyText}</span>
+          <button onClick={onConfirm}>{confirmText}</button>
+        </div>
+      ) : null,
+  })
+);
 jest.mock('./TechnicalDictionaryTable.component', () => ({
   __esModule: true,
   default: ({
-    onSubmit,
-    onApprove,
-    onReject,
-    onReopen,
     onEdit,
-    onCreateVersion,
     onDelete,
+    onView,
     rows,
   }: {
     rows: TechnicalDictionaryRow[];
-    onSubmit: (row: TechnicalDictionaryRow) => void;
-    onApprove: (row: TechnicalDictionaryRow) => void;
-    onReject: (row: TechnicalDictionaryRow) => void;
-    onReopen: (row: TechnicalDictionaryRow) => void;
     onEdit: (row: TechnicalDictionaryRow) => void;
-    onCreateVersion: (row: TechnicalDictionaryRow) => void;
+    onView: (row: TechnicalDictionaryRow) => void;
     onDelete: (row: TechnicalDictionaryRow) => void;
   }) => (
     <div data-testid="table">
-      <button onClick={() => onSubmit(rows[0])}>submit</button>
-      <button onClick={() => onApprove(rows[0])}>approve</button>
-      <button onClick={() => onReject(rows[0])}>reject</button>
-      <button onClick={() => onReopen(rows[0])}>reopen</button>
       <button onClick={() => onEdit(rows[0])}>edit</button>
-      <button onClick={() => onCreateVersion(rows[0])}>create-version</button>
+      <button onClick={() => onView(rows[0])}>view</button>
       <button onClick={() => onDelete(rows[0])}>delete</button>
     </div>
   ),
 }));
 jest.mock('./TechnicalDictionaryHeader.component', () => ({
   __esModule: true,
-  default: () => <div data-testid="header" />,
+  default: ({ dataDictionaryVersion }: { dataDictionaryVersion?: string }) => (
+    <div data-testid="header">{dataDictionaryVersion}</div>
+  ),
 }));
 jest.mock('./TechnicalRecordModal.component', () => ({
   __esModule: true,
@@ -178,8 +193,7 @@ jest.mock('./TechnicalRecordModal.component', () => ({
       </div>
     ) : null,
 }));
-jest.mock('./TechnicalBulkActionModal.component', () => () => null);
-jest.mock('./TechnicalImportModal.component', () => () => null);
+jest.mock('./TechnicalSnapshotsModal.component', () => () => null);
 jest.mock('./TechnicalDictionaryToolbar.component', () => () => null);
 jest.mock('./TechnicalAddColumnModal.component', () => () => null);
 jest.mock(
@@ -196,114 +210,148 @@ jest.mock(
 describe('TechnicalDictionaryPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCatalogState.error = undefined;
+    mockContextState.error = undefined;
+    mockContextState.dataDictionaryVersion = '2';
+    mockContextState.context.dataDictionaryVersion = '2';
+    mockContextState.context.resetAt = undefined;
+    mockContextState.capabilities.canEdit = true;
   });
 
-  it('shows a not-found result instead of a table when the catalog cannot be resolved', () => {
-    mockCatalogState.error = 'notFound';
+  it('shows an error result instead of a table when the context cannot be loaded', () => {
+    mockContextState.error = 'failed';
 
     render(<TechnicalDictionaryPage isEmbedded />);
 
     expect(
-      screen.getByText('message.technical-dictionary-not-found')
+      screen.getByText('message.technical-dictionary-load-failed')
     ).toBeInTheDocument();
     expect(screen.queryByTestId('table')).not.toBeInTheDocument();
   });
 
-  it('runs record workflow actions against the record scope with its working revision', async () => {
+  it('explains that the dictionary is unavailable until a Data Dictionary is approved', () => {
+    mockContextState.dataDictionaryVersion = undefined;
+    mockContextState.context.dataDictionaryVersion = null;
+
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('submit'));
-    fireEvent.click(screen.getByText('approve'));
-    fireEvent.click(screen.getByText('reject'));
-    fireEvent.click(screen.getByText('reopen'));
+    expect(
+      screen.getByText('message.technical-data-dictionary-not-approved')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('table')).not.toBeInTheDocument();
+  });
 
-    await waitFor(() =>
-      expect(transitionGlossaryTermWorkflow).toHaveBeenCalledTimes(4)
-    );
+  it('saves the edited values with the revision that was read, without a workflow', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
 
-    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
-      'term-1',
-      'submit',
-      { expectedRevision: 3 },
-      '2'
-    );
-    expect(transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
-      'term-1',
-      'approve',
-      { expectedRevision: 3 },
-      '2'
-    );
+    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(await screen.findByText('save'));
+
+    await waitFor(() => expect(updateTechnicalRecord).toHaveBeenCalledTimes(1));
+
+    expect(updateTechnicalRecord).toHaveBeenCalledWith('term-1', {
+      expectedRevision: 3,
+      cde: 'cde-1',
+      rank: 2,
+      elementType: 'DataElementType.AtomicDataElement',
+      generationType: undefined,
+      creationMethod: undefined,
+      timeliness: undefined,
+      systemOwnerId: 'team-1',
+    });
     expect(mockReloadRecords).toHaveBeenCalled();
   });
 
-  it('creates the next minor version of a record inside the same catalog version', async () => {
+  it('clears the CDE when the user clears the selector', async () => {
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('create-version'));
+    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(await screen.findByText('clear-cde'));
 
-    await waitFor(() =>
-      expect(createGlossaryTermWorkingVersion).toHaveBeenCalledWith(
-        'term-1',
-        '2.1',
-        '2'
-      )
-    );
+    await waitFor(() => expect(updateTechnicalRecord).toHaveBeenCalled());
+
+    expect(
+      (updateTechnicalRecord as jest.Mock).mock.calls[0][1].cde
+    ).toBeUndefined();
   });
 
-  it('saves only editable fields and never sends server-owned extension keys', async () => {
+  it('deletes a declaration with its revision after confirmation', async () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('delete'));
+
+    expect(deleteTechnicalRecord).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('label.delete'));
+
+    await waitFor(() =>
+      expect(deleteTechnicalRecord).toHaveBeenCalledWith('term-1', 3)
+    );
+
+    expect(mockReloadRecords).toHaveBeenCalled();
+  });
+
+  it('reloads the list and explains a revision conflict', async () => {
+    (updateTechnicalRecord as jest.Mock).mockRejectedValueOnce({
+      response: { status: 409, data: { code: 'TD_RECORD_REVISION_CONFLICT' } },
+    });
     render(<TechnicalDictionaryPage isEmbedded />);
 
     fireEvent.click(screen.getByText('edit'));
     fireEvent.click(await screen.findByText('save'));
 
     await waitFor(() =>
-      expect(updateGlossaryTermWorkingVersion).toHaveBeenCalledTimes(1)
+      expect(showErrorToast).toHaveBeenCalledWith(
+        'message.technical-record-changed-by-someone'
+      )
     );
-    const [termId, revision, payload, scope] = (
-      updateGlossaryTermWorkingVersion as jest.Mock
-    ).mock.calls[0];
 
-    expect(termId).toBe('term-1');
-    expect(revision).toBe(3);
-    expect(scope).toBe('2');
-    expect(Object.keys(payload.extension).sort()).toEqual([
-      'survivorshipRank',
-      'systemOwner',
-    ]);
-    expect(payload.extension.systemOwner).toMatchObject({
-      id: 'team-1',
-      type: 'team',
-    });
-    expect(payload.tags).toHaveLength(1);
-    expect(payload.tags[0].tagFQN).toBe('DataElementType.AtomicDataElement');
-    expect(payload.owners).toEqual([]);
-  });
-
-  it('deletes a Draft declaration in the record scope after confirmation', async () => {
-    render(<TechnicalDictionaryPage isEmbedded />);
-
-    fireEvent.click(screen.getByText('delete'));
-
-    await waitFor(() =>
-      expect(deleteTechnicalDraft).toHaveBeenCalledWith('term-1', '2')
-    );
     expect(mockReloadRecords).toHaveBeenCalled();
   });
 
-  it('clears the CDE relation when the user clears the selector', async () => {
+  it('reloads the context when the record vanished in a reset', async () => {
+    (updateTechnicalRecord as jest.Mock).mockRejectedValueOnce({
+      response: { status: 404, data: { code: 'TD_RECORD_NOT_FOUND' } },
+    });
     render(<TechnicalDictionaryPage isEmbedded />);
 
     fireEvent.click(screen.getByText('edit'));
-    fireEvent.click(await screen.findByText('clear-cde'));
+    fireEvent.click(await screen.findByText('save'));
 
-    await waitFor(() =>
-      expect(updateGlossaryTermWorkingVersion).toHaveBeenCalled()
+    await waitFor(() => expect(mockContextState.reload).toHaveBeenCalled());
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      'message.technical-dictionary-was-reset'
     );
+  });
+
+  it('offers the previous snapshot in the banner after a reset', async () => {
+    mockContextState.context.resetAt = Date.now();
+
+    render(<TechnicalDictionaryPage isEmbedded />);
 
     expect(
-      (updateGlossaryTermWorkingVersion as jest.Mock).mock.calls[0][2]
-        .relatedTerms
-    ).toEqual([]);
+      screen.getByTestId('technical-dictionary-reset-banner')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('technical-reset-banner-download'));
+
+    await waitFor(() =>
+      expect(exportTechnicalSnapshot).toHaveBeenCalledWith('1')
+    );
+  });
+});
+
+describe('isResetBannerVisible', () => {
+  const now = 1_700_000_000_000;
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('shows for a month after a reset', () => {
+    expect(isResetBannerVisible(now - 29 * DAY, now, false)).toBe(true);
+    expect(isResetBannerVisible(now - 31 * DAY, now, false)).toBe(false);
+  });
+
+  it('stays hidden when there was no reset or the user closed it', () => {
+    expect(isResetBannerVisible(undefined, now, false)).toBe(false);
+    expect(isResetBannerVisible(now, now, true)).toBe(false);
   });
 });

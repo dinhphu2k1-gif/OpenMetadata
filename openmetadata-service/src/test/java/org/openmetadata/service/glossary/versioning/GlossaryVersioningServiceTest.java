@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +24,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 
 class GlossaryVersioningServiceTest {
 
@@ -70,6 +73,52 @@ class GlossaryVersioningServiceTest {
         GlossaryVersioningService.selectLatestPublishedInScope(List.of(v20, v21), "2");
 
     assertEquals(v21.snapshotId(), selected.snapshotId());
+  }
+
+  @Test
+  void catalogApprovalPublishesEveryWorkingRecordRegardlessOfRecordStatus() {
+    GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);
+    UUID glossaryId = UUID.randomUUID();
+    WorkingVersionRecord draft = working(glossaryId, "2", "2.0", "Draft");
+    WorkingVersionRecord rejected = working(glossaryId, "2", "2.1", "Rejected");
+
+    when(dao.listWorkingByGlossaryAndParent("glossaryTerm", glossaryId, "2"))
+        .thenReturn(List.of(draft, rejected));
+    when(dao.nextPublicationSequence(eq("glossaryTerm"), any(UUID.class))).thenReturn(1L);
+    when(dao.deleteWorking(eq("glossaryTerm"), any(UUID.class), eq("2"), anyLong())).thenReturn(1);
+
+    List<PublishedSnapshotRecord> published =
+        GlossaryVersioningService.publishWorkingTerms(dao, glossaryId, "2", "reviewer");
+
+    assertEquals(2, published.size());
+    assertTrue(
+        published.stream()
+            .allMatch(row -> row.payload().contains("\"entityStatus\":\"Approved\"")));
+    verify(dao, times(2))
+        .insertSnapshot(
+            any(UUID.class),
+            eq("glossaryTerm"),
+            any(UUID.class),
+            eq(glossaryId),
+            eq("2"),
+            anyString(),
+            eq(1.0),
+            eq(1L),
+            anyString(),
+            anyString(),
+            anyLong(),
+            eq("reviewer"));
+    verify(dao).deleteWorking("glossaryTerm", draft.entityId(), "2", draft.revision());
+    verify(dao).deleteWorking("glossaryTerm", rejected.entityId(), "2", rejected.revision());
+    verify(dao, times(2))
+        .upsertPublishedHead(eq("glossaryTerm"), any(UUID.class), eq("2"), any(UUID.class), eq(1L));
+    verify(dao, times(2))
+        .insertOutbox(
+            any(UUID.class),
+            any(UUID.class),
+            eq(GlossaryVersioningService.SNAPSHOT_UPSERT_EVENT),
+            anyString(),
+            anyLong());
   }
 
   @Test
@@ -159,6 +208,30 @@ class GlossaryVersioningServiceTest {
         "hash",
         1,
         "admin",
+        null,
+        null);
+  }
+
+  private static WorkingVersionRecord working(
+      UUID glossaryId, String parentBusinessVersion, String businessVersion, String status) {
+    UUID entityId = UUID.randomUUID();
+    return new WorkingVersionRecord(
+        UUID.randomUUID(),
+        "glossaryTerm",
+        entityId,
+        glossaryId,
+        parentBusinessVersion,
+        businessVersion,
+        status,
+        3,
+        1.0,
+        "{\"id\":\"" + entityId + "\",\"name\":\"term\",\"entityStatus\":\"" + status + "\"}",
+        1,
+        "author",
+        1,
+        "author",
+        null,
+        null,
         null,
         null);
   }

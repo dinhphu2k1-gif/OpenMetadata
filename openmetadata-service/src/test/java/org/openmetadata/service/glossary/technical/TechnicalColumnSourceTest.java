@@ -11,9 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.junit.jupiter.api.Test;
@@ -67,18 +65,17 @@ class TechnicalColumnSourceTest {
   }
 
   @Test
-  void detectsSnapshotDriftIncludingNumericNormalization() {
+  void detectsSnapshotDrift() {
     TechnicalColumnSource source =
         TechnicalColumnSource.columnsOf(table(List.of(column("name")))).getFirst();
-    Map<String, Object> stored =
-        JsonUtils.readValue(JsonUtils.pojoToJson(source.sourceExtension()), Map.class);
+    TechnicalRecord stored = source.into(TechnicalRecord.builder()).id("r1").build();
 
-    assertTrue(source.isSnapshotOf(stored, "Tên khách hàng"));
-    assertFalse(source.isSnapshotOf(stored, "Mô tả khác"));
-
-    Map<String, Object> drifted = new HashMap<>(stored);
-    drifted.put(TechnicalDictionaryProfile.SOURCE_DATA_LENGTH, 50L);
-    assertFalse(source.isSnapshotOf(drifted, "Tên khách hàng"));
+    assertTrue(source.isSnapshotOf(stored));
+    assertFalse(source.isSnapshotOf(stored.toBuilder().description("Mô tả khác").build()));
+    assertFalse(source.isSnapshotOf(stored.toBuilder().dataLength(50).build()));
+    assertEquals("varchar(100)", stored.dataType());
+    assertEquals("ipcas", stored.sourceService());
+    assertEquals("name", stored.sourceColumn());
   }
 
   @Test
@@ -111,10 +108,10 @@ class TechnicalColumnSourceTest {
     SQLException timeout = new SQLException("timeout", "57014");
 
     assertTrue(
-        TechnicalRecordWriter.isConstraintViolation(
+        TechnicalRecordService.isConstraintViolation(
             new UnableToExecuteStatementException(duplicate, null)));
     assertFalse(
-        TechnicalRecordWriter.isConstraintViolation(
+        TechnicalRecordService.isConstraintViolation(
             new UnableToExecuteStatementException(timeout, null)));
   }
 }

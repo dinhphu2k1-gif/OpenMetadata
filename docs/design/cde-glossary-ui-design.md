@@ -64,7 +64,7 @@ Quy tắc:
 
 - **Working version**: bản đang soạn thảo hoặc đang chờ duyệt. Chỉ người có quyền quản trị nội dung được nhìn thấy.
 - **Published version**: version đã Approved. Data Dictionary Approved mới nhất là bản đang hoạt động: business payload giữ nguyên nhưng danh sách CDE hiển thị thay đổi khi CDE cùng scope được tạo/duyệt. Khi successor được Approved, bản cũ mới đóng băng archive manifest và trở thành `Archived` bất biến.
-- Nội dung snapshot Approved của từng CDE là bất biến. Mỗi Data Dictionary business version sở hữu tập CDE identity độc lập: hai CDE cùng mã ở scope `1` và `2` có `termId` khác nhau, nội dung và vòng đời không liên quan nhau. Working/head vẫn lưu `parentBusinessVersion` để cách ly tuyệt đối theo scope.
+- Nội dung snapshot Approved của từng CDE chỉ thay đổi qua luồng **Sửa phiên bản** (§5.6): bản sửa được duyệt ghi đè snapshot cùng `businessVersion`, nội dung cũ chuyển vào bảng lịch sử. Không có thao tác hủy duyệt. Mỗi Data Dictionary business version sở hữu tập CDE identity độc lập: hai CDE cùng mã ở scope `1` và `2` có `termId` khác nhau, nội dung và vòng đời không liên quan nhau. Working/head vẫn lưu `parentBusinessVersion` để cách ly tuyệt đối theo scope.
 
 ## 3. Mô hình trạng thái
 
@@ -84,7 +84,9 @@ Quy tắc:
 - `Draft`: được chỉnh sửa bởi Proposer và các Role có quyền quản trị.
 - `InReview`: khóa các trường nghiệp vụ; chỉ cho phép Reviewer/Steward phê duyệt hoặc từ chối.
 - `Rejected`: không hiển thị cho Consumer; người soạn thảo có thể đưa về Draft để sửa.
-- `Approved`: Data Dictionary mới nhất đang hoạt động; Consumer thấy các CDE cùng tiền tố đã Approved. Việc tạo/duyệt CDE không đổi trạng thái Data Dictionary.
+- `Approved`: Data Dictionary mới nhất đang hoạt động. Khi phê duyệt catalog, backend phê duyệt
+  nguyên tử toàn bộ CDE working trong đúng scope rồi mới publish catalog; Consumer thấy toàn bộ
+  các bản ghi đó. Việc tạo/duyệt thêm CDE sau đó không đổi trạng thái Data Dictionary.
 - `Archived`: Data Dictionary cũ và các CDE Approved của nó sau khi successor được Approved; chỉ đọc, không nhận thêm mutation. CDE non-Approved của predecessor bị xóa tại cutover.
 - Không coi thiếu `entityStatus` là Approved. Phương án triển khai mới không hỗ trợ dữ liệu thiếu trạng thái; môi trường phải được khởi tạo lại với dữ liệu tuân thủ schema mới.
 
@@ -129,7 +131,8 @@ Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ vi�
 | Chỉnh sửa Draft | Có | Không mặc định | Không | Có | Không | Không |
 | Gửi duyệt | Có | Không mặc định | Không | Có | Không | Không |
 | Approve/Reject | Có | Có | Có khi được gán | Không | Không | Không |
-| Thu hồi Approved | Có | Có theo policy | Không mặc định | Không | Không | Không |
+| Sửa phiên bản Approved (tạo bản nháp sửa) | Có | Không mặc định | Không | Có | Không | Không |
+| Hủy duyệt / thu hồi Approved | Không | Không | Không | Không | Không | Không |
 | Xóa | Có | Không | Không | Theo policy với Draft | Không | Không |
 | Xem/chọn version | Có | Có | Có | Có | Active Approved và Archived | Active Approved và Archived |
 
@@ -201,7 +204,8 @@ Quy tắc:
 
 - Mỗi CDE identity chỉ thuộc đúng một `parentBusinessVersion` và có tối đa một working version. Hai bản ghi cùng mã ở scope `N` và `N+1` là hai identity khác nhau, vì vậy có thể có working độc lập; mọi lookup/mutation phải mang scope Data Dictionary cha.
 - Chỉnh sửa và lưu nháp nhiều lần (Save Draft) chỉ cập nhật đè trực tiếp (in-place update) lên bản Draft hiện hành, **không tạo `businessVersion` mới** và không tạo thêm published snapshot ngầm nhằm tối ưu dung lượng lưu trữ (tránh storage bloating).
-- Snapshot Approved của CDE là bất biến; việc sửa đổi hoặc tạo version mới của CDE không làm thay đổi nội dung các published snapshot đã có.
+- Snapshot Approved của CDE chỉ bị thay đổi qua luồng Sửa phiên bản (§5.6). Tạo version mới không làm thay đổi nội dung các published snapshot đã có.
+- Không có thao tác hủy duyệt (revoke) cho CDE, DQ Rule hay Data Dictionary; endpoint `POST .../published/latest/archive` đã bị gỡ. Snapshot CDE chỉ chuyển sang Archived khi Data Dictionary cha được cutover.
 
 ### 5.5. Tạo business version mới của CDE
 
@@ -211,6 +215,25 @@ Khi tạo CDE version mới trong Data Dictionary `N`:
 2. Version bắt buộc có dạng `N.MINOR`; lần đầu của scope là `N.0`, các version sau tăng minor trong đúng scope.
 3. Tạo CDE trong scope mới luôn tạo identity mới và form bắt đầu rỗng; không dùng lại `id`, `fullyQualifiedName` hay business content của CDE cùng mã ở scope trước. Tạo minor version trong cùng scope mới giữ identity kỹ thuật và vẫn bắt đầu với business content rỗng.
 4. Việc Create không đổi status CDE hiện hành hoặc Data Dictionary. Trong scope active, Consumer tiếp tục thấy Approved head cũ cùng scope cho tới khi version mới Approved; không bao giờ fallback chéo scope.
+
+### 5.6. Sửa phiên bản đã phê duyệt
+
+Áp dụng cho CDE và DQ Rule (cùng entity `glossaryTerm`). Data Dictionary không có luồng này; muốn đổi Data Dictionary thì tạo business version `N+1`.
+
+1. Người dùng mở một version Approved bất kỳ của CDE (không chỉ bản mới nhất) và bấm **Sửa phiên bản**. Nút chỉ hiện khi có quyền `CreateVersion`, version chưa Archived và CDE chưa có working version.
+2. Backend tạo working `Draft` **cùng `businessVersion`** với version đó, payload sao chép nguyên nội dung snapshot. Mỗi CDE identity vẫn chỉ có tối đa một working version: đang có bản nháp sửa thì không tạo được version mới và ngược lại (`409`).
+3. Bản nháp sửa đi qua đúng luồng Lưu nháp → Gửi duyệt → Phê duyệt/Từ chối → Chỉnh sửa lại như mọi working version.
+4. Khi Phê duyệt, trong một transaction backend:
+   - chép dòng snapshot hiện tại sang `glossary_business_snapshot_history` kèm `supersededAt`, `supersededBy`;
+   - ghi đè `payload`, `contentHash`, `publishedAt`, `publishedBy` của snapshot, giữ nguyên `snapshotId`, `businessVersion`, `publicationSequence`; điều kiện `contentHash` cũ chống ghi đè đồng thời;
+   - không đổi published head, nên version mới nhất vẫn là version mới nhất; manifest Data Dictionary tham chiếu theo `snapshotId` nên tự hiển thị nội dung đã sửa;
+   - đưa sự kiện `PUBLISHED_SNAPSHOT_UPSERT` vào outbox để làm mới search index và Từ điển kỹ thuật. Bảng outbox có ràng buộc `UNIQUE (snapshotId, eventType)` và snapshot đã có sẵn sự kiện này từ lần duyệt đầu, nên bản sửa **đặt lại dòng hiện có** về chờ xử lý (payload mới, `createdAt = now`, `processedAt = NULL`, `attempts = 0`, `lastError = NULL`); chỉ chèn dòng mới khi chưa có. Chèn trùng sẽ vi phạm ràng buộc và làm hỏng transaction duyệt.
+5. Nếu Data Dictionary cha được cutover trước khi bản sửa được duyệt, working bị xóa theo cutover như mọi working của scope cũ; snapshot Archived không sửa được.
+6. Trong lúc chờ duyệt, Consumer vẫn thấy nội dung Approved hiện tại. Bảng CDE và bộ chọn version hiển thị đồng thời dòng Approved và dòng bản nháp sửa (nhãn "Bản nháp sửa").
+
+**Màn hình Lịch sử sửa đổi:** trên trang chi tiết CDE/DQ Rule, khi đang xem một version Approved hoặc Archived (không phải bản nháp), header có nút **Lịch sử sửa đổi** (hiện cho mọi người xem được version đó). Nút mở modal "Lịch sử sửa đổi của phiên bản X" gọi `GET .../published/{businessVersion}/history`, liệt kê các nội dung đã bị thay thế, mới nhất trước và mở sẵn mục đầu. Mỗi mục có tiêu đề "Bị thay thế lúc … bởi …"; phần mở gồm "Được phê duyệt lúc … bởi …", Tên hiển thị, Mô tả và 12 ký tự đầu của `contentHash`. Version chưa từng sửa hiển thị trạng thái trống "Phiên bản này chưa từng được sửa." Modal chỉ đọc, hiện chưa so sánh chi tiết từng trường.
+
+Bảng lịch sử `glossary_business_snapshot_history`: `historyId`, `snapshotId`, `entityType`, `entityId`, `glossaryId`, `parentBusinessVersion`, `businessVersion`, `nativeVersion`, `publicationSequence`, `payload`, `contentHash`, `publishedAt`, `publishedBy`, `supersededAt`, `supersededBy`. Mỗi lần sửa được duyệt thêm đúng một dòng; dòng lịch sử không bao giờ bị sửa hoặc xóa.
 
 ## 6. Luồng màn hình Glossary
 
@@ -381,7 +404,11 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 
 #### 3. Các Tab chức năng:
 - **Tab Tổng quan (`Overview`):** Hiển thị toàn bộ thông tin cơ bản, mô tả, phân loại tags và các thuộc tính mở rộng Custom Properties của CDE.
-- **Tab Tài sản liên kết (`Assets`):** Danh sách các bảng dữ liệu, cột kỹ thuật được gắn ánh xạ (mapping) với CDE này.
+- **Tab Tài sản liên kết (`Assets`):** Danh sách các cột được Từ điển kỹ thuật gán với CDE này. Liên kết trỏ tới CDE identity nên bao trùm mọi version `N.x`: mở CDE ở version nào trong cùng scope cũng thấy cùng một danh sách. Từ điển kỹ thuật chỉ gắn với Data Dictionary đang hiệu lực và bị làm mới khi Data Dictionary có phiên bản mới được phê duyệt ([Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) §9, §11.5). Vì vậy:
+  - CDE thuộc Data Dictionary đang hiệu lực: danh sách cột hiện hành của Từ điển kỹ thuật.
+  - CDE thuộc Data Dictionary đã Archived: danh sách cột **tại thời điểm cutover**, đọc từ bản chụp, chỉ đọc, kèm banner thời điểm lưu trữ.
+  - CDE thuộc Data Dictionary đang soạn: chưa có liên kết.
+- **Tab Quy tắc chất lượng dữ liệu (`Data Quality Rules`):** Danh sách DQ Rule đang liên kết với CDE này (Mã quy tắc, Tên quy tắc, Trạng thái, link sang trang chi tiết DQ Rule). Nguồn là relation read model theo `termId` của CDE, không quét text extension. Giống tab Assets, danh sách giống nhau ở mọi version của CDE trong scope. Consumer chỉ thấy DQ Rule `Approved`.
 *(Sub-terms không thuộc mô hình nghiệp vụ và không được tạo. UI ẩn Sub-terms cùng các tab kỹ thuật dư thừa như Activity Feed, Data Observability và Custom Properties raw theo cơ chế `CDE_RESTRICTED_TABS`.)*
 
 
@@ -593,6 +620,14 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Gọi: `transitionGlossaryTermWorkflow(id, 'createDraft', { businessVersion: '2.1', parentBusinessVersion: '2' })`
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working` với `parentBusinessVersion` trong typed request.
   * *Hành vi:* Khởi tạo Draft trắng đúng scope, chỉ giữ định danh kỹ thuật. Không kế thừa content từ version trước; thao tác Create không đổi status version hiện hành hoặc Data Dictionary.
+* **Sửa phiên bản Approved (§5.6):**
+  * Gọi: `createGlossaryTermCorrection(id, businessVersion, parentBusinessVersion)`
+  * Endpoint backend: `POST /v1/glossaryTerms/{id}/published/{businessVersion}/correction?parentBusinessVersion={N}`
+  * *Hành vi:* Tạo working `Draft` cùng `businessVersion`, sao chép nội dung snapshot. `404` nếu version không thuộc scope, `409` nếu version đã Archived hoặc CDE đã có working, `403` nếu thiếu `CreateVersion`.
+* **Lịch sử nội dung đã bị ghi đè của một version:**
+  * Gọi: `getGlossaryTermCorrectionHistory(id, businessVersion, parentBusinessVersion)`
+  * Endpoint backend: `GET /v1/glossaryTerms/{id}/published/{businessVersion}/history?parentBusinessVersion={N}`
+  * *Hành vi:* Trả các nội dung Approved trước đó của version, mới nhất trước, mỗi dòng có `supersededAt`, `supersededBy`; cùng quy tắc quyền xem với chi tiết bản phát hành.
 * **Lưu nháp CDE in-place (Save Draft):**
   * Gọi: `updateGlossaryTermWorkingVersion(id, expectedRevision, payload)`
   * Endpoint backend: `PATCH /v1/glossaryTerms/{id}/working?parentBusinessVersion={N}`
@@ -622,14 +657,12 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 
 ### 9.6. Nhóm API Tài sản liên kết (Tab Assets)
 
-* **Backend Endpoint:** `GET /v1/search/query` hoặc `GET /v1/glossaryTerms/{termId}/assets`
-* **Frontend Function:** `getGlossaryTermAssets(termId, params)`
+* **Backend Endpoint:** `GET /v1/glossaryTerms/{termId}/technicalAssets?limit=15&offset=0`
+* **Frontend Function:** `getCdeTechnicalAssets(termId, params)`
 * **Màn hình sử dụng:** Tab Tài sản liên kết (`AssetsTabs`) trên trang chi tiết CDE.
-* **Tham số:**
-  * `index=table_search_index`
-  * `query_filter={"query":{"bool":{"must":[{"term":{"tags.tagFQN.keyword":"{scopedCdeFqn}"}}]}}}`; asset/tag relationship của CDE scope `1` không tự chuyển sang identity cùng mã ở scope `2`.
-  * `size=15&from=0`
-* **Response:** Danh sách các bảng dữ liệu, cột kỹ thuật được gắn ánh xạ (tagging) với CDE này.
+* **Hành vi:** Server tự chọn nguồn theo trạng thái scope của CDE ([Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) §11.5): scope đang hiệu lực đọc `technical_dictionary_search_index` theo `cde.id`; scope Archived đọc `technical_binding_snapshot`. UI không truyền `businessVersion` hoặc `snapshotId`; mọi version `N.x` của CDE nhận cùng kết quả.
+* **Không đọc theo tag** `Data Dictionary.<mã>@v<N>` trên `table_search_index`, vì tag của scope Archived bị gỡ khỏi Column khi Từ điển kỹ thuật được làm mới.
+* **Response:** `source` (`CURRENT`/`SNAPSHOT`/`NONE`), `frozenAt` (khi `SNAPSHOT`), `data[]` gồm vị trí Column, Nguồn, Loại dữ liệu, Thứ hạng, Tình trạng nguồn, `assignedAt`, `assignedBy`, và `paging`.
 
 ---
 

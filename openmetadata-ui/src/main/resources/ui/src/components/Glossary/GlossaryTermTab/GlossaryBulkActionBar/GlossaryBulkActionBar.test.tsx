@@ -33,7 +33,6 @@ describe('GlossaryBulkActionBar', () => {
   const mockSubmitForReview = jest.fn();
   const mockApprove = jest.fn();
   const mockReject = jest.fn();
-  const mockRevokeApproval = jest.fn();
 
   const mockDraftTerm = {
     id: 'term-1',
@@ -147,7 +146,7 @@ describe('GlossaryBulkActionBar', () => {
     expect(screen.getByTestId('bulk-reject-btn')).toBeInTheDocument();
   });
 
-  it('should render bulk revoke action when approved terms are selected and user can approve/reject', () => {
+  it('should not render a bulk revoke action for approved terms', () => {
     render(
       <GlossaryBulkActionBar
         canApproveOrReject={true}
@@ -156,17 +155,13 @@ describe('GlossaryBulkActionBar', () => {
         onApprove={mockApprove}
         onClearSelection={mockClearSelection}
         onReject={mockReject}
-        onRevokeApproval={mockRevokeApproval}
         onSubmitForReview={mockSubmitForReview}
       />
     );
 
     expect(screen.getByTestId('approved-count-tag')).toBeInTheDocument();
-    expect(screen.getByTestId('bulk-revoke-btn')).toBeInTheDocument();
+    expect(screen.queryByTestId('bulk-revoke-btn')).not.toBeInTheDocument();
     expect(screen.queryByTestId('bulk-approve-btn')).not.toBeInTheDocument();
     expect(screen.queryByTestId('bulk-reject-btn')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('bulk-revoke-btn'));
-    expect(mockRevokeApproval).toHaveBeenCalledWith([mockApprovedTerm]);
   });
 });

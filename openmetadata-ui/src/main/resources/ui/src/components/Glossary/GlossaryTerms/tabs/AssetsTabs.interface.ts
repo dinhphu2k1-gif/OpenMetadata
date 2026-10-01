@@ -48,6 +48,8 @@ export interface AssetsTabsProps {
   noDataPlaceholder?: string | AssetNoDataPlaceholderProps;
   preloadedData?: SearchedDataProps['data'];
   skipSearch?: boolean;
+  /** With `preloadedData`, whether the first asset is selected (and its summary opened) on load. */
+  selectFirstAsset?: boolean;
   activeEntity?: Domain | DataProduct | GlossaryTerm | Tag;
 }
 

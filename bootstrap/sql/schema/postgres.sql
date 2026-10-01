@@ -2010,6 +2010,28 @@ CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_latest ON public.glossary_busin
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_parent ON public.glossary_business_snapshot (glossaryId, entityType, publishedAt DESC);
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_scope ON public.glossary_business_snapshot (glossaryId, parentBusinessVersion, publishedAt DESC);
 
+CREATE TABLE IF NOT EXISTS public.glossary_business_snapshot_history (
+  historyId varchar(36) PRIMARY KEY,
+  snapshotId varchar(36) NOT NULL,
+  entityType varchar(32) NOT NULL,
+  entityId varchar(36) NOT NULL,
+  glossaryId varchar(36),
+  parentBusinessVersion varchar(64),
+  businessVersion varchar(64) NOT NULL,
+  nativeVersion double precision,
+  publicationSequence bigint NOT NULL,
+  payload jsonb NOT NULL,
+  contentHash varchar(64) NOT NULL,
+  publishedAt bigint NOT NULL,
+  publishedBy varchar(256) NOT NULL,
+  supersededAt bigint NOT NULL,
+  supersededBy varchar(256) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_history_version
+  ON public.glossary_business_snapshot_history (entityType, entityId, businessVersion, supersededAt DESC);
+CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_history_snapshot
+  ON public.glossary_business_snapshot_history (snapshotId);
+
 CREATE TABLE IF NOT EXISTS public.glossary_published_head (
   entityType varchar(32) NOT NULL, entityId varchar(36) NOT NULL, parentBusinessVersion varchar(64),
   snapshotId varchar(36) NOT NULL UNIQUE, publicationSequence bigint NOT NULL,
@@ -2032,24 +2054,100 @@ CREATE TABLE IF NOT EXISTS public.glossary_snapshot_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending ON public.glossary_snapshot_outbox (processedAt, createdAt);
 
-CREATE TABLE IF NOT EXISTS public.technical_source_state (
-  technicalGlossaryId varchar(36) NOT NULL, parentBusinessVersion varchar(64) NOT NULL,
-  columnKey varchar(36) NOT NULL, status varchar(32) NOT NULL, columnFqn text NOT NULL,
-  detectedAt bigint NOT NULL,
-  PRIMARY KEY (technicalGlossaryId, parentBusinessVersion, columnKey)
+CREATE TABLE IF NOT EXISTS public.technical_dictionary_state (
+  id integer PRIMARY KEY,
+  dataDictionaryVersion varchar(16),
+  previousDataDictionaryVersion varchar(16),
+  resetAt bigint,
+  resetBy varchar(256)
 );
-CREATE TABLE IF NOT EXISTS public.technical_index_outbox (
-  termId varchar(36) PRIMARY KEY, enqueuedAt bigint NOT NULL,
-  attempts integer NOT NULL DEFAULT 0, lastError text
+INSERT INTO public.technical_dictionary_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.technical_record (
+  id varchar(36) PRIMARY KEY,
+  columnKey varchar(36) NOT NULL,
+  columnFqn text NOT NULL,
+  sourceService varchar(256),
+  sourceDatabase varchar(256),
+  sourceSchema varchar(256),
+  sourceTable varchar(256),
+  sourceColumn varchar(256),
+  dataType varchar(512),
+  dataLength integer,
+  dataPrecision integer,
+  dataScale integer,
+  description text,
+  sourceStatus varchar(16) NOT NULL,
+  cdeTermId varchar(36),
+  cdeAssignedAt bigint,
+  cdeAssignedBy varchar(256),
+  survivorshipRank smallint,
+  elementType varchar(256),
+  generationType varchar(256),
+  creationMethod varchar(256),
+  timeliness varchar(256),
+  systemOwnerId varchar(36),
+  revision bigint NOT NULL,
+  createdAt bigint NOT NULL,
+  createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL,
+  updatedBy varchar(256) NOT NULL,
+  CONSTRAINT uq_technical_record_column UNIQUE (columnKey)
 );
-CREATE INDEX IF NOT EXISTS idx_technical_index_outbox_enqueued ON public.technical_index_outbox (enqueuedAt);
+CREATE INDEX IF NOT EXISTS idx_technical_record_cde_rank
+  ON public.technical_record (cdeTermId, survivorshipRank);
+
+CREATE TABLE IF NOT EXISTS public.technical_record_audit (
+  id varchar(36) PRIMARY KEY,
+  recordId varchar(36) NOT NULL,
+  columnFqn text NOT NULL,
+  dataDictionaryVersion varchar(16),
+  action varchar(16) NOT NULL,
+  changes text,
+  actor varchar(256) NOT NULL,
+  changedAt bigint NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_technical_audit_record ON public.technical_record_audit (recordId, changedAt);
+CREATE INDEX IF NOT EXISTS idx_technical_audit_reset
+  ON public.technical_record_audit (action, dataDictionaryVersion);
+
+CREATE TABLE IF NOT EXISTS public.technical_binding_snapshot (
+  dataDictionaryVersion varchar(16) NOT NULL,
+  recordId varchar(36) NOT NULL,
+  columnKey varchar(36) NOT NULL,
+  cdeTermId varchar(36) NOT NULL,
+  cdeCode varchar(256),
+  cdeName varchar(512),
+  survivorshipRank smallint,
+  columnFqn text NOT NULL,
+  payload text NOT NULL,
+  frozenAt bigint NOT NULL,
+  PRIMARY KEY (dataDictionaryVersion, recordId)
+);
+CREATE INDEX IF NOT EXISTS idx_technical_snapshot_cde
+  ON public.technical_binding_snapshot (cdeTermId, dataDictionaryVersion);
+
+CREATE TABLE IF NOT EXISTS public.technical_outbox (
+  kind varchar(16) NOT NULL,
+  subjectKey varchar(64) NOT NULL,
+  payload text,
+  enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  lastError text,
+  PRIMARY KEY (kind, subjectKey)
+);
+CREATE INDEX IF NOT EXISTS idx_technical_outbox_enqueued ON public.technical_outbox (enqueuedAt);
 ALTER TABLE public.glossary_business_working OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_business_snapshot OWNER TO openmetadata_user;
+ALTER TABLE public.glossary_business_snapshot_history OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
-ALTER TABLE public.technical_source_state OWNER TO openmetadata_user;
-ALTER TABLE public.technical_index_outbox OWNER TO openmetadata_user;
+ALTER TABLE public.technical_dictionary_state OWNER TO openmetadata_user;
+ALTER TABLE public.technical_record OWNER TO openmetadata_user;
+ALTER TABLE public.technical_record_audit OWNER TO openmetadata_user;
+ALTER TABLE public.technical_binding_snapshot OWNER TO openmetadata_user;
+ALTER TABLE public.technical_outbox OWNER TO openmetadata_user;
 
 
 --

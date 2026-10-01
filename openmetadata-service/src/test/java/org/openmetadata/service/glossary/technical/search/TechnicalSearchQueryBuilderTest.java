@@ -21,13 +21,10 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 
 class TechnicalSearchQueryBuilderTest {
-  private static final UUID GLOSSARY_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-  private static final String SCOPE = "2";
+  private static final String VERSION = "2";
 
-  private static TechnicalSearchCriteria criteria(
-      boolean consumerOnly, String q, List<String> statuses, Map<String, List<String>> filters) {
-    return new TechnicalSearchCriteria(
-        GLOSSARY_ID, SCOPE, consumerOnly, q, statuses, filters, 25, 50);
+  private static TechnicalSearchCriteria criteria(String q, Map<String, List<String>> filters) {
+    return new TechnicalSearchCriteria(VERSION, q, filters, 25, 50);
   }
 
   private static JsonNode json(Object body) {
@@ -55,151 +52,155 @@ class TechnicalSearchQueryBuilderTest {
   }
 
   @Test
-  void alwaysFiltersByScopeAndReadsTheCurrentViewForAuthors() {
-    final JsonNode query = json(TechnicalSearchQueryBuilder.query(criteria(false, null, List.of("Draft"), Map.of())));
-    final List<JsonNode> filter = clauses(query, "filter");
-    assertTrue(hasTerm(filter, "term", "glossaryId", GLOSSARY_ID.toString()));
-    assertTrue(hasTerm(filter, "term", "parentBusinessVersion", SCOPE));
-    assertTrue(hasTerm(filter, "terms", "current.entityStatus", "Draft"));
-    assertFalse(query.toString().contains("hasPublished"));
+  void alwaysFiltersByTheBoundDataDictionaryVersion() {
+    final JsonNode query = json(TechnicalSearchQueryBuilder.query(criteria(null, Map.of())));
+
+    assertTrue(hasTerm(clauses(query, "filter"), "term", "dataDictionaryVersion", VERSION));
+    assertEquals(1, clauses(query, "filter").size());
+    assertTrue(clauses(query, "must").isEmpty());
   }
 
   @Test
-  void consumersOnlyReadPublishedRecordsThroughThePublishedView() {
-    final JsonNode query =
-        json(TechnicalSearchQueryBuilder.query(criteria(true, null, List.of("Approved"), Map.of())));
-    final List<JsonNode> filter = clauses(query, "filter");
-    assertTrue(hasTerm(filter, "term", "hasPublished", "true"));
-    assertTrue(hasTerm(filter, "terms", "published.entityStatus", "Approved"));
-    assertFalse(query.toString().contains("current."));
-  }
-
-  @Test
-  void mapsEveryListFilterToItsIndexField() {
+  void mapsEveryListFilterToItsFlatIndexField() {
     final Map<String, List<String>> filters =
         Map.of(
             TechnicalRowMatcher.SOURCE_SERVICES, List.of("ipcas"),
             TechnicalRowMatcher.SOURCE_STATUSES, List.of("Unavailable"),
             TechnicalRowMatcher.CDE_TERM_IDS, List.of("cde-1"),
             TechnicalRowMatcher.SYSTEM_OWNER_IDS, List.of("team-1"),
-            TechnicalRowMatcher.ELEMENT_TYPES, List.of("DataElementType.Atomic"),
-            TechnicalRowMatcher.GENERATION_TYPES, List.of("FieldGenerationType.Raw"),
-            TechnicalRowMatcher.CREATION_METHODS, List.of("DataCreationMethod.Manual"),
-            TechnicalRowMatcher.TIMELINESS, List.of("DataTimeliness.T0"));
+            TechnicalRowMatcher.ELEMENT_TYPES, List.of("DataElementType.AtomicDataElement"),
+            TechnicalRowMatcher.GENERATION_TYPES, List.of("FieldGenerationType.ManualInput"),
+            TechnicalRowMatcher.CREATION_METHODS, List.of("DataCreationMethod.Hardcoded"),
+            TechnicalRowMatcher.TIMELINESS, List.of("DataTimeliness.T1"));
+
     final List<JsonNode> filter =
-        clauses(json(TechnicalSearchQueryBuilder.query(criteria(false, null, List.of(), filters))), "filter");
+        clauses(json(TechnicalSearchQueryBuilder.query(criteria(null, filters))), "filter");
+
     assertTrue(hasTerm(filter, "terms", "service", "ipcas"));
     assertTrue(hasTerm(filter, "terms", "sourceStatus", "Unavailable"));
-    assertTrue(hasTerm(filter, "terms", "current.cde.id", "cde-1"));
-    assertTrue(hasTerm(filter, "terms", "current.systemOwner.id", "team-1"));
-    assertTrue(hasTerm(filter, "terms", "current.elementType.fqn", "DataElementType.Atomic"));
-    assertTrue(hasTerm(filter, "terms", "current.generationType.fqn", "FieldGenerationType.Raw"));
-    assertTrue(hasTerm(filter, "terms", "current.creationMethod.fqn", "DataCreationMethod.Manual"));
-    assertTrue(hasTerm(filter, "terms", "current.timeliness.fqn", "DataTimeliness.T0"));
+    assertTrue(hasTerm(filter, "terms", "cde.id", "cde-1"));
+    assertTrue(hasTerm(filter, "terms", "systemOwner.id", "team-1"));
+    assertTrue(hasTerm(filter, "terms", "elementType.fqn", "DataElementType.AtomicDataElement"));
+    assertTrue(hasTerm(filter, "terms", "generationType.fqn", "FieldGenerationType.ManualInput"));
+    assertTrue(hasTerm(filter, "terms", "creationMethod.fqn", "DataCreationMethod.Hardcoded"));
+    assertTrue(hasTerm(filter, "terms", "timeliness.fqn", "DataTimeliness.T1"));
   }
 
   @Test
   void cdeMappingSelectsMappedOrUnmappedRecordsAndBothMeanAll() {
     final JsonNode mapped =
-        json(TechnicalSearchQueryBuilder.query(criteria(false, null, List.of(), Map.of(TechnicalRowMatcher.CDE_MAPPING, List.of(TechnicalRowMatcher.MAPPED)))));
+        json(
+            TechnicalSearchQueryBuilder.query(
+                criteria(null, Map.of(TechnicalRowMatcher.CDE_MAPPING, List.of("MAPPED")))));
     final JsonNode unmapped =
-        json(TechnicalSearchQueryBuilder.query(criteria(false, null, List.of(), Map.of(TechnicalRowMatcher.CDE_MAPPING, List.of(TechnicalRowMatcher.UNMAPPED)))));
+        json(
+            TechnicalSearchQueryBuilder.query(
+                criteria(null, Map.of(TechnicalRowMatcher.CDE_MAPPING, List.of("UNMAPPED")))));
     final JsonNode both =
         json(
             TechnicalSearchQueryBuilder.query(
                 criteria(
-                    false,
-                    null,
-                    List.of(),
-                    Map.of(
-                        TechnicalRowMatcher.CDE_MAPPING,
-                        List.of(TechnicalRowMatcher.MAPPED, TechnicalRowMatcher.UNMAPPED)))));
-    assertTrue(hasTerm(clauses(mapped, "filter"), "exists", "field", "current.cde.id"));
-    assertTrue(hasTerm(clauses(unmapped, "must_not"), "exists", "field", "current.cde.id"));
-    assertFalse(both.toString().contains("exists"));
+                    null, Map.of(TechnicalRowMatcher.CDE_MAPPING, List.of("MAPPED", "UNMAPPED")))));
+
+    assertTrue(
+        clauses(mapped, "filter").stream()
+            .anyMatch(clause -> "cde.id".equals(clause.path("exists").path("field").asText())));
+    assertEquals(
+        "cde.id", clauses(unmapped, "must_not").getFirst().path("exists").path("field").asText());
+    assertTrue(clauses(both, "must_not").isEmpty());
+    assertEquals(1, clauses(both, "filter").size());
   }
 
   @Test
   void longTextUsesNgramFieldsOfLocationAndCde() {
-    final JsonNode match =
-        json(TechnicalSearchQueryBuilder.textQuery("TBMS_CTR", TechnicalIndexFields.CURRENT)).path("multi_match");
-    assertEquals("tbms_ctr", match.path("query").asText());
-    assertEquals("and", match.path("operator").asText());
+    final JsonNode multiMatch =
+        json(TechnicalSearchQueryBuilder.query(criteria("customer", Map.of())))
+            .path("bool")
+            .path("must")
+            .get(0)
+            .path("multi_match");
+
     final List<String> fields = new ArrayList<>();
-    match.path("fields").forEach(field -> fields.add(field.asText()));
-    assertEquals(
-        List.of(
-            "database.ngram",
-            "schema.ngram",
-            "table.ngram",
-            "column.ngram",
-            "current.cde.code.ngram",
-            "current.cde.name.ngram"),
-        fields);
+    multiMatch.path("fields").forEach(field -> fields.add(field.asText()));
+    assertEquals("customer", multiMatch.path("query").asText());
+    assertTrue(fields.contains("table.ngram"));
+    assertTrue(fields.contains("column.ngram"));
+    assertTrue(fields.contains("cde.code.ngram"));
+    assertTrue(fields.contains("cde.name.ngram"));
   }
 
   @Test
   void shortTextFallsBackToEscapedLowercaseWildcards() {
-    final JsonNode query = json(TechnicalSearchQueryBuilder.textQuery("A*", TechnicalIndexFields.PUBLISHED));
-    final List<JsonNode> should = clauses(query, "should");
-    assertEquals(6, should.size());
-    assertEquals("*a\\**", should.getFirst().path("wildcard").path("database").path("value").asText());
-    assertTrue(query.toString().contains("published.cde.code"));
-  }
+    final JsonNode should =
+        json(TechnicalSearchQueryBuilder.query(criteria("A*", Map.of())))
+            .path("bool")
+            .path("must")
+            .get(0)
+            .path("bool")
+            .path("should");
 
-  @Test
-  void textQueryIsARequiredClause() {
-    final JsonNode query = json(TechnicalSearchQueryBuilder.query(criteria(false, "brcd", List.of(), Map.of())));
-    assertEquals(1, clauses(query, "must").size());
+    assertTrue(
+        should.get(0).path("wildcard").elements().next().path("value").asText().equals("*a\\**"));
   }
 
   @Test
   void searchBodyPagesAndSortsByColumnFqnThenTermId() {
-    final JsonNode body = json(TechnicalSearchQueryBuilder.searchBody(criteria(false, null, List.of(), Map.of())));
+    final JsonNode body = json(TechnicalSearchQueryBuilder.searchBody(criteria(null, Map.of())));
+
     assertEquals(50, body.path("from").asInt());
     assertEquals(25, body.path("size").asInt());
-    assertTrue(body.path("track_total_hits").asBoolean());
-    assertEquals("asc", body.path("sort").get(0).path("columnFqn").asText());
-    assertEquals("asc", body.path("sort").get(1).path("termId").asText());
+    assertEquals("asc", body.path("sort").get(0).path("rank").path("order").asText());
+    assertEquals("_last", body.path("sort").get(0).path("rank").path("missing").asText());
+    assertEquals("asc", body.path("sort").get(1).path("columnFqn").asText());
+    assertEquals("asc", body.path("sort").get(2).path("termId").asText());
   }
 
   @Test
   void rejectsPagesBeyondTheResultWindow() {
-    final TechnicalSearchCriteria deep =
-        new TechnicalSearchCriteria(GLOSSARY_ID, SCOPE, false, null, List.of(), Map.of(), 25, 9_990);
-    assertThrows(BadRequestException.class, () -> TechnicalSearchQueryBuilder.searchBody(deep));
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            TechnicalSearchQueryBuilder.searchBody(
+                new TechnicalSearchCriteria(VERSION, null, Map.of(), 50, 9_990)));
   }
 
   @Test
-  void statisticsCountTablesSourcesAndApprovedOverTheScope() {
+  void statisticsCountTablesSourcesAndMappedRecordsOverTheBoundVersion() {
     final JsonNode body =
-        json(TechnicalSearchQueryBuilder.statsBody(TechnicalSearchCriteria.scopeOnly(GLOSSARY_ID, SCOPE, false)));
+        json(TechnicalSearchQueryBuilder.statsBody(TechnicalSearchCriteria.scopeOnly(VERSION)));
+
     assertEquals(0, body.path("size").asInt());
-    assertEquals("tableKey", body.path("aggs").path("tables").path("cardinality").path("field").asText());
-    assertEquals("service", body.path("aggs").path("sources").path("cardinality").path("field").asText());
-    assertTrue(body.path("aggs").path("approved").path("filter").path("term").path("hasPublished").asBoolean());
-    assertTrue(hasTerm(clauses(body.path("query"), "filter"), "term", "parentBusinessVersion", SCOPE));
+    assertEquals(
+        "tableKey", body.path("aggs").path("tables").path("cardinality").path("field").asText());
+    assertEquals(
+        "service", body.path("aggs").path("sources").path("cardinality").path("field").asText());
+    assertEquals(
+        "cde.id",
+        body.path("aggs").path("mapped").path("filter").path("exists").path("field").asText());
+    assertTrue(
+        hasTerm(clauses(body.path("query"), "filter"), "term", "dataDictionaryVersion", VERSION));
   }
 
   @Test
-  void columnKeysQueryLooksUpDeclaredColumnsInTheScope() {
+  void cdeQueryFindsTheRecordsBoundToOneCdeInTheBoundVersion() {
+    final UUID cde = UUID.randomUUID();
     final List<JsonNode> filter =
-        clauses(json(TechnicalSearchQueryBuilder.columnKeysQuery(GLOSSARY_ID, SCOPE, List.of("k1", "k2"))), "filter");
-    assertTrue(hasTerm(filter, "terms", "columnKey", "k2"));
-    assertTrue(hasTerm(filter, "term", "parentBusinessVersion", SCOPE));
+        clauses(json(TechnicalSearchQueryBuilder.cdeQuery(VERSION, cde)), "filter");
+
+    assertTrue(hasTerm(filter, "term", "dataDictionaryVersion", VERSION));
+    assertTrue(hasTerm(filter, "term", "cde.id", cde.toString()));
   }
 
   @Test
-  void tableQueryMatchesLowercaseLocationWithinTheReadableScope() {
+  void tableQueryMatchesLowercaseLocationNames() {
     final List<JsonNode> filter =
         clauses(
-            json(
-                TechnicalSearchQueryBuilder.tableQuery(
-                    TechnicalSearchCriteria.scopeOnly(GLOSSARY_ID, SCOPE, true), "MISDB", "AML", "TBMS_CTR")),
+            json(TechnicalSearchQueryBuilder.tableQuery(VERSION, "CORE", "DBO", "Customer")),
             "filter");
-    assertTrue(hasTerm(filter, "term", "database", "misdb"));
-    assertTrue(hasTerm(filter, "term", "schema", "aml"));
-    assertTrue(hasTerm(filter, "term", "table", "tbms_ctr"));
-    assertTrue(hasTerm(filter, "term", "hasPublished", "true"));
+
+    assertTrue(hasTerm(filter, "term", "database", "core"));
+    assertTrue(hasTerm(filter, "term", "schema", "dbo"));
+    assertTrue(hasTerm(filter, "term", "table", "customer"));
+    assertFalse(hasTerm(filter, "term", "table", "Customer"));
   }
 }

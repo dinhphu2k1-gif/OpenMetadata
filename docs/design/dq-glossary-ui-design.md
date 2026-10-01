@@ -4,6 +4,25 @@
 >
 > Baseline kiến trúc: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md). Database là nguồn sự thật cho list/detail/workflow; search engine chỉ là projection phục vụ discovery, không quyết định trạng thái nghiệp vụ.
 
+## Hiện trạng triển khai (cập nhật 2026-10-01)
+
+> Mục này mô tả code hiện có, đối chiếu bằng đọc mã nguồn; chưa build và chưa chạy test. Các mục còn lại của tài liệu vẫn là thiết kế đích.
+
+| Hạng mục | Hiện trạng |
+| --- | --- |
+| Profile registry | Đã có `GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY`. Chưa có feature flag bật/tắt DQ. |
+| Bootstrap | `DataQualityBootstrap` tạo glossary hệ thống `Data Quality` (displayName `Chất lượng dữ liệu`), mode `BUSINESS_WORKFLOW`, working Draft `1`. |
+| Tạo DQ Rule | `GlossaryTermResource` kiểm tra: là con trực tiếp của glossary DQ, đúng 1 CDE canonical, có `name` làm mã quy tắc. Workflow Draft/Submit/Reject/Reopen/Approve dùng chung endpoint `/working/*` với CDE. |
+| List/search/flat list | Dùng chung `GlossaryFlatListService`; chưa có service read model riêng cho DQ (so với `CdeFlatListService`/`CdeBusinessVersionSearchService`). |
+| Export | **Chưa có.** `GET /glossaryTerms/export` trả 400 `Export is not supported for this glossary profile` cho DQ. |
+| Import | Chưa có template/preview/commit nguyên tử ở backend (các endpoint `/glossaryTerms/import/*` hiện là của CDE). UI `DQImportPage` đọc và kiểm tra Excel ở client rồi chuyển từng dòng thành payload tạo term; không nguyên tử. |
+| UI | Có `DQGlossaryTermForm`, `DQGlossaryTableColumns`, `DQGlossaryTermOverview`/`Summary`, `DQImportExport`. |
+| Assets, tìm ngược CDE→DQ, audit | Chưa thấy triển khai. |
+| Migration/cutover, hardening, dọn code trùng | Chưa thực hiện. |
+| Test | Chỉ có test UI (`DQGlossaryTermForm.test.tsx`, `DQImportExport.utils.test.ts`, `DQImportPage.test.tsx`). Chưa có test backend hoặc integration test riêng cho DQ. |
+
+Khác biệt giữa thiết kế và hiện trạng cần được xử lý hoặc chấp nhận có chủ đích: §6.3 Import/export (export bị chặn, import phía client), §10 read model riêng, §11 audit, §12 migration.
+
 ## 1. Mục tiêu và nguyên tắc
 
 ### 1.1. Mục tiêu
@@ -20,7 +39,7 @@
 2. **Không hard-code bằng display name.** Backend nhận diện profile từ glossary identity/name bất biến; frontend dùng `profileKey` do backend trả về.
 3. **Không dùng Elasticsearch làm nguồn workflow.** Search có thể chậm hơn transaction; mọi mutation và list nghiệp vụ phải resolve lại từ database.
 4. **Không có dual write không kiểm soát.** Quan hệ CDE có một nguồn sự thật; các nhãn snapshot chỉ để hiển thị lịch sử.
-5. **Published snapshot bất biến.** Sửa quy tắc đã Approved phải tạo working business version kế tiếp.
+5. **Published snapshot chỉ đổi qua Sửa phiên bản.** Sửa quy tắc đã Approved bằng cách tạo working business version kế tiếp, hoặc dùng luồng Sửa phiên bản ([thiết kế CDE §5.6](./cde-glossary-ui-design.md)) để ghi đè chính version đó, lưu nội dung cũ vào lịch sử. Không có hủy duyệt.
 6. **Authorization tại backend.** Ẩn nút ở frontend không thay thế kiểm tra quyền trên API.
 7. **Schema có version.** Import template, validation và UI cùng tham chiếu một `schemaVersion`, tránh lệch cột sau nâng cấp.
 
@@ -183,6 +202,10 @@ stateDiagram-v2
   Approved --> Archived: Successor catalog cutover
 ```
 
+Khi phê duyệt DQ catalog, backend phê duyệt nguyên tử toàn bộ DQ Rule working trong đúng
+`parentBusinessVersion` rồi mới publish catalog và manifest. Trạng thái riêng trước đó của Rule
+(`Draft`, `In Review` hoặc `Rejected`) không làm Rule bị bỏ khỏi lần phê duyệt catalog.
+
 ### 5.2. Schema hiển thị chính thức — 19 trường
 
 Bảng danh sách, form và trang chi tiết phải dùng đúng nhãn và thứ tự sau. Checkbox chọn hàng và cột thao tác là control của UI, không tính vào 19 trường nghiệp vụ.
@@ -243,18 +266,57 @@ Hai trường ngày dùng cùng validator với CDE:
 
 ### 5.4. Liên kết CDE
 
+Quy tắc này áp dụng cho DQ Rule. Từ điển kỹ thuật không có phiên bản và luôn gắn với Data Dictionary
+đang hiệu lực; liên kết CDE của nó theo [thiết kế riêng](./technical-dictionary-design.md) §7.
+Hai bên dùng chung mô hình liên kết tới CDE identity và cách resolve nội dung hiển thị dưới đây.
+
+**Mô hình liên kết**
+
+- Liên kết trỏ tới **CDE identity**, không trỏ tới một version của CDE. Relation chỉ lưu `termId` ổn định của CDE; không lưu `versionContext` (`parentBusinessVersion`, `businessVersion`, `snapshotId`) và client không gửi các giá trị này.
+- Mỗi CDE identity thuộc đúng một Data Dictionary scope (FQN `Data Dictionary.<mã>@v<N>`); các version `N.0`, `N.1`, … là các lần duyệt nối tiếp của cùng identity. Vì vậy một liên kết bao trùm mọi version `N.x` của CDE, kể cả version được tạo sau khi gán.
+- CDE cùng mã ở scope `N+1` là identity khác; liên kết ở scope `N` không tự chuyển sang scope `N+1`.
 - Nguồn sự thật là CDE `termId` trong relation, không phải `cdeCode` hoặc `cdeName` trong extension.
-- Backend chỉ chấp nhận term thuộc profile `DATA_DICTIONARY`, đúng direct-child invariant, có cùng `parentBusinessVersion` với DQ Rule và actor được phép xem. DQ scope `N` chỉ được liên kết với CDE thuộc Data Dictionary scope `N`; không fallback hoặc resolve chéo scope.
-- “Mới nhất” được xác định bằng so sánh business version dạng số, không dựa vào thứ tự API hoặc so sánh chuỗi. Trong scope active, snapshot chưa Archived được ưu tiên để version bị thu hồi không che predecessor đang hoạt động; trong scope đã đóng băng, chọn Approved snapshot Archived mới nhất của chính scope đó.
-- Query option bắt buộc truyền đồng thời `glossaryId`, `parentBusinessVersion` và status `Approved`; backend scope/filter trước khi trả dữ liệu, frontend lọc phòng vệ. Mỗi CDE identity chỉ có một option là published snapshot `Approved` mới nhất trong scope. Option dùng `snapshotId`, hoặc composite `termId + parentBusinessVersion + businessVersion`, làm khóa ổn định.
-- Published DQ snapshot vẫn lưu reference label/FQN phục vụ audit; response projection của liên kết resolve `termId` sang latest Approved của CDE trong đúng `parentBusinessVersion` chứa identity đó.
-- Khi CDE đổi display name, active detail có thể hiển thị tên mới sau resolve; archived DQ snapshot vẫn hiển thị nhãn đã đóng băng.
-- Người dùng chọn đúng một CDE identity. Relation lưu `termId` ổn định cùng `versionContext` gồm `parentBusinessVersion`, `businessVersion` và `snapshotId`; backend luôn chuẩn hóa context sang published snapshot `Approved` mới nhất trong cùng scope.
-- Khi CDE version mới trong cùng scope được `Approved`, DQ read model và lần ghi/workflow tiếp theo tự động chuyển context sang version mới. Ví dụ DQ1.1 v2.0 đang liên kết CDE1 v2.0 sẽ resolve sang CDE1 v2.1 ngay sau khi CDE1 v2.1 được duyệt.
-- Archive Data Dictionary/CDE không xóa, thay thế hoặc migrate relation DQ hiện có. View/edit DQ cũ vẫn hiển thị reference đã liên kết cùng version và badge `Archived`; option này chỉ dùng để bảo toàn giá trị hiện tại, không xuất hiện như lựa chọn cho liên kết mới.
-- Nếu dữ liệu legacy chỉ có `termId`, API projection hydrate best-effort và đánh dấu orphan/ambiguous; không được âm thầm gắn sang version mới.
+- Mỗi DQ Rule liên kết đúng một CDE; một CDE có thể được nhiều DQ Rule liên kết.
+
+**Ràng buộc khi gán**
+
+- Backend chỉ chấp nhận term thuộc profile `DATA_DICTIONARY`, đúng direct-child invariant và actor được phép xem.
+- Scope của CDE đọc từ chính CDE identity và phải bằng `parentBusinessVersion` của DQ Rule. DQ scope `N` chỉ được liên kết với CDE thuộc Data Dictionary scope `N`; không fallback hoặc resolve chéo scope.
+- Chỉ được gán mới khi Data Dictionary scope `N` đang `Approved` active và CDE có ít nhất một snapshot `Approved` trong scope.
+
+**Resolve nội dung hiển thị**
+
+- Khi đọc, backend resolve `termId` sang một published snapshot của CDE để lấy mã, tên thành tố và các thông tin hiển thị khác:
+  - Scope active: snapshot `Approved` mới nhất chưa Archived, để version bị thu hồi không che predecessor đang hoạt động.
+  - Scope đã đóng băng: snapshot `Approved` Archived mới nhất của chính scope đó. Vì scope không còn thay đổi, kết quả luôn cố định.
+- “Mới nhất” được xác định bằng so sánh business version dạng số, không dựa vào thứ tự API hoặc so sánh chuỗi.
+- Working version Draft/In Review của CDE không bao giờ được dùng để resolve.
+- Nếu CDE không còn snapshot `Approved` nào trong scope, relation được giữ nguyên; UI hiển thị mã CDE kèm cảnh báo **“CDE không còn phiên bản được phê duyệt.”** và Submit/Approve DQ Rule bị từ chối cho tới khi đổi CDE.
+
+Ví dụ: DQ1 được gán CDE1 khi CDE1 đang ở v1.0.
+
+| Sự kiện | DQ1 hiển thị | Trang CDE1 |
+| --- | --- | --- |
+| CDE1 v1.1 được duyệt, đổi tên | Tên theo v1.1, không phải gán lại | Mở v1.0 hay v1.1 đều liệt kê DQ1 |
+| CDE1 v1.2 đang Draft | Vẫn theo v1.1 | Mở Draft v1.2 cũng liệt kê DQ1 |
+| CDE1 v1.1 bị thu hồi | Quay về theo v1.0 | Không đổi |
+| Data Dictionary scope `1` đóng băng | Theo bản `Approved` cuối cùng của scope `1`, badge `Archived` | Không đổi |
+| Data Dictionary scope `2` được duyệt | Không tự liên kết với CDE1 scope `2` | CDE1 scope `2` không liệt kê DQ1 |
+
+**Lịch sử và audit**
+
+- Published DQ snapshot lưu nhãn tham chiếu (mã, tên thành tố, FQN) tại thời điểm duyệt để render lịch sử phiên bản. Nhãn này chỉ phục vụ hiển thị lịch sử, không phải liên kết tới version CDE.
+- Version CDE tại thời điểm DQ Rule được duyệt được suy ra bằng cách đối chiếu `publishedAt` của DQ snapshot với các snapshot CDE cùng scope; không lưu trùng thông tin này trên relation.
+- Archive Data Dictionary/CDE không xóa, thay thế hoặc migrate relation hiện có. View/edit DQ cũ vẫn hiển thị CDE đã liên kết kèm badge `Archived`; CDE này chỉ dùng để bảo toàn giá trị hiện tại, không xuất hiện như lựa chọn cho liên kết mới.
+
+**Tương thích dữ liệu cũ**
+
+- Relation cũ còn `versionContext`: backend bỏ qua khi đọc và không ghi lại ở lần lưu tiếp theo; không cần migration riêng.
 - `extension.cdeCode` và `extension.cdeName` hiện có được coi là compatibility fields: đọc fallback trong migration window, không ghi mới sau cutover.
-- Reverse discovery “CDE đang được quy tắc nào kiểm soát” dùng relation index/read model, không quét text extension.
+
+**Reverse discovery**
+
+- Câu hỏi “CDE đang được quy tắc nào kiểm soát” dùng relation index/read model theo `termId`, không quét text extension. Trang chi tiết CDE hiển thị danh sách DQ Rule liên kết, giống nhau ở mọi version của CDE trong scope.
 
 ### 5.5. Custom Properties là global theo entity type
 
@@ -412,7 +474,7 @@ UI không suy quyền từ tên role, owner, reviewer hoặc release level. Nó 
 - `canViewPublished`, `canViewWorking`
 - `canCreate`, `canEdit`, `canDelete`
 - `canCreateVersion`
-- `canSubmit`, `canApprove`, `canReject`, `canReopen`, `canRevoke`
+- `canSubmit`, `canApprove`, `canReject`, `canReopen`
 - `canImport`, `canExport`
 - `canManageAssets`
 
@@ -507,7 +569,8 @@ Hành vi:
 
 - Chọn CDE bằng selector/async search chuẩn của OpenMetadata; không tạo dropdown style riêng và không tải cứng 1.000 CDE.
 - Option CDE lấy từ Data Dictionary scope có cùng số version `N` với catalog DQ đang mở (§5.4); request CDE luôn scope bằng ID + `parentBusinessVersion = N` và status `Approved`.
-- Placeholder là **“Tìm theo mã hoặc tên CDE”**; không hiển thị UUID. Mỗi option hiển thị `Mã CDE · Tên thành tố · v<businessVersion>`; không lặp badge `Approved` trên từng dòng. Phần đầu dropdown hiển thị `Data Dictionary: <tên> · v<version> · Approved`.
+- Mỗi CDE identity chỉ có một option, khóa option là `termId`; nội dung option resolve theo §5.4. Backend scope/filter trước khi trả dữ liệu, frontend lọc phòng vệ.
+- Placeholder là **“Tìm theo mã hoặc tên CDE”**; không hiển thị UUID. Mỗi option hiển thị `Mã CDE · Tên thành tố`, không hiển thị version vì người dùng chọn CDE chứ không chọn version; không lặp badge `Approved` trên từng dòng. Phần đầu dropdown hiển thị `Data Dictionary: <tên> · v<version> · Approved`.
 - Search theo mã/tên, debounce và bỏ response quá hạn để tránh kết quả cũ ghi đè query mới. Loading, empty và error state phải tách biệt.
 - Nếu Data Dictionary scope `N` chưa `Approved` hoặc đã `Archived`, disable chọn mới và hiển thị: **“Chưa có phiên bản Data Dictionary được phê duyệt và còn hiệu lực.”** Không fallback sang Data Dictionary scope khác, Draft hoặc Archived.
 - Tên CDE là read-only từ reference; không cho người dùng gõ một tên khác với CDE đã chọn.
@@ -530,7 +593,7 @@ Overview dùng cùng visual language với trang chi tiết CDE: breadcrumb, hea
 
 **Nội dung Overview — 14 trường còn lại**
 
-1. Card **Liên kết CDE**: `Mã CDE` là selector đơn trị có thể sửa ở Draft khi có capability; `Tên thành tố` read-only và tự resolve từ cùng CDE reference. Selector dùng cùng contract active-scope ở form. Reference lịch sử ngoài active scope vẫn hiển thị cùng version và badge `Archived`, nhưng bị disable trong danh sách lựa chọn mới.
+1. Card **Liên kết CDE**: `Mã CDE` là selector đơn trị có thể sửa ở Draft khi có capability; `Tên thành tố` read-only và tự resolve từ cùng CDE reference. `Mã CDE` là link sang trang chi tiết CDE; card không hiển thị version CDE. Selector dùng cùng contract active-scope ở form. CDE thuộc scope đã đóng băng vẫn hiển thị theo quy tắc resolve §5.4 kèm badge `Archived`, nhưng bị disable trong danh sách lựa chọn mới.
 2. Card **Quy tắc nghiệp vụ**: `Quy tắc nghiệp vụ` (`description`) hiển thị markdown toàn chiều rộng, cùng kiểu card Mô tả của CDE.
 3. Card **Thông tin quản trị**: `Cấp phát hành`, `Ngày hiệu lực`, `Ngày hết hiệu lực`.
 4. Card **Phân loại & kiểm soát**: `Tiêu chí chất lượng dữ liệu`, `Các tiêu chí cơ sở`, `Hình thức kiểm tra`, `Tần suất`, `Ngưỡng chất lượng dữ liệu`.
@@ -545,7 +608,7 @@ Tổng cộng header và Overview phải phủ đủ đúng 19 trường, không
 ### 8.6. Bulk action
 
 - Checkbox chỉ xuất hiện khi actor có capability phù hợp.
-- Chỉ cho Submit các row Draft; Approve/Reject các row InReview; Revoke các row Approved nếu policy cho phép.
+- Chỉ cho Submit các row Draft; Approve/Reject các row InReview. Không có bulk hủy duyệt.
 - Modal preview nhóm row hợp lệ/không hợp lệ và lý do.
 - Backend xử lý từng row có optimistic lock, trả kết quả chi tiết; UI không báo thành công toàn bộ nếu chỉ một phần thành công.
 
@@ -630,7 +693,7 @@ Migration phải idempotent, có dry-run, marker, rollback theo toàn glossary v
 | ADR-DQ-08 | DQ Rule v1 tham chiếu một CDE | Phù hợp dữ liệu/form hiện tại; có đường nâng cấp rõ |
 | ADR-DQ-09 | UI dùng đúng 19 trường nghiệp vụ đã chốt | Bổ sung Tên quy tắc (`displayName`), hiển thị business version và loại phát hành nhưng không bổ sung Owner/Reviewer/technical identity vào bảng nghiệp vụ |
 | ADR-DQ-10 | Hai trường ngày dùng contract CDE | Đồng nhất format, validation và import/export |
-| ADR-DQ-11 | CDE selector hiển thị Approved snapshot trong Data Dictionary scope cùng số version `N` với catalog DQ, khi scope đó đang active | Cho người dùng chọn rõ version, ngăn relation tới Draft/Archived và không chọn chéo scope |
+| ADR-DQ-11 | CDE selector hiển thị mỗi CDE identity một option, lấy từ Data Dictionary scope cùng số version `N` với catalog DQ, khi scope đó đang active. Relation chỉ lưu `termId`, không lưu `versionContext`, và bao trùm mọi version `N.x` của CDE (§5.4) | Người dùng liên kết với thành tố dữ liệu chứ không với một lần sửa của nó; không phải gán lại khi CDE lên version minor; ngăn relation tới CDE chưa từng Approved và không chọn chéo scope |
 | ADR-DQ-12 | Archive không rewrite relation DQ lịch sử | Bảo toàn audit, khả năng truy vết và tính bất biến của snapshot |
 | ADR-DQ-13 | Relation DQ→CDE lưu version context | `termId` dùng chung giữa các version nên không đủ để khôi phục lựa chọn |
 

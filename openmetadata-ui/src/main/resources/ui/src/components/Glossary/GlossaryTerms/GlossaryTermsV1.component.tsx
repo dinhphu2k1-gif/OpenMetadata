@@ -79,6 +79,7 @@ import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
 import DQGlossaryTermOverview from './DQGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
+import CDETechnicalAssetsTab from './tabs/CDETechnicalAssetsTab.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
 
 export const CDE_RESTRICTED_TABS = new Set([
@@ -502,6 +503,29 @@ const GlossaryTermsV1 = ({
             }
           : tab,
       );
+
+      // The stock tab list has no Assets tab for a version view, and the tag search behind it finds
+      // nothing for a CDE of a replaced Data Dictionary version. The bound Columns come from the
+      // Technical Dictionary instead (frozen at the cutover once the version was replaced).
+      if (
+        isViewingVersion &&
+        !cdeTabs.some((tab) => tab.key === EntityTabs.ASSETS)
+      ) {
+        cdeTabs.push({
+          label: (
+            <div data-testid="assets">
+              {tabLabelMap[EntityTabs.ASSETS] ?? t('label.asset-plural')}
+            </div>
+          ),
+          key: EntityTabs.ASSETS,
+          children: (
+            <CDETechnicalAssetsTab
+              cdeId={glossaryTerm.id}
+              glossaryTerm={glossaryTerm}
+            />
+          ),
+        } as (typeof cdeTabs)[number]);
+      }
 
       return cdeTabs.filter(
         (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),

@@ -9,12 +9,11 @@ import {
   GlossaryTerm,
 } from '../../../generated/entity/data/glossaryTerm';
 import {
-  getCdeVersionKey,
-  getSelectableCdeVersions,
+  getSelectableCdes,
   isApprovedDictionaryVersionForScope,
 } from './CDESelector.component';
 
-describe('CDESelector version selection', () => {
+describe('CDESelector identity selection', () => {
   it('selects the Approved Data Dictionary version in the requested scope', () => {
     expect(
       isApprovedDictionaryVersionForScope(
@@ -46,8 +45,8 @@ describe('CDESelector version selection', () => {
     ).toBe(true);
   });
 
-  it('keeps only the latest Approved snapshot for each CDE identity', () => {
-    const versions = getSelectableCdeVersions([
+  it('keeps only one option per CDE identity and excludes non-Approved duplicates', () => {
+    const cdes = getSelectableCdes([
       {
         id: 'cde-id',
         name: 'CDE1',
@@ -55,8 +54,6 @@ describe('CDESelector version selection', () => {
         description: '',
         entityStatus: TermStatus.Approved,
         parentBusinessVersion: '2',
-        businessVersion: '2.0',
-        snapshotId: 'snapshot-20',
       },
       {
         id: 'cde-id',
@@ -65,28 +62,23 @@ describe('CDESelector version selection', () => {
         description: '',
         entityStatus: TermStatus.Approved,
         parentBusinessVersion: '2',
-        businessVersion: '2.1',
-        snapshotId: 'snapshot-21',
       },
       {
-        id: 'cde-id',
-        name: 'CDE1',
-        displayName: 'Tên khách hàng',
+        id: 'other-cde-id',
+        name: 'CDE2',
+        displayName: 'Số điện thoại',
         description: '',
         entityStatus: TermStatus.Archived,
         archivedAt: 1,
         parentBusinessVersion: '2',
-        businessVersion: '2.2',
-        snapshotId: 'snapshot-22',
       },
     ] as GlossaryTerm[]);
 
-    expect(versions).toHaveLength(1);
-    expect(versions.map(getCdeVersionKey)).toEqual(['snapshot-21']);
+    expect(cdes.map((cde) => cde.id)).toEqual(['cde-id']);
   });
 
-  it('keeps the latest archived CDE selectable inside an archived scope', () => {
-    const versions = getSelectableCdeVersions(
+  it('keeps an archived CDE selectable inside an archived scope', () => {
+    const cdes = getSelectableCdes(
       [
         {
           id: 'cde-id',
@@ -95,13 +87,11 @@ describe('CDESelector version selection', () => {
           entityStatus: TermStatus.Archived,
           archivedAt: 1,
           parentBusinessVersion: '1',
-          businessVersion: '1.2',
-          snapshotId: 'snapshot-12',
         },
       ] as GlossaryTerm[],
       true
     );
 
-    expect(versions.map(getCdeVersionKey)).toEqual(['snapshot-12']);
+    expect(cdes.map((cde) => cde.id)).toEqual(['cde-id']);
   });
 });

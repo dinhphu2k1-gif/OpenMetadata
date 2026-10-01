@@ -5,73 +5,46 @@
 
 package org.openmetadata.service.glossary.technical;
 
-import static org.openmetadata.common.utils.CommonUtil.listOrEmpty;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import org.openmetadata.schema.entity.data.GlossaryTerm;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.utils.JsonUtils;
+import java.util.UUID;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.Field;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.RowPatch;
 
-/** Applies the editable changes of an import row to a working payload. */
+/** Applies the editable changes of an import row to the current values of a record. */
 public final class TechnicalImportPatch {
   private TechnicalImportPatch() {}
 
-  public static GlossaryTerm apply(GlossaryTerm term, RowPatch patch) {
-    applyExtension(term, patch);
-    if (patch.cde().specified()) {
-      term.setRelatedTerms(patch.cde().value() == null ? List.of() : List.of(patch.cde().value()));
-    }
-    term.setTags(applyTags(term.getTags(), patch.tags()));
-    return term;
+  /** The values after the patch: absent columns keep the current value, empty cells clear it. */
+  public static TechnicalRecordValues merge(TechnicalRecordValues current, RowPatch patch) {
+    return new TechnicalRecordValues(
+        pick(patch.cde(), current.cde(), TechnicalImportPatch::cdeId),
+        pick(patch.rank(), current.rank(), rank -> rank),
+        pick(
+            tag(patch, TechnicalDictionaryProfile.ELEMENT_TYPE_CLASSIFICATION),
+            current.elementType()),
+        pick(
+            tag(patch, TechnicalDictionaryProfile.GENERATION_TYPE_CLASSIFICATION),
+            current.generationType()),
+        pick(
+            tag(patch, TechnicalDictionaryProfile.CREATION_METHOD_CLASSIFICATION),
+            current.creationMethod()),
+        pick(
+            tag(patch, TechnicalDictionaryProfile.TIMELINESS_CLASSIFICATION), current.timeliness()),
+        pick(patch.systemOwner(), current.systemOwnerId(), owner -> owner));
   }
 
-  private static void applyExtension(GlossaryTerm term, RowPatch patch) {
-    final Map<String, Object> extension = TechnicalRecordValidator.extension(term.getExtension());
-    put(extension, TechnicalDictionaryProfile.SURVIVORSHIP_RANK, patch.rank());
-    put(
-        extension,
-        TechnicalDictionaryProfile.SYSTEM_OWNER,
-        new Field<>(
-            patch.systemOwner().specified(),
-            patch.systemOwner().value() == null
-                ? null
-                : JsonUtils.readValue(
-                    JsonUtils.pojoToJson(patch.systemOwner().value()), Map.class)));
-    term.setExtension(extension);
+  private static Field<String> tag(RowPatch patch, String classification) {
+    return patch.tags().getOrDefault(classification, Field.absent());
   }
 
-  private static void put(Map<String, Object> extension, String key, Field<?> field) {
-    if (field.specified()) {
-      if (field.value() == null) {
-        extension.remove(key);
-      } else {
-        extension.put(key, field.value());
-      }
-    }
+  private static String pick(Field<String> field, String current) {
+    return pick(field, current, value -> value);
   }
 
-  private static List<TagLabel> applyTags(
-      List<TagLabel> current, Map<String, Field<TagLabel>> changes) {
-    final List<TagLabel> result = new ArrayList<>();
-    for (TagLabel tag : listOrEmpty(current)) {
-      if (!isReplaced(tag, changes)) {
-        result.add(tag);
-      }
-    }
-    changes.values().stream()
-        .filter(field -> field.specified() && field.value() != null)
-        .forEach(field -> result.add(field.value()));
-    return result;
+  private static <T, V> V pick(Field<T> field, V current, java.util.function.Function<T, V> map) {
+    return field.specified() ? (field.value() == null ? null : map.apply(field.value())) : current;
   }
 
-  private static boolean isReplaced(TagLabel tag, Map<String, Field<TagLabel>> changes) {
-    return changes.entrySet().stream()
-        .anyMatch(
-            entry ->
-                entry.getValue().specified() && tag.getTagFQN().startsWith(entry.getKey() + "."));
+  private static UUID cdeId(TechnicalCdeInfo info) {
+    return UUID.fromString(info.id());
   }
 }

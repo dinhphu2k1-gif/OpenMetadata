@@ -304,6 +304,55 @@ public interface GlossaryVersionDAO {
       @Bind("payload") String payload,
       @Bind("contentHash") String contentHash);
 
+  @ConnectionAwareSqlUpdate(
+      value =
+          "UPDATE glossary_business_snapshot SET payload = :payload, contentHash = :contentHash, nativeVersion = :nativeVersion, publishedAt = :publishedAt, publishedBy = :publishedBy "
+              + "WHERE snapshotId = :snapshotId AND contentHash = :expectedContentHash",
+      connectionType = MYSQL)
+  @ConnectionAwareSqlUpdate(
+      value =
+          "UPDATE glossary_business_snapshot SET payload = (:payload :: jsonb), contentHash = :contentHash, nativeVersion = :nativeVersion, publishedAt = :publishedAt, publishedBy = :publishedBy "
+              + "WHERE snapshotId = :snapshotId AND contentHash = :expectedContentHash",
+      connectionType = POSTGRES)
+  int correctSnapshot(
+      @BindUUID("snapshotId") UUID snapshotId,
+      @Bind("expectedContentHash") String expectedContentHash,
+      @Bind("nativeVersion") Double nativeVersion,
+      @Bind("payload") String payload,
+      @Bind("contentHash") String contentHash,
+      @Bind("publishedAt") long publishedAt,
+      @Bind("publishedBy") String publishedBy);
+
+  @SqlUpdate(
+      "INSERT INTO glossary_business_snapshot_history "
+          + "(historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy) "
+          + "SELECT :historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, :supersededAt, :supersededBy "
+          + "FROM glossary_business_snapshot WHERE snapshotId = :snapshotId")
+  int insertSnapshotHistory(
+      @BindUUID("historyId") UUID historyId,
+      @BindUUID("snapshotId") UUID snapshotId,
+      @Bind("supersededAt") long supersededAt,
+      @Bind("supersededBy") String supersededBy);
+
+  @SqlQuery(
+      "SELECT historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy "
+          + "FROM glossary_business_snapshot_history WHERE entityType = :entityType AND entityId = :entityId AND businessVersion = :businessVersion "
+          + "ORDER BY supersededAt DESC, historyId")
+  @RegisterRowMapper(SnapshotHistoryMapper.class)
+  List<SnapshotHistoryRecord> listSnapshotHistory(
+      @Bind("entityType") String entityType,
+      @BindUUID("entityId") UUID entityId,
+      @Bind("businessVersion") String businessVersion);
+
+  @SqlQuery(
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+          + "FROM glossary_business_snapshot WHERE entityType = :entityType AND entityId = :entityId AND businessVersion = :businessVersion FOR UPDATE")
+  @RegisterRowMapper(PublishedSnapshotMapper.class)
+  PublishedSnapshotRecord lockPublishedVersion(
+      @Bind("entityType") String entityType,
+      @BindUUID("entityId") UUID entityId,
+      @Bind("businessVersion") String businessVersion);
+
   default void insertSnapshot(
       UUID snapshotId,
       String entityType,
@@ -542,6 +591,22 @@ public interface GlossaryVersionDAO {
       @Bind("payload") String payload,
       @Bind("createdAt") long createdAt);
 
+  @ConnectionAwareSqlUpdate(
+      value =
+          "UPDATE glossary_snapshot_outbox SET payload = :payload, createdAt = :createdAt, processedAt = NULL, attempts = 0, lastError = NULL "
+              + "WHERE snapshotId = :snapshotId AND eventType = :eventType",
+      connectionType = MYSQL)
+  @ConnectionAwareSqlUpdate(
+      value =
+          "UPDATE glossary_snapshot_outbox SET payload = (:payload :: jsonb), createdAt = :createdAt, processedAt = NULL, attempts = 0, lastError = NULL "
+              + "WHERE snapshotId = :snapshotId AND eventType = :eventType",
+      connectionType = POSTGRES)
+  int requeueOutbox(
+      @BindUUID("snapshotId") UUID snapshotId,
+      @Bind("eventType") String eventType,
+      @Bind("payload") String payload,
+      @Bind("createdAt") long createdAt);
+
   @SqlQuery(
       "SELECT eventId, snapshotId, eventType, payload, createdAt, processedAt, attempts, lastError "
           + "FROM glossary_snapshot_outbox WHERE processedAt IS NULL ORDER BY createdAt, eventId LIMIT :limit")
@@ -593,6 +658,23 @@ public interface GlossaryVersionDAO {
       String publishedBy,
       Long archivedAt,
       String archivedBy) {}
+
+  record SnapshotHistoryRecord(
+      UUID historyId,
+      UUID snapshotId,
+      String entityType,
+      UUID entityId,
+      UUID glossaryId,
+      String parentBusinessVersion,
+      String businessVersion,
+      Double nativeVersion,
+      long publicationSequence,
+      String payload,
+      String contentHash,
+      long publishedAt,
+      String publishedBy,
+      long supersededAt,
+      String supersededBy) {}
 
   record SnapshotOutboxRecord(
       UUID eventId,
@@ -647,6 +729,28 @@ public interface GlossaryVersionDAO {
           rs.getString("publishedBy"),
           nullableLong(rs, "archivedAt"),
           rs.getString("archivedBy"));
+    }
+  }
+
+  class SnapshotHistoryMapper implements RowMapper<SnapshotHistoryRecord> {
+    @Override
+    public SnapshotHistoryRecord map(ResultSet rs, StatementContext ctx) throws SQLException {
+      return new SnapshotHistoryRecord(
+          UUID.fromString(rs.getString("historyId")),
+          UUID.fromString(rs.getString("snapshotId")),
+          rs.getString("entityType"),
+          UUID.fromString(rs.getString("entityId")),
+          uuidOrNull(rs.getString("glossaryId")),
+          rs.getString("parentBusinessVersion"),
+          rs.getString("businessVersion"),
+          nullableDouble(rs, "nativeVersion"),
+          rs.getLong("publicationSequence"),
+          rs.getString("payload"),
+          rs.getString("contentHash"),
+          rs.getLong("publishedAt"),
+          rs.getString("publishedBy"),
+          rs.getLong("supersededAt"),
+          rs.getString("supersededBy"));
     }
   }
 

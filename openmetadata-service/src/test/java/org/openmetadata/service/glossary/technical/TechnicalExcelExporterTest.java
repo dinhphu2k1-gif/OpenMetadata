@@ -26,56 +26,50 @@ class TechnicalExcelExporterTest {
 
   private static Map<String, Object> row(String description) {
     Map<String, Object> row = new LinkedHashMap<>();
-    row.put("businessVersion", "2.1");
-    row.put("entityStatus", "In Review");
     row.put("description", description);
-    row.put(
-        "extension",
-        Map.of(
-            TechnicalDictionaryProfile.SOURCE_DATABASE, "core",
-            TechnicalDictionaryProfile.SOURCE_SCHEMA, "dbo",
-            TechnicalDictionaryProfile.SOURCE_TABLE, "CUSTOMER",
-            TechnicalDictionaryProfile.SOURCE_COLUMN, "NAME",
-            TechnicalDictionaryProfile.SOURCE_SERVICE, "ipcas",
-            TechnicalDictionaryProfile.SURVIVORSHIP_RANK, 1));
-    row.put(TechnicalRowFields.CDE_CODE, "CDE1");
-    row.put(TechnicalRowFields.CDE_NAME, "Tên khách hàng");
-    row.put(
-        TechnicalRowFields.DATA_OWNERS, List.of(Map.of("name", "khcl", "displayName", "Ban KHCL")));
-    row.put("tags", List.of(Map.of("tagFQN", "DataTimeliness.T1", "displayName", "T+1")));
+    row.put("database", "core");
+    row.put("schema", "dbo");
+    row.put("table", "CUSTOMER");
+    row.put("column", "NAME");
+    row.put("service", "ipcas");
+    row.put("dataType", "varchar(10)");
+    row.put("rank", 1);
+    row.put("cde", Map.of("id", "c1", "code", "CDE1", "name", "Tên khách hàng"));
+    row.put("dataOwners", List.of(Map.of("id", "u1", "name", "Ban KHCL")));
+    row.put("timeliness", Map.of("fqn", "DataTimeliness.T1", "label", "T+1"));
+    row.put("systemOwner", Map.of("id", "t1", "name", "Ban CNTT"));
     return row;
   }
 
   @Test
-  void valuesFollowTheNineteenColumnLayout() {
+  void valuesFollowTheFourteenColumnLayout() {
     List<String> values = TechnicalExcelExporter.values(row("Mô tả"));
 
+    assertEquals(14, TechnicalExcelExporter.HEADERS.size());
     assertEquals(TechnicalExcelExporter.HEADERS.size(), values.size());
     assertEquals("core", values.get(0));
-    assertEquals("Ban KHCL", values.get(4));
-    assertEquals("CDE1", values.get(6));
-    assertEquals("1", values.get(8));
-    assertEquals("T+1", values.get(13));
-    assertEquals("2.1", values.get(16));
-    assertEquals("Bản phụ", values.get(17));
-    assertEquals("Đang xem xét", values.get(18));
+    assertEquals("CDE1", values.get(5));
+    assertEquals("Tên khách hàng", values.get(6));
+    assertEquals("1", values.get(7));
+    assertEquals("T+1", values.get(12));
+    assertEquals("Mô tả", values.get(13));
   }
 
   @Test
   void writesReadableWorkbookAndNeutralizesFormulas() throws IOException {
     ExportedWorkbook exported =
-        TechnicalExcelExporter.write(List.of(row("=HYPERLINK(\"http://x\")"), row("ok")), "2");
+        TechnicalExcelExporter.write(List.of(row("=HYPERLINK(\"http://x\")"), row("ok")), "");
     try (InputStream input = Files.newInputStream(exported.path());
         Workbook workbook = new XSSFWorkbook(input)) {
       Sheet sheet = workbook.getSheetAt(0);
-      assertEquals("Technical Dictionary v2", sheet.getSheetName());
+      assertEquals("Technical Dictionary", sheet.getSheetName());
       assertEquals(2, exported.rowCount());
       List<String> headers = new ArrayList<>();
       sheet.getRow(0).forEach(cell -> headers.add(cell.getStringCellValue()));
       assertEquals(TechnicalExcelExporter.HEADERS, headers);
       Row first = sheet.getRow(1);
-      assertEquals("'=HYPERLINK(\"http://x\")", first.getCell(15).getStringCellValue());
-      assertFalse(sheet.getRow(2).getCell(15).getStringCellValue().startsWith("'"));
+      assertEquals("'=HYPERLINK(\"http://x\")", first.getCell(13).getStringCellValue());
+      assertFalse(sheet.getRow(2).getCell(13).getStringCellValue().startsWith("'"));
     } finally {
       Files.deleteIfExists(exported.path());
     }

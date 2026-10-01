@@ -34,9 +34,11 @@ class TechnicalRowMatcherTest {
   @Test
   void servicesAreLowercasedAndUuidsNormalized() {
     assertEquals(
-        List.of("ipcas", "crm"), filters(TechnicalRowMatcher.SOURCE_SERVICES, "IPCAS,Crm").get("sourceServices"));
+        List.of("ipcas", "crm"),
+        filters(TechnicalRowMatcher.SOURCE_SERVICES, "IPCAS,Crm").get("sourceServices"));
     assertEquals(
-        List.of(CDE), filters(TechnicalRowMatcher.CDE_TERM_IDS, CDE.toUpperCase()).get("cdeTermIds"));
+        List.of(CDE),
+        filters(TechnicalRowMatcher.CDE_TERM_IDS, CDE.toUpperCase()).get("cdeTermIds"));
   }
 
   @Test
@@ -55,7 +57,8 @@ class TechnicalRowMatcherTest {
     assertThrows(BadRequestException.class, () -> filters(TechnicalRowMatcher.CDE_MAPPING, "SOME"));
     assertThrows(
         BadRequestException.class, () -> filters(TechnicalRowMatcher.SOURCE_SERVICES, "a,,b"));
-    assertThrows(BadRequestException.class, () -> filters(TechnicalRowMatcher.SOURCE_SERVICES, "a,a"));
+    assertThrows(
+        BadRequestException.class, () -> filters(TechnicalRowMatcher.SOURCE_SERVICES, "a,a"));
     assertThrows(
         BadRequestException.class, () -> filters(TechnicalRowMatcher.SOURCE_STATUSES, "Gone"));
   }

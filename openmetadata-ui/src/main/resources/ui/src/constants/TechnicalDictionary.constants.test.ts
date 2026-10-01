@@ -18,14 +18,14 @@ import {
 } from './TechnicalDictionary.constants';
 
 describe('TechnicalDictionary constants', () => {
-  it('uses an isolated column preference key', () => {
+  it('uses a preference key that drops the layout of the versioned dictionary', () => {
     expect(TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY).toBe(
-      'governedGlossary.TECHNICAL_DICTIONARY.v1'
+      'technicalDictionary.v2'
     );
   });
 
-  it('lists the nineteen business columns in the documented order plus the action column', () => {
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(20);
+  it('lists the fourteen fields in the documented order plus the action column', () => {
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(15);
     expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(0, 4)).toEqual([
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
@@ -33,17 +33,27 @@ describe('TechnicalDictionary constants', () => {
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
     ]);
     expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-2)).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
     ]);
   });
 
-  it('keeps the four source columns, version, release type and status always visible', () => {
-    expect(TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS).toEqual(
-      expect.arrayContaining([
-        TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
-        TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
-      ])
+  it('keeps the update columns optional and hidden by default', () => {
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).not.toContain(
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.UPDATED_AT
     );
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).not.toContain(
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.UPDATED_BY
+    );
+  });
+
+  it('keeps the four source columns and the actions always visible', () => {
+    expect(TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS).toEqual([
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
+    ]);
   });
 });

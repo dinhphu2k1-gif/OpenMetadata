@@ -8,7 +8,6 @@ package org.openmetadata.service.glossary.technical.search;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,9 +18,8 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
 
 /**
- * Technical Dictionary reads over `technical_dictionary_search_index`. Pending index work is
- * processed first, so a read right after a failed sync already sees the repaired documents. An
- * unreachable index is reported as {@code TD_INDEX_UNAVAILABLE}.
+ * Technical Dictionary reads over `technical_dictionary_search_index`. An unreachable index is
+ * reported as {@code TD_INDEX_UNAVAILABLE}; pending outbox work is processed by the caller first.
  */
 public final class TechnicalSearchService {
   public static final String DATA = "data";
@@ -30,7 +28,7 @@ public final class TechnicalSearchService {
   public static final String TOTAL_COLUMNS = "totalColumns";
   public static final String TOTAL_TABLES = "totalTables";
   public static final String TOTAL_SOURCES = "totalSources";
-  public static final String APPROVED = "approved";
+  public static final String MAPPED = "mapped";
   private static final String HITS = "hits";
   private static final String SOURCE = "_source";
   private static final String AGGREGATIONS = "aggregations";
@@ -41,12 +39,28 @@ public final class TechnicalSearchService {
         read(() -> TechnicalSearchIndex.search(TechnicalSearchQueryBuilder.searchBody(criteria)))
             .path(HITS);
     final List<Map<String, Object>> rows = new ArrayList<>();
-    hits.path(HITS).forEach(hit -> rows.add(TechnicalRowMapper.toRow(source(hit), criteria.view())));
-    final Map<String, Object> paging = new LinkedHashMap<>();
-    paging.put(TOTAL, hits.path(TOTAL).path(VALUE).asLong());
-    paging.put("limit", criteria.limit());
-    paging.put("offset", criteria.offset());
-    return Map.of(DATA, rows, PAGING, paging);
+    hits.path(HITS).forEach(hit -> rows.add(source(hit)));
+    return page(rows, hits.path(TOTAL).path(VALUE).asLong(), criteria.limit(), criteria.offset());
+  }
+
+  /** One page of the records referencing a CDE in the bound version, in rank order. */
+  public Map<String, Object> rowsOfCde(String version, UUID cdeId, int limit, int offset) {
+    TechnicalSearchQueryBuilder.requireWithinWindow(offset, limit);
+    final Map<String, Object> body = new LinkedHashMap<>();
+    body.put("from", offset);
+    body.put("size", limit);
+    body.put("track_total_hits", true);
+    body.put(
+        "sort",
+        List.of(
+            Map.of(TechnicalIndexFields.RANK, Map.of("order", "asc", "missing", "_last")),
+            Map.of(TechnicalIndexFields.COLUMN_FQN, "asc"),
+            Map.of(TechnicalIndexFields.TERM_ID, "asc")));
+    body.put("query", TechnicalSearchQueryBuilder.cdeQuery(version, cdeId));
+    final JsonNode hits = read(() -> TechnicalSearchIndex.search(body)).path(HITS);
+    final List<Map<String, Object>> rows = new ArrayList<>();
+    hits.path(HITS).forEach(hit -> rows.add(source(hit)));
+    return page(rows, hits.path(TOTAL).path(VALUE).asLong(), limit, offset);
   }
 
   public Map<String, Long> stats(TechnicalSearchCriteria scope) {
@@ -55,9 +69,18 @@ public final class TechnicalSearchService {
     final JsonNode aggregations = response.path(AGGREGATIONS);
     final Map<String, Long> stats = new LinkedHashMap<>();
     stats.put(TOTAL_COLUMNS, response.path(HITS).path(TOTAL).path(VALUE).asLong());
-    stats.put(TOTAL_TABLES, aggregations.path(TechnicalSearchQueryBuilder.TABLES_AGGREGATION).path(VALUE).asLong());
-    stats.put(TOTAL_SOURCES, aggregations.path(TechnicalSearchQueryBuilder.SOURCES_AGGREGATION).path(VALUE).asLong());
-    stats.put(APPROVED, aggregations.path(TechnicalSearchQueryBuilder.APPROVED_AGGREGATION).path("doc_count").asLong());
+    stats.put(
+        TOTAL_TABLES,
+        aggregations.path(TechnicalSearchQueryBuilder.TABLES_AGGREGATION).path(VALUE).asLong());
+    stats.put(
+        TOTAL_SOURCES,
+        aggregations.path(TechnicalSearchQueryBuilder.SOURCES_AGGREGATION).path(VALUE).asLong());
+    stats.put(
+        MAPPED,
+        aggregations
+            .path(TechnicalSearchQueryBuilder.MAPPED_AGGREGATION)
+            .path("doc_count")
+            .asLong());
     return stats;
   }
 
@@ -69,53 +92,16 @@ public final class TechnicalSearchService {
                 TechnicalSearchQueryBuilder.query(criteria),
                 TechnicalSearchQueries.stableSort(TechnicalIndexFields.COLUMN_FQN),
                 true,
-                hit -> visitor.accept(TechnicalRowMapper.toRow(source(hit), criteria.view()))));
+                hit -> visitor.accept(source(hit))));
   }
 
-  /** Every matching row; used to select records whose state is then re-read from the database. */
-  public List<Map<String, Object>> rows(TechnicalSearchCriteria criteria) {
-    final List<Map<String, Object>> rows = new ArrayList<>();
-    scanRows(criteria, rows::add);
-    return rows;
-  }
-
-  /** Ids of every matching record, to be re-read from the database before any write. */
-  public List<UUID> termIds(TechnicalSearchCriteria criteria) {
-    return read(() -> TechnicalSearchQueries.scanTermIds(TechnicalSearchQueryBuilder.query(criteria)));
-  }
-
-  /** Column keys among {@code columnKeys} that already have a record in the scope. */
-  public Map<String, String> declaredColumns(
-      UUID glossaryId, String parentBusinessVersion, Collection<String> columnKeys) {
-    final Map<String, String> declared = new LinkedHashMap<>();
-    if (!columnKeys.isEmpty()) {
-      run(
-          () ->
-              TechnicalSearchQueries.scan(
-                  TechnicalSearchQueryBuilder.columnKeysQuery(
-                      glossaryId, parentBusinessVersion, columnKeys),
-                  TechnicalSearchQueries.stableSort(),
-                  List.of(TechnicalIndexFields.COLUMN_KEY, TechnicalIndexFields.TERM_ID),
-                  hit ->
-                      declared.put(
-                          hit.path(SOURCE).path(TechnicalIndexFields.COLUMN_KEY).asText(),
-                          hit.path(SOURCE).path(TechnicalIndexFields.TERM_ID).asText())));
-    }
-    return declared;
-  }
-
-  /** Rows the caller may read in one table. */
-  public List<Map<String, Object>> rowsOfTable(
-      TechnicalSearchCriteria scope, String database, String schema, String table) {
-    final List<Map<String, Object>> rows = new ArrayList<>();
-    run(
-        () ->
-            TechnicalSearchQueries.scan(
-                TechnicalSearchQueryBuilder.tableQuery(scope, database, schema, table),
-                TechnicalSearchQueries.stableSort(TechnicalIndexFields.COLUMN_FQN),
-                true,
-                hit -> rows.add(TechnicalRowMapper.toRow(source(hit), scope.view()))));
-    return rows;
+  private static Map<String, Object> page(
+      List<Map<String, Object>> rows, long total, int limit, int offset) {
+    final Map<String, Object> paging = new LinkedHashMap<>();
+    paging.put(TOTAL, total);
+    paging.put("limit", limit);
+    paging.put("offset", offset);
+    return Map.of(DATA, rows, PAGING, paging);
   }
 
   private static Map<String, Object> source(JsonNode hit) {

@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../../constants/Glossary.contant';
 import {
-  EntityVersionContext,
   GlossaryTerm,
   TagLabel,
   TermRelation,
@@ -71,9 +70,6 @@ const DQGlossaryTermForm = ({
   const [selectedCde, setSelectedCde] = useState<GlossaryTerm | undefined>(
     existingCdeRelation?.term as GlossaryTerm | undefined
   );
-  const [selectedVersionContext, setSelectedVersionContext] = useState<
-    EntityVersionContext | undefined
-  >(existingCdeRelation?.versionContext);
 
   useEffect(() => {
     if (editMode && glossaryTerm) {
@@ -86,13 +82,6 @@ const DQGlossaryTermForm = ({
       )?.term;
 
       setSelectedCde(relatedCde as GlossaryTerm | undefined);
-      setSelectedVersionContext(
-        glossaryTerm.relatedTerms?.find((relation) =>
-          relation.term?.fullyQualifiedName?.includes(
-            DATA_DICTIONARY_GLOSSARY_NAME
-          )
-        )?.versionContext
-      );
 
       form.setFieldsValue({
         name: glossaryTerm.name,
@@ -142,7 +131,6 @@ const DQGlossaryTermForm = ({
   const onCdeSelectChange = (value?: string, cde?: GlossaryTerm) => {
     setSelectedCde(cde);
     if (!value || !cde) {
-      setSelectedVersionContext(undefined);
       form.setFieldsValue({ cdeCode: undefined, cdeName: undefined });
 
       return;
@@ -152,15 +140,6 @@ const DQGlossaryTermForm = ({
       cdeCode: cde.name,
       cdeName: cde.displayName || cde.name,
     });
-    setSelectedVersionContext(
-      cde.snapshotId && cde.parentBusinessVersion && cde.businessVersion
-        ? {
-            snapshotId: cde.snapshotId,
-            parentBusinessVersion: cde.parentBusinessVersion,
-            businessVersion: cde.businessVersion,
-          }
-        : undefined
-    );
   };
 
   const onFinish = async (values: DQGlossaryTermFormValues) => {
@@ -249,7 +228,6 @@ const DQGlossaryTermForm = ({
           displayName: selectedCde.displayName,
           fullyQualifiedName: selectedCde.fullyQualifiedName,
         },
-        versionContext: selectedVersionContext,
       });
     }
 
@@ -355,7 +333,6 @@ const DQGlossaryTermForm = ({
               glossaryTerm?.parentBusinessVersion ?? parentBusinessVersion
             }
             selectedCde={selectedCde}
-            selectedVersionContext={selectedVersionContext}
             onChange={onCdeSelectChange}
           />
         </Form.Item>

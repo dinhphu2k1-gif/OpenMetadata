@@ -1,5 +1,17 @@
 # Kế hoạch triển khai Từ điển dữ liệu dùng chung theo từng chức năng
 
+## Trạng thái thực hiện (cập nhật 2026-10-01)
+
+Đối chiếu bằng đọc mã nguồn, chưa build/test trong lần cập nhật này.
+
+- F00–F07, F09–F16: đã có trong code (`GlossaryVersioningService`, `GovernedBulkWorkflowService`, `CdeFlatListService`, `CdeBusinessVersionSearchService`, `CdeImportService`, `CdeExcelExporter`; endpoint `/working/*`, `/published/*`, `/bulk/{action}`, `/import/*`, `/export`). Chưa kiểm chứng đầy đủ bằng test.
+- F17: đã có `CdeReleaseVersionType`, thuộc tính Cấp phát hành ở backend, form/bảng/import UI.
+- Tab Assets: theo [thiết kế Từ điển kỹ thuật §11.5](./technical-dictionary-design.md), CDE hiện hành lấy tài sản theo tag, phiên bản lưu trữ lấy từ `GET /glossaryTerms/{id}/technicalAssets`. Mô tả Assets ở F15 và API spec §9.6 chưa được rà lại theo đó.
+- Kiểm thử: `docs/test` mới có F02–F07 và F09–F12; thiếu F13–F17.
+- Sửa phiên bản (cập nhật 2026-10-01): đã bỏ hủy duyệt ở backend và UI; thêm `POST /glossaryTerms/{id}/published/{businessVersion}/correction`, `GET .../history`, bảng `glossary_business_snapshot_history` (migration 1.13.3) nút **Sửa phiên bản** và modal **Lịch sử sửa đổi** (`CorrectionHistoryModal`) trên trang chi tiết CDE/DQ. Backend compile và test UI đã chạy; chưa có integration test. Lần chạy đầu trên PostgreSQL thật phát hiện lỗi chèn trùng outbox khi duyệt bản sửa (đã sửa: đặt lại dòng outbox hiện có, thiết kế §5.6); cần integration test cho luồng sửa → duyệt trên MySQL và PostgreSQL. Lưu ý `publish` đổi mọi vi phạm ràng buộc (SQLState 23xxx) thành `409 The working version was published concurrently`, nên nguyên nhân thật chỉ thấy trong log DB.
+- Phạm vi Từ điển kỹ thuật không còn đi qua Governed Glossary (đã bỏ profile `TECHNICAL_DICTIONARY`), xem tài liệu TD.
+
+
 ## 1. Tài liệu nguồn và phạm vi
 
 Kế hoạch này là kế hoạch triển khai của tài liệu [Thiết kế luồng Từ điển dữ liệu dùng chung và CDE theo Version, Workflow và Role](./cde-glossary-ui-design.md). Khi có khác biệt, tài liệu thiết kế là nguồn yêu cầu nghiệp vụ; kế hoạch này quy định thứ tự thực hiện, kiểm thử và bàn giao. Các quyết định về nguồn dữ liệu phải tuân theo [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md), trong đó database là nguồn sự thật nghiệp vụ còn search engine là projection phục vụ discovery.
@@ -76,7 +88,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 | F13 | §6.3 Export toàn scope theo quyền; §8 Export; §9.3.5 |
 | F14 | §4.2–4.3 quyền Import; §6.2; §8 Import; §9.3.6 API template/preview/commit |
 | F15 | §7.1 Overview, custom properties và Assets; §9.5–9.6 |
-| F16 | §4.3 Delete/thu hồi; §6.2–7.1 action; §8 optimistic locking; §9.7 |
+| F16 | §4.3 Delete, bỏ thu hồi; §5.6 Sửa phiên bản; §6.2–7.1 action; §8 optimistic locking; §9.7 |
 | F17 | §2.5 Cấp phát hành; §4 authorization; §7.1 CDE Overview; §9.7 định tuyến phê duyệt |
 
 ## 4. Chi tiết từng chức năng
@@ -669,7 +681,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 
 - Overview gồm basic fields, owners, domains, tags và các custom properties. Sau F17, Panel bên phải hiển thị `releaseLevel` thay cho Reviewers.
 - Chỉ ẩn restricted tabs với CDE thuộc Data Dictionary.
-- Assets dùng đúng CDE identity; chốt mapping là hiện hành hay snapshot-aware.
+- Assets và danh sách DQ Rule dùng đúng CDE identity và luôn là danh sách hiện hành: mọi version `N.x` (kể cả Draft, bản lịch sử) hiển thị cùng danh sách; không snapshot-aware (DQ UI design §5.4).
 
 **Test/DoD**
 
@@ -683,6 +695,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Phạm vi**
 
 - Delete thủ công chỉ cho Draft/Rejected theo policy; cutover F09 được phép xóa toàn bộ CDE predecessor non-Approved sau cảnh báo/xác nhận ở bước Approve.
+- Không có thao tác hủy duyệt/thu hồi thủ công cho Data Dictionary, CDE hay DQ Rule (đã gỡ endpoint `.../published/latest/archive` và nút trên UI). Sửa nội dung một version Approved dùng luồng Sửa phiên bản (thiết kế §5.6).
 - Archive predecessor Data Dictionary và Approved CDE cùng scope là system transition bắt buộc của F09, không phải lựa chọn thủ công. Snapshot/archive manifest vẫn còn để audit và không được restore thành active khi đã có successor.
 - Mọi archive/delete/approve CDE phải lấy publication lock theo thứ tự F05/F09 để không race với cutover.
 - Audit transition, actor, revision và business version.

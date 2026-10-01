@@ -10,9 +10,20 @@
 Tài liệu này đặc tả chi tiết toàn bộ giao diện lập trình ứng dụng (RESTful APIs) phục vụ 3 phân hệ quản trị metadata trọng yếu của Agribank:
 1. **Từ điển dữ liệu dùng chung (Data Dictionary) & Thành tố dữ liệu dùng chung (CDE - Critical Data Elements)**.
 2. **Danh mục Quy tắc Chất lượng dữ liệu (Data Quality - DQ Rules Glossary)**.
-3. **Từ điển Kỹ thuật theo Phiên bản nghiệp vụ (Technical Dictionary)**.
+3. **Từ điển Kỹ thuật (Technical Dictionary)**, không phiên bản, gắn với Từ điển dữ liệu đang hiệu lực.
 
 Tài liệu được biên soạn theo tiêu chuẩn kỹ thuật ngân hàng, đóng vai trò là hợp đồng giao tiếp (API Contract) chính thức giữa Backend (OpenMetadata Core Server - JAX-RS / Dropwizard), Frontend (React Single Page Application), và các hệ sinh thái tích hợp bên ngoài (Data Pipeline, Ingestion Bots, DWH/Data Lakehouse).
+
+**Trạng thái tài liệu:** As-built, đối chiếu mã nguồn ngày `2026-09-30`.
+
+**Nguồn sự thật theo thứ tự ưu tiên:**
+
+1. JAX-RS resource trong `openmetadata-service` (method, path, query parameter, authorization).
+2. JSON Schema trong `openmetadata-spec` (request body và validation).
+3. Frontend REST wrapper trong `openmetadata-ui` (cách UI gọi API).
+4. Tài liệu thiết kế trong `docs/design` (ý định kiến trúc; không thay thế contract đã triển khai).
+
+Tài liệu này đặc tả **danh mục quy tắc Chất lượng dữ liệu** dưới dạng Governed Glossary. Các API vận hành kiểm thử dữ liệu gốc của OpenMetadata như `/dataQuality/testCases`, `/testSuites` và `/testCaseResults` nằm ngoài phạm vi tài liệu này.
 
 ### 1.2. Đối tượng sử dụng
 - **Kỹ sư phát triển Backend & Frontend:** Căn cứ lập trình đúng endpoint, tham số, kiểu dữ liệu, ràng buộc khóa lạc quan và mã phản hồi.
@@ -32,6 +43,8 @@ Tài liệu được biên soạn theo tiêu chuẩn kỹ thuật ngân hàng, �
 | **FQN** | Fully Qualified Name | Tên định danh toàn cầu duy nhất của một thực thể trong OpenMetadata. |
 | **RBAC** | Role-Based Access Control | Cơ chế kiểm soát truy cập dựa trên vai trò người dùng (Consumer, Proposer, Steward, Admin). |
 | **Optimistic Locking** | Khóa lạc quan | Kiểm soát xung đột cập nhật đồng thời dựa trên số hiệu hiệu chỉnh `workingRevision`. |
+
+Các trường audit của Governed Workflow như `createdAt`, `updatedAt`, `submittedAt`, `rejectedAt`, `publishedAt`, `archivedAt` dùng Unix epoch milliseconds (`int64`). Riêng `expiresAt` của import session là chuỗi ISO-8601 UTC.
 
 ---
 
@@ -115,17 +128,18 @@ flowchart TD
   - Nếu khớp: Cập nhật thành công và tăng `workingRevision` lên 1 đơn vị.
   - Nếu không khớp: Từ chối giao dịch, trả về HTTP status `409 Conflict`.
 
-### 2.3. Cấu trúc phản hồi lỗi chuẩn (Standard Error Envelope)
-Mọi phản hồi lỗi từ hệ thống tuân theo định dạng JSON chuẩn:
+### 2.3. Cấu trúc phản hồi lỗi
+
+HTTP status là tín hiệu bắt buộc để client xử lý lỗi. Các lỗi miền nghiệp vụ của Từ điển kỹ thuật có contract ổn định dạng:
+
 ```json
 {
-  "code": 409,
-  "errorCode": "OPTIMISTIC_LOCK_CONFLICT",
-  "message": "Bản ghi đã được cập nhật bởi một người dùng khác. Vui lòng tải lại trang để lấy dữ liệu mới nhất.",
-  "timestamp": "2026-09-29T08:30:00.000Z",
-  "path": "/api/v1/glossaryTerms/d3b07384-d113-4a6f-9988-251f92e42426/working"
+  "code": "TD_COLUMN_ALREADY_DECLARED",
+  "message": "Column 'ipcas.core.public.customer.customer_id' is already declared in the Technical Dictionary"
 }
 ```
+
+Các lỗi nền tảng/validation kế thừa OpenMetadata có thể dùng envelope chung của server và chứa `message` hoặc `responseMessage`. Client không được giả định mọi lỗi đều có `timestamp`, `path` hoặc `errorCode`; phải ưu tiên HTTP status, sau đó đọc `code` (nếu có) và thông điệp lỗi.
 
 ### 2.4. Bảng mã phản hồi HTTP (HTTP Status Codes)
 | HTTP Code | Mã lỗi chuẩn | Ý nghĩa & Ngữ cảnh áp dụng |
@@ -138,6 +152,7 @@ Mọi phản hồi lỗi từ hệ thống tuân theo định dạng JSON chuẩ
 | **404 Not Found** | `ENTITY_NOT_FOUND` | Không tìm thấy entity, hoặc bản ghi ở trạng thái người dùng không có quyền nhìn thấy. |
 | **409 Conflict** | `OPTIMISTIC_LOCK_CONFLICT` / `DUPLICATE_KEY` | Xung đột phiên bản khóa lạc quan hoặc trùng lặp mã duy nhất trong cùng Scope. |
 | **413 Payload Too Large** | `FILE_SIZE_EXCEEDED` | File tải lên vượt quá giới hạn tối đa cho phép (ví dụ file Import > 5MB). |
+| **503 Service Unavailable** | `TD_INDEX_UNAVAILABLE` | Search index riêng của Từ điển kỹ thuật không sẵn sàng; không tự động fallback sang truy vấn toàn bộ PostgreSQL. |
 | **500 Internal Error** | `INTERNAL_SERVER_ERROR` | Lỗi máy chủ nội bộ không mong muốn. Không để lộ stack trace ra client. |
 
 ---
@@ -232,19 +247,11 @@ giá trị lưu trữ nội bộ không phải contract công khai.
         "name": "TrungTamQuanLyDuLieu",
         "displayName": "Trung tâm Quản lý Dữ liệu"
       }
-    ],
-    "capabilities": {
-      "canViewPublished": true,
-      "canViewWorking": false,
-      "canEdit": false,
-      "canSubmit": false,
-      "canApprove": false,
-      "canReject": false,
-      "canImport": false,
-      "canExport": true
-    }
+    ]
   }
   ```
+
+Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `GET /api/v1/glossaries/{id}/permissions`; response là object boolean phẳng gồm `canViewWorking`, `canViewPublished`, `canEditWorking`, `canSubmit`, `canCreateVersion`, `canApprove`, `canReject`, `canArchive`, `canImportCdeDrafts`, `isConsumer`.
 
 ---
 
@@ -260,7 +267,7 @@ giá trị lưu trữ nội bộ không phải contract công khai.
     "displayName": "Từ điển dữ liệu dùng chung",
     "businessVersion": "1",
     "entityStatus": "Approved",
-    "publishedAt": "2026-01-01T08:00:00.000Z",
+    "publishedAt": 1767254400000,
     "publishedBy": "admin"
   }
   ```
@@ -269,18 +276,15 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 
 #### API 3.1.4: Lấy danh sách các phiên bản Approved đã phát hành
 - **Method & Endpoint:** `GET /api/v1/glossaries/{id}/published`
-- **Mẫu Phản hồi (200 OK):**
+- **Mẫu Phản hồi (200 OK):** Backend trả trực tiếp JSON array.
   ```json
-  {
-    "data": [
+  [
       {
         "businessVersion": "1",
         "entityStatus": "Approved",
-        "publishedAt": "2026-01-01T08:00:00.000Z",
-        "isCurrent": true
+        "publishedAt": 1767254400000
       }
-    ]
-  }
+  ]
   ```
 
 ---
@@ -305,42 +309,32 @@ giá trị lưu trữ nội bộ không phải contract công khai.
     "businessVersion": "2",
     "entityStatus": "Draft",
     "workingRevision": 3,
-    "description": "Từ điển dữ liệu dùng chung áp dụng cho kỳ kế hoạch 2026-2027.",
-    "capabilities": {
-      "canViewPublished": true,
-      "canViewWorking": true,
-      "canEdit": true,
-      "canSubmit": true,
-      "canApprove": false,
-      "canReject": false
-    }
+    "description": "Từ điển dữ liệu dùng chung áp dụng cho kỳ kế hoạch 2026-2027."
   }
   ```
 
 ---
 
 #### API 3.1.7: Xem trước CDE sẽ tự động phát hành khi Cutover (Publish Preview)
+
+> [!NOTE]
+> Response bổ sung `technicalDictionary: { declaredColumns, mappedColumns }` để cảnh báo số cột Từ điển kỹ thuật sẽ bị làm mới khi phê duyệt (mục 5.6).
 - **Method & Endpoint:** `GET /api/v1/glossaries/{id}/working/publish-preview?limit={n}&after={cursor}`
-- **Mô tả:** Trả về danh sách CDE `Approved` trong scope mới sẽ được công bố, kèm số lượng CDE cũ sẽ bị Archive hoặc xóa dọn.
+- **Mô tả:** Trả về danh sách revision CDE `Approved` trong scope mới sẽ được công bố. `limit` từ 1 đến 100; `after` là cursor do server trả.
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
-    "targetBusinessVersion": "2",
-    "cdeToPublishCount": 1420,
-    "predecessorStats": {
-      "predecessorVersion": "1",
-      "cdeToArchiveCount": 1250,
-      "cdeDraftToDeleteCount": 15
-    },
-    "previewTerms": [
+    "data": [
       {
-        "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
-        "name": "CDE_CUST_ID",
-        "displayName": "Mã khách hàng",
-        "businessVersion": "2.0",
-        "entityStatus": "Approved"
+        "termId": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
+        "termSnapshotId": "b95bfc06-02a1-4f46-bbe7-a82b91f0252d",
+        "termBusinessVersion": "2.0",
+        "displayOrder": 0
       }
-    ]
+    ],
+    "paging": {"after": "25"},
+    "termCount": 1420,
+    "evaluatedAt": 1790640000000
   }
   ```
 
@@ -354,7 +348,10 @@ giá trị lưu trữ nội bộ không phải contract công khai.
     "expectedRevision": 3,
     "payload": {
       "description": "Cập nhật định hướng quản trị từ điển dữ liệu kỳ 2.",
-      "displayName": "Từ điển dữ liệu dùng chung (Kỳ 2026-2027)"
+      "owners": [],
+      "reviewers": [],
+      "domains": [],
+      "tags": []
     }
   }
   ```
@@ -363,19 +360,21 @@ giá trị lưu trữ nội bộ không phải contract công khai.
   {
     "id": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
     "workingRevision": 4,
-    "displayName": "Từ điển dữ liệu dùng chung (Kỳ 2026-2027)",
-    "updatedAt": "2026-09-29T08:35:00.000Z"
+    "updatedAt": 1790661300000
   }
   ```
 
 ---
 
 #### API 3.1.9: Thao tác Vòng đời Từ điển dữ liệu (Workflow Actions)
-- **Method & Endpoint:** `POST /api/v1/glossaries/{id}/working/{action}`
+- **Method & Endpoint chuyển trạng thái:** `POST /api/v1/glossaries/{id}/working/{action}`
+- **Endpoint tạo version kế tiếp:** `POST /api/v1/glossaries/{id}/working` với body `{"businessVersion":"N+1"}`.
 - **Path Actions:**
-  - `createDraft`: Khởi tạo bản nháp kỳ tiếp theo ($N+1$).
   - `submit`: Gửi thẩm định toàn bộ Scope từ điển (`Draft` $\rightarrow$ `In Review`).
-  - `approve`: Phê duyệt và kích hoạt Cutover (`In Review` $\rightarrow$ `Approved`).
+  - `approve`: Trong một transaction, phê duyệt toàn bộ working record thuộc đúng scope
+    (không phụ thuộc record đang `Draft`, `In Review` hay `Rejected`), tạo manifest, rồi phê duyệt
+    catalog và kích hoạt Cutover (`In Review` $\rightarrow$ `Approved`). Áp dụng thống nhất cho
+    Từ điển dữ liệu dùng chung, Chất lượng dữ liệu và Từ điển kỹ thuật.
   - `reject`: Từ chối thẩm định (`In Review` $\rightarrow$ `Rejected`).
   - `reopen`: Mở lại bản nháp để chỉnh sửa (`Rejected` $\rightarrow$ `Draft`).
 - **Mẫu Request (Approve Cutover):**
@@ -385,10 +384,7 @@ giá trị lưu trữ nội bộ không phải contract công khai.
   Authorization: Bearer <TOKEN>
   Content-Type: application/json
 
-  {
-    "expectedRevision": 4,
-    "comment": "Đồng ý phê duyệt ban hành phiên bản Từ điển dữ liệu kỳ 2."
-  }
+  {"expectedRevision": 4}
   ```
 - **Mẫu Phản hồi (200 OK):**
   ```json
@@ -419,8 +415,8 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 | 10 | `extension.relatedRegulatoryDocuments` | Văn bản quy định liên quan | `markdown` | Không | Căn cứ văn bản, luật định, thông tư của NHNN hoặc nội bộ ban hành. |
 | 11 | `extension.dataQualityRules` | Quy định chất lượng dữ liệu | `Array<string>` | **Có** | Danh sách 1 giá trị: `["Y"]` (Có) hoặc `["N"]` (Không). |
 | 12 | `businessVersion` | Phiên bản | `string` | **Có** | Số hiệu phiên bản nghiệp vụ dạng `$N.MINOR$` (ví dụ: `1.0`, `1.1`). |
-| 13 | `extension.releaseVersionType` | Loại phiên bản phát hành | `string` | **Auto** | Hệ thống tự tính: `Bản chính` nếu là `$N.0$`, `Bản phụ` nếu `$N.MINOR$` ($MINOR \ge 1$). |
-| 14 | `extension.releaseLevel` | Cấp phát hành | `string` | **Có** | Thẩm quyền phê duyệt: Chỉ nhận `CEO` (Tổng Giám đốc) hoặc `TTQLDL` (Trung tâm QLDL). |
+| 13 | `extension.releaseVersionType` | Loại phiên bản phát hành | `Array<string>` | **Auto** | Hệ thống tự tính: `Bản chính` nếu là `$N.0$`, `Bản phụ` nếu `$N.MINOR$` ($MINOR \ge 1$). |
+| 14 | `extension.releaseLevel` | Cấp phát hành | `Array<string>` | **Có** | Danh sách một giá trị: `CEO` (Tổng Giám đốc) hoặc `TTQLDL` (Trung tâm QLDL). |
 | 15 | `extension.effectiveDate` | Ngày hiệu lực | `string (date)` | Không | Định dạng chuẩn `yyyy-MM-dd`. |
 | 16 | `extension.expirationDate` | Ngày hết hiệu lực | `string (date)` | Không | Định dạng `yyyy-MM-dd`. Ràng buộc: $\ge$ `effectiveDate`. |
 
@@ -447,8 +443,8 @@ giá trị lưu trữ nội bộ không phải contract công khai.
         "recordType": "published",
         "description": "Mã định danh duy nhất của khách hàng trên toàn hệ thống Agribank.",
         "extension": {
-          "releaseVersionType": "Bản chính",
-          "releaseLevel": "CEO",
+          "releaseVersionType": ["Bản chính"],
+          "releaseLevel": ["CEO"],
           "dataQualityRules": ["Y"],
           "effectiveDate": "2026-01-01",
           "expirationDate": "2030-12-31"
@@ -480,34 +476,34 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 
 ---
 
-#### API 3.2.3: Lấy chi tiết CDE theo Scoped FQN
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/name/{scopedFqn}`
+#### API 3.2.3: Lấy representation hiện hành theo Identity FQN
+- **Method & Endpoint:** `GET /api/v1/glossaryTerms/name/{identityFqn}`
 - **Path Parameters:**
-  - `scopedFqn`: FQN có chứa version scope (ví dụ: `Data Dictionary.CDE_CUST_ID@v1`).
-- **Mẫu Phản hồi (200 OK):** Trả về đầy đủ thông tin CDE, `extension`, `domain`, `tags`, `owners`.
+  - `identityFqn`: FQN identity lưu trong `glossary_term_entity`, ví dụ `Data Dictionary.CDE_CUST_ID`.
+- **Mẫu Phản hồi (200 OK):** Trả working representation cho actor có quyền nếu working tồn tại; nếu không trả latest published. Response có thể project `fullyQualifiedName` dạng scoped `Data Dictionary.CDE_CUST_ID@v1`.
+
+Không dùng scoped FQN trong response để lookup identity. Deep link cần version chính xác phải mang `termId`, `businessVersion`, `parentBusinessVersion` và gọi API `/published/{businessVersion}` hoặc `/working` tương ứng.
 
 ---
 
 #### API 3.2.4: Lấy danh sách các phiên bản Approved của CDE trong Scope
 - **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/published?parentBusinessVersion={N}`
-- **Mẫu Phản hồi (200 OK):**
+- **Mẫu Phản hồi (200 OK):** Backend trả trực tiếp một JSON array, không bọc trong `{ "data": ... }`.
   ```json
-  {
-    "data": [
+  [
       {
         "businessVersion": "1.1",
         "entityStatus": "Approved",
-        "releaseVersionType": "Bản phụ",
-        "publishedAt": "2026-03-15T09:00:00.000Z"
+        "extension": {"releaseVersionType": ["Bản phụ"]},
+        "publishedAt": 1773565200000
       },
       {
         "businessVersion": "1.0",
         "entityStatus": "Approved",
-        "releaseVersionType": "Bản chính",
-        "publishedAt": "2026-01-01T08:00:00.000Z"
+        "extension": {"releaseVersionType": ["Bản chính"]},
+        "publishedAt": 1767254400000
       }
-    ]
-  }
+  ]
   ```
 
 ---
@@ -541,12 +537,13 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 - **Mẫu Request Body:**
   ```json
   {
-    "glossary": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
+    "glossary": "Data Dictionary",
+    "parentBusinessVersion": "1",
     "name": "CDE_ACC_NO",
     "displayName": "Số tài khoản thanh toán",
     "description": "Số tài khoản thanh toán nội bảng của khách hàng mở tại Agribank.",
     "extension": {
-      "releaseLevel": "TTQLDL",
+      "releaseLevel": ["TTQLDL"],
       "dataQualityRules": ["Y"],
       "effectiveDate": "2026-03-01",
       "entityRelationship": "Liên kết 1-N với bảng Thông tin khách hàng",
@@ -585,11 +582,10 @@ giá trị lưu trữ nội bộ không phải contract công khai.
   ```json
   {
     "parentBusinessVersion": "1",
-    "businessVersion": "1.1",
-    "comment": "Nâng cấp phiên bản để cập nhật văn bản quy định liên quan mới."
+    "businessVersion": "1.1"
   }
   ```
-- **Mẫu Phản hồi (201 Created):**
+- **Mẫu Phản hồi (200 OK):**
   ```json
   {
     "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
@@ -608,15 +604,17 @@ giá trị lưu trữ nội bộ không phải contract công khai.
   ```json
   {
     "expectedRevision": 1,
-    "payload": {
-      "displayName": "Mã khách hàng chuẩn hóa",
-      "description": "Ý nghĩa nghiệp vụ được cập nhật lại chuẩn mực hơn.",
-      "extension": {
-        "releaseLevel": "CEO",
-        "dataQualityRules": ["Y"],
-        "effectiveDate": "2026-01-01",
-        "expirationDate": "2032-12-31"
-      }
+    "displayName": "Mã khách hàng chuẩn hóa",
+    "description": "Ý nghĩa nghiệp vụ được cập nhật lại chuẩn mực hơn.",
+    "owners": [],
+    "domains": [],
+    "tags": [],
+    "relatedTerms": [],
+    "extension": {
+      "releaseLevel": ["CEO"],
+      "dataQualityRules": ["Y"],
+      "effectiveDate": "2026-01-01",
+      "expirationDate": "2032-12-31"
     }
   }
   ```
@@ -625,7 +623,7 @@ giá trị lưu trữ nội bộ không phải contract công khai.
   {
     "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
     "workingRevision": 2,
-    "updatedAt": "2026-09-29T08:40:00.000Z"
+    "updatedAt": 1790661600000
   }
   ```
 
@@ -636,10 +634,7 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 - **Path Actions:** `submit`, `approve`, `reject`, `reopen`.
 - **Mẫu Request Body:**
   ```json
-  {
-    "expectedRevision": 2,
-    "comment": "Kính gửi Trung tâm Quản lý dữ liệu thẩm định và phê duyệt."
-  }
+  {"expectedRevision": 2}
   ```
 - **Mẫu Phản hồi (200 OK):**
   ```json
@@ -647,35 +642,78 @@ giá trị lưu trữ nội bộ không phải contract công khai.
     "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
     "entityStatus": "In Review",
     "workingRevision": 3,
-    "message": "CDE đã được chuyển sang trạng thái đang xem xét."
+    "submittedAt": 1790640000000,
+    "submittedBy": "maker@example.com"
   }
   ```
 
 ---
 
-#### API 3.2.11: Lấy ma trận quyền thao tác trên CDE (Version Permissions)
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/permissions?parentBusinessVersion={N}`
+#### API 3.2.10a: Sửa phiên bản Approved (tạo bản nháp sửa)
+- **Method & Endpoint:** `POST /api/v1/glossaryTerms/{id}/published/{businessVersion}/correction?parentBusinessVersion={N}`
+- **Request Body:** không có.
+- **Hành vi:** Tạo working `Draft` cùng `businessVersion`, payload sao chép từ snapshot Approved đó. Bản nháp đi qua `submit`/`approve`/`reject`/`reopen` như API 3.2.10. Khi `approve`, backend chép nội dung cũ sang bảng lịch sử rồi ghi đè snapshot, giữ nguyên `snapshotId` và published head (thiết kế CDE §5.6). Áp dụng cho CDE và DQ Rule.
+- **Mã lỗi:** `403` thiếu `CreateVersion`; `404` version không thuộc scope; `409` version đã Archived, CDE đã có working version, hoặc tạo đồng thời.
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
-    "cdeId": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
+    "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
+    "businessVersion": "1.1",
     "parentBusinessVersion": "1",
-    "capabilities": {
-      "canViewPublished": true,
-      "canViewWorking": true,
-      "canEdit": true,
-      "canSubmit": true,
-      "canApprove": false,
-      "canReject": false,
-      "canReopen": false,
-      "canDelete": false
+    "entityStatus": "Draft",
+    "workingRevision": 1,
+    "capabilities": { "canEditWorking": true, "canSubmit": true }
+  }
+  ```
+
+#### API 3.2.10b: Lịch sử nội dung đã bị ghi đè của một version
+- **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/published/{businessVersion}/history?parentBusinessVersion={N}`
+- **Hành vi:** Danh sách nội dung Approved trước các lần sửa, mới nhất trước. Quyền xem như API chi tiết bản phát hành.
+- **Mẫu Phản hồi (200 OK):**
+  ```json
+  [
+    {
+      "historyId": "5b0c...",
+      "snapshotId": "9e1d...",
+      "businessVersion": "1.1",
+      "contentHash": "ab12...",
+      "publishedAt": 1790640000000,
+      "publishedBy": "checker@example.com",
+      "supersededAt": 1790726400000,
+      "supersededBy": "checker2@example.com",
+      "displayName": "Mã chi nhánh"
     }
+  ]
+  ```
+
+> Không còn endpoint hủy duyệt: `POST /api/v1/glossaries/{id}/published/latest/archive` và `POST /api/v1/glossaryTerms/{id}/published/latest/archive` đã bị gỡ.
+
+---
+
+#### API 3.2.11: Lấy ma trận quyền thao tác trên CDE (Version Permissions)
+- **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/permissions`
+- **Mẫu Phản hồi (200 OK):**
+  ```json
+  {
+    "canViewPublished": true,
+    "canViewWorking": true,
+    "canEditWorking": true,
+    "canSubmit": true,
+    "canCreateVersion": true,
+    "canApprove": false,
+    "canReject": false,
+    "canArchive": false,
+    "canImportCdeDrafts": true,
+    "isConsumer": false
   }
   ```
 
 ---
 
 #### API 3.2.12: Lấy danh sách Tài sản metadata liên kết (Tab Assets)
+
+> [!NOTE]
+> Tab Assets của CDE dùng `GET /api/v1/glossaryTerms/{id}/technicalAssets` (mục 5.5): danh sách cột hiện hành khi phiên bản DD của CDE đang hiệu lực, bản chụp tại thời điểm cutover khi đã bị thay thế. Endpoint dưới đây (tìm theo tag) không còn được UI dùng cho CDE.
 - **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/assets?limit=15&offset=0`
 - **Mẫu Phản hồi (200 OK):**
   ```json
@@ -721,26 +759,31 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
-    "importSessionId": "sess_89a3f2b4-7123-4567-8901-abcdef123456",
+    "importSessionId": "89a3f2b4-7123-4567-8901-abcdef123456",
     "expiresAt": "2026-09-29T09:15:00.000Z",
     "fileHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "canCommit": true,
+    "scope": {
+      "glossaryId": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
+      "parentBusinessVersion": "2"
+    },
+    "existingCodePolicy": "OVERWRITE_EXISTING",
     "summary": {
-      "totalRows": 150,
-      "createCount": 120,
-      "updateCount": 30,
-      "errorCount": 0,
-      "warningCount": 2
+      "total": 150,
+      "CREATE": 120,
+      "UPDATE_DRAFT": 30,
+      "error": 0,
+      "warning": 2
     },
     "rows": [
       {
         "rowNumber": 2,
         "cdeCode": "CDE_CUST_ID",
         "action": "UPDATE_DRAFT",
-        "status": "VALID",
+        "warnings": [],
         "errors": []
       }
-    ]
+    ],
+    "canCommit": true
   }
   ```
 
@@ -751,10 +794,10 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
-    "importSessionId": "sess_89a3f2b4-7123-4567-8901-abcdef123456",
-    "status": "COMPLETED",
-    "committedRows": 150,
-    "message": "Nhập dữ liệu CDE thành công."
+    "importSessionId": "89a3f2b4-7123-4567-8901-abcdef123456",
+    "committed": 150,
+    "skipped": 0,
+    "parentBusinessVersion": "2"
   }
   ```
 - **Kênh WebSocket tiến độ:** `wss://<host>/api/v1/ws/cdeImportChannel?sessionId={importSessionId}`.
@@ -763,331 +806,324 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 
 ## 4. PHÂN HỆ 2: DANH MỤC QUY TẮC CHẤT LƯỢNG DỮ LIỆU (DATA QUALITY - DQ GLOSSARY)
 
-Phân hệ quản lý các quy tắc chất lượng dữ liệu nghiệp vụ, kế thừa kiến trúc **Governed Glossary Profile** (`profileKey = DATA_QUALITY`).
+Phân hệ quản lý quy tắc CLDL nghiệp vụ bằng profile Governed Glossary `DATA_QUALITY`. Profile được backend xác định từ Glossary có tên hệ thống `Data Quality`; client **không gửi** query parameter `profile`.
 
-### 4.1. Schema 19 Thuộc tính Quy tắc Chất lượng Dữ liệu
-| Tên trường API | Tên hiển thị tiếng Việt | Kiểu dữ liệu | Mô tả & Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `name` | Mã quy tắc CLDL | `string` | Mã duy nhất (ví dụ: `DQ_CUST_001`). Canonical identifier. |
-| `displayName` | Tên quy tắc | `string` | Tên hiển thị (ví dụ: `Kiểm tra định dạng Mã số thuế`). |
-| `description` | Mô tả quy tắc | `markdown` | Diễn giải mục đích và yêu cầu đo lường. |
-| `owners` | Đơn vị chủ trì | `EntityReference` | Team nghiệp vụ chịu trách nhiệm quy tắc. |
-| `relatedTerms` | CDE liên kết | `Array<EntityReference>` | Bắt buộc liên kết tới đúng CDE trong cùng Governance Scope. |
-| `extension.dimension` | Chiều chất lượng | `string (enum)` | `Accuracy` (Chính xác), `Completeness` (Đầy đủ), `Consistency` (Nhất quán), `Timeliness` (Kịp thời), `Uniqueness` (Duy nhất), `Validity` (Hợp lệ). |
-| `extension.ruleExplanation` | Diễn giải quy tắc nghiệp vụ | `markdown` | Diễn giải chi tiết công thức hoặc thuật toán tính toán. |
-| `extension.otherConstraints` | Ràng buộc / Yêu cầu khác | `markdown` | Điều kiện lọc phụ, ngoại lệ áp dụng. |
-| `extension.qualityThreshold` | Ngưỡng chất lượng dữ liệu | `string` | Biểu thức hoặc tỷ lệ cần đạt (ví dụ: `>= 99.5%`). |
-| `extension.releaseLevel` | Cấp phát hành | `string (enum)` | `CEO` (Tổng Giám đốc) hoặc `TTQLDL` (Trung tâm Quản lý dữ liệu). |
-| `extension.releaseVersionType` | Loại phiên bản phát hành | `string (enum)` | Server-owned: `Bản chính` ($N.0$) hoặc `Bản phụ` ($N.MINOR$). |
-| `extension.effectiveDate` | Ngày hiệu lực | `string (date)` | `yyyy-MM-dd`. |
-| `extension.expirationDate` | Ngày hết hiệu lực | `string (date)` | `yyyy-MM-dd`. |
+### 4.1. Mô hình dữ liệu và ràng buộc
 
----
+| Trường | Kiểu | Quy tắc |
+| :--- | :--- | :--- |
+| `name` | `string` | Mã quy tắc, duy nhất trong Data Quality Glossary. |
+| `displayName` | `string/null` | Tên hiển thị của quy tắc. |
+| `description` | `markdown` | Nội dung quy tắc nghiệp vụ. |
+| `owners`, `domains` | `EntityReference[]` | Đơn vị sở hữu và miền dữ liệu. |
+| `relatedTerms` / `versionedRelatedTerms` | `TermRelation[]` | Đúng một CDE chuẩn thuộc Data Dictionary cùng `parentBusinessVersion`. Chỉ gửi `term.id`; không gửi `versionContext`. Liên kết bao trùm mọi version `N.x` của CDE, nội dung CDE trong response được resolve theo bản `Approved` mới nhất của scope. |
+| `tags` | `TagLabel[]` | Các nhóm `DataQualityDimension`, `DataQualityTargetPopulation`, `DataQualityMethod`, `DataQualityFrequency`. |
+| `extension.ruleExplanation` | `string` | Diễn giải công thức/logic. |
+| `extension.otherConstraints` | `string` | Ràng buộc hoặc ngoại lệ. |
+| `extension.relatedRegulatoryDocuments` | `string` | Văn bản quy định liên quan. |
+| `extension.qualityThreshold` | `string` | Ngưỡng đạt, ví dụ `>= 99.5%`. |
+| `extension.releaseLevel` | `string[]` | Một cấp phát hành theo cấu hình nghiệp vụ. |
+| `extension.effectiveDate`, `extension.expirationDate` | `yyyy-MM-dd` | Khoảng hiệu lực; ngày hết hiệu lực không trước ngày hiệu lực. |
+| `extension.releaseVersionType` | `string[]` | Server-owned, suy từ `businessVersion`; client không gửi giá trị này. |
 
-### 4.2. Đặc tả chi tiết từng API Chất lượng Dữ liệu
+Một DQ Rule phải là con trực tiếp của Data Quality Glossary, phải có `name`, và phải tham chiếu đúng một CDE chuẩn. Backend kiểm tra lại CDE và scope; không tin `cdeCode`/`cdeName` lưu trong extension cũ.
 
-#### API 4.2.1: Truy vấn danh sách Flat list Quy tắc CLDL
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Query Parameters:** `profile=DATA_QUALITY`, `parentBusinessVersion={N}`, `limit`, `offset`.
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "data": [
-      {
-        "id": "b1234567-89ab-cdef-0123-456789abcdef",
-        "name": "DQ_CUST_TAX_01",
-        "displayName": "Kiểm tra định dạng Mã số thuế khách hàng",
-        "parentBusinessVersion": "1",
-        "businessVersion": "1.0",
-        "entityStatus": "Approved",
-        "relatedTerms": [
-          {
-            "id": "c1f7a4e2-623b-4830-a15d-5ff36f2f3981",
-            "name": "CDE_CUST_ID",
-            "displayName": "Mã khách hàng"
-          }
-        ],
-        "extension": {
-          "dimension": "Validity",
-          "qualityThreshold": "100%",
-          "releaseLevel": "TTQLDL",
-          "releaseVersionType": "Bản chính",
-          "effectiveDate": "2026-01-01"
-        }
-      }
-    ],
-    "paging": {
-      "total": 350,
-      "limit": 25,
-      "offset": 0
-    }
-  }
-  ```
+### 4.2. API đọc danh sách, tìm kiếm và chi tiết
 
----
+| Chức năng | Method và endpoint | Tham số chính |
+| :--- | :--- | :--- |
+| Flat list trong một scope | `GET /api/v1/glossaryTerms` | `glossary={dqGlossaryId}`, `parentBusinessVersion=N`, `limit=10|15|25|50`, `offset>=0` |
+| Tìm kiếm/lọc | `GET /api/v1/glossaryTerms/search` | Các tham số trên cộng `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder` |
+| Chi tiết hiện hành | `GET /api/v1/glossaryTerms/{id}` | `fields` tùy chọn; trả working nếu có quyền và tồn tại, nếu không trả latest published |
+| Working version | `GET /api/v1/glossaryTerms/{id}/working` | `parentBusinessVersion=N` bắt buộc |
+| Lịch sử published | `GET /api/v1/glossaryTerms/{id}/published` | `parentBusinessVersion=N` để giới hạn scope |
+| Published cụ thể | `GET /api/v1/glossaryTerms/{id}/published/{businessVersion}` | `parentBusinessVersion=N` |
+| Lịch sử sửa của một version | `GET /api/v1/glossaryTerms/{id}/published/{businessVersion}/history` | `parentBusinessVersion=N` |
+| Tạo bản nháp sửa | `POST /api/v1/glossaryTerms/{id}/published/{businessVersion}/correction` | `parentBusinessVersion=N` bắt buộc |
+| Quyền hiệu lực | `GET /api/v1/glossaryTerms/{id}/permissions` | Không có query `profile` |
 
-#### API 4.2.2: Tìm kiếm & Lọc Quy tắc CLDL
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/search?profile=DATA_QUALITY`
-- **Query Parameters:** `q`, `dimension`, `statuses`, `cdeId`, `parentBusinessVersion={N}`, `limit`, `offset`.
-- **Mẫu Phản hồi (200 OK):** Cùng định dạng với API 4.2.1.
+Ví dụ:
 
----
+```http
+GET /api/v1/glossaryTerms/search?glossary=7bd5c86d-87ad-4d9c-b1b8-0e57b10be637&parentBusinessVersion=2&q=customer&statuses=Draft,In%20Review&classificationTags=DataQualityDimension.Accuracy&limit=25&offset=0
+Authorization: Bearer <TOKEN>
+```
 
-#### API 4.2.3: Xem chi tiết Quy tắc CLDL
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Mẫu Phản hồi (200 OK):** Trả về đầy đủ 19 thuộc tính, logic kiểm tra và CDE liên kết.
+Response flat-list/search có dạng `{ "data": [...], "paging": { "total", "limit", "offset" } }`. Consumer-only chỉ nhận representation published; người có `canViewWorking` có thể nhận working representation theo quyền từng record.
 
----
+### 4.3. Tạo và cập nhật DQ Rule
 
-#### API 4.2.4: Lấy danh sách các phiên bản Approved của Quy tắc CLDL
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/{id}/published?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Mẫu Phản hồi (200 OK):** Danh sách các version nghiệp vụ đã phê duyệt của quy tắc.
+#### 4.3.1. Tạo Draft đầu tiên
 
----
+```http
+POST /api/v1/glossaryTerms
+Content-Type: application/json
+```
 
-#### API 4.2.5: Tạo mới Quy tắc CLDL (Bản $N.0$)
-- **Method & Endpoint:** `POST /api/v1/glossaryTerms?profile=DATA_QUALITY`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "name": "DQ_ACC_STATUS_01",
-    "displayName": "Kiểm tra tính hợp lệ trạng thái tài khoản",
-    "description": "Trạng thái tài khoản phải thuộc danh mục hợp lệ quy định tại CoreBanking.",
-    "relatedTerms": [
-      {
-        "id": "a9812e11-1244-4902-8812-78129aa123bb"
-      }
-    ],
-    "extension": {
-      "dimension": "Consistency",
-      "qualityThreshold": ">= 99.9%",
-      "ruleExplanation": "ACCOUNT.STATUS IN ('ACTIVE', 'DORMANT', 'CLOSED')",
-      "releaseLevel": "TTQLDL",
-      "effectiveDate": "2026-04-01"
-    }
-  }
-  ```
-- **Mẫu Phản hồi (201 Created):**
-  ```json
-  {
-    "id": "d9812345-bcde-4567-8901-234567890abc",
-    "name": "DQ_ACC_STATUS_01",
-    "parentBusinessVersion": "1",
-    "businessVersion": "1.0",
-    "entityStatus": "Draft",
-    "workingRevision": 1
-  }
-  ```
-
----
-
-#### API 4.2.6: Nâng phiên bản Quy tắc CLDL ($N.MINOR$)
-- **Method & Endpoint:** `POST /api/v1/glossaryTerms/{id}/working?profile=DATA_QUALITY`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "parentBusinessVersion": "1",
-    "businessVersion": "1.1",
-    "comment": "Bổ sung thêm mã trạng thái mới vào tập hợp kiểm tra."
-  }
-  ```
-
----
-
-#### API 4.2.7: Lưu nháp Quy tắc CLDL tại chỗ (In-place Save Draft)
-- **Method & Endpoint:** `PATCH /api/v1/glossaryTerms/{id}/working?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Mẫu Request Body:**
-  ```json
-  {
-    "expectedRevision": 1,
-    "payload": {
-      "description": "Cập nhật ngưỡng chất lượng từ 99.9% lên 100%.",
-      "extension": {
-        "qualityThreshold": "100%",
-        "otherConstraints": "Áp dụng bắt buộc từ quý 2/2026"
+```json
+{
+  "glossary": "Data Quality",
+  "parentBusinessVersion": "2",
+  "name": "DQ_ACC_STATUS_01",
+  "displayName": "Kiểm tra trạng thái tài khoản",
+  "description": "Trạng thái tài khoản phải thuộc tập giá trị hợp lệ.",
+  "versionedRelatedTerms": [
+    {
+      "relationType": "relatedTo",
+      "term": {
+        "id": "a9812e11-1244-4902-8812-78129aa123bb",
+        "type": "glossaryTerm"
       }
     }
+  ],
+  "tags": [
+    {
+      "tagFQN": "DataQualityDimension.Accuracy",
+      "source": "Classification",
+      "labelType": "Manual",
+      "state": "Confirmed"
+    }
+  ],
+  "owners": [],
+  "domains": [],
+  "extension": {
+    "qualityThreshold": ">= 99.9%",
+    "ruleExplanation": "ACCOUNT.STATUS IN ('ACTIVE','CLOSED')",
+    "releaseLevel": ["TTQLDL"],
+    "effectiveDate": "2026-10-01"
   }
-  ```
-- **Mẫu Phản hồi (200 OK):**
-  ```json
-  {
-    "id": "d9812345-bcde-4567-8901-234567890abc",
-    "workingRevision": 2,
-    "updatedAt": "2026-09-29T08:45:00.000Z"
+}
+```
+
+Thành công trả `201 Created` với working representation, gồm `businessVersion`, `parentBusinessVersion`, `entityStatus="Draft"` và `workingRevision`.
+
+#### 4.3.2. Tạo minor working version
+
+```http
+POST /api/v1/glossaryTerms/{id}/working
+```
+
+```json
+{
+  "businessVersion": "2.1",
+  "parentBusinessVersion": "2"
+}
+```
+
+Request chỉ nhận đúng hai trường trên; `comment`, `payload`, `expectedRevision` và trường identity bị từ chối.
+
+#### 4.3.3. Lưu Draft tại chỗ
+
+```http
+PATCH /api/v1/glossaryTerms/{id}/working?parentBusinessVersion=2
+```
+
+```json
+{
+  "expectedRevision": 3,
+  "displayName": "Kiểm tra trạng thái tài khoản",
+  "description": "Nội dung đầy đủ sau chỉnh sửa.",
+  "owners": [],
+  "domains": [],
+  "tags": [],
+  "relatedTerms": [
+    {
+      "term": {
+        "id": "a9812e11-1244-4902-8812-78129aa123bb",
+        "type": "glossaryTerm"
+      }
+    }
+  ],
+  "extension": {
+    "qualityThreshold": "100%",
+    "otherConstraints": "Áp dụng từ quý IV/2026"
   }
-  ```
+}
+```
 
----
+Đây là **full mutable payload**, không có wrapper `payload`. `description`, `owners`, `domains`, `tags` và `expectedRevision` là bắt buộc theo JSON Schema. Backend tăng `workingRevision`; revision cũ trả `409 Conflict`.
 
-#### API 4.2.8: Vòng đời Phê duyệt Quy tắc CLDL (Maker - Checker)
-- **Method & Endpoint:** `POST /api/v1/glossaryTerms/{id}/working/{action}?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Path Actions:** `submit`, `approve`, `reject`, `reopen`.
-- **Mẫu Request Body:**
-  ```json
-  {
-    "expectedRevision": 2,
-    "comment": "Đã hoàn tất kiểm tra công thức, kính gửi phê duyệt ban hành."
-  }
-  ```
+### 4.4. Workflow
 
----
+```http
+POST /api/v1/glossaryTerms/{id}/working/{submit|approve|reject|reopen}?parentBusinessVersion=N
+Content-Type: application/json
 
-#### API 4.2.9: Xuất danh mục Quy tắc CLDL ra Excel (.xlsx)
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/export?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Headers:** `Accept: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+{"expectedRevision": 4}
+```
 
----
+Body chỉ cho phép `expectedRevision >= 1`; `comment` và mọi field khác bị từ chối. State machine hợp lệ: `Draft -> In Review`, `In Review -> Approved|Rejected`, `Rejected -> Draft`.
 
-#### API 4.2.10: Tải file mẫu Nhập Quy tắc CLDL (DQ Import Template)
-- **Method & Endpoint:** `GET /api/v1/glossaryTerms/import/template?profile=DATA_QUALITY`
+### 4.5. Trạng thái import/export DQ hiện tại
 
----
+As-built chưa có server API chuyên biệt cho DQ import/export. Cụ thể:
 
-#### API 4.2.11: Preview file Nhập Quy tắc CLDL
-- **Method & Endpoint:** `POST /api/v1/glossaryTerms/import/preview?profile=DATA_QUALITY&parentBusinessVersion={N}`
-- **Content-Type:** `multipart/form-data`
+- `GET /glossaryTerms/export` trả `400` khi Glossary profile là `DATA_QUALITY`.
+- `/glossaryTerms/import/template`, `/import/preview` và `/import/{sessionId}/commit` là contract dành cho CDE, không nhận `profile=DATA_QUALITY`.
+- UI hiện tạo template/xuất Excel, đọc và kiểm tra file tại trình duyệt, sau đó gọi API create/update từng DQ Rule. Luồng này không phải atomic server transaction.
 
----
-
-#### API 4.2.12: Commit Nhập Quy tắc CLDL vào Database
-- **Method & Endpoint:** `POST /api/v1/glossaryTerms/import/{importSessionId}/commit?profile=DATA_QUALITY`
-
----
+Hệ thống tích hợp không được gọi các endpoint DQ import/export giả định. Nếu cần import nguyên tử, phải bổ sung contract backend riêng trước khi công bố cho bên ngoài.
 
 ## 5. PHÂN HỆ 3: TỪ ĐIỂN KỸ THUẬT (TECHNICAL DICTIONARY)
 
-> **Contract:** Từ điển kỹ thuật là profile `TECHNICAL_DICTIONARY` của Governed
-> Glossary, kế thừa Data Quality (và qua đó Data Dictionary). Không có
-> `/technical-dictionary/*`, `scopeId`, `scopeVersion` hay scope lifecycle. Mỗi
-> catalog version `N` có identity record riêng; record chỉ được gán CDE của Data
-> Dictionary cùng số `N`.
->
-> Nguồn thiết kế:
-> [technical-dictionary-ui-design.md](../design/technical-dictionary-ui-design.md)
-> và
-> [technical-dictionary-feature-implementation-plan.md](../design/technical-dictionary-feature-implementation-plan.md).
+Từ điển kỹ thuật **không có phiên bản và không có workflow**. Mỗi record đại diện cho một physical Column đã được **khai báo**; lưu là có hiệu lực ngay. Từ điển luôn gắn với **Từ điển dữ liệu dùng chung (DD) đang hiệu lực** (phiên bản Approved mới nhất, gọi là `vN`) và chỉ gán được CDE `Approved` của `vN`. Khi DD `vN+1` được phê duyệt, trong cùng transaction phê duyệt: các record đã gán CDE được chụp lại thành bản chụp của `vN` (giữ vĩnh viễn), toàn bộ record bị xóa và tag trên Column được gỡ. Thiết kế: [Thiết kế Từ điển kỹ thuật](../design/technical-dictionary-design.md).
 
-Record chỉ do hệ thống sinh từ physical Column (bootstrap job và sự kiện Table),
-người dùng không tạo hoặc xóa: `POST`/`DELETE /glossaryTerms` trên glossary này
-trả `403` với mã `TD_MANUAL_CREATE_NOT_ALLOWED` / `TD_MANUAL_DELETE_NOT_ALLOWED`.
+PostgreSQL (`technical_record`) là nguồn sự thật cho ghi; `technical_dictionary_search_index` là read model cho danh sách, lọc, thống kê và export. Mọi endpoint bên dưới **không có** tham số `glossary`, `parentBusinessVersion`, `versionView` hay `statuses`. Các endpoint `/glossaries/{id}/working*`, `/published*`, `/glossaryTerms/{id}/working*`, `/published*`, `/permissions`, `/glossaryTerms/bulk/*` không còn áp dụng cho Từ điển kỹ thuật; `POST`/`DELETE /glossaryTerms` trên glossary này không tạo/xóa record.
 
-### 5.1. Catalog version (dùng chung)
+### 5.1. Phân quyền
+
+| Capability | Điều kiện |
+| :--- | :--- |
+| `canEdit` | Admin, role `DataSteward`, hoặc policy `EditWorking` trên glossary `Technical Dictionary` (role `DataProposer` có policy này) |
+| `canView` | `canEdit` hoặc policy `ViewBasic` trên glossary `Technical Dictionary` |
+| `canImport` | Bằng `canEdit` |
+| `canExport` | Bằng `canView` |
+
+Mọi người xem thấy cùng một dữ liệu. Ghi luôn được kiểm tra lại ở server.
+
+### 5.2. Ngữ cảnh và phiên bản DD đang gắn
 
 ```http
-GET   /api/v1/glossaries/{id}/working
-POST  /api/v1/glossaries/{id}/working                 # tạo catalog N+1, tự chạy bootstrap job
-PATCH /api/v1/glossaries/{id}/working
-POST  /api/v1/glossaries/{id}/working/{submit|approve|reject|reopen}
-GET   /api/v1/glossaries/{id}/working/publish-preview
-GET   /api/v1/glossaries/{id}/published
-GET   /api/v1/glossaries/{id}/published/{businessVersion}
-GET   /api/v1/glossaries/{id}/permissions
+GET /api/v1/glossaryTerms/technical/context
 ```
 
-Route UI mặc định `/technical-dictionary`; lịch sử dùng `?businessVersion=N`.
-Version không tồn tại là Not Found, không fallback sang version khác.
+```json
+{
+  "glossaryId": "72b9cc8a-b13b-43f2-9d7b-574f84993f94",
+  "dataDictionaryVersion": "2",
+  "previousDataDictionaryVersion": "1",
+  "resetAt": 1790640000000,
+  "resetBy": "admin",
+  "capabilities": { "canView": true, "canEdit": true, "canImport": true, "canExport": true }
+}
+```
 
-### 5.2. Danh sách, tìm kiếm, thống kê, export
+`dataDictionaryVersion` là `null` khi chưa có DD nào được phê duyệt; khi đó khai báo, sửa và import trả `409 TD_DATA_DICTIONARY_NOT_ACTIVE`.
+
+### 5.3. Danh sách và thống kê
 
 ```http
-GET /api/v1/glossaryTerms/search
-  ?glossary={id}&parentBusinessVersion=N&limit=25&offset=0
-  &q=customer                          # database/schema/table/column/mã-tên CDE
-  &statuses=Draft,In Review
-  &sourceServices=ipcas                # OR trong nhóm, AND giữa các nhóm
-  &cdeMapping=MAPPED|UNMAPPED
-  &cdeTermIds=uuid,uuid
-  &systemOwnerIds=uuid
-  &sourceStatuses=Available,Unavailable,Changed
+GET /api/v1/glossaryTerms/technical/search
+  ?q=customer
+  &sourceServices=ipcas
+  &cdeMapping=MAPPED
+  &cdeTermIds={uuid},{uuid}
+  &systemOwnerIds={uuid}
+  &sourceStatuses=Available,Unavailable
   &elementTypes=DataElementType.AtomicDataElement
   &generationTypes=FieldGenerationType.SystemGenerated
   &creationMethods=DataCreationMethod.Parameterised
   &timeliness=DataTimeliness.T1
-  &versionView=LATEST|ALL              # mặc định LATEST
-
-GET /api/v1/glossaryTerms/stats?glossary={id}&parentBusinessVersion=N
-GET /api/v1/glossaryTerms/export?glossary={id}&parentBusinessVersion=N
+  &limit=25&offset=0
 ```
 
-- `limit` chỉ nhận `10`, `15`, `25`, `50`.
-- Mỗi row là read-model phẳng gồm payload record và các trường suy ra:
-  `sourceStatus`, `cdeCode`, `cdeName`, `dataOwners` (chủ sở hữu của CDE được
-  quy chiếu), `searchText`, `sortKey`.
-- `stats` trả `totalColumns`, `totalTables`, `mappedCde`, `totalSources`.
-- `export` trả `.xlsx` 19 cột, tên `TuDienKyThuat_Agribank_v{N}_YYYYMMDD_HHmm.xlsx`,
-  mỗi record một dòng (representation mới nhất); file này import lại được.
+`limit` chỉ nhận `10`, `15`, `25`, `50`. Filter nhiều giá trị dùng CSV: OR trong một nhóm, AND giữa các nhóm. `cdeMapping` nhận `MAPPED`, `UNMAPPED`. Phân trang tối đa 10.000 kết quả đầu. Khi index không sẵn sàng: `503 TD_INDEX_UNAVAILABLE`, không fallback quét PostgreSQL.
 
-### 5.3. Record workflow (dùng chung)
+Mỗi phần tử `data` là một dòng phẳng, cũng là hình dạng của `GET /records/{id}`, bản chụp và export:
 
-```http
-GET|PATCH /api/v1/glossaryTerms/{id}/working?parentBusinessVersion=N
-POST      /api/v1/glossaryTerms/{id}/working                       # minor kế tiếp
-POST      /api/v1/glossaryTerms/{id}/working/{submit|approve|reject|reopen}?parentBusinessVersion=N
-GET       /api/v1/glossaryTerms/{id}/published?parentBusinessVersion=N
-```
-
-`PATCH` chỉ nhận `survivorshipRank`, `systemOwner` (Team) trong `extension`, tag
-của 4 classification (`DataElementType`, `FieldGenerationType`,
-`DataCreationMethod`, `DataTimeliness`) và một `relatedTerms` trỏ tới CDE. Mọi
-trường nguồn (database, schema, table, column, kiểu dữ liệu, mô tả) do server
-sở hữu; gửi lên sẽ bị từ chối `400 TD_SERVER_OWNED_FIELD`. Gửi `relatedTerms`
-rỗng sẽ gỡ CDE.
-
-### 5.4. Bulk workflow
-
-```http
-POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}
+```json
 {
-  "glossaryId": "uuid", "parentBusinessVersion": "2",
-  "termIds": ["uuid"],                 // hoặc
-  "criteria": { "q": "...", "sourceServices": "ipcas", ... },   // tham số như /search
-  "dryRun": false, "offset": 0, "limit": 500
+  "termId": "e3910764-2ddf-422c-9b51-b30b00b6873f",
+  "columnKey": "3f1c…",
+  "columnFqn": "ipcas.core.public.customer.customer_id",
+  "service": "ipcas", "database": "core", "schema": "public", "table": "customer", "column": "customer_id",
+  "dataType": "VARCHAR", "description": "Mã khách hàng",
+  "sourceStatus": "Available",
+  "dataDictionaryVersion": "2",
+  "revision": 3,
+  "cde": { "id": "a9812e11-…", "code": "CDE_CUSTOMER_ID", "name": "Mã khách hàng", "businessVersion": "2.1",
+           "assignedAt": 1790640000000, "assignedBy": "steward" },
+  "dataOwners": [{ "id": "…", "name": "Ban KHCL" }],
+  "rank": 1,
+  "elementType": { "fqn": "DataElementType.AtomicDataElement", "label": "Dữ liệu nguyên tố" },
+  "generationType": { "fqn": "…", "label": "…" },
+  "creationMethod": { "fqn": "…", "label": "…" },
+  "timeliness": { "fqn": "DataTimeliness.T1", "label": "T+1" },
+  "systemOwner": { "id": "…", "name": "Ban CNTT" },
+  "createdAt": 1790640000000, "createdBy": "steward", "updatedAt": 1790640000000, "updatedBy": "steward"
 }
 ```
 
-Mỗi lần gọi xử lý một chunk (`limit` tối đa 1000), mỗi record một transaction.
-Response: `matched`, `eligible`, `ineligible`, `attempted`, `succeeded`,
-`failedCount`, `failures[{termId, code, message}]`, `remaining`. Client lặp lại với
-`offset = tổng số thất bại` cho tới khi `remaining = 0`. Bulk approve kiểm tra
-Thứ hạng trên trạng thái cuối của chunk nên đổi chỗ thứ hạng trong một lần duyệt
-là hợp lệ.
-
-### 5.5. Import gán CDE
+`sourceStatus` là `Available` hoặc `Unavailable` (Column nguồn bị xóa hoặc đổi tên). Khối `cde` và `dataOwners` chỉ có khi đã gán CDE.
 
 ```http
+GET /api/v1/glossaryTerms/technical/stats
+```
+
+```json
+{ "totalColumns": 1250, "totalTables": 83, "totalSources": 6, "mapped": 940 }
+```
+
+### 5.4. Khai báo, sửa, xóa
+
+```http
+GET /api/v1/glossaryTerms/technical/columns?q=customer&limit=20     # canEdit; limit 1..50, mặc định 20
+POST /api/v1/glossaryTerms/technical/records                        # canEdit
+GET /api/v1/glossaryTerms/technical/records/{id}                    # canView
+PATCH /api/v1/glossaryTerms/technical/records/{id}                  # canEdit
+DELETE /api/v1/glossaryTerms/technical/records/{id}?expectedRevision=3   # canEdit
+GET /api/v1/glossaryTerms/technical/records/{id}/history?limit=20&offset=0   # canView
+```
+
+`POST` chỉ bắt buộc `columnFqn`; backend đọc Column từ `table_entity`:
+
+```json
+{
+  "columnFqn": "ipcas.core.public.customer.customer_id",
+  "cde": "a9812e11-1244-4902-8812-78129aa123bb",
+  "rank": 1,
+  "elementType": "DataElementType.AtomicDataElement",
+  "generationType": "FieldGenerationType.SystemGenerated",
+  "creationMethod": "DataCreationMethod.Parameterised",
+  "timeliness": "DataTimeliness.T1",
+  "systemOwnerId": "2d242416-65bb-4aa7-9252-87da77ec23f8"
+}
+```
+
+`PATCH` gửi **toàn bộ** giá trị sửa được kèm `expectedRevision`; giá trị vắng mặt bị xóa. Trả về dòng phẳng mới, `revision` tăng 1. Nếu không có giá trị nào đổi thì không tăng `revision` và không ghi audit.
+
+Quy tắc kiểm tra: `rank` từ `1` đến `999`; có `cde` thì bắt buộc có `rank`, không có `cde` thì `rank` phải trống; `cde` phải là CDE `Approved` của DD đang gắn; `rank` duy nhất trong cùng CDE trên các record `Available`; tag phải thuộc đúng classification (`DataElementType`, `FieldGenerationType`, `DataCreationMethod`, `DataTimeliness`); `systemOwnerId` là một Team tồn tại.
+
+`history` trả `{data:[{id, action, actor, at, dataDictionaryVersion, changes:[{field, oldValue, newValue}]}], paging}` mới nhất trước; `action` là `CREATE`, `UPDATE`, `DELETE`, `IMPORT` hoặc `RESET`; `oldValue`/`newValue` đã được đổi sang nhãn đọc được (mã CDE, tên Team, nhãn tag).
+
+### 5.5. Export, import, bản chụp
+
+```http
+GET  /api/v1/glossaryTerms/technical/export
 GET  /api/v1/glossaryTerms/import/technical/template
-POST /api/v1/glossaryTerms/import/technical/preview
-       ?glossary={id}&parentBusinessVersion=N&updatePolicy=DRAFT_ONLY|ALL_EDITABLE   (multipart `file`)
+POST /api/v1/glossaryTerms/import/technical/preview          # multipart/form-data, part "file"
 POST /api/v1/glossaryTerms/import/technical/{importSessionId}/commit
+GET  /api/v1/glossaryTerms/technical/snapshots
+GET  /api/v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/export
+GET  /api/v1/glossaryTerms/{cdeId}/technicalAssets?limit=15&offset=0
+POST /api/v1/glossaryTerms/technical/index/rebuild           # Admin
 ```
 
-Khớp dòng với record theo Database/Schema/Bảng/Cột (thêm `Nguồn` để phân biệt),
-không bao giờ tạo record. Chỉ cột có trong file được áp dụng; ô trống xóa giá trị.
-Giới hạn 20 MB, 70.000 dòng. Session dùng một lần, gắn actor, hết hạn sau 30 phút;
-commit là một transaction và kiểm tra lại revision từng dòng (`409
-TD_IMPORT_CONFLICT` nếu preview đã cũ).
+- **Export**: file `TuDienKyThuat_Agribank_TDDLv{N}_YYYYMMDD_HHmm.xlsx`, sheet `Technical Dictionary`, 16 cột. Bản chụp: `TuDienKyThuat_Agribank_TDDLv{K}_banchup_YYYYMMDD_HHmm.xlsx`, cùng 16 cột, chỉ có cột đã gán CDE; Mã/Tên CDE lấy từ lúc chụp.
+- **Import**: không có `updatePolicy`. Mỗi dòng match theo `Tên cơ sở dữ liệu + Tên Schema + Tên Bảng + Tên cột` (và `Nguồn` nếu có). Action preview: `CREATE_RECORD` (Column chưa khai báo), `UPDATE`, `NO_CHANGE`, `ERROR`. Chỉ cập nhật cột có trong file; ô trống xóa giá trị. Mã CDE resolve trong DD đang gắn. Thứ hạng kiểm tra trên trạng thái cuối của file; trùng là lỗi dòng. Session gắn actor và `dataDictionaryVersion`, dùng một lần, hết hạn sau 30 phút; commit nguyên tử, kiểm tra lại quyền và `revision` từng dòng. File tối đa 20 MiB, 70.000 dòng, 32.000 ký tự/ô. Commit khi DD đã đổi phiên bản: `409 TD_IMPORT_SESSION_INVALID`. Mỗi dòng thay đổi ghi audit `IMPORT`.
+- **`snapshots`**: `{data:[{dataDictionaryVersion, bindings, frozenAt}]}`, mới nhất trước. Bản chụp giữ vĩnh viễn, không có API xóa.
+- **`technicalAssets`** (tab Tài sản liên kết của CDE): `{source, dataDictionaryVersion, frozenAt, data, paging}`. `source = CURRENT` khi phiên bản DD của CDE đang hiệu lực (đọc index theo `cde.id`), `SNAPSHOT` khi đã bị thay thế (đọc bản chụp, chỉ đọc, kèm `frozenAt`), `NONE` khi phiên bản đang soạn (`data` rỗng). Không phụ thuộc phiên bản `N.x` của CDE.
+- **`index/rebuild`**: dựng physical index mới từ PostgreSQL rồi chuyển alias; reader dùng index cũ trong lúc dựng. Sai quyền `403`; index lỗi `503 TD_INDEX_UNAVAILABLE`.
 
-### 5.6. Bootstrap job
+### 5.6. Tác động lên phê duyệt Từ điển dữ liệu
 
-```http
-GET  /api/v1/glossaries/{id}/bootstrap-jobs?businessVersion=N
-POST /api/v1/glossaries/{id}/bootstrap-jobs?businessVersion=N          # Admin, tạo job còn thiếu
-POST /api/v1/glossaries/{id}/bootstrap-jobs/{jobId}/retry              # Admin, chỉ job Failed
-```
+`GET /api/v1/glossaries/{ddId}/working/publish-preview` trả thêm `technicalDictionary: {declaredColumns, mappedColumns}` (null với glossary khác DD) để UI cảnh báo số cột sẽ bị xóa và số cột được lưu vào bản chụp.
 
-Trạng thái job (`Pending|Running|Succeeded|Failed`) độc lập với trạng thái
-workflow của catalog. Phạm vi Column cấu hình ở `technicalDictionary.*` trong
-`openmetadata.yaml` và được chụp lại vào job khi tạo.
+### 5.7. Mã lỗi miền Từ điển kỹ thuật
 
-### 5.7. Mã lỗi
-
-`TD_MANUAL_CREATE_NOT_ALLOWED`, `TD_MANUAL_DELETE_NOT_ALLOWED`,
-`TD_SERVER_OWNED_FIELD`, `TD_INVALID_FIELD`, `TD_SOURCE_UNAVAILABLE`,
-`TD_RANK_REQUIRED`, `TD_RANK_DUPLICATE`, `TD_CDE_SCOPE_MISMATCH`,
-`TD_CDE_SCOPE_NOT_ACTIVE`, `TD_COLUMN_SCOPE_EMPTY`, `TD_BOOTSTRAP_NOT_READY`,
-`TD_IMPORT_ROW_NOT_MATCHED`, `TD_IMPORT_CONFLICT`, `TD_IMPORT_SESSION_INVALID`.
-Mã chung (`WORKING_REVISION_CONFLICT`, ...) theo các phân hệ trước.
+| Mã lỗi | HTTP thường dùng | Ý nghĩa |
+| :--- | :---: | :--- |
+| `TD_DATA_DICTIONARY_NOT_ACTIVE` | 409 | Chưa có DD Approved đang hiệu lực. |
+| `TD_RECORD_NOT_FOUND` | 404 | Record không tồn tại hoặc đã bị xóa khi làm mới. |
+| `TD_RECORD_REVISION_CONFLICT` | 409 | `expectedRevision` lệch với `revision` hiện tại. |
+| `TD_CDE_SCOPE_NOT_ACTIVE` | 409 | CDE không thuộc DD đang gắn hoặc không còn phiên bản Approved. |
+| `TD_RANK_REQUIRED`, `TD_RANK_DUPLICATE` | 400 / 409 | Thiếu Thứ hạng khi có CDE, hoặc trùng Thứ hạng trong cùng CDE. |
+| `TD_INVALID_FIELD`, `TD_SERVER_OWNED_FIELD` | 400 | Giá trị field/tag/Team không hợp lệ. |
+| `TD_COLUMN_NOT_FOUND` | 404 | Không tìm thấy physical Column. |
+| `TD_COLUMN_ALREADY_DECLARED` | 409 | Column đã được khai báo. |
+| `TD_IMPORT_ROW_NOT_MATCHED`, `TD_IMPORT_CONFLICT`, `TD_IMPORT_SESSION_INVALID` | 400 / 409 | Lỗi đối sánh, stale preview hoặc session import. |
+| `TD_NOT_INITIALIZED` | 404 / 503 | Glossary `Technical Dictionary` chưa được khởi tạo. |
+| `TD_INDEX_UNAVAILABLE` | 503 | Index riêng không sẵn sàng. |
 
 ## 6. PHỤ LỤC: VÍ DỤ TÍCH HỢP HỆ THỐNG (INTEGRATION EXAMPLES)
 
@@ -1098,12 +1134,13 @@ curl -X POST "http://localhost:8585/api/v1/glossaryTerms" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "glossary": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
+    "glossary": "Data Dictionary",
+    "parentBusinessVersion": "1",
     "name": "CDE_BRANCH_CODE",
     "displayName": "Mã chi nhánh mở tài khoản",
     "description": "Mã định danh duy nhất của chi nhánh Agribank nơi mở tài khoản thanh toán.",
     "extension": {
-      "releaseLevel": "TTQLDL",
+      "releaseLevel": ["TTQLDL"],
       "dataQualityRules": ["Y"],
       "effectiveDate": "2026-04-01"
     }
@@ -1113,10 +1150,7 @@ curl -X POST "http://localhost:8585/api/v1/glossaryTerms" \
 curl -X POST "http://localhost:8585/api/v1/glossaryTerms/{CDE_UUID}/working/submit?parentBusinessVersion=1" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "expectedRevision": 1,
-    "comment": "Kính gửi Trung tâm QLDL phê duyệt mã CDE_BRANCH_CODE."
-  }'
+  -d '{"expectedRevision": 1}'
 ```
 
 ### 6.2. Kịch bản Python SDK: Kiểm tra xung đột khóa lạc quan (Optimistic Locking Handling)
@@ -1140,11 +1174,19 @@ def update_cde_safely(cde_id: str, parent_version: str, new_description: str):
     current_rev = current_data["workingRevision"]
 
     # 2. Cập nhật kèm expectedRevision
+    # PATCH là full mutable payload, vì vậy phải carry-forward các trường
+    # không đổi thay vì chỉ gửi riêng description.
+    extension = dict(current_data.get("extension") or {})
+    extension.pop("releaseVersionType", None)  # server-owned
     patch_payload = {
         "expectedRevision": current_rev,
-        "payload": {
-            "description": new_description
-        }
+        "displayName": current_data.get("displayName"),
+        "description": new_description,
+        "owners": current_data.get("owners") or [],
+        "domains": current_data.get("domains") or [],
+        "tags": current_data.get("tags") or [],
+        "relatedTerms": current_data.get("relatedTerms") or [],
+        "extension": extension,
     }
     patch_res = requests.patch(
         f"{BASE_URL}/glossaryTerms/{cde_id}/working?parentBusinessVersion={parent_version}",
@@ -1164,4 +1206,4 @@ if __name__ == "__main__":
 ```
 
 ---
-*Tài liệu này được biên soạn và chuẩn hóa 100% theo kiến trúc OpenMetadata Core 1.13.3 và các tiêu chuẩn quản trị dữ liệu Agribank.*
+*Tài liệu phản ánh contract đã triển khai trên nhánh OpenMetadata Core 1.13.3 của dự án tại ngày đối chiếu nêu ở mục 1.1.*

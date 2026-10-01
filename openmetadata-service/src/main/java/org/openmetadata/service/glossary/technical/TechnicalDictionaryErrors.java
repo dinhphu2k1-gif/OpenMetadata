@@ -12,23 +12,21 @@ import java.util.Map;
 
 /** Stable Technical Dictionary error codes returned as `{code, message}` bodies. */
 public final class TechnicalDictionaryErrors {
-  public static final String MANUAL_CREATE_NOT_ALLOWED = "TD_MANUAL_CREATE_NOT_ALLOWED";
-  public static final String MANUAL_DELETE_NOT_ALLOWED = "TD_MANUAL_DELETE_NOT_ALLOWED";
   public static final String SERVER_OWNED_FIELD = "TD_SERVER_OWNED_FIELD";
   public static final String INVALID_FIELD = "TD_INVALID_FIELD";
-  public static final String SOURCE_UNAVAILABLE = "TD_SOURCE_UNAVAILABLE";
   public static final String RANK_REQUIRED = "TD_RANK_REQUIRED";
   public static final String RANK_DUPLICATE = "TD_RANK_DUPLICATE";
-  public static final String CDE_SCOPE_MISMATCH = "TD_CDE_SCOPE_MISMATCH";
   public static final String CDE_SCOPE_NOT_ACTIVE = "TD_CDE_SCOPE_NOT_ACTIVE";
+  public static final String DATA_DICTIONARY_NOT_ACTIVE = "TD_DATA_DICTIONARY_NOT_ACTIVE";
   public static final String NOT_INITIALIZED = "TD_NOT_INITIALIZED";
+  public static final String RECORD_NOT_FOUND = "TD_RECORD_NOT_FOUND";
+  public static final String RECORD_REVISION_CONFLICT = "TD_RECORD_REVISION_CONFLICT";
   public static final String IMPORT_ROW_NOT_MATCHED = "TD_IMPORT_ROW_NOT_MATCHED";
   public static final String IMPORT_CONFLICT = "TD_IMPORT_CONFLICT";
   public static final String IMPORT_SESSION_INVALID = "TD_IMPORT_SESSION_INVALID";
   public static final String INDEX_UNAVAILABLE = "TD_INDEX_UNAVAILABLE";
   public static final String COLUMN_NOT_FOUND = "TD_COLUMN_NOT_FOUND";
   public static final String COLUMN_ALREADY_DECLARED = "TD_COLUMN_ALREADY_DECLARED";
-  public static final String DRAFT_NOT_DELETABLE = "TD_DRAFT_NOT_DELETABLE";
 
   private TechnicalDictionaryErrors() {}
 

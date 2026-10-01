@@ -180,8 +180,7 @@ public class GlossaryBusinessVersionSearchService {
               compareNumericVersion(
                   String.valueOf(left.get("businessVersion")),
                   String.valueOf(right.get("businessVersion")));
-          default -> Comparator.comparing(
-              row -> searchable(row.get("name")));
+          default -> Comparator.comparing(row -> searchable(row.get("name")));
         };
     if (criteria.sortField() == null) {
       primary =

@@ -5,23 +5,17 @@
 
 package org.openmetadata.service.glossary.technical;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.ws.rs.WebApplicationException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.openmetadata.schema.entity.data.GlossaryTerm;
-import org.openmetadata.schema.type.EntityReference;
-import org.openmetadata.schema.type.TagLabel;
-import org.openmetadata.schema.type.TermRelation;
 
 class TechnicalRecordValidatorTest {
   private static final UUID TEAM_ID = UUID.randomUUID();
+  private static final UUID CDE_ID = UUID.randomUUID();
 
   private final TechnicalRecordValidator validator =
       new TechnicalRecordValidator(
@@ -37,128 +31,74 @@ class TechnicalRecordValidatorTest {
             }
           });
 
-  private static GlossaryTerm current() {
-    Map<String, Object> extension = new LinkedHashMap<>();
-    extension.put(TechnicalDictionaryProfile.SOURCE_COLUMN_FQN, "ipcas.core.dbo.customer.name");
-    extension.put(TechnicalDictionaryProfile.SOURCE_TABLE, "customer");
-    extension.put(TechnicalDictionaryProfile.RELEASE_VERSION_TYPE, List.of("Bản chính"));
-    return new GlossaryTerm()
-        .withDisplayName("name")
-        .withDescription("Tên khách hàng")
-        .withExtension(extension);
+  private static TechnicalRecordValues values(UUID cde, Integer rank, String timeliness) {
+    return new TechnicalRecordValues(
+        cde, rank, "DataElementType.AtomicDataElement", null, null, timeliness, TEAM_ID);
   }
 
-  private static Map<String, Object> team(UUID id) {
-    return Map.of("id", id.toString(), "type", "team");
-  }
-
-  private static int status(WebApplicationException exception) {
-    return exception.getResponse().getStatus();
+  private static String code(WebApplicationException exception) {
+    return TechnicalDictionaryErrors.codeOf(exception);
   }
 
   @Test
-  void keepsServerOwnedFieldsAndAcceptsEditableFields() {
-    GlossaryTerm requested =
-        new GlossaryTerm()
-            .withDisplayName("changed")
-            .withDescription("changed")
-            .withTags(List.of(new TagLabel().withTagFQN("DataTimeliness.T1")))
-            .withExtension(
-                Map.of(
-                    TechnicalDictionaryProfile.SURVIVORSHIP_RANK,
-                    2,
-                    TechnicalDictionaryProfile.SYSTEM_OWNER,
-                    team(TEAM_ID)));
+  void acceptsCompleteValuesAndReturnsThemNormalized() {
+    TechnicalRecordValues validated = validator.validate(values(CDE_ID, 3, " DataTimeliness.T1 "));
 
-    GlossaryTerm prepared = validator.prepareDraft(requested, current());
-    Map<String, Object> extension = TechnicalRecordValidator.extension(prepared.getExtension());
-
-    assertEquals("name", prepared.getDisplayName());
-    assertEquals("Tên khách hàng", prepared.getDescription());
-    assertEquals(2, TechnicalRecordValidator.rank(extension));
-    assertEquals("customer", extension.get(TechnicalDictionaryProfile.SOURCE_TABLE));
-    assertEquals(
-        List.of("Bản chính"), extension.get(TechnicalDictionaryProfile.RELEASE_VERSION_TYPE));
+    assertEquals(CDE_ID, validated.cde());
+    assertEquals(3, validated.rank());
+    assertEquals("DataTimeliness.T1", validated.timeliness());
+    assertEquals(TEAM_ID, validated.systemOwnerId());
   }
 
   @Test
-  void rejectsServerOwnedExtensionKeys() {
-    GlossaryTerm requested =
-        new GlossaryTerm().withExtension(Map.of(TechnicalDictionaryProfile.SOURCE_TABLE, "x"));
-    WebApplicationException error =
+  void blankTagsAreClearedAndAnEmptyRecordIsValid() {
+    TechnicalRecordValues validated =
+        validator.validate(new TechnicalRecordValues(null, null, "", null, "  ", null, null));
+
+    assertNull(validated.elementType());
+    assertNull(validated.creationMethod());
+    assertEquals(TechnicalRecordValues.EMPTY, validated);
+  }
+
+  @Test
+  void ranksMustBeInRangeAndMatchTheCde() {
+    WebApplicationException tooHigh =
         assertThrows(
-            WebApplicationException.class, () -> validator.prepareDraft(requested, current()));
-    assertEquals(400, status(error));
-  }
-
-  @Test
-  void rejectsRankOutsideBoundsOrFractional() {
-    for (Object rank : List.of(0, 1000, 1.5)) {
-      GlossaryTerm requested =
-          new GlossaryTerm()
-              .withExtension(Map.of(TechnicalDictionaryProfile.SURVIVORSHIP_RANK, rank));
-      assertThrows(
-          WebApplicationException.class,
-          () -> validator.prepareDraft(requested, current()),
-          String.valueOf(rank));
-    }
-  }
-
-  @Test
-  void rejectsUnknownTeamAndMalformedTeamId() {
-    for (Object owner : List.of(team(UUID.randomUUID()), Map.of("id", "bad", "type", "team"))) {
-      GlossaryTerm requested =
-          new GlossaryTerm().withExtension(Map.of(TechnicalDictionaryProfile.SYSTEM_OWNER, owner));
-      assertThrows(
-          WebApplicationException.class, () -> validator.prepareDraft(requested, current()));
-    }
-  }
-
-  @Test
-  void rejectsUnmanagedDuplicatedOrMissingTags() {
-    List<List<TagLabel>> invalid =
-        List.of(
-            List.of(new TagLabel().withTagFQN("PII.Sensitive")),
-            List.of(
-                new TagLabel().withTagFQN("DataTimeliness.T0"),
-                new TagLabel().withTagFQN("DataTimeliness.T1")),
-            List.of(new TagLabel().withTagFQN("DataElementType.Missing")));
-    for (List<TagLabel> tags : invalid) {
-      GlossaryTerm requested = new GlossaryTerm().withTags(tags);
-      assertThrows(
-          WebApplicationException.class, () -> validator.prepareDraft(requested, current()));
-    }
-  }
-
-  @Test
-  void requiresRankOnlyWhenCdeIsReferenced() {
-    GlossaryTerm mappedWithoutRank =
-        current().withRelatedTerms(List.of(new TermRelation().withTerm(new EntityReference())));
+            WebApplicationException.class, () -> validator.validate(values(CDE_ID, 1000, null)));
     WebApplicationException missing =
         assertThrows(
-            WebApplicationException.class,
-            () -> validator.requireWorkflowReady(mappedWithoutRank, null));
-    assertEquals(400, status(missing));
+            WebApplicationException.class, () -> validator.validate(values(CDE_ID, null, null)));
+    WebApplicationException orphan =
+        assertThrows(
+            WebApplicationException.class, () -> validator.validate(values(null, 1, null)));
 
-    Map<String, Object> extension = TechnicalRecordValidator.extension(current().getExtension());
-    extension.put(TechnicalDictionaryProfile.SURVIVORSHIP_RANK, 1);
-    GlossaryTerm unmappedWithRank = current().withExtension(extension);
-    assertThrows(
-        WebApplicationException.class,
-        () -> validator.requireWorkflowReady(unmappedWithRank, null));
-
-    assertDoesNotThrow(
-        () -> validator.requireWorkflowReady(current(), TechnicalDictionaryProfile.SOURCE_CHANGED));
+    assertEquals(TechnicalDictionaryErrors.INVALID_FIELD, code(tooHigh));
+    assertEquals(TechnicalDictionaryErrors.RANK_REQUIRED, code(missing));
+    assertEquals(TechnicalDictionaryErrors.INVALID_FIELD, code(orphan));
   }
 
   @Test
-  void blocksWorkflowWhenSourceColumnIsUnavailable() {
-    WebApplicationException error =
+  void tagsMustBelongToTheirClassificationAndExist() {
+    WebApplicationException wrongClassification =
         assertThrows(
             WebApplicationException.class,
-            () ->
-                validator.requireWorkflowReady(
-                    current(), TechnicalDictionaryProfile.SOURCE_UNAVAILABLE));
-    assertEquals(409, status(error));
+            () -> validator.validate(values(null, null, "DataElementType.AtomicDataElement")));
+    WebApplicationException unknown =
+        assertThrows(
+            WebApplicationException.class,
+            () -> validator.validate(values(null, null, "DataTimeliness.Missing")));
+
+    assertEquals(TechnicalDictionaryErrors.INVALID_FIELD, code(wrongClassification));
+    assertEquals(TechnicalDictionaryErrors.INVALID_FIELD, code(unknown));
+  }
+
+  @Test
+  void theSystemOwnerMustBeAnExistingTeam() {
+    TechnicalRecordValues values =
+        new TechnicalRecordValues(null, null, null, null, null, null, UUID.randomUUID());
+
+    assertEquals(
+        TechnicalDictionaryErrors.INVALID_FIELD,
+        code(assertThrows(WebApplicationException.class, () -> validator.validate(values))));
   }
 }

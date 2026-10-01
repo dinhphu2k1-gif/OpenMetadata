@@ -10,50 +10,39 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { PlusOutlined } from '@ant-design/icons';
-import { Alert, Button, Modal, Result, Space } from 'antd';
+import { Alert, Button, Result } from 'antd';
 import { AxiosError } from 'axios';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import Loader from '../../components/common/Loader/Loader';
-import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
+import ConfirmationModal from '../../components/Modals/ConfirmationModal/ConfirmationModal';
+import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
+import { ROUTES } from '../../constants/constants';
 import { TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME } from '../../constants/Glossary.contant';
-import {
-  EntityReference,
-  GlossaryTerm,
-  LabelType,
-  State,
-  TagSource,
-} from '../../generated/entity/data/glossaryTerm';
-import { useTechnicalDictionaryCatalog } from '../../hooks/useTechnicalDictionaryCatalog';
+import { useAuth } from '../../hooks/authHooks';
+import { useTechnicalDictionaryContext } from '../../hooks/useTechnicalDictionaryContext';
 import { useTechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { useTechnicalDictionaryRecords } from '../../hooks/useTechnicalDictionaryRecords';
 import {
-  createGlossaryTermWorkingVersion,
-  transitionGlossaryTermWorkflow,
-  transitionGlossaryWorkflow,
-  updateGlossaryTermWorkingVersion,
-} from '../../rest/glossaryAPI';
-import {
-  deleteTechnicalDraft,
+  deleteTechnicalRecord,
   exportTechnicalDictionary,
-  getTechnicalStats,
-  TechnicalStats,
+  exportTechnicalSnapshot,
+  rebuildTechnicalIndex,
+  updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
+import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
-import TechnicalBulkActionModal from './TechnicalBulkActionModal.component';
-import TechnicalDictionaryHeader, {
-  TechnicalCatalogAction,
-} from './TechnicalDictionaryHeader.component';
+import TechnicalDictionaryHeader from './TechnicalDictionaryHeader.component';
 import TechnicalDictionaryTable from './TechnicalDictionaryTable.component';
 import TechnicalDictionaryToolbar from './TechnicalDictionaryToolbar.component';
-import TechnicalImportModal from './TechnicalImportModal.component';
 import TechnicalRecordModal, {
   TechnicalRecordFormValues,
   TechnicalRecordModalMode,
 } from './TechnicalRecordModal.component';
+import TechnicalSnapshotsModal from './TechnicalSnapshotsModal.component';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
@@ -62,11 +51,18 @@ interface TechnicalDictionaryPageProps {
   isEmbedded?: boolean;
 }
 
-const nextMinor = (businessVersion: string) => {
-  const [major, minor] = businessVersion.split('.');
+interface PendingConfirmation {
+  header: string;
+  body: string;
+  confirmText: string;
+  onConfirm: () => Promise<void> | void;
+}
 
-  return `${major}.${Number(minor) + 1}`;
-};
+const RESET_BANNER_DAYS = 30;
+const RESET_BANNER_STORAGE_PREFIX = 'technicalDictionary.resetBanner.';
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
+const REVISION_CONFLICT = 'TD_RECORD_REVISION_CONFLICT';
+const RECORD_NOT_FOUND = 'TD_RECORD_NOT_FOUND';
 
 const saveBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
@@ -77,113 +73,136 @@ const saveBlob = (blob: Blob, fileName: string) => {
   URL.revokeObjectURL(url);
 };
 
+const errorCodeOf = (error: unknown): string | undefined =>
+  (error as AxiosError<{ code?: string }>)?.response?.data?.code;
+
+/** The banner is shown for a month after a reset unless the user closed it. */
+export const isResetBannerVisible = (
+  resetAt: number | null | undefined,
+  now: number,
+  dismissed: boolean
+): boolean =>
+  Boolean(resetAt) &&
+  !dismissed &&
+  now - (resetAt as number) <= RESET_BANNER_DAYS * MILLIS_PER_DAY;
+
+const readDismissed = (resetAt?: number | null): boolean => {
+  try {
+    return (
+      Boolean(resetAt) &&
+      localStorage.getItem(`${RESET_BANNER_STORAGE_PREFIX}${resetAt}`) === '1'
+    );
+  } catch {
+    return false;
+  }
+};
+
+const rememberDismissed = (resetAt?: number | null) => {
+  try {
+    localStorage.setItem(`${RESET_BANNER_STORAGE_PREFIX}${resetAt}`, '1');
+  } catch {
+    // Storage may be unavailable; the banner then simply shows again.
+  }
+};
+
 const TechnicalDictionaryPage = ({
   isEmbedded = false,
 }: TechnicalDictionaryPageProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { isAdminUser } = useAuth();
   const {
-    glossary,
-    catalog,
-    versions,
+    context,
+    dataDictionaryVersion,
     capabilities,
-    isLoading: isCatalogLoading,
+    isLoading: isContextLoading,
     error,
-    selectVersion,
-    reload: reloadCatalog,
-  } = useTechnicalDictionaryCatalog();
+    reload: reloadContext,
+  } = useTechnicalDictionaryContext();
   const options = useTechnicalDictionaryOptions();
   const records = useTechnicalDictionaryRecords({
-    glossaryId: glossary?.id,
-    businessVersion: catalog?.businessVersion,
+    enabled: Boolean(dataDictionaryVersion) && capabilities.canView,
+    dataDictionaryVersion,
   });
-  const [stats, setStats] = useState<TechnicalStats>();
-  const [statsKey, setStatsKey] = useState(0);
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [modal, setModal] = useState<{
     mode: TechnicalRecordModalMode;
     row: TechnicalDictionaryRow;
   }>();
   const [isSaving, setIsSaving] = useState(false);
-  const [isBusy, setIsBusy] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<PendingConfirmation>();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    setBannerDismissed(readDismissed(context?.resetAt));
+  }, [context?.resetAt]);
 
   const refreshData = useCallback(() => {
     records.reload();
-    setStatsKey((key) => key + 1);
-    setSelectedKeys([]);
   }, [records.reload]);
-
-  useEffect(() => {
-    if (!glossary?.id || !catalog) {
-      return;
-    }
-    getTechnicalStats(glossary.id, catalog.businessVersion)
-      .then(setStats)
-      .catch(() => setStats(undefined));
-  }, [glossary?.id, catalog?.businessVersion, statsKey]);
 
   const fail = useCallback((failure: unknown) => {
     showErrorToast(failure as AxiosError);
   }, []);
 
-  const runRecordAction = useCallback(
-    async (
-      row: TechnicalDictionaryRow,
-      action: 'submit' | 'approve' | 'reject' | 'reopen' | 'createVersion'
-    ) => {
-      try {
-        if (action === 'createVersion') {
-          await createGlossaryTermWorkingVersion(
-            row.termId,
-            nextMinor(row.businessVersion),
-            row.parentBusinessVersion
-          );
-        } else if (action === 'approve') {
-          await transitionGlossaryTermWorkflow(
-            row.termId,
-            'approve',
-            { expectedRevision: row.workingRevision as number },
-            row.parentBusinessVersion
-          );
-        } else {
-          await transitionGlossaryTermWorkflow(
-            row.termId,
-            action,
-            { expectedRevision: row.workingRevision as number },
-            row.parentBusinessVersion
-          );
-        }
-        showSuccessToast(t('message.technical-record-updated'));
+  /** A record that vanished or changed means the list on screen is stale. */
+  const failRecordAction = useCallback(
+    async (failure: unknown) => {
+      const code = errorCodeOf(failure);
+      if (code === REVISION_CONFLICT) {
+        showErrorToast(t('message.technical-record-changed-by-someone'));
+        setModal(undefined);
         refreshData();
-      } catch (failure) {
+      } else if (code === RECORD_NOT_FOUND) {
+        showErrorToast(
+          t('message.technical-dictionary-was-reset', {
+            version: dataDictionaryVersion,
+          })
+        );
+        setModal(undefined);
+        await reloadContext();
+        refreshData();
+      } else {
         fail(failure);
       }
     },
-    [fail, refreshData, t]
+    [dataDictionaryVersion, fail, refreshData, reloadContext, t]
   );
+
+  const handleConfirm = useCallback(async () => {
+    if (!confirmation) {
+      return;
+    }
+    setIsConfirming(true);
+    try {
+      await confirmation.onConfirm();
+    } finally {
+      setIsConfirming(false);
+      setConfirmation(undefined);
+    }
+  }, [confirmation]);
 
   const handleDelete = useCallback(
     (row: TechnicalDictionaryRow) => {
-      Modal.confirm({
-        title: t('label.delete-declaration'),
-        content: t('message.technical-declaration-delete-confirm'),
-        okText: t('label.delete'),
-        okButtonProps: { danger: true },
-        cancelText: t('label.cancel'),
-        onOk: async () => {
+      setConfirmation({
+        header: t('label.delete-declaration'),
+        body: t('message.technical-declaration-delete-confirm'),
+        confirmText: t('label.delete'),
+        onConfirm: async () => {
           try {
-            await deleteTechnicalDraft(row.termId, row.parentBusinessVersion);
+            await deleteTechnicalRecord(row.termId, row.revision);
             showSuccessToast(t('message.technical-declaration-deleted'));
+            setModal(undefined);
             refreshData();
           } catch (failure) {
-            fail(failure);
+            await failRecordAction(failure);
           }
         },
       });
     },
-    [fail, refreshData, t]
+    [failRecordAction, refreshData, t]
   );
 
   const handleSave = useCallback(
@@ -192,168 +211,105 @@ const TechnicalDictionaryPage = ({
         return;
       }
       const { row } = modal;
-      const relatedTerms =
-        values.cde === undefined
-          ? row.cdeRelation
-            ? [row.cdeRelation]
-            : []
-          : values.cde
-          ? [{ term: { id: values.cde.id, type: 'glossaryTerm' } }]
-          : [];
-      const team = options.teams.find(
-        (item) => item.id === values.systemOwnerId
-      );
-      const extension: Record<string, unknown> = {
-        ...(values.rank ? { survivorshipRank: values.rank } : {}),
-        ...(team ? { systemOwner: { ...team, type: 'team' } } : {}),
-      };
-      const tags = [
-        values.elementType,
-        values.generationType,
-        values.creationMethod,
-        values.timeliness,
-      ]
-        .filter((fqn): fqn is string => Boolean(fqn))
-        .map((tagFQN) => ({
-          tagFQN,
-          source: TagSource.Classification,
-          labelType: LabelType.Manual,
-          state: State.Confirmed,
-        }));
       setIsSaving(true);
       try {
-        await updateGlossaryTermWorkingVersion(
-          row.termId,
-          row.workingRevision as number,
-          {
-            displayName: row.columnName,
-            description: row.description,
-            owners: [] as EntityReference[],
-            domains: [] as EntityReference[],
-            relatedTerms,
-            tags,
-            extension,
-          } as unknown as GlossaryTerm,
-          row.parentBusinessVersion
-        );
+        await updateTechnicalRecord(row.termId, {
+          expectedRevision: row.revision,
+          cde: values.cde === undefined ? row.cdeTermId : values.cde?.id,
+          rank: values.rank ?? undefined,
+          elementType: values.elementType,
+          generationType: values.generationType,
+          creationMethod: values.creationMethod,
+          timeliness: values.timeliness,
+          // The form has no system-owner field; keep the one already set.
+          systemOwnerId: values.systemOwnerId ?? row.systemOwner?.id,
+        });
         showSuccessToast(t('message.technical-record-updated'));
         setModal(undefined);
         refreshData();
       } catch (failure) {
-        fail(failure);
+        await failRecordAction(failure);
       } finally {
         setIsSaving(false);
       }
     },
-    [fail, modal, options.teams, refreshData, t]
-  );
-
-  const isLatestActive = Boolean(
-    catalog && versions[0] === catalog.businessVersion && !catalog.isWorking
-  );
-
-  const runCatalogAction = useCallback(
-    async (action: TechnicalCatalogAction) => {
-      if (!glossary || !catalog) {
-        return;
-      }
-      setIsBusy(true);
-      try {
-        const created =
-          action === 'createDraft'
-            ? String(Number(catalog.businessVersion) + 1)
-            : undefined;
-        await transitionGlossaryWorkflow(
-          glossary.id,
-          action,
-          created
-            ? { businessVersion: created }
-            : { expectedRevision: catalog.workingRevision }
-        );
-        showSuccessToast(t('message.technical-catalog-updated'));
-        await reloadCatalog();
-        if (created) {
-          selectVersion(created);
-        }
-        refreshData();
-      } catch (failure) {
-        fail(failure);
-      } finally {
-        setIsBusy(false);
-      }
-    },
-    [catalog, fail, glossary, refreshData, reloadCatalog, selectVersion, t]
-  );
-
-  const handleCatalogAction = useCallback(
-    (action: TechnicalCatalogAction) => {
-      if (action === 'approve') {
-        Modal.confirm({
-          title: t('label.catalog-action-approve'),
-          content: t('message.technical-catalog-approve-warning'),
-          okText: t('label.approve'),
-          cancelText: t('label.cancel'),
-          onOk: () => runCatalogAction(action),
-        });
-      } else {
-        runCatalogAction(action);
-      }
-    },
-    [runCatalogAction, t]
+    [failRecordAction, modal, refreshData, t]
   );
 
   const handleExport = useCallback(async () => {
-    if (!glossary || !catalog) {
+    try {
+      const file = await exportTechnicalDictionary();
+      saveBlob(file.blob, file.fileName);
+    } catch (failure) {
+      fail(failure);
+    }
+  }, [fail]);
+
+  const handleDownloadPreviousSnapshot = useCallback(async () => {
+    if (!context?.previousDataDictionaryVersion) {
       return;
     }
     try {
-      const file = await exportTechnicalDictionary(
-        glossary.id,
-        catalog.businessVersion
+      const file = await exportTechnicalSnapshot(
+        context.previousDataDictionaryVersion
       );
       saveBlob(file.blob, file.fileName);
     } catch (failure) {
       fail(failure);
     }
-  }, [catalog, fail, glossary]);
+  }, [context?.previousDataDictionaryVersion, fail]);
 
-  const selectedTermIds = useMemo(
-    () =>
-      records.rows
-        .filter((row) => selectedKeys.includes(row.key))
-        .map((row) => row.termId),
-    [records.rows, selectedKeys]
-  );
-  const canBulk =
-    Boolean(catalog?.isWorking) &&
-    (capabilities.canSubmit ||
-      capabilities.canApprove ||
-      capabilities.canReject);
-  const canImport =
-    !(catalog?.isReadOnly ?? true) && capabilities.canEditWorking;
-  const canAddColumn = canImport;
+  const handleRebuildIndex = useCallback(async () => {
+    try {
+      await rebuildTechnicalIndex();
+      showSuccessToast(t('message.technical-index-rebuilt'));
+      refreshData();
+    } catch (failure) {
+      fail(failure);
+    }
+  }, [fail, refreshData, t]);
+
+  const dismissBanner = useCallback(() => {
+    rememberDismissed(context?.resetAt);
+    setBannerDismissed(true);
+  }, [context?.resetAt]);
+
   const hasActiveFilters =
     Boolean(records.filters.q) ||
     Object.values(records.filters).some(
       (value) => Array.isArray(value) && value.length > 0
     );
 
-  if (isCatalogLoading && !catalog) {
+  if (isContextLoading && !context) {
     return <Loader />;
   }
-  if (error || !glossary || !catalog) {
+  if (error || !context) {
     return (
       <Result
         data-testid="technical-dictionary-error"
-        status={error === 'forbidden' ? '403' : '404'}
+        status={error === 'forbidden' ? '403' : '500'}
         title={t(
           error === 'forbidden'
             ? 'message.technical-dictionary-forbidden'
-            : 'message.technical-dictionary-not-found'
+            : 'message.technical-dictionary-load-failed'
         )}
       />
     );
   }
+
+  const showBanner = isResetBannerVisible(
+    context.resetAt,
+    Date.now(),
+    bannerDismissed
+  );
+
+  const notBoundContent = (
+    <Result
+      data-testid="technical-dictionary-not-bound"
+      status="info"
+      title={t('message.technical-data-dictionary-not-approved')}
+    />
+  );
 
   const content = (
     <div
@@ -362,107 +318,114 @@ const TechnicalDictionaryPage = ({
           ? 'tech-dict-content-card tech-dict-content-card-embedded'
           : 'tech-dict-content-card'
       }>
-      {records.failed && (
+      {showBanner && context.resetAt && (
         <Alert
+          closable
           showIcon
+          action={
+            context.previousDataDictionaryVersion ? (
+              <Button
+                data-testid="technical-reset-banner-download"
+                size="small"
+                type="link"
+                onClick={handleDownloadPreviousSnapshot}>
+                {t('label.technical-download-snapshot', {
+                  version: context.previousDataDictionaryVersion,
+                })}
+              </Button>
+            ) : undefined
+          }
           className="m-b-md"
-          data-testid="technical-dictionary-load-error"
-          message={t('message.technical-dictionary-load-failed')}
-          type="error"
+          data-testid="technical-dictionary-reset-banner"
+          message={t('message.technical-dictionary-reset-banner', {
+            date: formatDateTime(context.resetAt),
+            version: dataDictionaryVersion,
+          })}
+          type="info"
+          onClose={dismissBanner}
         />
       )}
-      <TechnicalDictionaryTable
-        capabilities={capabilities}
-        catalog={catalog}
-        extraTableFilters={
-          <TechnicalDictionaryToolbar
-            canAddColumn={canAddColumn}
-            canBulk={canBulk}
-            canImport={canImport}
+      {!dataDictionaryVersion ? (
+        notBoundContent
+      ) : (
+        <>
+          {records.failed && (
+            <Alert
+              showIcon
+              className="m-b-md"
+              data-testid="technical-dictionary-load-error"
+              message={t('message.technical-dictionary-load-failed')}
+              type="error"
+            />
+          )}
+          <TechnicalDictionaryTable
             capabilities={capabilities}
-            filters={records.filters}
-            options={options}
-            searchText={records.searchText}
-            onAddColumn={() => setAddColumnOpen(true)}
-            onBulk={() => setBulkOpen(true)}
-            onExport={handleExport}
-            onFilters={records.setFilters}
-            onImport={() => setImportOpen(true)}
-            onSearchText={records.setSearchText}
+            emptyContent={
+              hasActiveFilters ? undefined : (
+                <div data-testid="technical-dictionary-empty">
+                  <p>{t('message.technical-dictionary-empty')}</p>
+                </div>
+              )
+            }
+            extraTableFilters={
+              <TechnicalDictionaryToolbar
+                canAddColumn={capabilities.canEdit}
+                filters={records.filters}
+                options={options}
+                searchText={records.searchText}
+                onAddColumn={() => setAddColumnOpen(true)}
+                onFilters={records.setFilters}
+                onSearchText={records.setSearchText}
+              />
+            }
+            isLoading={records.isLoading}
+            page={records.page}
+            pageSize={records.pageSize}
+            rows={records.rows}
+            total={records.total}
+            onDelete={handleDelete}
+            onEdit={(row) => setModal({ mode: 'edit', row })}
+            onPageChange={records.setPage}
+            onPageSizeChange={records.setPageSize}
+            onView={(row) => setModal({ mode: 'view', row })}
           />
-        }
-        emptyContent={
-          hasActiveFilters ? undefined : (
-            <div data-testid="technical-dictionary-empty">
-              <p>{t('message.technical-dictionary-empty')}</p>
-              {canAddColumn && (
-                <Space>
-                  <Button
-                    icon={<PlusOutlined />}
-                    type="primary"
-                    onClick={() => setAddColumnOpen(true)}>
-                    {t('label.add-column')}
-                  </Button>
-                  <Button onClick={() => setImportOpen(true)}>
-                    {t('label.import')}
-                  </Button>
-                </Space>
-              )}
-            </div>
-          )
-        }
-        isLoading={records.isLoading}
-        page={records.page}
-        pageSize={records.pageSize}
-        rows={records.rows}
-        selectedKeys={selectedKeys}
-        total={records.total}
-        onApprove={(row) => runRecordAction(row, 'approve')}
-        onCreateVersion={(row) => runRecordAction(row, 'createVersion')}
-        onDelete={handleDelete}
-        onEdit={(row) => setModal({ mode: 'edit', row })}
-        onPageChange={records.setPage}
-        onPageSizeChange={records.setPageSize}
-        onReject={(row) => runRecordAction(row, 'reject')}
-        onReopen={(row) => runRecordAction(row, 'reopen')}
-        onSelectionChange={setSelectedKeys}
-        onSubmit={(row) => runRecordAction(row, 'submit')}
-        onView={(row) => setModal({ mode: 'view', row })}
+          <TechnicalRecordModal
+            dataDictionaryVersion={dataDictionaryVersion}
+            isSaving={isSaving}
+            mode={modal?.mode ?? 'view'}
+            open={Boolean(modal)}
+            options={options}
+            row={modal?.row}
+            onCancel={() => setModal(undefined)}
+            onDelete={
+              capabilities.canEdit && modal
+                ? () => handleDelete(modal.row)
+                : undefined
+            }
+            onSave={handleSave}
+          />
+          <TechnicalAddColumnModal
+            dataDictionaryVersion={dataDictionaryVersion}
+            open={addColumnOpen}
+            options={options}
+            onClose={() => setAddColumnOpen(false)}
+            onDone={refreshData}
+          />
+        </>
+      )}
+      <ConfirmationModal
+        bodyText={confirmation?.body ?? ''}
+        cancelText={t('label.cancel')}
+        confirmText={confirmation?.confirmText ?? ''}
+        header={confirmation?.header ?? ''}
+        isLoading={isConfirming}
+        visible={Boolean(confirmation)}
+        onCancel={() => setConfirmation(undefined)}
+        onConfirm={handleConfirm}
       />
-      <TechnicalRecordModal
-        isSaving={isSaving}
-        mode={modal?.mode ?? 'view'}
-        open={Boolean(modal)}
-        options={options}
-        row={modal?.row}
-        onCancel={() => setModal(undefined)}
-        onSave={handleSave}
-      />
-      <TechnicalBulkActionModal
-        businessVersion={catalog.businessVersion}
-        capabilities={capabilities}
-        filters={records.filters}
-        glossaryId={glossary.id}
-        open={bulkOpen}
-        selectedTermIds={selectedTermIds}
-        onClose={() => setBulkOpen(false)}
-        onDone={refreshData}
-      />
-      <TechnicalAddColumnModal
-        businessVersion={catalog.businessVersion}
-        glossaryId={glossary.id}
-        open={addColumnOpen}
-        options={options}
-        onClose={() => setAddColumnOpen(false)}
-        onDone={refreshData}
-      />
-      <TechnicalImportModal
-        businessVersion={catalog.businessVersion}
-        canCreateVersion={capabilities.canCreateVersion}
-        glossaryId={glossary.id}
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onDone={refreshData}
+      <TechnicalSnapshotsModal
+        open={snapshotsOpen}
+        onClose={() => setSnapshotsOpen(false)}
       />
     </div>
   );
@@ -489,13 +452,12 @@ const TechnicalDictionaryPage = ({
         </div>
         <TechnicalDictionaryHeader
           capabilities={capabilities}
-          catalog={catalog}
-          isBusy={isBusy}
-          isLatestActive={isLatestActive}
-          stats={stats}
-          versions={versions}
-          onCatalogAction={handleCatalogAction}
-          onSelectVersion={selectVersion}
+          dataDictionaryVersion={dataDictionaryVersion}
+          isAdmin={isAdminUser}
+          onExport={handleExport}
+          onImport={() => navigate(ROUTES.TECHNICAL_DICTIONARY_IMPORT)}
+          onOpenSnapshots={() => setSnapshotsOpen(true)}
+          onRebuildIndex={handleRebuildIndex}
         />
         {content}
       </div>

@@ -25,7 +25,6 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.PlannedRow;
-import org.openmetadata.service.glossary.technical.TechnicalImportPlan.UpdatePolicy;
 
 /** Single-use, time-limited preview sessions for the Technical Dictionary import. */
 public final class TechnicalImportService {
@@ -69,7 +68,7 @@ public final class TechnicalImportService {
           .createRow(0)
           .createCell(0)
           .setCellValue(
-              "Bốn cột đầu xác định cột dữ liệu và bắt buộc. Chỉ các cột có trong file được cập nhật; ô trống sẽ xóa giá trị. File xuất từ Từ điển kỹ thuật có thể dùng trực tiếp.");
+              "Bốn cột đầu xác định cột dữ liệu và bắt buộc. Chỉ các cột có trong file được cập nhật; ô trống sẽ xóa giá trị. Cột chưa được khai báo sẽ được khai báo. File xuất từ Từ điển kỹ thuật hoặc bản chụp có thể dùng trực tiếp.");
       workbook.write(output);
       return output.toByteArray();
     } catch (IOException exception) {
@@ -77,22 +76,14 @@ public final class TechnicalImportService {
     }
   }
 
-  public Map<String, Object> preview(
-      byte[] fileBytes,
-      PreviewScope scope,
-      List<Map<String, Object>> latestRows,
-      TechnicalImportLookups lookups) {
-    return preview(fileBytes, scope, sheet -> latestRows, lookups);
-  }
-
   /**
-   * Plans the file against the declared records returned by {@code declaredRows} for the parsed
-   * sheet, so only the tables named in the file have to be read.
+   * Plans the file against the records returned by {@code declaredRecords} for the parsed sheet, so
+   * only the tables named in the file have to be read.
    */
   public Map<String, Object> preview(
       byte[] fileBytes,
       PreviewScope scope,
-      Function<TechnicalImportSheet, List<Map<String, Object>>> declaredRows,
+      Function<TechnicalImportSheet, List<TechnicalRecord>> declaredRecords,
       TechnicalImportLookups lookups) {
     expireSessions();
     if (sessions.size() >= MAX_ACTIVE_SESSIONS) {
@@ -102,17 +93,15 @@ public final class TechnicalImportService {
     final TechnicalImportSheet sheet = TechnicalImportSheet.parse(fileBytes);
     final List<PlannedRow> planned =
         new TechnicalImportPlanner(
-                TechnicalImportPlanner.indexRows(declaredRows.apply(sheet)),
+                TechnicalImportPlanner.indexRecords(declaredRecords.apply(sheet)),
                 lookups,
-                scope.policy())
+                new TechnicalRecordValidator())
             .plan(sheet);
     final Session session =
         new Session(
             UUID.randomUUID(),
             scope.actor(),
-            scope.glossaryId(),
-            scope.parentBusinessVersion(),
-            scope.policy(),
+            scope.dataDictionaryVersion(),
             sha256(fileBytes),
             System.currentTimeMillis() + SESSION_TTL_MILLIS,
             List.copyOf(planned));
@@ -143,9 +132,7 @@ public final class TechnicalImportService {
     preview.put("importSessionId", session.id());
     preview.put("expiresAt", Instant.ofEpochMilli(session.expiresAt()).toString());
     preview.put("fileHash", session.fileHash());
-    preview.put("glossaryId", session.glossaryId());
-    preview.put("parentBusinessVersion", session.parentBusinessVersion());
-    preview.put("updatePolicy", session.policy());
+    preview.put("dataDictionaryVersion", session.dataDictionaryVersion());
     preview.put("summary", summary(session.rows()));
     preview.put("rows", sampleRows(session.rows()));
     preview.put("truncated", session.rows().size() > PREVIEW_ROW_LIMIT);
@@ -204,15 +191,12 @@ public final class TechnicalImportService {
         TechnicalDictionaryErrors.IMPORT_SESSION_INVALID, message);
   }
 
-  public record PreviewScope(
-      UUID glossaryId, String parentBusinessVersion, UpdatePolicy policy, String actor) {}
+  public record PreviewScope(String dataDictionaryVersion, String actor) {}
 
   public record Session(
       UUID id,
       String actor,
-      UUID glossaryId,
-      String parentBusinessVersion,
-      UpdatePolicy policy,
+      String dataDictionaryVersion,
       String fileHash,
       long expiresAt,
       List<PlannedRow> rows) {}
