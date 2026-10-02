@@ -6,6 +6,9 @@
 > `TestCase` từ DQ Rule; đây là integration phase riêng” ở §2.2 của tài liệu đó chính là phạm vi của tài liệu này.
 > Liên kết CDE → Column dùng [Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) (TD). Liên kết DQ Rule → CDE
 > theo DQ §5.4. Baseline: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md).
+>
+> Thứ tự triển khai, file cần sửa, kiểm thử và tiêu chí nghiệm thu nằm ở
+> [Kế hoạch triển khai Kiểm thử theo Quy tắc CLDL](./dq-rule-test-execution-implementation-plan.md).
 
 ## 1. Yêu cầu và diễn giải
 
@@ -451,39 +454,3 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 | Q3 | Import/Export DQ có cần cột khai báo kiểm thử không? | Không ở v1; khai báo trên UI |
 | Q4 | Có cần nút **Chạy ngay** cho một Rule? | Không ở v1; pipeline theo Tần suất chạy toàn bộ suite, chưa chạy được riêng một Rule |
 | Q5 | Testcase do người dùng tự tạo trên cùng Column có tính vào kết quả CDE không? | Không; tab CDE chỉ gộp testcase do Rule sinh ra để kết quả khớp danh mục quy tắc đã duyệt |
-
-## 13. Kế hoạch triển khai
-
-| Mốc | Nội dung | Phụ thuộc |
-| --- | --- | --- |
-| T0 | Xác minh 4 mục §11; chốt Q1–Q5 | |
-| T1 | Schema `dqTestSpec.json`, DTO `testSpec`, validation §4.3, form và card Overview §9.1 | DQ07–DQ09 workflow DQ dùng chung đã ổn định |
-| T2 | Bảng §7, reconciler, outbox, bootstrap suite và pipeline §5.3, sinh testcase khi Approve Rule | T1 |
-| T3 | Kích hoạt từ TD và cutover (§5.5), khóa managed §5.6 | T2; điểm kích hoạt của TD |
-| T4 | API kết quả §8, tab Kết quả kiểm thử của Rule, tab Chất lượng dữ liệu của CDE, bộ lọc §9.4 | T2 |
-| T5 | Xu hướng §6.4, reconcile status, cảnh báo cutover DD | T4 |
-
-## 14. Tiêu chí chấp nhận
-
-- Rule Approved có `testSpec` sinh đúng một testcase `ACTIVE` trên mỗi Column `Available` của CDE trong TD; Column không
-  hợp kiểu được đánh dấu Không áp dụng; Draft/In Review/Rejected không sinh testcase.
-- Gán, đổi, bỏ CDE trên TD, đổi CDE của Rule, approve version mới và cutover DD/DQ đều đưa tập testcase về đúng §5.1
-  mà không tạo trùng, kể cả khi chạy lại reconcile nhiều lần.
-- Version minor đổi tham số hoặc SQL thì cập nhật testcase hiện có, giữ lịch sử kết quả; đổi loại kiểm tra bị từ chối.
-- Testcase managed không sửa/xóa được qua API/UI gốc; ghi kết quả và incident vẫn hoạt động.
-- Kết quả Rule và CDE khớp với kết quả gốc của từng testcase và ngưỡng §6.1–6.3; dòng testcase tôn trọng quyền xem Table.
-- SQL không phải `SELECT` đơn bị từ chối ở Lưu và ở Approve.
-- Kết quả của Rule/CDE đã lưu trữ vẫn tra cứu được sau cutover.
-
-## 15. Ảnh hưởng tới tài liệu và mã nguồn khác
-
-| Nơi | Thay đổi |
-| --- | --- |
-| DQ design §2.2 | Bỏ “Không tự động tạo `TestCase`…”, “Không thực thi SQL…” khỏi ngoài phạm vi; trỏ sang tài liệu này |
-| DQ design §6.1, §8.4, §8.5 | DTO có `testSpec`; form thêm section Khai báo kiểm thử; Overview thêm card |
-| CDE design §7.1 mục 3 | Tab Quy tắc chất lượng dữ liệu gộp vào tab Chất lượng dữ liệu §9.3 |
-| TD design §6.2, §9.4 | Thêm kích hoạt reconcile; thêm số testcase bị ngừng vào hộp xác nhận cutover |
-| `GovernedGlossaryProfileRegistry` | System key `dqTestSpec` cho profile `DATA_QUALITY` |
-| `GlossaryVersioningService`, `TechnicalRecordService`, `TechnicalCutover` | Ghi `dq_test_outbox` trong transaction |
-| `TestCaseRepository`, `TestDefinitionRepository` | Khóa managed §5.6 |
-| UI `GlossaryTermsV1`, `DQGlossaryTermForm`, `DQGlossaryTermOverview`, `CDEGlossaryTermOverview` | §9 |
