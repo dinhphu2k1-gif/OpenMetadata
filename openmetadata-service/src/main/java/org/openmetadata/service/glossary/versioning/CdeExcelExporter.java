@@ -220,7 +220,8 @@ public final class CdeExcelExporter {
         source
             .replaceAll("(?i)<br\\s*/?>", lineBreak)
             .replaceAll("(?i)</(p|div|li|h[1-6])>", lineBreak);
-    return Jsoup.parse(withBreaks).text().replace(lineBreak, "\n").trim();
+    String plainText = Jsoup.parse(withBreaks).text();
+    return plainText.replace(lineBreak + " ", lineBreak).replace(lineBreak, "\n").trim();
   }
 
   private static String quality(Object value) {

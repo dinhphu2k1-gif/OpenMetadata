@@ -11,13 +11,17 @@
  *  limitations under the License.
  */
 import { LeftSidebarItem } from '../components/MyData/LeftSidebar/LeftSidebar.interface';
-import { SIDEBAR_LIST } from '../constants/LeftSidebar.constants';
+import {
+  PORTAL_SIDEBAR_LIST,
+  SIDEBAR_LIST,
+} from '../constants/LeftSidebar.constants';
+import { IS_PORTAL_MODE } from './PortalMode';
 
 class LeftSidebarClassBase {
   sidebarItems: Array<LeftSidebarItem>;
 
   constructor() {
-    this.sidebarItems = SIDEBAR_LIST;
+    this.sidebarItems = IS_PORTAL_MODE ? PORTAL_SIDEBAR_LIST : SIDEBAR_LIST;
   }
 
   /**

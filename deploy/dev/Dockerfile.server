@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🐳 Dockerfile for OpenMetadata Custom Backend Server (Java 21)
+# 🐳 Dockerfile for OpenMetadata Custom Server (backend + UI) (Java 21)
 # Image: openmetadata/server:custom-1.13.3
 # ==============================================================================
 

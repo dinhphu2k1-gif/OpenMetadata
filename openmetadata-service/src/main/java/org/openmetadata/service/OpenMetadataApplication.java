@@ -93,6 +93,7 @@ import org.openmetadata.service.cache.CacheConfig;
 import org.openmetadata.service.config.CacheConfiguration;
 import org.openmetadata.service.config.OMWebBundle;
 import org.openmetadata.service.config.OMWebConfiguration;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.events.EventFilter;
 import org.openmetadata.service.events.EventPubSub;
 import org.openmetadata.service.events.lifecycle.EntityLifecycleEventDispatcher;
@@ -135,6 +136,7 @@ import org.openmetadata.service.resources.audit.AuditLogResource;
 import org.openmetadata.service.resources.databases.DatasourceConfig;
 import org.openmetadata.service.resources.filters.ETagRequestFilter;
 import org.openmetadata.service.resources.filters.ETagResponseFilter;
+import org.openmetadata.service.resources.filters.PortalReadOnlyFilter;
 import org.openmetadata.service.resources.settings.SettingsCache;
 import org.openmetadata.service.resources.system.DiagnosticsResource;
 import org.openmetadata.service.resources.system.IndexResource;
@@ -233,6 +235,7 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
           CertificateException,
           KeyStoreException,
           NoSuchAlgorithmException {
+    PortalConfiguration.activate(catalogConfig.getPortalConfiguration());
 
     this.environment = environment;
 
@@ -371,6 +374,12 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // Register Event Handler
     registerEventFilter(catalogConfig, environment);
 
+    // The Portal service is this server in read-only mode
+    if (catalogConfig.getPortalConfiguration().isEnabled()) {
+      LOG.info("Portal mode: rejecting every request that changes data");
+      environment.jersey().register(PortalReadOnlyFilter.class);
+    }
+
     // Register ETag Filters for optimistic concurrency control
     environment.jersey().register(ETagRequestFilter.class);
     environment.jersey().register(ETagResponseFilter.class);
@@ -380,25 +389,18 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // cannot leak across requests that share a Jetty worker thread.
     environment.jersey().register(ImpersonationCleanupFilter.class);
 
-    // Register User Activity Tracking
-    registerUserActivityTracking(environment);
+    // Register User Activity Tracking. The read-only Portal cannot store the activity it would
+    // track.
+    if (!catalogConfig.getPortalConfiguration().isEnabled()) {
+      registerUserActivityTracking(environment);
+    }
 
     environment.lifecycle().manage(new ManagedShutdown());
 
-    JobHandlerRegistry registry = getJobHandlerRegistry();
-    environment
-        .lifecycle()
-        .manage(new GenericBackgroundWorker(jdbi.onDemand(JobDAO.class), registry));
-
-    environment
-        .lifecycle()
-        .manage(
-            new SearchIndexRetryWorker(
-                jdbi.onDemand(CollectionDAO.class), Entity.getSearchRepository()));
-
-    // Register Distributed Job Participant for distributed search indexing
-    registerDistributedJobParticipant(environment, jdbi, catalogConfig.getCacheConfig());
-    registerDistributedRdfJobParticipant(environment, jdbi);
+    // The read-only Portal has no write access to the database, so it runs none of these workers
+    if (!catalogConfig.getPortalConfiguration().isEnabled()) {
+      registerBackgroundWorkers(catalogConfig, environment);
+    }
 
     // Register Event publishers
     registerEventPublisher(catalogConfig);
@@ -421,8 +423,10 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // Register Auth Handlers (must be before MCP for SSO initialization)
     registerAuthServlets(catalogConfig, environment);
 
-    // Register MCP (depends on Auth Handlers for SSO)
-    registerMCPServer(catalogConfig, environment);
+    // Register MCP (depends on Auth Handlers for SSO). The read-only Portal exposes no MCP tools.
+    if (!catalogConfig.getPortalConfiguration().isEnabled()) {
+      registerMCPServer(catalogConfig, environment);
+    }
 
     // Handle Services Jobs
     registerHealthCheckJobs(catalogConfig);
@@ -457,6 +461,23 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     JobHandlerRegistry registry = new JobHandlerRegistry();
     registry.register("EnumCleanupHandler", new EnumCleanupHandler(getDao(jdbi)));
     return registry;
+  }
+
+  private void registerBackgroundWorkers(
+      OpenMetadataApplicationConfig catalogConfig, Environment environment) {
+    environment
+        .lifecycle()
+        .manage(new GenericBackgroundWorker(jdbi.onDemand(JobDAO.class), getJobHandlerRegistry()));
+
+    environment
+        .lifecycle()
+        .manage(
+            new SearchIndexRetryWorker(
+                jdbi.onDemand(CollectionDAO.class), Entity.getSearchRepository()));
+
+    // Register Distributed Job Participant for distributed search indexing
+    registerDistributedJobParticipant(environment, jdbi, catalogConfig.getCacheConfig());
+    registerDistributedRdfJobParticipant(environment, jdbi);
   }
 
   private void registerHealthCheckJobs(OpenMetadataApplicationConfig catalogConfig) {
@@ -672,7 +693,11 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // Handle Asset Using Servlet
     OpenMetadataAssetServlet assetServlet =
         new OpenMetadataAssetServlet(
-            config.getBasePath(), "/assets", "/", "index.html", webConfiguration);
+            config.getBasePath(),
+            config.getPortalConfiguration().getAssetResourcePath(),
+            "/",
+            "index.html",
+            webConfiguration);
     environment.servlets().addServlet("static", assetServlet).addMapping("/*");
 
     LOG.info("Asset Servlet registered with mapping: /*");
@@ -1038,11 +1063,14 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
             limits);
 
     // Start the Quartz scheduler after all resources are initialized to avoid race conditions
-    // where stale triggers fire before entity repositories have seeded their data
-    try {
-      AppScheduler.getInstance().start();
-    } catch (SchedulerException e) {
-      LOG.error("Failed to start AppScheduler", e);
+    // where stale triggers fire before entity repositories have seeded their data. The Portal never
+    // starts it: the apps run on the OpenMetadata server.
+    if (!config.getPortalConfiguration().isEnabled()) {
+      try {
+        AppScheduler.getInstance().start();
+      } catch (SchedulerException e) {
+        LOG.error("Failed to start AppScheduler", e);
+      }
     }
 
     environment.jersey().register(new AuditLogResource(authorizer, auditLogRepository));

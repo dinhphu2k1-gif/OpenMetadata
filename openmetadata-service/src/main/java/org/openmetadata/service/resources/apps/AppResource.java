@@ -146,11 +146,15 @@ public class AppResource extends EntityResource<App, AppRepository> {
       searchRepository = Entity.getSearchRepository();
       AppScheduler.initialize(config, dao, searchRepository);
 
-      // Initialize Default Apps
-      List<CreateApp> createAppsReq =
-          getEntitiesFromSeedData(
-              APPLICATION, String.format(".*json/data/%s/.*\\.json$", entityType), CreateApp.class);
-      loadDefaultApplications(createAppsReq);
+      // The read-only Portal installs no apps: that is done by the OpenMetadata server
+      if (!config.getPortalConfiguration().isEnabled()) {
+        List<CreateApp> createAppsReq =
+            getEntitiesFromSeedData(
+                APPLICATION,
+                String.format(".*json/data/%s/.*\\.json$", entityType),
+                CreateApp.class);
+        loadDefaultApplications(createAppsReq);
+      }
       ApplicationContext.initialize();
     } catch (Exception ex) {
       LOG.error("Failed in Create App Requests", ex);

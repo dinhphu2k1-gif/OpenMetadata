@@ -226,6 +226,7 @@ import org.openmetadata.service.cache.CachedReadBundle;
 import org.openmetadata.service.cache.CachedRelationshipDao;
 import org.openmetadata.service.cache.ListCountCache;
 import org.openmetadata.service.config.CacheConfiguration;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.events.lifecycle.EntityLifecycleEventDispatcher;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityLockedException;
@@ -1321,6 +1322,10 @@ public abstract class EntityRepository<T extends EntityInterface> {
    */
   @Transaction
   public final void initializeEntity(T entity) {
+    if (PortalConfiguration.isActive()) {
+      LOG.debug("The read-only Portal does not initialize {}", entity.getFullyQualifiedName());
+      return;
+    }
     T existingEntity = findByNameOrNull(entity.getFullyQualifiedName(), ALL);
     if (existingEntity != null) {
       LOG.debug("{} {} is already initialized", entityType, entity.getFullyQualifiedName());

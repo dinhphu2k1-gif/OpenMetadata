@@ -61,6 +61,7 @@ import org.openmetadata.schema.utils.EntityInterfaceUtil;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.jdbi3.BotRepository;
 import org.openmetadata.service.jdbi3.ListFilter;
 import org.openmetadata.service.jdbi3.UserRepository;
@@ -95,6 +96,9 @@ public class BotResource extends EntityResource<Bot, BotRepository> {
 
   @Override
   public void initialize(OpenMetadataApplicationConfig config) throws IOException {
+    if (PortalConfiguration.isActive()) {
+      return;
+    }
     String domain = SecurityUtil.getDomain(config);
     // First, load the bot users and assign their roles
     UserRepository userRepository = (UserRepository) Entity.getEntityRepository(Entity.USER);

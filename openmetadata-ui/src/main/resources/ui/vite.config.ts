@@ -22,10 +22,13 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const isPortal =
+    (env.VITE_APP_MODE || process.env.VITE_APP_MODE) === 'portal';
   const devServerTarget =
     env.VITE_DEV_SERVER_TARGET ||
     env.DEV_SERVER_TARGET ||
-    'http://localhost:8585/';
+    (isPortal ? 'http://localhost:8595/' : 'http://localhost:8585/');
+  const devServerPort = Number(env.VITE_DEV_PORT) || (isPortal ? 3001 : 3000);
 
   // Use empty base so dynamic imports use relative paths
   // The actual BASE_PATH is injected at runtime by the Java backend via ${basePath} replacement
@@ -142,13 +145,17 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
-      port: 3000,
+      port: devServerPort,
       open: true,
       proxy: {
         '/api/': {
           target: devServerTarget,
           changeOrigin: true,
           ws: true,
+        },
+        '/callback': {
+          target: devServerTarget,
+          changeOrigin: true,
         },
       },
       watch: {
@@ -170,7 +177,7 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
-      outDir: 'dist',
+      outDir: isPortal ? 'dist-portal' : 'dist',
       assetsDir: 'assets',
       copyPublicDir: true,
       sourcemap: false,

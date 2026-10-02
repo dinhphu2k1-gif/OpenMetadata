@@ -11,6 +11,9 @@
 
 volumes:
   es-data:
+  ingestion-volume-dag-airflow:
+  ingestion-volume-dags:
+  ingestion-volume-tmp:
 services:
   postgresql:
     image: docker.getcollate.io/openmetadata/postgresql:1.13.3
@@ -22,12 +25,17 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+      PORTAL_RO_PASSWORD: ${PORTAL_RO_PASSWORD:-portal_ro_password}
     expose:
       - 5432
     ports:
       - "8001:5432"
     volumes:
      - ./docker-volume/db-data-postgres:/var/lib/postgresql/data
+     # Creates the read-only database user of the Portal, when the data directory is first initialised.
+     # The SQL file stays outside docker-entrypoint-initdb.d, which would run it without the password.
+     - ./postgres-init/zz-portal-role.sh:/docker-entrypoint-initdb.d/zz-portal-role.sh:ro
+     - ./postgres-init/portal-read-only-role.sql:/portal-init/portal-read-only-role.sql:ro
     networks:
       - local_app_net
     healthcheck:
@@ -296,7 +304,7 @@ services:
   openmetadata-server:
     image: openmetadata/server:custom-1.13.3
     container_name: openmetadata_server
-    environment:
+    environment: &openmetadata-server-environment
       OPENMETADATA_CLUSTER_NAME: ${OPENMETADATA_CLUSTER_NAME:-openmetadata}
       SERVER_PORT: ${SERVER_PORT:-8585}
       SERVER_ADMIN_PORT: ${SERVER_ADMIN_PORT:-8586}
@@ -481,6 +489,8 @@ services:
       - 8586
       - 5005
     ports:
+      # The server also serves the web UI, so this is the address users open in the browser.
+      - "${OPENMETADATA_UI_PORT:-80}:8585"
       - "8585:8585"
       - "8586:8586"
       - "5005:5005"
@@ -499,18 +509,90 @@ services:
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider",  "http://localhost:8586/healthcheck" ]
 
-  openmetadata-ui:
-    image: ${OPENMETADATA_UI_IMAGE:-openmetadata/frontend:custom-1.13.3}
-    container_name: openmetadata_ui
+  # The Portal is the same server in read-only mode: it serves the Portal UI build and keeps the
+  # OpenMetadata login, users, roles and policies.
+  portal:
+    image: openmetadata/server:custom-1.13.3
+    container_name: openmetadata_portal
+    environment:
+      <<: *openmetadata-server-environment
+      OM_PORTAL_ENABLED: "true"
+      PIPELINE_SERVICE_CLIENT_ENABLED: "false"
+      AUTHENTICATION_CALLBACK_URL: ${PORTAL_AUTHENTICATION_CALLBACK_URL:-""}
+      # Same PostgreSQL database as openmetadata-server, through a user that can only read
+      DB_DRIVER_CLASS: ${DB_DRIVER_CLASS:-org.postgresql.Driver}
+      DB_SCHEME: ${DB_SCHEME:-postgresql}
+      DB_PARAMS: ${DB_PARAMS:-allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC+7}
+      DB_USE_SSL: ${DB_USE_SSL:-false}
+      DB_USER: portal_ro
+      DB_USER_PASSWORD: ${PORTAL_RO_PASSWORD:-portal_ro_password}
+      # A read-only session is not a "primary" server for the PostgreSQL driver
+      DB_PG_TARGET_SERVER_TYPE: any
+      DB_HOST: ${DB_HOST:-postgresql}
+      DB_PORT: ${DB_PORT:-5432}
+      OM_DATABASE: ${OM_DATABASE:-openmetadata_db}
+      # Same OpenSearch cluster as openmetadata-server
+      SEARCH_TYPE: ${SEARCH_TYPE:- "opensearch"}
+      ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-opensearch}
+      ELASTICSEARCH_PORT: ${ELASTICSEARCH_PORT:-9200}
+      ELASTICSEARCH_SCHEME: ${ELASTICSEARCH_SCHEME:-http}
+      ELASTICSEARCH_USER: ${ELASTICSEARCH_USER:-""}
+      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-"OpenMetadata_password123!!!"}
+      ELASTICSEARCH_CLUSTER_ALIAS: ${ELASTICSEARCH_CLUSTER_ALIAS:- "openmetadata"}
     expose:
-      - 80
+      - 8585
+      - 8586
     ports:
-      - "80:80"
+      - "${PORTAL_UI_PORT:-8595}:8585"
     depends_on:
+      opensearch:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      execute-migrate-all:
+        condition: service_completed_successfully
+      # The Portal creates no data of its own: it needs the server to have created the initial data
       openmetadata-server:
         condition: service_healthy
     networks:
       - local_app_net
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider",  "http://localhost:8586/healthcheck" ]
+
+  ingestion:
+    image: ${INGESTION_IMAGE:-docker.getcollate.io/openmetadata/ingestion:1.13.3}
+    container_name: openmetadata_ingestion
+    depends_on:
+      opensearch:
+        condition: service_started
+      postgresql:
+        condition: service_healthy
+      openmetadata-server:
+        condition: service_started
+    environment:
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
+      DB_HOST: ${AIRFLOW_DB_HOST:-postgresql}
+      DB_PORT: ${AIRFLOW_DB_PORT:-5432}
+      AIRFLOW_DB: ${AIRFLOW_DB:-airflow_db}
+      DB_USER: ${AIRFLOW_DB_USER:-airflow_user}
+      DB_SCHEME: ${AIRFLOW_DB_SCHEME:-postgresql+psycopg2}
+      DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_pass}
+      DB_PROPERTIES: ${AIRFLOW_DB_PROPERTIES:-}
+    entrypoint: /bin/bash
+    command:
+      - "/opt/airflow/ingestion_dependency.sh"
+    expose:
+      - 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - local_app_net
+    volumes:
+      - ingestion-volume-dag-airflow:/opt/airflow/dag_generated_configs
+      - ingestion-volume-dags:/opt/airflow/dags
+      - ingestion-volume-tmp:/tmp
 
 networks:
   local_app_net:

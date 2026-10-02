@@ -153,18 +153,32 @@ public class EventSubscriptionResource
   @Override
   public void initialize(OpenMetadataApplicationConfig config) {
     try {
-      EventSubscriptionScheduler.initialize(config);
-      EventsSubscriptionRegistry.initialize(
-          listOrEmpty(EventSubscriptionResource.getNotificationsFilterDescriptors()),
-          listOrEmpty(EventSubscriptionResource.getObservabilityFilterDescriptors()));
-      repository.initSeedDataFromResources();
-      initializeEventSubscriptions();
-      // Schedule the audit log consumer to read from change_event and write to audit_log
-      EventSubscriptionScheduler.getInstance().scheduleAuditLogConsumer();
+      if (config.getPortalConfiguration().isEnabled()) {
+        // The Portal sends no notifications and writes no audit log: that stays on the OpenMetadata
+        // server
+        initializeRegistry();
+      } else {
+        initializeScheduling(config);
+      }
     } catch (Exception ex) {
       // Starting application should not fail
       LOG.warn("Exception during initialization", ex);
     }
+  }
+
+  private void initializeRegistry() throws IOException {
+    EventsSubscriptionRegistry.initialize(
+        listOrEmpty(EventSubscriptionResource.getNotificationsFilterDescriptors()),
+        listOrEmpty(EventSubscriptionResource.getObservabilityFilterDescriptors()));
+  }
+
+  private void initializeScheduling(OpenMetadataApplicationConfig config) throws Exception {
+    EventSubscriptionScheduler.initialize(config);
+    initializeRegistry();
+    repository.initSeedDataFromResources();
+    initializeEventSubscriptions();
+    // Schedule the audit log consumer to read from change_event and write to audit_log
+    EventSubscriptionScheduler.getInstance().scheduleAuditLogConsumer();
   }
 
   private void initializeEventSubscriptions() {

@@ -76,6 +76,7 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.exception.BadRequestException;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
@@ -310,6 +311,9 @@ public class UserRepository extends EntityRepository<User> {
   }
 
   public void updateUserLastLoginTime(User orginalUser, long lastLoginTime) {
+    if (PortalConfiguration.isActive()) {
+      return;
+    }
     User updatedUser = JsonUtils.deepCopy(orginalUser, User.class);
     JsonPatch patch =
         JsonUtils.getJsonPatch(orginalUser, updatedUser.withLastLoginTime(lastLoginTime));
@@ -550,6 +554,9 @@ public class UserRepository extends EntityRepository<User> {
   }
 
   public void initializeUsers(OpenMetadataApplicationConfig config) {
+    if (PortalConfiguration.isActive()) {
+      return;
+    }
     AuthProvider authProvider = SecurityConfigurationManager.getCurrentAuthConfig().getProvider();
     // Create Admins
     Set<String> adminUsers =

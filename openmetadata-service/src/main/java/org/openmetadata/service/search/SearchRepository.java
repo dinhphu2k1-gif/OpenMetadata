@@ -723,7 +723,11 @@ public class SearchRepository {
   }
 
   private static final Map<String, Set<String>> RBAC_CHILD_TYPES =
-      Map.of(Entity.TABLE, Set.of(Entity.TABLE_COLUMN));
+      Map.of(
+          Entity.TABLE,
+          Set.of(Entity.TABLE_COLUMN),
+          Entity.GLOSSARY_TERM,
+          Set.of("glossaryTermPublished"));
 
   public List<String> getChildIndexAliases(String entityType) {
     Set<String> rbacChildren = RBAC_CHILD_TYPES.getOrDefault(entityType, Set.of());

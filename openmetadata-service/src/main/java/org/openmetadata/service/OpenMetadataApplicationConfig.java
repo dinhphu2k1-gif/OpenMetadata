@@ -44,6 +44,7 @@ import org.openmetadata.service.config.BulkOperationConfiguration;
 import org.openmetadata.service.config.CacheConfiguration;
 import org.openmetadata.service.config.OMWebConfiguration;
 import org.openmetadata.service.config.ObjectStorageConfiguration;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.config.QoSConfiguration;
 import org.openmetadata.service.jdbi3.HikariCPDataSourceFactory;
 import org.openmetadata.service.migration.MigrationConfiguration;
@@ -215,6 +216,16 @@ public class OpenMetadataApplicationConfig extends Configuration {
   @JsonProperty("cacheMemory")
   @Valid
   private CacheConfiguration cacheMemoryConfiguration = new CacheConfiguration();
+
+  @JsonProperty("portal")
+  private PortalConfiguration portalConfiguration = new PortalConfiguration();
+
+  public PortalConfiguration getPortalConfiguration() {
+    if (portalConfiguration == null) {
+      portalConfiguration = new PortalConfiguration();
+    }
+    return portalConfiguration;
+  }
 
   public QoSConfiguration getQosConfiguration() {
     if (qosConfiguration == null) {

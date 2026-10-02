@@ -116,10 +116,12 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
   @Override
   public void initialize(OpenMetadataApplicationConfig config) throws IOException {
     super.initialize(config);
-    DataDictionaryBootstrap.initialize();
-    DataQualityBootstrap.initialize();
-    TechnicalDictionaryBootstrap.initialize();
-    versioningService.processPendingOutbox();
+    if (!config.getPortalConfiguration().isEnabled()) {
+      DataDictionaryBootstrap.initialize();
+      DataQualityBootstrap.initialize();
+      TechnicalDictionaryBootstrap.initialize();
+      versioningService.processPendingOutbox();
+    }
   }
 
   @GET

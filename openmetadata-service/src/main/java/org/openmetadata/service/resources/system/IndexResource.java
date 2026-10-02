@@ -27,8 +27,10 @@ public class IndexResource {
   private static volatile String configuredBasePath = "/";
 
   public static void initialize(OpenMetadataApplicationConfig catalogConfig) {
+    String indexPath =
+        catalogConfig.getPortalConfiguration().getAssetResourcePath() + "/index.html";
     String rawIndexHtml;
-    try (InputStream inputStream = IndexResource.class.getResourceAsStream("/assets/index.html")) {
+    try (InputStream inputStream = IndexResource.class.getResourceAsStream(indexPath)) {
       if (inputStream == null) {
         LOG.warn("UI assets not found on classpath. Running in no-ui mode.");
         return;
@@ -38,7 +40,7 @@ public class IndexResource {
               .lines()
               .collect(Collectors.joining("\n"));
     } catch (IOException e) {
-      throw new IllegalStateException("Failed to load /assets/index.html", e);
+      throw new IllegalStateException("Failed to load " + indexPath, e);
     }
 
     String basePath = catalogConfig.getBasePath();

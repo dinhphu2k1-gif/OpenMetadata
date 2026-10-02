@@ -92,4 +92,18 @@ describe('Web Analytics utils', () => {
 
     expect(postWebAnalyticEvent).not.toHaveBeenCalled();
   });
+
+  it('the Portal analytic instance should not send page views', async () => {
+    jest.resetModules();
+    jest.doMock('./PortalMode', () => ({ IS_PORTAL_MODE: true }));
+    const portalUtils = await import('./WebAnalyticsUtils');
+    const portalApi = await import('./../rest/WebAnalyticsAPI');
+
+    const instance = portalUtils.getAnalyticInstance(userId);
+    await instance.page();
+
+    expect(portalApi.postWebAnalyticEvent).not.toHaveBeenCalled();
+
+    jest.dontMock('./PortalMode');
+  });
 });

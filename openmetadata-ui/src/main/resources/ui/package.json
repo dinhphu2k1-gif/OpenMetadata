@@ -13,7 +13,9 @@
   },
   "scripts": {
     "start": "vite",
+    "start:portal": "VITE_APP_MODE=portal vite",
     "build": "NODE_OPTIONS=\"${NODE_OPTIONS:---max-old-space-size=6144}\" vite build",
+    "build:portal": "VITE_APP_MODE=portal NODE_OPTIONS=\"${NODE_OPTIONS:---max-old-space-size=6144}\" vite build",
     "preview": "vite preview",
     "postinstall": "yarn run build-check",
     "preinstall": "cd ../../../../.. && yarn install --frozen-lockfile && cd openmetadata-ui-core-components/src/main/resources/ui && yarn install && yarn build",

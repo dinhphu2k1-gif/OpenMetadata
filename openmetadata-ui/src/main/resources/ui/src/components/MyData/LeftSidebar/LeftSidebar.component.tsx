@@ -29,6 +29,7 @@ import useCustomLocation from '../../../hooks/useCustomLocation/useCustomLocatio
 import { useSidebarItems } from '../../../hooks/useSidebarItems';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { isNonAdminPersona } from '../../../utils/Persona/BasicConsumerNavigation';
+import { IS_PORTAL_MODE } from '../../../utils/PortalMode';
 import { useAuthProvider } from '../../Auth/AuthProviders/AuthProvider';
 import BrandImage from '../../common/BrandImage/BrandImage';
 import './left-sidebar.less';
@@ -71,7 +72,7 @@ const LeftSidebar = () => {
 
   const lowerSidebarItems = useMemo(
     () =>
-      isNonAdminPersona(selectedPersona)
+      IS_PORTAL_MODE || isNonAdminPersona(selectedPersona)
         ? [LOGOUT_ITEM]
         : [SETTING_ITEM, LOGOUT_ITEM],
     [selectedPersona]

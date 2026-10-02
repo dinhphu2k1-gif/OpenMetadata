@@ -654,6 +654,10 @@ health:
         failureAttempts: 2
         successAttempts: 1
 
+# Portal mode runs this server as the read-only Portal service with the Portal UI build
+portal:
+  enabled: ${OM_PORTAL_ENABLED:-false}
+
 limits:
   enable: ${LIMITS_ENABLED:-false}
   className: ${LIMITS_CLASS_NAME:-"org.openmetadata.service.limits.DefaultLimits"}

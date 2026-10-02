@@ -86,6 +86,10 @@
         <targetPath>assets</targetPath>
       </resource>
       <resource>
+        <directory>src/main/resources/ui/dist-portal</directory>
+        <targetPath>portal-assets</targetPath>
+      </resource>
+      <resource>
         <directory>src/main/resources/json/data</directory>
       </resource>
     </resources>
@@ -182,6 +186,37 @@
               <resources>
                 <resource>
                   <directory>src/main/resources/ui/dist</directory>
+                  <filtering>true</filtering>
+                </resource>
+              </resources>
+              <nonFilteredFileExtensions>
+                <nonFilteredFileExtension>gz</nonFilteredFileExtension>
+                <nonFilteredFileExtension>br</nonFilteredFileExtension>
+                <nonFilteredFileExtension>woff</nonFilteredFileExtension>
+                <nonFilteredFileExtension>woff2</nonFilteredFileExtension>
+                <nonFilteredFileExtension>ttf</nonFilteredFileExtension>
+                <nonFilteredFileExtension>eot</nonFilteredFileExtension>
+                <nonFilteredFileExtension>svg</nonFilteredFileExtension>
+                <nonFilteredFileExtension>png</nonFilteredFileExtension>
+                <nonFilteredFileExtension>webp</nonFilteredFileExtension>
+                <nonFilteredFileExtension>jpg</nonFilteredFileExtension>
+                <nonFilteredFileExtension>jpeg</nonFilteredFileExtension>
+                <nonFilteredFileExtension>js</nonFilteredFileExtension>
+                <nonFilteredFileExtension>css</nonFilteredFileExtension>
+              </nonFilteredFileExtensions>
+            </configuration>
+          </execution>
+          <execution>
+            <id>copy-portal-resources</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${basedir}/target/classes/portal-assets</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources/ui/dist-portal</directory>
                   <filtering>true</filtering>
                 </resource>
               </resources>

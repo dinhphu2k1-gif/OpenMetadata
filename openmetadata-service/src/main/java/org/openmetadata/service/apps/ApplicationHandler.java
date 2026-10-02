@@ -27,6 +27,7 @@ import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.apps.scheduler.AppScheduler;
 import org.openmetadata.service.cache.CacheBundle;
 import org.openmetadata.service.cache.CacheConfig;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.events.scheduled.EventSubscriptionScheduler;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.jdbi3.AppMarketPlaceRepository;
@@ -124,6 +125,9 @@ public class ApplicationHandler {
   }
 
   public void cleanupStaleJobs() {
+    if (PortalConfiguration.isActive()) {
+      return;
+    }
     try {
       LOG.info("Cleaning up stale application jobs from previous server runs");
       CollectionDAO.AppExtensionTimeSeries dao =

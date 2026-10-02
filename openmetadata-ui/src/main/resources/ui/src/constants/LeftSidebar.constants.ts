@@ -202,6 +202,27 @@ export const SIDEBAR_LIST: Array<LeftSidebarItem> = [
   },
 ];
 
+// The Portal shows the menu that the BasicConsumerPersona navigation shows in OpenMetadata.
+const PORTAL_MENU: Record<string, string[]> = {
+  [ROUTES.MY_DATA]: [],
+  [ROUTES.EXPLORE]: [],
+  [ROUTES.DATA_MARKETPLACE_SECTION]: [ROUTES.DOMAIN],
+  governance: [ROUTES.DATA_DICTIONARY],
+};
+
+export const PORTAL_SIDEBAR_LIST: Array<LeftSidebarItem> = SIDEBAR_LIST.filter(
+  (item) => item.key in PORTAL_MENU
+).map((item) =>
+  item.children
+    ? {
+        ...item,
+        children: item.children.filter((child) =>
+          PORTAL_MENU[item.key].includes(child.key)
+        ),
+      }
+    : item
+);
+
 export const SETTING_ITEM = {
   key: ROUTES.SETTINGS,
   title: 'label.setting-plural',

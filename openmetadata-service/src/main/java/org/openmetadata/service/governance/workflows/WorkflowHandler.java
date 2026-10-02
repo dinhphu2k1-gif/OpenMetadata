@@ -76,6 +76,8 @@ public class WorkflowHandler {
   private static WorkflowHandler instance;
   @Getter private static volatile boolean initialized = false;
   private final boolean isMigrationContext;
+  // False in migration and in the read-only Portal: neither may run or clean up workflow jobs
+  private final boolean runsJobs;
 
   private static final String CONNECTION_VALIDATION_QUERY = "SELECT 1";
 
@@ -86,6 +88,7 @@ public class WorkflowHandler {
 
   private WorkflowHandler(OpenMetadataApplicationConfig config, boolean isMigrationContext) {
     this.isMigrationContext = isMigrationContext;
+    this.runsJobs = !isMigrationContext && !config.getPortalConfiguration().isEnabled();
     StandaloneProcessEngineConfiguration processEngineConfiguration =
         new StandaloneProcessEngineConfiguration();
     processEngineConfiguration.setJdbcUrl(config.getDataSourceFactory().getUrl());
@@ -194,7 +197,7 @@ public class WorkflowHandler {
         isMigrationContext
             ? ProcessEngineConfiguration.DB_SCHEMA_UPDATE_TRUE
             : ProcessEngineConfiguration.DB_SCHEMA_UPDATE_FALSE);
-    processEngineConfiguration.setAsyncExecutorActivate(!isMigrationContext);
+    processEngineConfiguration.setAsyncExecutorActivate(runsJobs);
     processEngineConfiguration.setAsyncExecutorCorePoolSize(
         workflowSettings.getExecutorConfiguration().getCorePoolSize());
     processEngineConfiguration.setAsyncExecutorMaxPoolSize(
@@ -210,7 +213,7 @@ public class WorkflowHandler {
     processEngineConfiguration.setAsyncExecutorDefaultTimerJobAcquireWaitTime(
         workflowSettings.getExecutorConfiguration().getTimerJobAcquisitionInterval());
     processEngineConfiguration.setAsyncHistoryEnabled(true);
-    processEngineConfiguration.setEnableHistoryCleaning(!isMigrationContext);
+    processEngineConfiguration.setEnableHistoryCleaning(runsJobs);
     processEngineConfiguration.setCleanInstancesEndedAfter(
         Duration.ofDays(
             workflowSettings.getHistoryCleanUpConfiguration().getCleanAfterNumberOfDays()));
