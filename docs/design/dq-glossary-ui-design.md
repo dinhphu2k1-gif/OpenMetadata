@@ -55,8 +55,7 @@ Khác biệt giữa thiết kế và hiện trạng cần được xử lý ho�
 ### 2.2. Ngoài phạm vi
 
 - Không thay thế module Data Quality/Observability gốc của OpenMetadata dùng `TestDefinition`, `TestCase`, test result và dashboard.
-- Không thực thi SQL, profiling hoặc scheduler từ danh mục quy tắc này trong pha đầu.
-- Không tự động tạo `TestCase` từ DQ Rule; đây là integration phase riêng.
+- Khai báo kiểm thử trên DQ Rule, tự sinh `TestCase` lên các Column gắn CDE, lịch chạy và tổng hợp kết quả theo Rule/CDE thuộc [Thiết kế Kiểm thử theo Quy tắc CLDL](./dq-rule-test-execution-design.md).
 - Không cho người dùng tạo thêm glossary cùng profile hoặc đổi technical name của glossary hệ thống.
 
 ### 2.3. Tránh nhầm lẫn khái niệm

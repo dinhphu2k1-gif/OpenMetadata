@@ -102,7 +102,10 @@ public final class DataDictionaryResolver {
     if (create.getParent() != null) {
       throw new BadRequestException("A CDE must be a direct child of the Data Dictionary");
     }
-    rejectUnsupportedCreateField("provider", create.getProvider() != null);
+    rejectUnsupportedCreateField(
+        "provider",
+        create.getProvider() != null
+            && create.getProvider() != org.openmetadata.schema.type.ProviderType.USER);
     rejectUnsupportedCreateField("style", create.getStyle() != null);
     rejectUnsupportedCreateField(
         "synonyms", create.getSynonyms() != null && !create.getSynonyms().isEmpty());

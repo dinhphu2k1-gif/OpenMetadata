@@ -308,7 +308,7 @@ describe('Test Glossary-term component', () => {
     expect(screen.queryByText('GenericTab')).not.toBeInTheDocument();
   });
 
-  it('should only show Overview and Assets tabs for CDE when user is not admin', async () => {
+  it('should show Overview, Assets and Data Observability tabs for CDE when user is not admin', async () => {
     (useApplicationStore as unknown as jest.Mock).mockReturnValue({
       currentUser: { isAdmin: false },
     });
@@ -326,10 +326,11 @@ describe('Test Glossary-term component', () => {
 
     const tabs = await screen.findAllByRole('tab');
 
-    expect(tabs).toHaveLength(2);
+    expect(tabs).toHaveLength(3);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',
       'label.asset-plural0',
+      'label.data-observability',
     ]);
   });
 
@@ -390,7 +391,7 @@ describe('Test Glossary-term component', () => {
     );
   });
 
-  it('should only show Overview and Assets tabs for Data Quality when user is not admin', async () => {
+  it('should show Overview, Assets and Data Observability tabs for Data Quality when user is not admin', async () => {
     (useApplicationStore as unknown as jest.Mock).mockReturnValue({
       currentUser: { isAdmin: false },
     });
@@ -408,10 +409,11 @@ describe('Test Glossary-term component', () => {
 
     const tabs = await screen.findAllByRole('tab');
 
-    expect(tabs).toHaveLength(2);
+    expect(tabs).toHaveLength(3);
     expect(tabs.map((tab) => tab.textContent)).toStrictEqual([
       'label.overview',
       'label.asset-plural0',
+      'label.data-observability',
     ]);
   });
 

@@ -86,7 +86,6 @@ export const CDE_RESTRICTED_TABS = new Set([
   EntityTabs.GLOSSARY_TERMS,
   EntityTabs.ACTIVITY_FEED,
   EntityTabs.CUSTOM_PROPERTIES,
-  EntityTabs.DATA_OBSERVABILITY,
 ]);
 
 const GlossaryTermsV1 = ({

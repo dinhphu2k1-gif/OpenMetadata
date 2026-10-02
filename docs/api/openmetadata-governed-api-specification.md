@@ -93,14 +93,14 @@ flowchart TD
   Authorization: Bearer <JWT_ACCESS_TOKEN>
   ```
 - **Vai trò người dùng (5 Roles chuẩn của hệ thống Agribank Metadata):**
-  1. `BASIC_CONSUMER` (Người dùng cơ bản): Quyền tối thiểu, chỉ được phép tra cứu và đọc (`GET`) các bản ghi đã được phê duyệt (`Approved` - Published snapshot) và các bản ghi lưu trữ lịch sử (`Archived`). Không xem được bản nháp (`Draft`), đang xem xét (`In Review`), từ chối (`Rejected`) và không có quyền export nâng cao.
-  2. `DATA_CONSUMER` (Người tiêu thụ / khai thác dữ liệu): Khai thác nội dung đã được phê duyệt (`Approved`) và lịch sử (`Archived`), có toàn quyền tra cứu, tìm kiếm, lọc dữ liệu và xuất dữ liệu (`Export`) ra Excel. Không xem được bản ghi đang trong chu trình soạn thảo (`Draft/In Review/Rejected`).
-  3. `DATA_PROPOSER` (Người đề xuất - Maker): Soạn thảo dữ liệu, có quyền tạo mới bản ghi (`Draft` $N.0$), nâng phiên bản ($N.MINOR$), chỉnh sửa lưu nháp tại chỗ (`Save Draft`), gửi thẩm định (`Submit`), mở lại bản nháp sau từ chối (`Reopen`) và Import dữ liệu hàng loạt vào Draft theo policy.
-  4. `DATA_STEWARD` (Quản trị viên nghiệp vụ dữ liệu - Checker/Approver): Thẩm định và kiểm soát chất lượng dữ liệu, có quyền phê duyệt ban hành (`Approve`), từ chối thẩm định (`Reject`) các bản ghi đang xem xét (`In Review`), hoặc thu hồi phê duyệt theo thẩm quyền. Mặc định không trực tiếp tạo mới hoặc chỉnh sửa nội dung bản nháp của Maker.
+  1. `BasicConsumer` (Người dùng cơ bản): Quyền tối thiểu, chỉ được phép tra cứu và đọc (`GET`) các bản ghi đã được phê duyệt (`Approved` - Published snapshot) và các bản ghi lưu trữ lịch sử (`Archived`). Không xem được bản nháp (`Draft`), đang xem xét (`In Review`), từ chối (`Rejected`) và không có quyền export nâng cao.
+  2. `DataConsumer` (Người tiêu thụ / khai thác dữ liệu): Khai thác nội dung đã được phê duyệt (`Approved`) và lịch sử (`Archived`), có toàn quyền tra cứu, tìm kiếm, lọc dữ liệu và xuất dữ liệu (`Export`) ra Excel. Không xem được bản ghi đang trong chu trình soạn thảo (`Draft/In Review/Rejected`).
+  3. `DataProposer` (Người đề xuất - Maker): Soạn thảo dữ liệu, có quyền tạo mới bản ghi (`Draft` $N.0$), nâng phiên bản ($N.MINOR$), chỉnh sửa lưu nháp tại chỗ (`Save Draft`), gửi thẩm định (`Submit`), mở lại bản nháp sau từ chối (`Reopen`) và Import dữ liệu hàng loạt vào Draft theo policy.
+  4. `DataSteward` (Quản trị viên nghiệp vụ dữ liệu - Checker/Approver): Thẩm định và kiểm soát chất lượng dữ liệu, có quyền phê duyệt ban hành (`Approve`), từ chối thẩm định (`Reject`) các bản ghi đang xem xét (`In Review`), hoặc thu hồi phê duyệt theo thẩm quyền. Mặc định không trực tiếp tạo mới hoặc chỉnh sửa nội dung bản nháp của Maker.
   5. `Admin` (Quản trị viên hệ thống - Administrator): Toàn quyền quản trị trên toàn bộ hệ thống, khởi tạo Scope mới, liên kết binding scope, kích hoạt Cutover toàn hệ thống, quản lý phân quyền và xử lý ngoại lệ.
 
 #### Bảng Ma trận Quyền hạn và Phạm vi Dữ liệu theo 5 Role:
-| Nội dung / Thao tác | BASIC_CONSUMER | DATA_CONSUMER | DATA_PROPOSER (Maker) | DATA_STEWARD (Checker) | Admin |
+| Nội dung / Thao tác | BasicConsumer | DataConsumer | DataProposer (Maker) | DataSteward (Checker) | Admin |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Xem bản Approved mới nhất** | ✅ Có | ✅ Có | ✅ Có | ✅ Có | ✅ Có |
 | **Xem bản Archived (Lịch sử)** | ✅ Có (Chỉ đọc) | ✅ Có (Chỉ đọc) | ✅ Có | ✅ Có | ✅ Có |
@@ -118,7 +118,7 @@ flowchart TD
 | **Tạo Scope & Phê duyệt Cutover** | ❌ Không | ❌ Không | ❌ Không | ❌ Không | ✅ Có |
 
 > [!NOTE]
-> **Quy tắc phân loại Consumer-only:** Người dùng chỉ bị áp dụng cơ chế giới hạn "chỉ thấy Approved" (`Consumer-only`) khi quyền hiệu lực thỏa mãn: `canViewPublished = true` VÀ `canViewWorking = false`. Nếu một người dùng mang role `BASIC_CONSUMER` hoặc `DATA_CONSUMER` nhưng đồng thời là Chủ sở hữu (Owner) của bản ghi hoặc được phân công thẩm định thì hệ thống vẫn cấp quyền truy cập bản nháp theo chính sách hiệu lực.
+> **Quy tắc phân loại Consumer-only:** Người dùng chỉ bị áp dụng cơ chế giới hạn "chỉ thấy Approved" (`Consumer-only`) khi quyền hiệu lực thỏa mãn: `canViewPublished = true` VÀ `canViewWorking = false`. Nếu một người dùng mang role `BasicConsumer` hoặc `DataConsumer` nhưng đồng thời là Chủ sở hữu (Owner) của bản ghi hoặc được phân công thẩm định thì hệ thống vẫn cấp quyền truy cập bản nháp theo chính sách hiệu lực.
 
 
 ### 2.2. Kiểm soát đồng thời bằng Khóa lạc quan (Optimistic Locking)
@@ -151,9 +151,15 @@ Các lỗi nền tảng/validation kế thừa OpenMetadata có thể dùng enve
 | **403 Forbidden** | `PERMISSION_DENIED` | Người dùng không đủ quyền thực hiện thao tác (Maker duyệt bài, Consumer xem Draft). |
 | **404 Not Found** | `ENTITY_NOT_FOUND` | Không tìm thấy entity, hoặc bản ghi ở trạng thái người dùng không có quyền nhìn thấy. |
 | **409 Conflict** | `OPTIMISTIC_LOCK_CONFLICT` / `DUPLICATE_KEY` | Xung đột phiên bản khóa lạc quan hoặc trùng lặp mã duy nhất trong cùng Scope. |
-| **413 Payload Too Large** | `FILE_SIZE_EXCEEDED` | File tải lên vượt quá giới hạn tối đa cho phép (ví dụ file Import > 5MB). |
+| **413 Payload Too Large** | `FILE_SIZE_EXCEEDED` | File tải lên vượt giới hạn: CDE import tối đa 5 MiB/5.000 dòng; Technical Dictionary import tối đa 20 MiB/70.000 dòng. |
 | **503 Service Unavailable** | `TD_INDEX_UNAVAILABLE` | Search index riêng của Từ điển kỹ thuật không sẵn sàng; không tự động fallback sang truy vấn toàn bộ PostgreSQL. |
 | **500 Internal Error** | `INTERNAL_SERVER_ERROR` | Lỗi máy chủ nội bộ không mong muốn. Không để lộ stack trace ra client. |
+
+### 2.5. Phạm vi danh mục API as-built
+
+Danh mục tại các mục 3-5 đã được đối chiếu với JAX-RS resource hiện tại (`GlossaryResource`, `GlossaryTermResource`, `TechnicalDictionaryResource`, `TechnicalDictionaryImportResource`) và Swagger được build từ source. Đây là contract tích hợp cho ba phân hệ governed, không phải bản sao toàn bộ API glossary upstream của OpenMetadata.
+
+Một số route upstream vẫn xuất hiện trong Swagger nhưng không thuộc contract này. Đặc biệt, direct `PATCH /glossaries/{id}`, direct `PATCH /glossaryTerms/{id}`, `PUT` upsert và native bulk create bị backend từ chối đối với luồng governed; client phải dùng `/working`, workflow hoặc import nguyên tử được mô tả trong tài liệu. Các API native history, vote, relation, move, delete/restore và CSV upstream chỉ được dùng khi có đặc tả nghiệp vụ riêng, không được suy ra là API của ba phân hệ này chỉ vì route xuất hiện trong Swagger.
 
 ---
 
@@ -183,13 +189,15 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 
 #### API 3.1.1: Lấy danh sách Từ điển dữ liệu (Sidebar/List)
 - **Method & Endpoint:** `GET /api/v1/glossaries`
-- **Mô tả:** Lấy danh sách Từ điển dữ liệu cho cây thư mục/panel trái.
+- **Mô tả:** Backend hiện chỉ trả hai governed glossary `Data Dictionary` và `Data Quality`; glossary `Technical Dictionary` không nằm trong danh sách này.
 - **Query Parameters:**
   - `fields` (string, tùy chọn): Danh sách trường quan hệ cần nạp (ví dụ: `owners,tags,reviewers`).
-  - `limit` (integer, mặc định `25`): Số lượng bản ghi mỗi trang.
+  - `limit` (integer, mặc định `10`, miền kiểm tra hiện tại `0..1.000.000`): Số lượng bản ghi mỗi trang.
+  - `before`, `after` (string, tùy chọn): Cursor phân trang; không dùng `offset` tại endpoint này.
+  - `include` (string, mặc định `non-deleted`): `all`, `deleted` hoặc `non-deleted`.
 - **Quy tắc phân quyền:**
   - `Consumer-only`: Chỉ trả về thực thể nếu có bản ghi `Approved`. Nếu chỉ có bản `Draft`, trả về danh sách rỗng.
-  - Các role khác: Trả về thực thể kèm bản ghi nháp hiện hành.
+  - User có `canViewWorking=true`: Trả về thực thể kèm bản ghi nháp hiện hành trong phạm vi được cấp.
 - **Mẫu Request:**
   ```http
   GET /api/v1/glossaries?fields=owners,tags HTTP/1.1
@@ -227,9 +235,11 @@ giá trị lưu trữ nội bộ không phải contract công khai.
 ---
 
 #### API 3.1.2: Lấy chi tiết Từ điển theo FQN
-- **Method & Endpoint:** `GET /api/v1/glossaries/name/{glossaryFqn}`
+- **Method & Endpoint theo FQN:** `GET /api/v1/glossaries/name/{glossaryFqn}`
+- **Endpoint tương đương theo ID:** `GET /api/v1/glossaries/{id}`
 - **Path Parameters:**
   - `glossaryFqn` (string): FQN của Từ điển dữ liệu (ví dụ: `Data Dictionary`).
+  - `id` (UUID): ID identity của governed glossary khi dùng endpoint theo ID.
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
@@ -371,10 +381,10 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 - **Endpoint tạo version kế tiếp:** `POST /api/v1/glossaries/{id}/working` với body `{"businessVersion":"N+1"}`.
 - **Path Actions:**
   - `submit`: Gửi thẩm định toàn bộ Scope từ điển (`Draft` $\rightarrow$ `In Review`).
-  - `approve`: Trong một transaction, phê duyệt toàn bộ working record thuộc đúng scope
-    (không phụ thuộc record đang `Draft`, `In Review` hay `Rejected`), tạo manifest, rồi phê duyệt
-    catalog và kích hoạt Cutover (`In Review` $\rightarrow$ `Approved`). Áp dụng thống nhất cho
-    Từ điển dữ liệu dùng chung, Chất lượng dữ liệu và Từ điển kỹ thuật.
+  - `approve`: Glossary working bắt buộc đang `In Review`. Trong một transaction, backend phát hành
+    toàn bộ working term thuộc đúng glossary/scope (không kiểm tra trạng thái riêng của từng term),
+    tạo manifest và phát hành glossary. Khi glossary là `Data Dictionary`, transaction đồng thời
+    chụp/reset Từ điển kỹ thuật theo mục 5.6; thao tác này không phải phê duyệt từng record kỹ thuật.
   - `reject`: Từ chối thẩm định (`In Review` $\rightarrow$ `Rejected`).
   - `reopen`: Mở lại bản nháp để chỉnh sửa (`Rejected` $\rightarrow$ `Draft`).
 - **Mẫu Request (Approve Cutover):**
@@ -392,9 +402,24 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
     "id": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
     "businessVersion": "2",
     "entityStatus": "Approved",
-    "message": "Cutover thành công. Phiên bản 2 đã trở thành phiên bản hoạt động chính thức."
+    "snapshotId": "3b581a70-c52d-4c35-9df9-e038d4971515",
+    "publicationSequence": 2,
+    "publishedAt": 1790661300000,
+    "publishedBy": "checker@example.com"
   }
   ```
+
+---
+
+#### API 3.1.10: Danh sách term trong snapshot và thu hồi bản phát hành
+
+```http
+GET  /api/v1/glossaries/{id}/published/{businessVersion}/terms
+POST /api/v1/glossaries/{id}/published/latest/archive
+```
+
+- `GET .../terms` trả trực tiếp JSON array các revision term thuộc manifest của snapshot glossary. Với snapshot mới nhất chưa archive và actor không phải consumer-only, backend còn ghép các working term cùng scope vào kết quả.
+- `POST .../archive` không có request body. Endpoint yêu cầu `canArchive=true`, archive bản published mới nhất và tạo lại một working record trạng thái `Rejected` để sửa đổi. Ma trận nghiệp vụ nguồn không mặc nhiên cấp thao tác này; chỉ sử dụng khi quyền thu hồi được phê duyệt riêng.
 
 ---
 
@@ -404,8 +429,8 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 | STT | Tên trường API | Tên hiển thị tiếng Việt | Kiểu dữ liệu | Bắt buộc | Mô tả & Ràng buộc giá trị |
 | :---: | :--- | :--- | :--- | :---: | :--- |
 | 1 | `name` | Mã CDE | `string` | **Có** | Mã định danh duy nhất (ví dụ: `CDE_CUST_ID`). Không dấu, không khoảng trắng. |
-| 2 | `domain` | Khối / Miền nghiệp vụ | `EntityReference` | Không | Liên kết tới Domain phân cấp trong hệ thống. |
-| 3 | `displayName` | Tên thuật ngữ nghiệp vụ | `string` | **Có** | Tên chuẩn hóa tiếng Việt (ví dụ: `Mã khách hàng`). |
+| 2 | `domains` | Khối / Miền nghiệp vụ | `Array<string>` khi create; `Array<EntityReference>` khi đọc/cập nhật | Không | Danh sách Domain phân cấp trong hệ thống. |
+| 3 | `displayName` | Tên thuật ngữ nghiệp vụ | `string` | Không theo JSON Schema hiện tại | Tên chuẩn hóa tiếng Việt (ví dụ: `Mã khách hàng`). |
 | 4 | `tags` (Data Source) | Hệ thống nguồn | `Array<Tag>` | Không | Tag thuộc Classification `DataSource` (ví dụ: `CoreBanking`). |
 | 5 | `description` | Ý nghĩa nghiệp vụ | `markdown` | **Có** | Định nghĩa chi tiết ý nghĩa và mục đích sử dụng. |
 | 6 | `extension.entityRelationship` | Mối quan hệ với thực thể | `markdown` | Không | Quan hệ liên kết logic giữa thực thể CDE với các đối tượng dữ liệu khác. |
@@ -413,12 +438,14 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 | 8 | `tags` (Classification) | Phân loại dữ liệu | `Array<Tag>` | Không | Nhãn bảo mật (Công khai, Nội bộ, Bảo mật, Tối mật). |
 | 9 | `tags` (Personal Data) | Dữ liệu cá nhân | `Array<Tag>` | Không | Phân loại dữ liệu định danh khách hàng (PII). |
 | 10 | `extension.relatedRegulatoryDocuments` | Văn bản quy định liên quan | `markdown` | Không | Căn cứ văn bản, luật định, thông tư của NHNN hoặc nội bộ ban hành. |
-| 11 | `extension.dataQualityRules` | Quy định chất lượng dữ liệu | `Array<string>` | **Có** | Danh sách 1 giá trị: `["Y"]` (Có) hoặc `["N"]` (Không). |
-| 12 | `businessVersion` | Phiên bản | `string` | **Có** | Số hiệu phiên bản nghiệp vụ dạng `$N.MINOR$` (ví dụ: `1.0`, `1.1`). |
+| 11 | `extension.dataQualityRules` | Quy định chất lượng dữ liệu | `Array<string>` | Không theo JSON Schema hiện tại | Danh sách 1 giá trị: `["Y"]` (Có) hoặc `["N"]` (Không). |
+| 12 | `businessVersion` | Phiên bản | `string` | **Auto** khi tạo CDE đầu tiên; bắt buộc ở API tạo minor | Số hiệu phiên bản nghiệp vụ dạng `$N.MINOR$` (ví dụ: `1.0`, `1.1`). |
 | 13 | `extension.releaseVersionType` | Loại phiên bản phát hành | `Array<string>` | **Auto** | Hệ thống tự tính: `Bản chính` nếu là `$N.0$`, `Bản phụ` nếu `$N.MINOR$` ($MINOR \ge 1$). |
-| 14 | `extension.releaseLevel` | Cấp phát hành | `Array<string>` | **Có** | Danh sách một giá trị: `CEO` (Tổng Giám đốc) hoặc `TTQLDL` (Trung tâm QLDL). |
+| 14 | `extension.releaseLevel` | Cấp phát hành | `Array<string>` | Không theo JSON Schema hiện tại | Danh sách một giá trị: `CEO` (Tổng Giám đốc) hoặc `TTQLDL` (Trung tâm QLDL). |
 | 15 | `extension.effectiveDate` | Ngày hiệu lực | `string (date)` | Không | Định dạng chuẩn `yyyy-MM-dd`. |
 | 16 | `extension.expirationDate` | Ngày hết hiệu lực | `string (date)` | Không | Định dạng `yyyy-MM-dd`. Ràng buộc: $\ge$ `effectiveDate`. |
+
+Ngoài 16 thuộc tính nghiệp vụ trên, `POST /glossaryTerms` bắt buộc có `glossary`, `name`, `description`, `parentBusinessVersion`. Client không gửi `businessVersion` khi tạo CDE đầu tiên; backend sinh phiên bản `$N.0$`. Các trường được nghiệp vụ yêu cầu nhưng JSON Schema chưa đánh dấu bắt buộc phải được coi là khoảng trống validation cần xử lý, không được mô tả là backend đã cưỡng chế.
 
 ---
 
@@ -427,7 +454,7 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 - **Query Parameters:**
   - `glossary` (UUID, bắt buộc): ID Từ điển.
   - `parentBusinessVersion` (string, bắt buộc): Scope kỳ quản trị (ví dụ: `1`, `2`).
-  - `limit` (integer, mặc định `25`), `offset` (integer, mặc định `0`).
+  - `limit` (integer, mặc định `10`, chỉ nhận `10`, `15`, `25`, `50`), `offset` (integer, mặc định `0`, phải `>= 0`).
 - **Mẫu Phản hồi (200 OK):**
   ```json
   {
@@ -471,7 +498,7 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 
 #### API 3.2.2: Tìm kiếm và Lọc CDE theo đa tiêu chí (Authoritative Search & Filter)
 - **Method & Endpoint:** `GET /api/v1/glossaryTerms/search`
-- **Query Parameters:** `glossary`, `parentBusinessVersion`, `q`, `statuses`, `domainIds`, `ownerIds`, `limit`, `offset`.
+- **Query Parameters:** `glossary`, `parentBusinessVersion`, `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`, `limit`, `offset`. `limit` mặc định `50` và chỉ nhận `10`, `15`, `25`, `50`; `offset` mặc định `0`.
 - **Mẫu Phản hồi (200 OK):** Cùng định dạng với API 3.2.1.
 
 ---
@@ -632,6 +659,7 @@ Không dùng scoped FQN trong response để lookup identity. Deep link cần ve
 #### API 3.2.10: Chuyển trạng thái Workflow CDE (Maker - Checker)
 - **Method & Endpoint:** `POST /api/v1/glossaryTerms/{id}/working/{action}?parentBusinessVersion={N}`
 - **Path Actions:** `submit`, `approve`, `reject`, `reopen`.
+- **Lưu ý phân quyền:** `reject` và `reopen` tồn tại trong runtime nhưng không được ma trận nghiệp vụ nguồn mặc nhiên cấp; chỉ bật khi có phê duyệt nghiệp vụ/policy riêng.
 - **Mẫu Request Body:**
   ```json
   {"expectedRevision": 2}
@@ -736,6 +764,34 @@ Không dùng scoped FQN trong response để lookup identity. Deep link cần ve
 
 ---
 
+#### API 3.2.13: Latest published, thu hồi và workflow hàng loạt
+
+```http
+GET  /api/v1/glossaryTerms/{id}/published/latest
+POST /api/v1/glossaryTerms/{id}/published/latest/archive
+POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}
+```
+
+- `GET .../published/latest` chỉ áp dụng cho CDE thuộc `Data Dictionary` và trả representation Approved mới nhất.
+- `POST .../archive` không có body, yêu cầu `canArchive=true`; endpoint dùng chung cho governed CDE/DQ Rule và trả working representation trạng thái `Rejected`. Quyền này không được suy ra từ `A` nếu chưa được nghiệp vụ phê duyệt riêng.
+- Bulk workflow dùng cho cả CDE và DQ Rule. Body chọn record bằng `termIds`, `criteria` hoặc kết hợp cả hai:
+
+  ```json
+  {
+    "glossaryId": "e305e5d3-883a-44ba-8ca4-f655848bb21f",
+    "parentBusinessVersion": "2",
+    "termIds": ["c1f7a4e2-623b-4830-a15d-5ff36f2f3981"],
+    "criteria": {"statuses": "Draft", "q": "customer"},
+    "dryRun": false,
+    "offset": 0,
+    "limit": 500
+  }
+  ```
+
+`limit` bulk mặc định `500`, tối đa `1.000`. Mỗi record chạy trong transaction riêng; response báo `matched`, `eligible`, `attempted`, `succeeded`, `failedCount`, `failures`, `remaining`. Đây không phải thao tác nguyên tử toàn lô.
+
+---
+
 ### 3.3. Nhóm API Xuất & Nhập Excel CDE (Export & Import)
 
 #### API 3.3.1: Xuất dữ liệu CDE ra Excel (.xlsx)
@@ -800,7 +856,7 @@ Không dùng scoped FQN trong response để lookup identity. Deep link cần ve
     "parentBusinessVersion": "2"
   }
   ```
-- **Kênh WebSocket tiến độ:** `wss://<host>/api/v1/ws/cdeImportChannel?sessionId={importSessionId}`.
+- **Kênh tiến độ:** kết nối Socket.IO qua path `/api/v1/push/feed` với query `userId={currentUserId}`, sau đó lắng nghe event `cdeImportChannel`. Payload dùng `jobId={importSessionId}` để client lọc đúng phiên import; `cdeImportChannel` là tên event, không phải một WebSocket URL riêng.
 
 ---
 
@@ -832,8 +888,8 @@ Một DQ Rule phải là con trực tiếp của Data Quality Glossary, phải c
 
 | Chức năng | Method và endpoint | Tham số chính |
 | :--- | :--- | :--- |
-| Flat list trong một scope | `GET /api/v1/glossaryTerms` | `glossary={dqGlossaryId}`, `parentBusinessVersion=N`, `limit=10|15|25|50`, `offset>=0` |
-| Tìm kiếm/lọc | `GET /api/v1/glossaryTerms/search` | Các tham số trên cộng `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder` |
+| Flat list trong một scope | `GET /api/v1/glossaryTerms` | `glossary={dqGlossaryId}`, `parentBusinessVersion=N`, `limit=10|15|25|50` (mặc định `10`), `offset>=0` |
+| Tìm kiếm/lọc | `GET /api/v1/glossaryTerms/search` | Các tham số trên cộng `q`, `statuses`, `domainIds`, `ownerIds`, `dataSourceTags`, `classificationTags`, `sortField`, `sortOrder`; `limit` mặc định `50` |
 | Chi tiết hiện hành | `GET /api/v1/glossaryTerms/{id}` | `fields` tùy chọn; trả working nếu có quyền và tồn tại, nếu không trả latest published |
 | Working version | `GET /api/v1/glossaryTerms/{id}/working` | `parentBusinessVersion=N` bắt buộc |
 | Lịch sử published | `GET /api/v1/glossaryTerms/{id}/published` | `parentBusinessVersion=N` để giới hạn scope |
@@ -954,6 +1010,8 @@ Content-Type: application/json
 
 Body chỉ cho phép `expectedRevision >= 1`; `comment` và mọi field khác bị từ chối. State machine hợp lệ: `Draft -> In Review`, `In Review -> Approved|Rejected`, `Rejected -> Draft`.
 
+Workflow hàng loạt dùng endpoint `POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}` và request/response tại API 3.2.13. Runtime hiện có cả `reject` và `reopen`; ma trận nghiệp vụ nguồn chỉ mặc nhiên quy định `W` và `A`, vì vậy quyền từ chối/thu hồi phải được nghiệp vụ phê duyệt riêng trước khi cấp policy.
+
 ### 4.5. Trạng thái import/export DQ hiện tại
 
 As-built chưa có server API chuyên biệt cho DQ import/export. Cụ thể:
@@ -972,14 +1030,33 @@ PostgreSQL (`technical_record`) là nguồn sự thật cho ghi; `technical_dict
 
 ### 5.1. Phân quyền
 
-| Capability | Điều kiện |
+#### 5.1.1. Yêu cầu nghiệp vụ theo ma trận nguồn
+
+Phân hệ này áp dụng nguyên [ma trận phân quyền nghiệp vụ](#211-ma-trận-phân-quyền-nghiệp-vụ): Admin System, Người phê duyệt, Người đề xuất và Người dùng TT QLDL có `R`; Người dùng các ban TSC/Chi nhánh không có quyền truy cập. Chỉ Người đề xuất có `W` và chỉ Người phê duyệt có `A`; Admin System không có `W` hoặc `A`. Dữ liệu do Người đề xuất tạo mới hoặc sửa đổi phải chờ Người phê duyệt phê duyệt trước khi có hiệu lực.
+
+#### 5.1.2. Sai khác của API hiện tại cần xử lý
+
+API Từ điển kỹ thuật hiện là mô hình **không phiên bản, không workflow**: mọi lần `POST`/`PATCH` có hiệu lực ngay và chỉ trả bốn capability `canView`, `canEdit`, `canImport`, `canExport`. Vì vậy API hiện tại **chưa thể đáp ứng** ma trận phân quyền nguồn cho phân hệ này.
+
+| Sai khác | Hành vi hiện tại | Yêu cầu cần đạt trước nghiệm thu |
+| :--- | :--- | :--- |
+| Tách người đề xuất/người phê duyệt | Role `DataSteward` được cấp trực tiếp `canEdit`; không có capability phê duyệt | Bổ sung working state và các capability submit/approve; người phê duyệt không có quyền edit. Reject/archive chỉ bổ sung nếu được nghiệp vụ phê duyệt riêng |
+| Phạm vi Admin System | OpenMetadata Admin có toàn quyền `canEdit` và `canImport` | Role quản trị nghiệp vụ chỉ có `C` đối với tài khoản/phân quyền và `R` đối với Từ điển kỹ thuật; không có `W` hoặc `A` |
+| Phạm vi xem của Các Ban liên quan | `canView` được suy ra từ policy `ViewBasic` trên glossary `Technical Dictionary`; policy consumer dùng chung có thể làm lộ phân hệ | Policy theo phân hệ/tổ chức phải từ chối toàn bộ endpoint Từ điển kỹ thuật đối với user Các Ban liên quan |
+| API `/{cdeId}/technicalAssets` | Endpoint hiện chỉ kiểm tra quyền nhìn thấy CDE qua `versionEntity`, chưa kiểm tra `TechnicalDictionaryAccess.canView` | Bắt buộc kiểm tra thêm quyền xem Từ điển kỹ thuật trước khi trả dữ liệu cột/mapping kỹ thuật |
+| Hiệu lực thay đổi | Lưu là có hiệu lực ngay | Chỉ bản được phê duyệt mới có hiệu lực; bản chờ duyệt không xuất hiện với người chỉ có quyền Vấn tin |
+
+> [!WARNING]
+> Bảng capability hiện tại bên dưới chỉ mô tả runtime để tích hợp và kiểm thử sai khác; không phải ma trận nghiệp vụ được chấp thuận.
+
+| Capability runtime hiện tại | Điều kiện hiện tại |
 | :--- | :--- |
-| `canEdit` | Admin, role `DATA_STEWARD`, hoặc policy `EditWorking` trên glossary `Technical Dictionary` (role `DATA_PROPOSER` có policy này) |
+| `canEdit` | Admin, role `DataSteward`, hoặc policy `EditWorking` trên glossary `Technical Dictionary` (role `DataProposer` có policy này) |
 | `canView` | `canEdit` hoặc policy `ViewBasic` trên glossary `Technical Dictionary` |
 | `canImport` | Bằng `canEdit` |
 | `canExport` | Bằng `canView` |
 
-Mọi người xem thấy cùng một dữ liệu. Ghi luôn được kiểm tra lại ở server.
+Mọi user có `canView` hiện thấy cùng một dữ liệu. Mọi thao tác ghi vẫn phải được kiểm tra quyền lại ở server.
 
 ### 5.2. Ngữ cảnh và phiên bản DD đang gắn
 
