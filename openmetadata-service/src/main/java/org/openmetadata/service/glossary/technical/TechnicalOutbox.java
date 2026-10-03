@@ -23,6 +23,7 @@ import org.jdbi.v3.core.JdbiException;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.search.TechnicalDocumentBuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex;
@@ -230,6 +231,7 @@ public final class TechnicalOutbox {
 
   private static void project(OutboxEntry entry) {
     new TechnicalColumnProjection().projectColumns(List.of(entry.payload()));
+    DqTestOutbox.afterColumnProjected(entry.subjectKey());
   }
 
   /** Clears the projection and the documents of every record removed by one reset. */

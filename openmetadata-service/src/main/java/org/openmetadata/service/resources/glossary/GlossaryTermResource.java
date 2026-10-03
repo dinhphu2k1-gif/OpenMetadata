@@ -86,6 +86,7 @@ import org.openmetadata.schema.api.data.RestoreEntity;
 import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.ChangeEvent;
+import org.openmetadata.schema.type.DqTestSpecs;
 import org.openmetadata.schema.type.EntityHistory;
 import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.EntityStatus;
@@ -103,6 +104,8 @@ import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.dq.DqTestErrors;
+import org.openmetadata.service.glossary.dq.DqTestSpecService;
 import org.openmetadata.service.glossary.technical.TechnicalAssets;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
@@ -631,7 +634,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             term,
             currentPayload,
             mutableDraftPayload(term, currentPayload, request),
-            request.getRelatedTerms());
+            request.getDataQualityTestSpecs());
     repository.prepareInternal(payload, true);
     return GlossaryVersionResponses.working(
         versioningService.saveWorking(
@@ -980,6 +983,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
     GlossaryAuthorizationResolver.requireSubmit(capabilitiesForWorking(securityContext, working));
     requireGovernedWorkflowPayload(securityContext, payload, working.glossaryId());
+    DqTestSpecService.validateForWorkflow(payload);
     repository.prepareInternal(payload, true);
   }
 
@@ -992,6 +996,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     EntityRepository.validateOwners(payload.getOwners());
     EntityRepository.validateReviewers(payload.getReviewers());
     repository.validateDomainsByRef(payload.getDomains());
+    DqTestSpecService.validateForWorkflow(payload);
     repository.prepareInternal(payload, true);
   }
 
@@ -1024,19 +1029,34 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
   }
 
+  private static void rejectTestSpecsOutsideDataQuality(DqTestSpecs requestedTestSpecs) {
+    if (requestedTestSpecs != null) {
+      throw DqTestErrors.badRequest(
+          DqTestErrors.NOT_A_RULE,
+          "Only Data Quality Rules can declare tests",
+          "dataQualityTestSpecs");
+    }
+  }
+
   private GlossaryTerm applyProfileDraftRules(
       SecurityContext securityContext,
       GlossaryTerm identity,
       GlossaryTerm currentPayload,
       GlossaryTerm payload,
-      List<TermRelation> requestedRelations) {
+      DqTestSpecs requestedTestSpecs) {
     Glossary glossary = Entity.getEntity(identity.getGlossary(), "id,name", Include.NON_DELETED);
     GlossaryTerm result = payload;
     switch (GovernedGlossaryProfileRegistry.require(glossary)) {
-      case DATA_QUALITY -> requireCanonicalCdeRelation(securityContext, payload);
-      case DATA_DICTIONARY -> {
-        // Data Dictionary drafts need no additional profile normalization.
+      case DATA_QUALITY -> {
+        requireCanonicalCdeRelation(securityContext, payload);
+        result.setDataQualityTestSpecs(
+            DqTestSpecService.prepareDraft(
+                identity.getId(),
+                currentPayload.getDataQualityTestSpecs(),
+                requestedTestSpecs,
+                payload.getExtension()));
       }
+      case DATA_DICTIONARY -> rejectTestSpecsOutsideDataQuality(requestedTestSpecs);
     }
     return result;
   }

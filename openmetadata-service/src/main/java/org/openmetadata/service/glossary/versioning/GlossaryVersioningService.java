@@ -34,6 +34,7 @@ import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
@@ -592,6 +593,7 @@ public class GlossaryVersioningService {
                     if (publicationHook != null) {
                       publicationHook.onPublished(handle, working, result);
                     }
+                    DqTestOutbox.onPublished(handle, result);
                     requireUpdated(
                         dao.deleteWorking(
                             entityType, entityId, parentBusinessVersion, expectedRevision));
@@ -616,6 +618,7 @@ public class GlossaryVersioningService {
     if (GLOSSARY.equals(entityType)) {
       TechnicalOutbox.drainAsync();
     }
+    DqTestOutbox.drainAsync();
     return published;
   }
 
@@ -705,6 +708,7 @@ public class GlossaryVersioningService {
     if (publicationHook != null) {
       publicationHook.onPublished(handle, working, result);
     }
+    DqTestOutbox.onPublished(handle, result);
     requireUpdated(
         dao.deleteWorking(
             working.entityType(),

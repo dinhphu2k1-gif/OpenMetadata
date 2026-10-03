@@ -26,7 +26,7 @@ public class GlossaryTermIndex implements TaggableIndex {
 
   @Override
   public Set<String> getExcludedFields() {
-    return Set.of("children");
+    return Set.of("children", "dataQualityTestSpecs");
   }
 
   @Override

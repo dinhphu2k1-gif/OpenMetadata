@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.jdbi.v3.core.Handle;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.search.TechnicalDocumentBuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalIndexFields;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
@@ -35,6 +36,7 @@ public final class TechnicalCutover {
    */
   public static void onGlossaryPublished(
       Handle handle, UUID glossaryId, String previousVersion, String newVersion, String actor) {
+    DqTestOutbox.onGlossaryPublished(handle, glossaryId);
     if (isDataDictionary(glossaryId)) {
       final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
       dao.lockStateExclusive();
