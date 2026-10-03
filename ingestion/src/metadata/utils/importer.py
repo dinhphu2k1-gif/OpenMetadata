@@ -240,6 +240,7 @@ def import_connection_fn(connection: BaseModel, function_name: str) -> Callable:
 
 RULE_LIBRARY_VALIDATOR_MODULE_MAP = {
     "ColumnRuleLibrarySqlExpressionValidator": "columnRuleLibrarySqlExpressionValidator",
+    "DqrColumnSqlValidator": "dqrColumnSqlValidator",
     "TableRuleLibrarySqlExpressionValidator": "tableRuleLibrarySqlExpressionValidator",
 }
 
