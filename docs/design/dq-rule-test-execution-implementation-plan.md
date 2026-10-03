@@ -1,12 +1,13 @@
 # Kế hoạch triển khai Kiểm thử theo Quy tắc chất lượng dữ liệu
 
-## Trạng thái thực hiện (cập nhật 2026-10-02)
+## Trạng thái thực hiện (cập nhật 2026-10-03)
 
-Chưa bắt đầu. Mọi mốc ở trạng thái **Chưa làm**.
+T0 đang làm: đã xác minh 5 giả định bằng đọc code và chốt nơi lưu `testSpecs` (DQT-14); còn chạy spike validator SQL trên
+Oracle dev (script đã có, chờ nguồn Oracle). Các mốc khác **Chưa làm**.
 
 | Mốc | Trạng thái |
 | --- | --- |
-| T0 | Chưa làm |
+| T0 | Đang làm: còn chạy spike trên Oracle dev |
 | T1 | Chưa làm |
 | T2 | Chưa làm |
 | T3 | Chưa làm |
@@ -47,23 +48,29 @@ Một mốc chỉ hoàn thành khi có đủ:
 Feature flag đề xuất `governedGlossary.dataQuality.testExecution.enabled`, mặc định tắt. Khi tắt: không hiển thị section
 **Khai báo kiểm thử**, outbox không được xử lý, tab kết quả giữ nội dung cũ. Flag chỉ bật production sau T3.
 
+Repo chưa có cơ chế feature flag cho governed glossary (kế hoạch DQ, DQ00). PR đầu tiên của T1 thêm flag dạng cấu hình
+server trong `openmetadata.yaml` (biến môi trường, mặc định `false`), đọc ở backend và trả cho UI qua endpoint cấu hình
+hiện có; không dựng hệ thống flag chung.
+
 ### 2.2. Phụ thuộc bên ngoài
 
 | Phụ thuộc | Cần cho |
 | --- | --- |
-| Workflow DQ dùng chung ổn định (DQ07–DQ09 trong kế hoạch DQ) | T1 |
+| Workflow DQ dùng chung chạy trọn Draft → Submit → Approve và tạo minor version (DQ08–DQ10 trong kế hoạch DQ). Chủ dự án tự xử lý | T1 |
 | Điểm kích hoạt của TD (`TechnicalRecordService`, `TechnicalCutover`, import committer) | T3 |
 | Connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service có CDE | Bật flag production |
+| Airflow chạy pipeline dùng bản ingestion build từ fork (có `DqrColumnSqlValidator`), không dùng image ingestion gốc | Chạy khai báo `SQL` ở mọi môi trường từ T2 |
+| Một nguồn Oracle dev (và DB2 nếu có) cho spike T0 và test T2 | T0, T2 |
 
 ## 3. Danh sách mốc và phụ thuộc
 
 | Mốc | Nội dung | Phụ thuộc |
 | --- | --- | --- |
-| T0 | Xác minh 4 mục DQT §11; chốt Q1–Q5 DQT §12 | |
-| T1 | Schema `dqTestSpec.json`, DTO `testSpec`, validation, form và card Overview | DQ07–DQ09 |
-| T2 | Bảng lưu trữ, reconciler, outbox, bootstrap suite và pipeline, sinh testcase khi Approve Rule | T1 |
+| T0 | Xác minh giả định kỹ thuật DQT §11; chạy thử validator SQL trên Oracle (Q1–Q7 DQT §12 đã chốt) | |
+| T1 | Feature flag, schema `dqTestSpecs.json`, trường `dataQualityTestSpecs` của `GlossaryTerm`, DTO `testSpecs`, validation, form và card Overview | DQ08–DQ10 |
+| T2 | Bảng lưu trữ, reconciler, outbox, suite và pipeline riêng của Rule, sinh testcase khi Approve Rule | T1 |
 | T3 | Kích hoạt từ TD và cutover, khóa testcase managed | T2; điểm kích hoạt TD |
-| T4 | API kết quả, tab Kết quả kiểm thử của Rule, tab Chất lượng dữ liệu của CDE, bộ lọc danh sách | T2 |
+| T4 | API kết quả, đặt lịch chạy, Chạy ngay, tab Kết quả kiểm thử của Rule, tab Chất lượng dữ liệu của CDE, bộ lọc danh sách | T2 |
 | T5 | Xu hướng, reconcile status, cảnh báo cutover DD | T4 |
 
 T3 và T4 có thể làm song song sau T2.
@@ -83,48 +90,72 @@ T3 và T4 có thể làm song song sau T2.
 
 **Phạm vi**
 
-- Xác minh 4 mục ở DQT §11:
-  1. `TestCaseIndex` có chứa tag thừa kế từ Column không.
-  2. Hành vi `_process_logical_suite` ([test_suite.py](../../ingestion/src/metadata/data_quality/source/test_suite.py)) với
-     testcase thuộc nhiều service và nhiều Table không sắp xếp.
-  3. `TestDefinition` có `sqlExpression` được ingestion chọn đúng
-     [columnRuleLibrarySqlExpressionValidator.py](../../ingestion/src/metadata/data_quality/validations/column/sqlalchemy/columnRuleLibrarySqlExpressionValidator.py).
-  4. Lưu `extension.dqTestSpec` dạng object qua validate extension hiện có.
-- Chốt Q1–Q5 với nghiệp vụ.
+- Xác minh 5 giả định ở DQT §11. Đã xong bằng đọc code ngày 2026-10-03; kết luận và ảnh hưởng ghi ở bảng DQT §11:
+  1. `TestCaseIndex` chứa tag thừa kế từ Column: gần như có; kiểm tra reindex dời sang T3.
+  2. `_process_logical_suite` ([test_suite.py](../../ingestion/src/metadata/data_quality/source/test_suite.py)) với
+     nhiều Table và service: đúng, có thể tách lô; không cần sửa.
+  3. Validator SQL ([columnRuleLibrarySqlExpressionValidator.py](../../ingestion/src/metadata/data_quality/validations/column/sqlalchemy/columnRuleLibrarySqlExpressionValidator.py)):
+     chọn theo `validatorClass` đúng, nhưng có hai lỗi đếm vi phạm và tên bảng Oracle/DB2 → thiết kế thêm
+     `DqrColumnSqlValidator` (DQT-13).
+  4. Lưu trong `extension`: không phù hợp; payload governed là JSON của `GlossaryTerm` → thêm trường tùy chọn
+     `dataQualityTestSpecs` vào schema `GlossaryTerm` (DQT-14). API gốc PUT/PATCH glossary term đã bị chặn.
+  5. Pipeline riêng mỗi Rule: API deploy/trigger/status gốc có sẵn; thử pipeline không lịch dời sang T2.
+- Spike còn lại: chạy một câu SQL qua logic của `DqrColumnSqlValidator` (bọc `COUNT(*)`, tên `schema.table`) trên một
+  nguồn Oracle dev; nếu có nguồn DB2 thì chạy thêm. Script spike đứng riêng (`dqr_sql_spike.py`, cần `sqlalchemy`,
+  `jinja2`, driver `oracledb` hoặc `ibm_db_sa`) chạy cùng câu SQL với tên bảng của validator gốc và của
+  `DqrColumnSqlValidator`, in số vi phạm, tổng bản ghi và tỷ lệ đạt. Kết quả mong đợi: tên gốc `default.SCHEMA.TABLE` lỗi,
+  tên `SCHEMA.TABLE` chạy đúng.
+- Câu hỏi nghiệp vụ Q1–Q7 đã chốt ngày 2026-10-03 (DQT §12).
 
 **DoD**
 
-- Mỗi mục có kết luận kèm bằng chứng (test spike, đoạn mã, log chạy thử).
-- Thiết kế DQT được cập nhật nếu kết luận khác giả định, đặc biệt mục 4 (nơi lưu `testSpec`) và mục 3 (cách tạo
-  definition managed).
-- Q1–Q5 có câu trả lời ghi vào DQT §12.
+- Mỗi giả định có kết luận kèm bằng chứng (đoạn mã, log chạy thử) trong DQT §11. Đã có cho cả 5 mục.
+- Spike Oracle chạy được câu SQL mẫu ở DQT §4.1 với tên bảng `schema.table` và cho đúng số vi phạm; nếu tên cột hoặc
+  tên bảng cần đặt trong ngoặc kép (chữ hoa/thường), cập nhật DQT §4.1 trước khi bắt đầu T2.
 
 ### T1 — Khai báo kiểm thử trên DQ Rule
 
 **Phạm vi**
 
-- Schema `dqTestSpec.json` trong `openmetadata-spec` (DQT §4.2); generate model Java/TypeScript.
-- DTO create/patch DQ Rule thêm trường typed `testSpec`; server map vào `extension.dqTestSpec` (hoặc trường riêng theo
-  kết luận T0 mục 4).
-- `GovernedGlossaryProfileRegistry`: system key `dqTestSpec` cho profile `DATA_QUALITY`; Custom Properties chung không
-  hiển thị khóa này.
-- Validator theo DQT §4.3: method mismatch, `LIBRARY` definition và tham số, `SQL` chỉ một câu `SELECT` (parse bằng SQL
-  parser), ngưỡng hỗ trợ, bất biến loại kiểm tra giữa version minor. Lưu Draft chạy kiểm tra cú pháp; Submit/Approve chạy
-  đầy đủ.
-- `testSpec` có trong snapshot, `contentHash` và lịch sử phiên bản; luồng Sửa phiên bản ghi đè và lưu bản cũ.
-- Endpoint `GET .../governed/dataQuality/testDefinitions` và `POST .../{ruleId}/dataQuality/preview` (DQT §8).
-- UI: section **Khai báo kiểm thử** trong `DQGlossaryTermForm`, dùng lại component tham số của `TestCaseFormV1` và SQL
-  editor gốc; khối **Áp dụng cho** gọi preview; card chỉ đọc trong `DQGlossaryTermOverview` (DQT §9.1).
-- Hộp xác nhận Approve hiển thị số cột sẽ áp dụng (DQT §4.4).
+- Feature flag cấu hình server (§2.1).
+- Schema `dqTestSpecs.json` trong `openmetadata-spec` (DQT §4.2); thêm trường tùy chọn `dataQualityTestSpecs` vào
+  `glossaryTerm.json` (DQT-14); generate model Java, TypeScript và Python (`make generate`).
+- DTO create/patch DQ Rule thêm trường typed `testSpecs` (mảng); server ghi vào `dataQualityTestSpecs` của payload
+  working. Glossary term ngoài profile `DATA_QUALITY` gửi giá trị khác `null` bị từ chối.
+- `GlossaryTermIndex` bỏ `dataQualityTestSpecs` khỏi tài liệu search.
+- Cấp `key` cho khai báo mới khi Lưu Draft: `t<n>`, `n` = lớn nhất từng xuất hiện trong working và snapshot history + 1;
+  không tái sử dụng key đã xóa (DQT §4.2).
+- `GovernedGlossaryProfileRegistry`: profile `DATA_QUALITY` cho phép trường `dataQualityTestSpecs`.
+- Validator theo DQT §4.3 cho từng khai báo: tên trùng, key không tồn tại, `LIBRARY` definition và tham
+  số, `SQL` chỉ một câu `SELECT` (parse bằng SQL parser) và không chỉ select hàm gộp, ngưỡng hiệu lực (riêng hoặc của Rule) được hỗ trợ, bất biến
+  `kind`/`testDefinitionFqn` theo `key`. Lưu Draft chạy kiểm tra cú pháp; Submit/Approve chạy đầy đủ. Lỗi trả kèm
+  `specKey` hoặc chỉ số phần tử.
+- `testSpecs` có trong snapshot, `contentHash` và lịch sử phiên bản; luồng Sửa phiên bản ghi đè và lưu bản cũ.
+- Endpoint `GET .../governed/dataQuality/testDefinitions` và `POST .../{ruleId}/dataQuality/preview` (DQT §8), preview
+  trả kết quả theo từng khai báo và tổng số testcase.
+- UI: section **Khai báo kiểm thử** dạng danh sách card trong `DQGlossaryTermForm` (thêm, xóa, kéo thả, ngưỡng riêng,
+  khóa definition của khai báo đã Approved), dùng lại component tham số của `TestCaseFormV1` và SQL editor gốc; khối
+  **Áp dụng cho** gọi preview; card chỉ đọc dạng bảng trong `DQGlossaryTermOverview` (DQT §9.1).
+- Hộp xác nhận Approve hiển thị số khai báo, số cột, số testcase sẽ sinh và số khai báo bị ngừng (DQT §4.4).
 
 **DoD/Test**
 
-- Rule không khai báo `testSpec` vẫn tạo, duyệt và export như trước; Import/Export giữ 19 trường.
-- Mỗi mã lỗi `DQ_TEST_SPEC_*`, `DQ_THRESHOLD_UNSUPPORTED` có integration test cho cả Lưu và Approve.
-- SQL chứa DDL/DML, nhiều câu, `;` thừa, comment chứa lệnh, thiếu biến bắt buộc đều bị từ chối.
-- Version minor đổi `kind` hoặc `testDefinitionFqn` bị từ chối; đổi tham số/SQL được chấp nhận.
-- Snapshot và lịch sử phiên bản hiển thị đúng `testSpec` của từng version.
-- In Review/Approved/Archived không sửa được `testSpec` qua API.
+- Rule có `testSpecs` rỗng vẫn tạo, duyệt và export như trước; Import/Export giữ 19 trường.
+- Rule lưu và duyệt được với nhiều khai báo (kiểm thử với ít nhất 10 khai báo); không có giới hạn số lượng.
+- Rule trộn khai báo `LIBRARY` và `SQL` lưu và duyệt được với mọi giá trị tag Hình thức kiểm tra.
+- Mỗi mã lỗi `DQ_TEST_SPEC_*`, `DQ_THRESHOLD_UNSUPPORTED` có integration test cho cả Lưu và Approve, và lỗi chỉ đúng
+  khai báo.
+- SQL chứa DDL/DML, nhiều câu, `;` thừa, comment chứa lệnh, thiếu biến bắt buộc, hoặc chỉ select `COUNT(*)` đều bị từ
+  chối.
+- Ngưỡng phần trăm trên khai báo `SQL` được chấp nhận khi bật `computePassedFailedRowCount`, bị từ chối khi tắt.
+- `testSpecs` không xuất hiện trong `extension`, Custom Properties hay search index của glossary term; snapshot đọc
+  lại bằng `GlossaryTerm.class` vẫn chạy; đổi `testSpecs` làm đổi `contentHash`.
+- Glossary term của profile khác gửi `dataQualityTestSpecs` bị từ chối; PUT/PATCH gốc vẫn bị chặn.
+- Khai báo giữ `key` mà đổi `kind` hoặc `testDefinitionFqn` bị từ chối; đổi tên/tham số/SQL/ngưỡng được chấp nhận; thêm
+  và xóa khai báo ở version minor được chấp nhận.
+- Key mới không trùng key của khai báo đã xóa ở version trước; client gửi key lạ bị từ chối.
+- Snapshot và lịch sử phiên bản hiển thị đúng `testSpecs` của từng version.
+- In Review/Approved/Archived không sửa được `testSpecs` qua API.
 - Chưa có testcase nào được tạo ở mốc này.
 
 ### T2 — Reconciler và sinh testcase khi Approve
@@ -132,27 +163,43 @@ T3 và T4 có thể làm song song sau T2.
 **Phạm vi**
 
 - Migration `1.13.3` MySQL và PostgreSQL ([bootstrap/sql/migrations/native/1.13.3](../../bootstrap/sql/migrations/native/1.13.3)):
-  `dq_rule_exec`, `dq_rule_test_binding`, `dq_test_outbox` kèm index (DQT §7).
-- DAO jdbi3 cho ba bảng.
+  `dq_rule_exec`, `dq_rule_test_spec_exec`, `dq_rule_test_binding`, `dq_test_outbox` kèm index (DQT §7).
+- DAO jdbi3 cho bốn bảng.
 - Bot hệ thống `dq-governance-bot` (bootstrap idempotent).
-- Bootstrap logical suite `DQR-Exec-Daily`, `DQR-Exec-Monthly`, `DQR-Exec-Quarterly` và pipeline TestSuite với lịch mặc
-  định (DQT §5.3).
-- Reconciler tính tập mong muốn (DQT §5.1) cho một Rule, diff với binding và: tạo/sửa/soft-delete/restore testcase,
-  tạo/sửa definition managed cho loại `SQL`, chuyển suite khi đổi Tần suất, đánh dấu `NOT_APPLICABLE` theo
-  `supportedDataTypes`, ghi `ERROR` khi thất bại. Khóa `FOR UPDATE` trên `dq_rule_exec`.
+- Reconciler tạo logical suite `DQR__<N>__<mã>` và pipeline TestSuite riêng cho Rule ở lần áp dụng đầu, chưa có lịch
+  (DQT §5.3); disable pipeline khi Rule bị retire toàn bộ, bật lại khi Rule quay lại.
+- Reconciler tính tập mong muốn (DQT §5.1) theo bộ (Rule, khai báo, Column) cho một Rule, diff với binding theo `key`
+  và: tạo/sửa/soft-delete/restore testcase, retire mọi testcase của khai báo bị xóa (`SPEC_REMOVED`), tạo/sửa/retire
+  definition managed cho từng khai báo `SQL`, đánh dấu `NOT_APPLICABLE` theo
+  `supportedDataTypes` của từng khai báo, ghi `ERROR` khi thất bại. Khóa `FOR UPDATE` trên `dq_rule_exec`.
 - Outbox: `GlossaryVersioningService` ghi `RECONCILE_RULE` trong cùng transaction với Approve; xử lý sau commit; worker
   thử lại.
+- Ingestion: validator `DqrColumnSqlValidator` (DQT §4.1, DQT-13) cho runner sqlalchemy, kế thừa
+  `ColumnRuleLibrarySqlExpressionValidator`, ghi đè `get_table_name` (Oracle/DB2 → `schema.table`) và `_run_results`
+  (bọc `SELECT COUNT(*) FROM (…)`), thêm đếm tổng bản ghi khi `computePassedFailedRowCount`. Đăng ký trong
+  `RULE_LIBRARY_VALIDATOR_MODULE_MAP` ([importer.py](../../ingestion/src/metadata/utils/importer.py)) và map param
+  setter của rule library ([param_setter_factory.py](../../ingestion/src/metadata/data_quality/validations/runtime_param_setter/param_setter_factory.py)).
+  Definition managed loại `SQL` đặt `validatorClass = DqrColumnSqlValidator`.
+- Thử deploy pipeline TestSuite không có `scheduleInterval` và trigger thủ công (DQT §11 mục 5).
 
 **DoD/Test**
 
-- Rule Approved có `testSpec` sinh đúng một testcase `ACTIVE` trên mỗi Column `Available` của CDE; Draft/In Review/Rejected
-  không sinh testcase.
+- Rule Approved có `k` khai báo sinh đúng `k` testcase `ACTIVE` trên mỗi Column `Available` của CDE (trừ cặp không áp
+  dụng); Draft/In Review/Rejected không sinh testcase.
 - Chạy reconcile nhiều lần liên tiếp và đồng thời không tạo trùng.
 - Approve version minor đổi tham số/SQL cập nhật testcase hiện có, lịch sử kết quả giữ nguyên.
+- Approve version minor thêm khai báo tạo testcase mới; xóa khai báo retire testcase của khai báo đó, kết quả cũ vẫn đọc
+  được; khai báo khác không bị ảnh hưởng.
 - Version mới đổi CDE retire testcase trên Column cũ và tạo trên Column mới.
-- Đổi Tần suất chuyển testcase sang đúng logical suite.
+- Mỗi Rule áp dụng có đúng một suite và một pipeline riêng, chứa mọi testcase `ACTIVE` của mọi khai báo; đổi tag Tần
+  suất không ảnh hưởng suite hay lịch.
+- Rule retire toàn bộ thì pipeline bị disable, không bị xóa.
 - Lỗi reconcile không rollback phê duyệt; binding `ERROR` được worker xử lý lại.
 - Testcase bị hard-delete ngoài luồng được tạo lại và ghi audit.
+- Pytest cho `DqrColumnSqlValidator`: tên bảng cho Oracle, DB2, PostgreSQL, MySQL; số vi phạm đọc từ `COUNT(*)` ở
+  database (không `fetchall`); `passedRowsPercentage` khi bật đếm; `Success` khi 0 vi phạm; SQL không an toàn bị từ chối.
+- Khai báo `SQL` chạy thật qua pipeline trên nguồn Oracle dev cho kết quả đúng.
+- Pipeline không lịch deploy được và chạy được bằng trigger.
 - Pipeline logical suite chạy thật trên môi trường dev cho ít nhất hai service và ghi kết quả vào time-series.
 
 ### T3 — Kích hoạt từ TD, cutover và khóa managed
@@ -169,8 +216,8 @@ T3 và T4 có thể làm song song sau T2.
 
 **DoD/Test**
 
-- Gán, đổi, bỏ CDE trên TD và đổi `sourceStatus` đưa tập testcase về đúng DQT §5.1.
-- Đổi kiểu dữ liệu Column chuyển `ACTIVE` ↔ `NOT_APPLICABLE`.
+- Gán, đổi, bỏ CDE trên TD và đổi `sourceStatus` đưa tập testcase về đúng DQT §5.1, cho mọi khai báo của mọi Rule.
+- Đổi kiểu dữ liệu Column chuyển `ACTIVE` ↔ `NOT_APPLICABLE` theo từng khai báo.
 - Cutover DD/DQ retire toàn bộ binding của scope cũ; kết quả cũ vẫn đọc được.
 - Lỗi reconcile không rollback lưu TD hay cutover.
 - Testcase managed không sửa/xóa được qua API và UI gốc; ghi kết quả và incident vẫn hoạt động; testcase thường không bị
@@ -180,39 +227,53 @@ T3 và T4 có thể làm song song sau T2.
 
 **Phạm vi**
 
-- Service tính Kết quả theo ngưỡng (DQT §6.1), kết quả Rule (§6.2), kết quả CDE (§6.3), badge Quá hạn; đọc time-series
-  gốc theo `testCaseId` trong binding.
+- Endpoint `GET`/`PUT .../{ruleId}/dataQuality/schedule`, `POST .../{ruleId}/dataQuality/run`,
+  `GET .../{ruleId}/dataQuality/run/latest` (DQT §8); outbox `SYNC_PIPELINE` đồng bộ lịch sang
+  `airflowConfig.scheduleInterval`; audit đổi lịch và Chạy ngay.
+- Service tính Kết quả theo ngưỡng hiệu lực của khai báo (DQT §6.1), kết quả khai báo và kết quả Rule (§6.2), kết quả
+  CDE (§6.3), badge Quá hạn; đọc time-series gốc theo `testCaseId` trong binding.
 - Endpoint `GET .../{ruleId}/dataQuality/results` và `GET .../{cdeId}/dataQuality/results`, phân trang, ẩn dòng thiếu
   quyền `ViewTests`/`ViewAll` trên Table (DQT §10).
 - UI `GlossaryTermsV1`: tab `data_observability` của Rule thành **Kết quả kiểm thử**, của CDE thành **Chất lượng dữ liệu**
   (DQT §9.2, §9.3); gộp tab Quy tắc CLDL hiện có của CDE vào bảng Quy tắc (`CDEGlossaryTermOverview`).
+- Nút **Chạy ngay** và dòng **Lịch chạy** với modal Đổi lịch (chọn nhanh, cron, xem trước 5 lần chạy, Không đặt lịch) ở
+  tab Kết quả kiểm thử; **Chạy ngay** trong menu dòng của bảng Quy tắc ở tab CDE (DQT §9.2, §9.3).
+- Chip lọc theo khai báo trong tab Kết quả kiểm thử, bộ lọc **Đã ngừng** cho khai báo đã xóa; cột Kiểm thử trong bảng
+  testcase của Rule và CDE.
 - Empty state cho Rule chưa Approved, Rule chưa khai báo kiểm thử, banner cho Rule đã lưu trữ.
 - Bộ lọc **Kiểm thử** ở danh sách DQ (DQT §9.4).
 
 **DoD/Test**
 
-- Unit test đủ mọi dạng ngưỡng (`count = 0`, `count <= n`, `>= x%`, `> x%`, `= x%`, trống) và các trạng thái gốc
-  `Success`/`Failed`/`Aborted`/chưa có kết quả.
+- Unit test đủ mọi dạng ngưỡng (`count = 0`, `count <= n`, `>= x%`, `> x%`, `= x%`, trống), ngưỡng riêng của khai báo
+  và ngưỡng mặc định của Rule, và các trạng thái gốc `Success`/`Failed`/`Aborted`/chưa có kết quả.
+- Rule nhiều khai báo: Rule Không đạt khi chỉ một khai báo Không đạt; kết quả từng khai báo đúng.
 - Kết quả Rule và CDE khớp kết quả gốc của từng testcase.
 - Người dùng thiếu quyền Table không thấy dòng testcase, thẻ tổng ghi số dòng bị ẩn.
 - Consumer chỉ thấy Rule Approved trong tab CDE.
 - Kết quả Rule/CDE đã lưu trữ vẫn tra cứu được sau cutover.
 - URL tab không đổi so với trước.
+- Đặt, đổi, bỏ lịch cập nhật đúng lịch của pipeline; cron sai bị từ chối (`DQ_SCHEDULE_INVALID`); lịch giữ nguyên khi
+  Rule lên version mới.
+- Chạy ngay ghi kết quả vào time-series; bấm khi đang chạy bị chặn (`DQ_TEST_RUN_IN_PROGRESS`); Rule chưa có testcase
+  `ACTIVE` bị chặn (`DQ_TEST_RUN_NOT_AVAILABLE`); người không có `canEdit` không thấy nút và bị từ chối qua API.
+- Badge Quá hạn tính theo lịch của Rule; Rule chưa đặt lịch không có badge.
 
 ### T5 — Xu hướng và vận hành
 
 **Phạm vi**
 
-- Endpoint `trend` cho Rule và CDE (30/90 ngày), tính từ time-series kể cả binding `RETIRED` trong khoảng còn active;
-  mốc `publishedAt` của version (DQT §6.4).
+- Endpoint `trend` cho Rule (lọc theo khai báo) và CDE (30/90 ngày), tính từ time-series kể cả binding `RETIRED` trong
+  khoảng còn active; mốc `publishedAt` của version (DQT §6.4).
 - Biểu đồ xu hướng trong hai tab ở T4.
 - `POST .../governed/dataQuality/reconcile` và `GET .../reconcile/status` (outbox lag, binding `ERROR`, Table có pipeline
-  basic suite chứa testcase managed).
+  basic suite chứa testcase managed, số pipeline của Rule, số Rule chạy cùng khung giờ).
+- Modal Đổi lịch hiển thị số Rule khác đặt cùng khung giờ trên cùng service (DQT §11).
 - Hộp xác nhận cutover DD (TD §9.4) thêm “{n} testcase của {m} quy tắc sẽ ngừng chạy”.
 
 **DoD/Test**
 
-- Xu hướng đúng khi Rule đổi version, đổi CDE và sau cutover.
+- Xu hướng đúng khi Rule đổi version, thêm/xóa khai báo, đổi CDE và sau cutover.
 - Benchmark trend trên dữ liệu thử nghiệm lớn; nếu vượt ngưỡng chấp nhận thì mở việc bảng rollup theo ngày.
 - Reconcile toàn bộ chỉ Admin gọi được và idempotent.
 
@@ -222,13 +283,21 @@ T3 và T4 có thể làm song song sau T2.
 
 | Nơi | Thay đổi | Mốc |
 | --- | --- | --- |
-| `openmetadata-spec` | `dqTestSpec.json`, DTO `testSpec`, response kết quả/trend | T1, T4 |
-| `service/glossary/GovernedGlossaryProfileRegistry` | System key `dqTestSpec` | T1 |
-| `service/glossary` (mới) | Validator `testSpec`, reconciler, outbox worker, tính kết quả | T1, T2, T4 |
+| `openmetadata-spec` | `dqTestSpecs.json`, DTO `testSpecs`, response kết quả/trend | T1, T4 |
+| `service/glossary/GovernedGlossaryProfileRegistry` | Trường `testSpecs` trong payload governed của profile `DATA_QUALITY` | T1 |
+| `service/glossary` (mới) | Cấp key và validator `testSpecs`, reconciler, outbox worker, tính kết quả | T1, T2, T4 |
 | `service/glossary/versioning/GlossaryVersioningService` | Ghi outbox khi Approve | T2 |
 | `service/glossary/technical/TechnicalRecordService`, `TechnicalImportCommitter`, `TechnicalColumnSync`, `TechnicalCutover` | Ghi outbox | T3 |
 | `jdbi3/TestCaseRepository`, `jdbi3/TestDefinitionRepository` | Khóa managed | T3 |
 | `resources/glossary` | Endpoint DQT §8 | T1, T4, T5 |
+
+### Ingestion Python
+
+| Nơi | Thay đổi | Mốc |
+| --- | --- | --- |
+| `data_quality/validations/column/sqlalchemy/` (mới) | `DqrColumnSqlValidator` kế thừa validator rule-library gốc | T2 |
+| `utils/importer.py` | Đăng ký module trong `RULE_LIBRARY_VALIDATOR_MODULE_MAP` | T2 |
+| `data_quality/validations/runtime_param_setter/param_setter_factory.py` | Map param setter rule library cho `DqrColumnSqlValidator` | T2 |
 
 ### Frontend React/TypeScript
 
@@ -244,15 +313,15 @@ T3 và T4 có thể làm song song sau T2.
 
 ### Bootstrap/migration
 
-- Migration `1.13.3` MySQL và PostgreSQL cho ba bảng (T2).
-- Bootstrap idempotent bot, logical suite và pipeline (T2).
+- Migration `1.13.3` MySQL và PostgreSQL cho bốn bảng (T2).
+- Bootstrap idempotent bot hệ thống (T2). Suite và pipeline do reconciler tạo theo từng Rule, không bootstrap sẵn.
 
 ### Tài liệu
 
 | Tài liệu | Thay đổi | Mốc |
 | --- | --- | --- |
 | [Thiết kế DQ](./dq-glossary-ui-design.md) §2.2 | Bỏ “Không tự động tạo `TestCase`…”, “Không thực thi SQL…” khỏi ngoài phạm vi | T1 |
-| Thiết kế DQ §6.1, §8.4, §8.5 | DTO có `testSpec`; form và Overview | T1 |
+| Thiết kế DQ §6.1, §8.4, §8.5 | DTO có `testSpecs`; form và Overview | T1 |
 | [Thiết kế CDE](./cde-glossary-ui-design.md) §7.1 mục 3 | Tab Quy tắc CLDL gộp vào tab Chất lượng dữ liệu | T4 |
 | [Thiết kế TD](./technical-dictionary-design.md) §6.2, §9.4 | Kích hoạt reconcile; số testcase bị ngừng khi cutover | T3, T5 |
 
@@ -260,23 +329,26 @@ T3 và T4 có thể làm song song sau T2.
 
 | Tầng | Nội dung bắt buộc |
 | --- | --- |
-| Unit backend | Validator `testSpec` và SQL, tính tập mong muốn, diff binding, tính kết quả theo ngưỡng |
-| Repository integration | Ba bảng mới, unique/index, `FOR UPDATE`, outbox trên MySQL và PostgreSQL |
+| Unit backend | Cấp key, validator `testSpecs` và SQL, tính tập mong muốn, diff binding theo `key`, tính kết quả theo ngưỡng |
+| Repository integration | Bốn bảng mới, unique/index, `FOR UPDATE`, outbox trên MySQL và PostgreSQL |
 | Resource integration | Mã lỗi, khóa managed, quyền xem dòng testcase, endpoint Admin |
-| Ingestion | Definition managed loại `SQL` chạy đúng validator; logical suite nhiều service |
-| Unit frontend | Map `testSpec` ↔ form, hiển thị kết quả, empty state |
+| Ingestion (pytest) | `DqrColumnSqlValidator`: tên bảng theo nguồn, đếm ở database, tỷ lệ đạt; definition managed chọn đúng validator; logical suite nhiều service; chạy thật trên Oracle dev |
+| Unit frontend | Map `testSpecs` ↔ danh sách card, thêm/xóa/sắp xếp, hiển thị kết quả theo khai báo, empty state |
 | E2E | Hành trình chính bên dưới |
 
 Hành trình E2E chính:
 
-1. Proposer tạo Rule loại `LIBRARY` liên kết CDE có 3 Column trong TD, xem preview.
-2. Approver duyệt; hệ thống sinh 3 testcase trong suite đúng Tần suất.
-3. Chạy pipeline; tab Kết quả kiểm thử của Rule và tab Chất lượng dữ liệu của CDE hiển thị đúng.
-4. Gỡ CDE khỏi 1 Column trên TD; testcase tương ứng bị retire, kết quả cũ còn trong xu hướng.
-5. Tạo version minor đổi tham số; testcase cập nhật, lịch sử liên tục.
-6. Thử sửa/xóa testcase managed qua UI gốc; bị chặn.
-7. Lặp lại với Rule loại `SQL`.
-8. Cutover DD; mọi testcase của scope cũ bị retire, kết quả vẫn tra cứu được.
+1. Proposer tạo Rule loại `LIBRARY` có 2 khai báo, liên kết CDE có 3 Column trong TD, xem preview.
+2. Approver duyệt; hệ thống sinh 6 testcase trong suite và pipeline riêng của Rule; tab Kết quả kiểm thử cảnh báo chưa
+   có lịch.
+3. Đặt lịch hằng ngày; pipeline nhận đúng lịch. Bấm Chạy ngay; kết quả hiện sau khi lần chạy kết thúc.
+4. Tab Kết quả kiểm thử của Rule (cả lọc theo khai báo) và tab Chất lượng dữ liệu của CDE hiển thị đúng.
+5. Gỡ CDE khỏi 1 Column trên TD; testcase của mọi khai báo trên cột đó bị retire, kết quả cũ còn trong xu hướng.
+6. Tạo version minor đổi tham số một khai báo, xóa một khai báo, thêm một khai báo mới; testcase của khai báo giữ lại
+   cập nhật và lịch sử liên tục, khai báo bị xóa ngừng chạy, khai báo mới sinh testcase; lịch chạy giữ nguyên.
+7. Thử sửa/xóa testcase managed qua UI gốc; bị chặn.
+8. Lặp lại với Rule trộn khai báo `LIBRARY` và `SQL`; chỉ khai báo `SQL` sinh definition managed.
+9. Cutover DD; mọi testcase của scope cũ bị retire, pipeline của Rule bị disable, kết quả vẫn tra cứu được.
 
 ## 7. Kế hoạch PR đề xuất
 
@@ -285,11 +357,11 @@ Hành trình E2E chính:
 | 1 | T0 spike và cập nhật thiết kế | Không đổi behavior |
 | 2 | T1 schema, DTO, validation, endpoint testDefinitions/preview | Flag tắt |
 | 3 | T1 UI form và card Overview | Flag tắt |
-| 4 | T2 migration, DAO, bootstrap suite/pipeline/bot | Flag tắt |
-| 5 | T2 reconciler và outbox khi Approve | Test idempotent bắt buộc |
+| 4 | T2 migration, DAO, bootstrap bot | Flag tắt |
+| 5 | T2 reconciler (gồm suite/pipeline riêng của Rule) và outbox khi Approve | Test idempotent bắt buộc |
 | 6 | T3 kích hoạt TD/cutover | Phụ thuộc điểm kích hoạt TD |
 | 7 | T3 khóa managed backend và UI | |
-| 8 | T4 API kết quả | Test quyền |
+| 8 | T4 API kết quả, lịch chạy, Chạy ngay | Test quyền |
 | 9 | T4 UI tab và bộ lọc | |
 | 10 | T5 xu hướng, reconcile status, cảnh báo cutover | |
 
@@ -299,7 +371,10 @@ Rủi ro sản phẩm và vận hành nằm ở DQT §11. Rủi ro riêng của 
 
 | Rủi ro | Biện pháp |
 | --- | --- |
-| Kết luận T0 thay đổi nơi lưu `testSpec` hoặc cách tạo definition `SQL` | Không bắt đầu T1 trước khi T0 xong |
+| Spike Oracle cho thấy cần đặt tên bảng/cột trong ngoặc kép hoặc xử lý khác | Không bắt đầu T2 trước khi spike xong; cập nhật DQT §4.1 |
+| Thêm trường vào schema `GlossaryTerm` gốc làm khó nâng cấp OpenMetadata | Trường tùy chọn, tên riêng `dataQualityTestSpecs`, không đổi trường có sẵn; thêm vào danh mục kiểm tra khi nâng cấp |
+| Airflow dùng image ingestion gốc nên thiếu `DqrColumnSqlValidator` | Build và deploy ingestion từ fork trước khi bật khai báo `SQL`; reconcile status cảnh báo khi testcase `SQL` lỗi do không nạp được validator |
+| `DqrColumnSqlValidator` lệch validator gốc khi nâng cấp OpenMetadata | Pytest bao các nguồn; thêm vào danh mục kiểm tra khi nâng cấp |
 | Điểm kích hoạt TD chưa ổn định làm chậm T3 | T4 làm song song với T3; flag chưa bật production |
 | Reconciler tạo trùng testcase khi chạy song song | Test đồng thời ở T2 là điều kiện merge PR 5 |
 
@@ -307,30 +382,39 @@ Rủi ro sản phẩm và vận hành nằm ở DQT §11. Rủi ro riêng của 
 
 ### Rollout
 
-1. Deploy T1–T2 với flag tắt; chạy bootstrap suite/pipeline.
+1. Deploy T1–T2 với flag tắt; chạy bootstrap bot. Deploy ingestion build từ fork lên Airflow (có
+   `DqrColumnSqlValidator`).
 2. Bật flag ở môi trường kiểm thử, duyệt vài Rule thật và đối chiếu kết quả với chạy tay.
 3. Xác nhận connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service.
 4. Bật production sau khi T3 hoàn tất (khóa managed và kích hoạt TD).
-5. Theo dõi outbox lag và binding `ERROR` ít nhất một chu kỳ Tần suất Daily.
+5. Theo dõi outbox lag, binding `ERROR` và tải Airflow (số DAG chạy đồng thời) ít nhất một tuần.
 
 ### Rollback
 
 - Tắt flag: outbox ngừng xử lý, testcase managed không bị xóa.
-- Nếu cần dừng chạy testcase: tạm dừng pipeline `DQR-Exec-*` trong trang pipeline gốc.
+- Nếu cần dừng chạy testcase: tạm dừng pipeline `DQR__*` trong trang pipeline gốc (từng Rule), hoặc Admin bỏ lịch hàng
+  loạt qua `PUT .../schedule`.
 - Migration chỉ thêm bảng, không đổi bảng hiện có; rollback ứng dụng không cần rollback schema.
+- Trường `dataQualityTestSpecs` là tùy chọn; bản ứng dụng cũ đọc snapshot có trường này phải bỏ qua được trường lạ,
+  hoặc rollback kèm xóa trường khỏi payload. Kiểm tra trước khi bật production.
 
 ## 10. Checklist nghiệm thu cuối
 
 Theo tiêu chí chấp nhận của thiết kế:
 
-- [ ] Rule Approved có `testSpec` sinh đúng một testcase `ACTIVE` trên mỗi Column `Available` của CDE trong TD; Column
-  không hợp kiểu được đánh dấu Không áp dụng; Draft/In Review/Rejected không sinh testcase.
+- [ ] Rule Approved sinh đúng một testcase `ACTIVE` cho mỗi khai báo trên mỗi Column `Available` của CDE trong TD, không
+  giới hạn số khai báo; Column không hợp kiểu được đánh dấu Không áp dụng cho khai báo đó; Draft/In Review/Rejected
+  không sinh testcase.
 - [ ] Gán, đổi, bỏ CDE trên TD, đổi CDE của Rule, approve version mới và cutover DD/DQ đều đưa tập testcase về đúng
   DQT §5.1 mà không tạo trùng, kể cả khi chạy lại reconcile nhiều lần.
-- [ ] Version minor đổi tham số hoặc SQL thì cập nhật testcase hiện có, giữ lịch sử kết quả; đổi loại kiểm tra bị từ chối.
+- [ ] Version minor đổi tham số hoặc SQL thì cập nhật testcase hiện có, giữ lịch sử kết quả; thêm/xóa khai báo sinh/retire
+  đúng testcase; đổi loại kiểm tra của khai báo đã có bị từ chối.
 - [ ] Testcase managed không sửa/xóa được qua API/UI gốc; ghi kết quả và incident vẫn hoạt động.
-- [ ] Kết quả Rule và CDE khớp với kết quả gốc của từng testcase và ngưỡng DQT §6.1–6.3; dòng testcase tôn trọng quyền
+- [ ] Kết quả khai báo, Rule và CDE khớp với kết quả gốc của từng testcase và ngưỡng DQT §6.1–6.3; dòng testcase tôn trọng quyền
   xem Table.
-- [ ] SQL không phải `SELECT` đơn bị từ chối ở Lưu và ở Approve.
+- [ ] SQL không phải `SELECT` đơn, hoặc chỉ select `COUNT(*)`, bị từ chối ở Lưu và ở Approve.
+- [ ] Khai báo `SQL` cho đúng số vi phạm trên Oracle, DB2 (nếu có) và PostgreSQL mà không kéo bản ghi về ingestion.
+- [ ] Mỗi Rule áp dụng có suite và pipeline riêng; lịch chạy do người dùng đặt (hoặc không đặt) được đồng bộ đúng sang
+  pipeline và giữ qua các version; Chạy ngay chạy toàn bộ testcase của Rule và bị chặn khi đang chạy.
 - [ ] Kết quả của Rule/CDE đã lưu trữ vẫn tra cứu được sau cutover.
 - [ ] Tài liệu ở §5 Tài liệu đã cập nhật.
