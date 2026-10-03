@@ -21,7 +21,7 @@ export const resetDqTestConfigCache = () => {
   cachedConfig = undefined;
 };
 
-/** Server flag and capabilities of Data Quality Rule test execution, read once per session. */
+/** Capabilities of the caller on Data Quality Rule test execution, read once per session. */
 export const useDqTestConfig = () => {
   const [config, setConfig] = useState<DQTestConfig>();
   const [isLoading, setIsLoading] = useState(true);
@@ -42,9 +42,5 @@ export const useDqTestConfig = () => {
     };
   }, []);
 
-  return {
-    config,
-    isEnabled: Boolean(config?.testExecutionEnabled),
-    isLoading,
-  };
+  return { config, isLoading };
 };

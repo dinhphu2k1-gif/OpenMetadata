@@ -84,9 +84,7 @@ public final class DqTestOutbox {
   }
 
   private static void enqueue(DqRuleTestDAO dao, String kind, String key, String payload) {
-    if (DqTestExecutionSettings.isEnabled()) {
-      dao.enqueue(kind, key, payload, System.currentTimeMillis());
-    }
+    dao.enqueue(kind, key, payload, System.currentTimeMillis());
   }
 
   /**
@@ -94,10 +92,8 @@ public final class DqTestOutbox {
    * entry that led here is durable and retried, so this is queued in its own transaction.
    */
   public static void afterColumnProjected(String columnKey) {
-    if (DqTestExecutionSettings.isEnabled()) {
-      enqueueColumn(dao(), columnKey, null);
-      drainAsync();
-    }
+    enqueueColumn(dao(), columnKey, null);
+    drainAsync();
   }
 
   /** Publication hook: queues the reconcile of an approved Data Quality Rule. */
@@ -135,9 +131,7 @@ public final class DqTestOutbox {
 
   /** Processes the queue on the worker thread; used after a committed change. */
   public static void drainAsync() {
-    if (DqTestExecutionSettings.isEnabled()) {
-      WORKER.execute(DqTestOutbox::drainSafely);
-    }
+    WORKER.execute(DqTestOutbox::drainSafely);
   }
 
   public static void drainPending() {
@@ -164,9 +158,7 @@ public final class DqTestOutbox {
 
   private static void drainSafely() {
     try {
-      if (DqTestExecutionSettings.isEnabled()) {
-        drainPending();
-      }
+      drainPending();
     } catch (RuntimeException exception) {
       LOG.warn("Data Quality test outbox worker run failed", exception);
     }

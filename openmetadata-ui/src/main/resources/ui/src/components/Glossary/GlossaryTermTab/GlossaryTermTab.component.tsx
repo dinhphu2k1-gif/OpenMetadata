@@ -151,7 +151,6 @@ import {
   CDE_TAG_CLASSIFICATIONS,
   getCDEGlossaryTableColumns,
 } from './CDEGlossaryTableColumns';
-import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
 import { getDqRuleStatuses } from '../../../rest/dqRuleTestAPI';
 import {
   DQ_OUTCOME_LABEL_KEY,
@@ -734,7 +733,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   >(['all']);
   const [dqRuleStatuses, setDqRuleStatuses] =
     useState<Record<string, string>>();
-  const { isEnabled: isDqTestEnabled } = useDqTestConfig();
   const [dqFilterOptions, setDqFilterOptions] = useState<{
     dimensions: Array<{ label: string; value: string }>;
     methods: Array<{ label: string; value: string }>;
@@ -1121,8 +1119,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     [handlePageChange]
   );
 
-  const hasActiveDqTestFilter =
-    isDqTestEnabled && !selectedDqTestStatuses.includes('all');
+  const hasActiveDqTestFilter = !selectedDqTestStatuses.includes('all');
 
   useEffect(() => {
     if (hasActiveDqTestFilter) {
@@ -3080,15 +3077,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               selectedValues={selectedDqTargetPopulations}
               onChange={handleDqTargetPopulationsChange}
             />
-            {isDqTestEnabled && (
-              <CDEFilterDropdown
-                dataTestId="dq-test-filter"
-                label={t('dq.test.filter-title', 'Kiểm thử')}
-                options={dqTestStatusOptions}
-                selectedValues={selectedDqTestStatuses}
-                onChange={handleDqTestStatusesChange}
-              />
-            )}
+            <CDEFilterDropdown
+              dataTestId="dq-test-filter"
+              label={t('dq.test.filter-title', 'Kiểm thử')}
+              options={dqTestStatusOptions}
+              selectedValues={selectedDqTestStatuses}
+              onChange={handleDqTestStatusesChange}
+            />
           </>
         )}
 
@@ -3149,7 +3144,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedDqOwners,
     selectedDqMethods,
     selectedDqTargetPopulations,
-    isDqTestEnabled,
     dqTestStatusOptions,
     selectedDqTestStatuses,
     handleDqTestStatusesChange,

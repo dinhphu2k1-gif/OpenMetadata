@@ -594,6 +594,28 @@ services:
       - ingestion-volume-dags:/opt/airflow/dags
       - ingestion-volume-tmp:/tmp
 
+  # MySQL nguồn dữ liệu nhỏ để thử kiểm thử theo quy tắc CLDL. Chỉ chạy khi bật profile:
+  #   docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-mysql
+  # Chi tiết dữ liệu và kịch bản thử: dq-sandbox/README.md
+  dq-sandbox-mysql:
+    image: mysql:8.0
+    container_name: dq-sandbox-mysql
+    profiles: ["dq-sandbox"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DQ_SANDBOX_ROOT_PASSWORD:-root_pw}
+    ports:
+      - "${DQ_SANDBOX_MYSQL_PORT:-3307}:3306"
+    volumes:
+      - ./dq-sandbox/init:/docker-entrypoint-initdb.d:ro
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    networks:
+      - local_app_net
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-udq_reader", "-pdq_reader_pw", "-e", "select 1 from core_kh.kh limit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
 networks:
   local_app_net:
     name: omd_network

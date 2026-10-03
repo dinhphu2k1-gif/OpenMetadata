@@ -34,7 +34,6 @@ import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqManagedGuard;
 import org.openmetadata.service.glossary.dq.DqResultService;
 import org.openmetadata.service.glossary.dq.DqRuleTestService;
-import org.openmetadata.service.glossary.dq.DqTestExecutionSettings;
 import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.dq.DqTrendService;
 import org.openmetadata.service.jdbi3.DqRuleTestDAO;
@@ -247,7 +246,6 @@ public class DqRuleTestResource {
   @Operation(operationId = "reconcileDqRuleTests", summary = "Reconcile every Rule (administrator)")
   public Map<String, Object> reconcileAll(@Context SecurityContext securityContext) {
     access.requireAdmin(securityContext);
-    DqTestExecutionSettings.requireEnabled();
     DqTestOutbox.enqueueAll(Entity.getJdbi().onDemand(DqRuleTestDAO.class));
     DqTestOutbox.drainAsync();
     return Map.of("queued", true);
@@ -260,7 +258,6 @@ public class DqRuleTestResource {
     access.requireAdmin(securityContext);
     final DqRuleTestDAO dao = Entity.getJdbi().onDemand(DqRuleTestDAO.class);
     final Map<String, Object> status = new LinkedHashMap<>();
-    status.put("enabled", DqTestExecutionSettings.isEnabled());
     status.put("outboxPending", DqTestOutbox.pendingCount());
     status.put("oldestPendingAt", DqTestOutbox.oldestPendingAt());
     status.put("rules", dao.listRuleExec().size());

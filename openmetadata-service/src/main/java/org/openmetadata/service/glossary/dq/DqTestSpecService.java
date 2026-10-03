@@ -35,9 +35,6 @@ public final class DqTestSpecService {
       UUID ruleId, DqTestSpecs current, DqTestSpecs requested, Object extension) {
     DqTestSpecs result = current;
     if (requested != null) {
-      if (!nullOrEmpty(requested.getItems())) {
-        DqTestExecutionSettings.requireEnabled();
-      }
       final DqTestSpecs assigned = DqTestSpecKeys.assign(requested, issuedUpTo(ruleId, current));
       new DqTestSpecValidator(
               DqTestSpecValidator.Mode.DRAFT, definitionResolver(), null, ruleThreshold(extension))
@@ -51,7 +48,6 @@ public final class DqTestSpecService {
   public static void validateForWorkflow(GlossaryTerm payload) {
     final DqTestSpecs specs = payload.getDataQualityTestSpecs();
     if (specs != null && !nullOrEmpty(specs.getItems())) {
-      DqTestExecutionSettings.requireEnabled();
       new DqTestSpecValidator(
               DqTestSpecValidator.Mode.FULL,
               definitionResolver(),

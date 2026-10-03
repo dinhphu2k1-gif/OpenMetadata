@@ -122,8 +122,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       DataQualityBootstrap.initialize();
       TechnicalDictionaryBootstrap.initialize();
       versioningService.processPendingOutbox();
+      DqTestBootstrap.initialize(config);
     }
-    DqTestBootstrap.initialize(config);
   }
 
   @GET

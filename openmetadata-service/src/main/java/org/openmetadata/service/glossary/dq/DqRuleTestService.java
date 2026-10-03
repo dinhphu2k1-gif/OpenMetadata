@@ -41,7 +41,6 @@ public final class DqRuleTestService {
 
   public static Map<String, Object> config() {
     final Map<String, Object> config = new LinkedHashMap<>();
-    config.put("testExecutionEnabled", DqTestExecutionSettings.isEnabled());
     config.put("defaultTimezone", DqSchedule.DEFAULT_TIMEZONE);
     return config;
   }
@@ -120,7 +119,6 @@ public final class DqRuleTestService {
   /** Sets or clears (null cron) the schedule of a Rule; effective at once, no approval. */
   public static Map<String, Object> setSchedule(
       String ruleId, String cron, String timezone, String actor) {
-    DqTestExecutionSettings.requireEnabled();
     DqSchedule.validate(cron, timezone);
     final RuleExecRow row = requireExecRow(ruleId);
     dao().updateSchedule(ruleId, cron, timezone, actor, System.currentTimeMillis());
@@ -137,7 +135,6 @@ public final class DqRuleTestService {
 
   /** Triggers the pipeline of the Rule, which runs every testcase of the Rule. */
   public static Map<String, Object> run(String ruleId, String actor) {
-    DqTestExecutionSettings.requireEnabled();
     final IngestionPipeline pipeline = requireRunnablePipeline(ruleId);
     if (isRunning(DqPipelineGateway.latestStatus(pipeline))) {
       throw DqTestErrors.conflict(

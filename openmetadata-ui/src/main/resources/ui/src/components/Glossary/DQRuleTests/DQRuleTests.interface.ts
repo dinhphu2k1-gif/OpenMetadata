@@ -23,7 +23,6 @@ export interface DQTestCapabilities {
 }
 
 export interface DQTestConfig {
-  testExecutionEnabled: boolean;
   defaultTimezone: string;
   capabilities?: DQTestCapabilities;
 }

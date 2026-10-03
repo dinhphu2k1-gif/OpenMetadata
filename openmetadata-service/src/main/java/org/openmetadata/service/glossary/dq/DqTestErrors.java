@@ -23,7 +23,6 @@ public final class DqTestErrors {
   public static final String SCHEDULE_INVALID = "DQ_SCHEDULE_INVALID";
   public static final String RUN_IN_PROGRESS = "DQ_TEST_RUN_IN_PROGRESS";
   public static final String RUN_NOT_AVAILABLE = "DQ_TEST_RUN_NOT_AVAILABLE";
-  public static final String FEATURE_DISABLED = "DQ_TEST_EXECUTION_DISABLED";
   public static final String NOT_A_RULE = "DQ_TEST_SPEC_NOT_A_RULE";
 
   private DqTestErrors() {}

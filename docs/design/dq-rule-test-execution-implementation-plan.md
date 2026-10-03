@@ -50,12 +50,8 @@ Một mốc chỉ hoàn thành khi có đủ:
 5. Hiển thị kết quả.
 6. Xu hướng và công cụ vận hành.
 
-Feature flag đề xuất `governedGlossary.dataQuality.testExecution.enabled`, mặc định tắt. Khi tắt: không hiển thị section
-**Khai báo kiểm thử**, outbox không được xử lý, tab kết quả giữ nội dung cũ. Flag chỉ bật production sau T3.
-
-Repo chưa có cơ chế feature flag cho governed glossary (kế hoạch DQ, DQ00). PR đầu tiên của T1 thêm flag dạng cấu hình
-server trong `openmetadata.yaml` (biến môi trường, mặc định `false`), đọc ở backend và trả cho UI qua endpoint cấu hình
-hiện có; không dựng hệ thống flag chung.
+Không dùng feature flag (quyết định 2026-10-03): tính năng luôn hoạt động trên server quản trị và được kiểm thử kỹ ở
+môi trường dev trước khi đưa lên production. Portal chỉ đọc không khởi động worker outbox.
 
 ### 2.2. Phụ thuộc bên ngoài
 
@@ -63,7 +59,7 @@ hiện có; không dựng hệ thống flag chung.
 | --- | --- |
 | Workflow DQ dùng chung chạy trọn Draft → Submit → Approve và tạo minor version (DQ08–DQ10 trong kế hoạch DQ). Chủ dự án tự xử lý | T1 |
 | Điểm kích hoạt của TD (`TechnicalRecordService`, `TechnicalCutover`, import committer) | T3 |
-| Connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service có CDE | Bật flag production |
+| Connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service có CDE | Đưa lên production |
 | Airflow chạy pipeline dùng bản ingestion build từ fork (có `DqrColumnSqlValidator`), không dùng image ingestion gốc | Chạy khai báo `SQL` ở mọi môi trường từ T2 |
 | Một nguồn Oracle dev (và DB2 nếu có) cho spike T0 và test T2 | T0, T2 |
 
@@ -72,7 +68,7 @@ hiện có; không dựng hệ thống flag chung.
 | Mốc | Nội dung | Phụ thuộc |
 | --- | --- | --- |
 | T0 | Xác minh giả định kỹ thuật DQT §11; chạy thử validator SQL trên Oracle (Q1–Q7 DQT §12 đã chốt) | |
-| T1 | Feature flag, schema `dqTestSpecs.json`, trường `dataQualityTestSpecs` của `GlossaryTerm`, DTO `testSpecs`, validation, form và card Overview | DQ08–DQ10 |
+| T1 | Schema `dqTestSpecs.json`, trường `dataQualityTestSpecs` của `GlossaryTerm`, DTO `testSpecs`, validation, form và card Overview | DQ08–DQ10 |
 | T2 | Bảng lưu trữ, reconciler, outbox, suite và pipeline riêng của Rule, sinh testcase khi Approve Rule | T1 |
 | T3 | Kích hoạt từ TD và cutover, khóa testcase managed | T2; điểm kích hoạt TD |
 | T4 | API kết quả, đặt lịch chạy, Chạy ngay, tab Kết quả kiểm thử của Rule, tab Chất lượng dữ liệu của CDE, bộ lọc danh sách | T2 |
@@ -122,7 +118,6 @@ T3 và T4 có thể làm song song sau T2.
 
 **Phạm vi**
 
-- Feature flag cấu hình server (§2.1).
 - Schema `dqTestSpecs.json` trong `openmetadata-spec` (DQT §4.2); thêm trường tùy chọn `dataQualityTestSpecs` vào
   `glossaryTerm.json` (DQT-14); generate model Java, TypeScript và Python (`make generate`).
 - DTO create/patch DQ Rule thêm trường typed `testSpecs` (mảng); server ghi vào `dataQualityTestSpecs` của payload
@@ -380,23 +375,22 @@ Rủi ro sản phẩm và vận hành nằm ở DQT §11. Rủi ro riêng của 
 | Thêm trường vào schema `GlossaryTerm` gốc làm khó nâng cấp OpenMetadata | Trường tùy chọn, tên riêng `dataQualityTestSpecs`, không đổi trường có sẵn; thêm vào danh mục kiểm tra khi nâng cấp |
 | Airflow dùng image ingestion gốc nên thiếu `DqrColumnSqlValidator` | Build và deploy ingestion từ fork trước khi bật khai báo `SQL`; reconcile status cảnh báo khi testcase `SQL` lỗi do không nạp được validator |
 | `DqrColumnSqlValidator` lệch validator gốc khi nâng cấp OpenMetadata | Pytest bao các nguồn; thêm vào danh mục kiểm tra khi nâng cấp |
-| Điểm kích hoạt TD chưa ổn định làm chậm T3 | T4 làm song song với T3; flag chưa bật production |
+| Điểm kích hoạt TD chưa ổn định làm chậm T3 | T4 làm song song với T3; chưa đưa lên production trước khi T3 xong |
 | Reconciler tạo trùng testcase khi chạy song song | Test đồng thời ở T2 là điều kiện merge PR 5 |
 
 ## 9. Rollout và rollback
 
 ### Rollout
 
-1. Deploy T1–T2 với flag tắt; chạy bootstrap bot. Deploy ingestion build từ fork lên Airflow (có
-   `DqrColumnSqlValidator`).
-2. Bật flag ở môi trường kiểm thử, duyệt vài Rule thật và đối chiếu kết quả với chạy tay.
+1. Deploy lên môi trường dev cùng ingestion build từ fork trên Airflow (có `DqrColumnSqlValidator`).
+2. Duyệt vài Rule thật và đối chiếu kết quả với chạy tay.
 3. Xác nhận connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service.
-4. Bật production sau khi T3 hoàn tất (khóa managed và kích hoạt TD).
+4. Đưa lên production sau khi T3 hoàn tất (khóa managed và kích hoạt TD) và các bước trên đạt.
 5. Theo dõi outbox lag, binding `ERROR` và tải Airflow (số DAG chạy đồng thời) ít nhất một tuần.
 
 ### Rollback
 
-- Tắt flag: outbox ngừng xử lý, testcase managed không bị xóa.
+- Quay lại bản ứng dụng cũ: testcase managed và pipeline đã tạo không bị xóa, nhưng khóa managed không còn.
 - Nếu cần dừng chạy testcase: tạm dừng pipeline `DQR__*` trong trang pipeline gốc (từng Rule), hoặc Admin bỏ lịch hàng
   loạt qua `PUT .../schedule`.
 - Migration chỉ thêm bảng, không đổi bảng hiện có; rollback ứng dụng không cần rollback schema.

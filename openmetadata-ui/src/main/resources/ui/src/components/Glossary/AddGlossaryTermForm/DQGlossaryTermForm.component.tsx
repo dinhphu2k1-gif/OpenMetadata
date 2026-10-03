@@ -24,7 +24,6 @@ import {
   DqTestSpecKind,
   DqTestSpecs,
 } from '../../../generated/type/dqTestSpecs';
-import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
 import DQTestSpecsField, {
   isDqTestSpecsValid,
 } from '../DQRuleTests/DQTestSpecsField.component';
@@ -72,7 +71,6 @@ const DQGlossaryTermForm = ({
 }: DQGlossaryTermFormProps) => {
   const form = formRef as unknown as FormInstance<DQGlossaryTermFormValues>;
   const { t } = useTranslation();
-  const { isEnabled: isTestExecutionEnabled } = useDqTestConfig();
   const methodTags = Form.useWatch('methodTags', form);
   const qualityThreshold = Form.useWatch('qualityThreshold', form);
 
@@ -259,9 +257,7 @@ const DQGlossaryTermForm = ({
       mutuallyExclusive: false,
       style: undefined,
       extension: isEmpty(extension) ? undefined : extension,
-      dataQualityTestSpecs: isTestExecutionEnabled
-        ? values.testSpecs
-        : undefined,
+      dataQualityTestSpecs: values.testSpecs,
     } as GlossaryTermForm);
   };
 
@@ -462,30 +458,28 @@ const DQGlossaryTermForm = ({
         </Form.Item>
       </GlossaryTermFormSection>
 
-      {isTestExecutionEnabled && (
-        <GlossaryTermFormSection
-          className="cde-form-section-tests"
-          title={t('dq.test.title')}>
-          <Form.Item
-            className="cde-form-field-full"
-            name="testSpecs"
-            rules={[
-              {
-                validator: async (_, value?: DqTestSpecs) =>
-                  isDqTestSpecsValid(value)
-                    ? Promise.resolve()
-                    : Promise.reject(new Error(t('dq.test.invalid'))),
-              },
-            ]}>
-            <DQTestSpecsField
-              cdeTermId={selectedCde?.id}
-              defaultKind={defaultTestKind}
-              lockedKeys={lockedTestKeys}
-              ruleThreshold={qualityThreshold}
-            />
-          </Form.Item>
-        </GlossaryTermFormSection>
-      )}
+      <GlossaryTermFormSection
+        className="cde-form-section-tests"
+        title={t('dq.test.title')}>
+        <Form.Item
+          className="cde-form-field-full"
+          name="testSpecs"
+          rules={[
+            {
+              validator: async (_, value?: DqTestSpecs) =>
+                isDqTestSpecsValid(value)
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(t('dq.test.invalid'))),
+            },
+          ]}>
+          <DQTestSpecsField
+            cdeTermId={selectedCde?.id}
+            defaultKind={defaultTestKind}
+            lockedKeys={lockedTestKeys}
+            ruleThreshold={qualityThreshold}
+          />
+        </Form.Item>
+      </GlossaryTermFormSection>
 
       <GlossaryTermFormSection
         className="cde-form-section-context"

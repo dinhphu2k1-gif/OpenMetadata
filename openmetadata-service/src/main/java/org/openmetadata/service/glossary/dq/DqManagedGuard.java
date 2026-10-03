@@ -31,7 +31,7 @@ public final class DqManagedGuard {
   public record ManagedBy(String ruleId, String ruleCode, String specKey, String specName) {}
 
   public static void requireNotManaged(TestCase testCase) {
-    if (!DqManagedWrite.isActive() && DqTestExecutionSettings.isEnabled()) {
+    if (!DqManagedWrite.isActive()) {
       managedBy(testCase)
           .ifPresent(
               managed -> {

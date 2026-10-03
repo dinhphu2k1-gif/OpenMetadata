@@ -375,7 +375,7 @@ const GlossaryTermsV1 = ({
     [glossaryTerm],
   );
 
-  const { config: dqTestConfig, isEnabled: isDqTestEnabled } = useDqTestConfig();
+  const { config: dqTestConfig } = useDqTestConfig();
 
   const isDQGlossaryTerm = useMemo(
     () =>
@@ -518,7 +518,7 @@ const GlossaryTermsV1 = ({
       } as (typeof dqTabs)[number];
 
       return (
-        isDqTestEnabled ? withResultTab(dqTabs, resultTab) : dqTabs
+        withResultTab(dqTabs, resultTab)
       ).filter((tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs));
     }
 
@@ -571,7 +571,7 @@ const GlossaryTermsV1 = ({
       } as (typeof cdeTabs)[number];
 
       return (
-        isDqTestEnabled ? withResultTab(cdeTabs, cdeResultTab) : cdeTabs
+        withResultTab(cdeTabs, cdeResultTab)
       ).filter((tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs));
     }
 
@@ -592,7 +592,6 @@ const GlossaryTermsV1 = ({
     handleAssetClick,
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
-    isDqTestEnabled,
     dqTestConfig,
   ]);
 

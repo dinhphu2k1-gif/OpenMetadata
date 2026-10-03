@@ -20,9 +20,6 @@ public final class DqTestBootstrap {
   public static void initialize(OpenMetadataApplicationConfig config) {
     CONFIG.set(config);
     DqTestOutbox.startWorker();
-    LOG.info(
-        "Data Quality Rule test execution is {}",
-        DqTestExecutionSettings.isEnabled() ? "enabled" : "disabled");
   }
 
   public static OpenMetadataApplicationConfig config() {

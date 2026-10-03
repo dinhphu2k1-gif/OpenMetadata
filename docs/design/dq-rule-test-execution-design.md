@@ -428,7 +428,7 @@ Mọi endpoint nằm dưới `/v1/glossaryTerms/dataQuality` (cùng kiểu với
 
 | Mục đích | Endpoint |
 | --- | --- |
-| Cờ tính năng và quyền của người gọi | `GET /config` → `{testExecutionEnabled, defaultTimezone, capabilities}` |
+| Quyền của người gọi và múi giờ mặc định | `GET /config` → `{defaultTimezone, capabilities}` |
 | Danh sách `TestDefinition` chọn được cho `LIBRARY` | `GET /testDefinitions` |
 | Preview áp dụng (Column của CDE, áp dụng được hay không, theo từng khai báo) | `POST /preview` với `{cdeTermId, dataQualityTestSpecs}` |
 | Kiểm tra lịch và xem 5 lần chạy tới | `POST /schedule/preview` với `{cron, timezone}` |
@@ -620,9 +620,8 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 
 Những điểm hiện thực khác hoặc chi tiết hơn so với các mục trên:
 
-- **Cờ tính năng:** biến môi trường `DQ_RULE_TEST_EXECUTION_ENABLED` (mặc định tắt), đọc ở `DqTestExecutionSettings`,
-  UI hỏi qua `GET /config`. Khi tắt: API khai báo/lịch/chạy trả `403 DQ_TEST_EXECUTION_DISABLED`, không ghi outbox, tab
-  kết quả giữ nội dung observability gốc, form không hiện section Khai báo kiểm thử.
+- **Không có cờ bật/tắt:** tính năng luôn hoạt động trên server quản trị. Worker outbox chỉ khởi động khi server không ở
+  chế độ Portal (Portal dùng tài khoản DB chỉ đọc).
 - **Actor `dq-governance-bot`** chỉ là tên ghi vào `updatedBy`; không có entity bot. Khóa managed (§5.6) dựa trên cờ
   trong tiến trình (`DqManagedWrite`) đặt quanh các lệnh ghi của reconciler, không dựa trên tên người dùng, nên không ai
   mạo danh được bằng cách đặt tên.

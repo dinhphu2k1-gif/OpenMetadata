@@ -14,7 +14,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
-import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
 import { previewDqRuleTests } from '../../../rest/dqRuleTestAPI';
 import { DQPreview } from './DQRuleTests.interface';
 
@@ -25,19 +24,18 @@ interface DQApprovePreviewProps {
 /** Tells the approver how many testcases approving the Rule will create. */
 const DQApprovePreview = ({ rule }: DQApprovePreviewProps) => {
   const { t } = useTranslation();
-  const { isEnabled } = useDqTestConfig();
   const [preview, setPreview] = useState<DQPreview>();
   const specs = rule.dataQualityTestSpecs;
   const cdeTermId = rule.relatedTerms?.find((relation) => relation.term?.id)
     ?.term?.id;
 
   useEffect(() => {
-    if (isEnabled && specs?.items?.length && cdeTermId) {
+    if (specs?.items?.length && cdeTermId) {
       previewDqRuleTests(cdeTermId, specs)
         .then(setPreview)
         .catch(() => setPreview(undefined));
     }
-  }, [isEnabled, specs, cdeTermId]);
+  }, [specs, cdeTermId]);
 
   if (!preview) {
     return null;

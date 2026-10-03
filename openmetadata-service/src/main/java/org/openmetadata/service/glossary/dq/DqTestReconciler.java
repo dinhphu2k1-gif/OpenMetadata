@@ -49,11 +49,9 @@ public final class DqTestReconciler {
   /** Reconciles one Rule; returns the number of bindings left in ERROR. */
   public static int reconcileRule(String ruleId) {
     int errors = 0;
-    if (DqTestExecutionSettings.isEnabled()) {
-      final DqRuleSource source = DqRuleSource.load(UUID.fromString(ruleId));
-      if (source != null) {
-        errors = Entity.getJdbi().inTransaction(handle -> new Run(handle, source).execute());
-      }
+    final DqRuleSource source = DqRuleSource.load(UUID.fromString(ruleId));
+    if (source != null) {
+      errors = Entity.getJdbi().inTransaction(handle -> new Run(handle, source).execute());
     }
     return errors;
   }
@@ -335,7 +333,13 @@ public final class DqTestReconciler {
         errors++;
       }
       dao.updateRuleApplied(
-          ruleId, rule.businessVersion(), appliedHash(), rule.cdeTermId(), suiteId, pipelineId, now);
+          ruleId,
+          rule.businessVersion(),
+          appliedHash(),
+          rule.cdeTermId(),
+          suiteId,
+          pipelineId,
+          now);
     }
 
     private void disablePipeline(RuleExecRow row) {

@@ -98,3 +98,26 @@ docker exec -i openmetadata_postgresql psql -U postgres -v portal_password=porta
 ```
 
 Khi dùng OIDC, đặt `PORTAL_AUTHENTICATION_CALLBACK_URL` là địa chỉ `/callback` của Portal.
+
+---
+
+## 7. Kiểm thử theo quy tắc chất lượng dữ liệu
+
+Tính năng khai báo kiểm thử trên DQ Rule, tự sinh testcase trên các cột của CDE, đặt lịch và Chạy ngay theo Rule.
+Không có cờ bật/tắt: tính năng luôn hoạt động trên `openmetadata-server`. `portal` chỉ đọc nên không chạy việc nền.
+
+Yêu cầu khi deploy:
+
+1. Build lại image server (`./build-server-image.sh`) và image ingestion từ mã nguồn này. Ingestion cần có
+   `DqrColumnSqlValidator`, nên đặt `INGESTION_IMAGE` trỏ tới image đã build.
+2. Bảng mới nằm trong migration `1.13.3`; `execute-migrate-all` tự tạo khi khởi động.
+
+Nguồn dữ liệu thử nghiệm (MySQL nhỏ, có vi phạm cố ý, tài khoản chỉ đọc `dq_reader`):
+
+```bash
+docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-mysql
+docker compose -f docker-compose.dev.yml --profile dq-sandbox rm -sfv dq-sandbox-mysql    # xóa để nạp lại dữ liệu
+```
+
+Trong OpenMetadata khai báo service MySQL với host `dq-sandbox-mysql`, cổng `3306`, tài khoản `dq_reader` /
+`dq_reader_pw`. Dữ liệu và kịch bản thử: `dq-sandbox/README.md`.
