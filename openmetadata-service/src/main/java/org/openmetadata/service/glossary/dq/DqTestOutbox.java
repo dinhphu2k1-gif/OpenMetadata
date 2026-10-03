@@ -190,11 +190,41 @@ public final class DqTestOutbox {
   /** Returns true when a full batch succeeded, so more work may remain. */
   private static boolean processBatch() {
     final List<OutboxEntry> entries = dao().listPending(BATCH_SIZE);
-    boolean succeeded = true;
+    final List<OutboxEntry> columns =
+        entries.stream().filter(entry -> RECONCILE_COLUMN.equals(entry.kind())).toList();
+    boolean succeeded = processColumns(columns);
     for (OutboxEntry entry : entries) {
-      succeeded &= processEntry(entry);
+      if (!RECONCILE_COLUMN.equals(entry.kind())) {
+        succeeded &= processEntry(entry);
+      }
     }
     return succeeded && entries.size() == BATCH_SIZE;
+  }
+
+  /**
+   * Columns changed together (a Technical Dictionary import) reconcile every Rule they touch once,
+   * not once per Column.
+   */
+  private static boolean processColumns(List<OutboxEntry> columns) {
+    boolean succeeded = true;
+    if (!columns.isEmpty()) {
+      try {
+        final Set<String> ruleIds = new LinkedHashSet<>();
+        columns.forEach(entry -> ruleIds.addAll(rulesOfColumn(entry)));
+        final int errors = reconcileRules(ruleIds);
+        if (errors > 0) {
+          throw new IllegalStateException(errors + " binding(s) could not be reconciled");
+        }
+        columns.forEach(
+            entry -> dao().deleteProcessed(entry.kind(), entry.subjectKey(), entry.enqueuedAt()));
+      } catch (RuntimeException exception) {
+        LOG.warn("Data Quality test outbox column batch failed", exception);
+        columns.forEach(
+            entry -> dao().markFailed(entry.kind(), entry.subjectKey(), error(exception)));
+        succeeded = false;
+      }
+    }
+    return succeeded;
   }
 
   private static boolean processEntry(OutboxEntry entry) {
@@ -220,15 +250,15 @@ public final class DqTestOutbox {
   private static int run(OutboxEntry entry) {
     return switch (entry.kind()) {
       case RECONCILE_RULE -> DqTestReconciler.reconcileRule(entry.subjectKey());
-      case RECONCILE_COLUMN -> reconcileColumn(entry);
+      case RECONCILE_COLUMN -> reconcileRules(rulesOfColumn(entry));
       case SYNC_PIPELINE -> syncPipeline(entry.subjectKey());
       case RETIRE_SCOPE, RECONCILE_ALL -> reconcileRules(allRuleIds());
       default -> throw new IllegalArgumentException("Unknown outbox kind " + entry.kind());
     };
   }
 
-  /** Reconciles the Rules of the CDE the Column left, of the CDE it joined and of its bindings. */
-  private static int reconcileColumn(OutboxEntry entry) {
+  /** The Rules of the CDE the Column left, of the CDE it joined and of its bindings. */
+  private static Set<String> rulesOfColumn(OutboxEntry entry) {
     final Set<String> ruleIds = new LinkedHashSet<>();
     dao()
         .listBindingsByColumn(entry.subjectKey())
@@ -241,7 +271,7 @@ public final class DqTestOutbox {
         dao().listRuleExecByCde(column.cdeTermId()).forEach(rule -> ruleIds.add(rule.ruleTermId()));
       }
     }
-    return reconcileRules(ruleIds);
+    return ruleIds;
   }
 
   private static int reconcileRules(Set<String> ruleIds) {

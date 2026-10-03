@@ -84,8 +84,7 @@ class DqTestSpecSqlTest {
         "SELECT SUM({{ column_name }}) FROM {{ table_name }}"
       })
   void rejectsAggregateOnlySelect(String sql) {
-    assertTrue(
-        problems(sql).stream().anyMatch(problem -> problem.contains("aggregate")), sql);
+    assertTrue(problems(sql).stream().anyMatch(problem -> problem.contains("aggregate")), sql);
   }
 
   @Test
@@ -97,7 +96,8 @@ class DqTestSpecSqlTest {
 
   @Test
   void otherVariablesNeedAValue() {
-    final String sql = "SELECT {{ column_name }} FROM {{ table_name }} WHERE {{ column_name }} > {{ limit }}";
+    final String sql =
+        "SELECT {{ column_name }} FROM {{ table_name }} WHERE {{ column_name }} > {{ limit }}";
     assertFalse(DqTestSpecSql.problems(sql, Set.of()).isEmpty());
     assertEquals(List.of(), DqTestSpecSql.problems(sql, Set.of("limit")));
   }
@@ -106,6 +106,7 @@ class DqTestSpecSqlTest {
   void rejectsBlankAndComplexTemplates() {
     assertFalse(problems(" ").isEmpty());
     assertFalse(problems("SELECT {{ column_name | upper }} FROM {{ table_name }}").isEmpty());
-    assertFalse(problems("{% if x %}SELECT {{ column_name }} FROM {{ table_name }}{% endif %}").isEmpty());
+    assertFalse(
+        problems("{% if x %}SELECT {{ column_name }} FROM {{ table_name }}{% endif %}").isEmpty());
   }
 }

@@ -16,13 +16,34 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class DqThresholdTest {
   @ParameterizedTest
-  @ValueSource(strings = {">= 99.5%", ">99%", "= 100%", "<= 1.25 %", "< 5%", "count = 0", "count <= 12", "COUNT <= 3"})
+  @ValueSource(
+      strings = {
+        ">= 99.5%",
+        ">99%",
+        "= 100%",
+        "<= 1.25 %",
+        "< 5%",
+        "count = 0",
+        "count <= 12",
+        "COUNT <= 3"
+      })
   void parsesGrammar(String text) {
     assertTrue(DqThreshold.parse(text).isPresent(), text);
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "  ", ">= 101%", ">= 99.5", "count > 1", "count = -1", "99%", "count <= 1.5", "abc"})
+  @ValueSource(
+      strings = {
+        "",
+        "  ",
+        ">= 101%",
+        ">= 99.5",
+        "count > 1",
+        "count = -1",
+        "99%",
+        "count <= 1.5",
+        "abc"
+      })
   void rejectsInvalid(String text) {
     assertFalse(DqThreshold.parse(text).isPresent(), text);
   }

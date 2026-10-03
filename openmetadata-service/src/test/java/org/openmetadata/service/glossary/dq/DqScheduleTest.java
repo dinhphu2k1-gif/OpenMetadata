@@ -25,18 +25,22 @@ class DqScheduleTest {
   void rejectsBadCronAndBadZone() {
     assertThrows(WebApplicationException.class, () -> DqSchedule.validate("not a cron", null));
     assertThrows(WebApplicationException.class, () -> DqSchedule.validate("   ", null));
-    assertThrows(WebApplicationException.class, () -> DqSchedule.validate("0 2 * * *", "Mars/Base"));
+    assertThrows(
+        WebApplicationException.class, () -> DqSchedule.validate("0 2 * * *", "Mars/Base"));
   }
 
   @Test
   void previewsTheNextRuns() {
-    assertEquals(DqSchedule.PREVIEW_RUNS, DqSchedule.nextRuns("0 2 * * *", null, DqSchedule.PREVIEW_RUNS).size());
+    assertEquals(
+        DqSchedule.PREVIEW_RUNS,
+        DqSchedule.nextRuns("0 2 * * *", null, DqSchedule.PREVIEW_RUNS).size());
     assertTrue(DqSchedule.nextRuns(null, null, 5).isEmpty());
   }
 
   @Test
   void intervalIsTheGapBetweenRuns() {
-    assertEquals(Duration.ofDays(1), DqSchedule.interval("0 2 * * *", "Asia/Ho_Chi_Minh").orElseThrow());
+    assertEquals(
+        Duration.ofDays(1), DqSchedule.interval("0 2 * * *", "Asia/Ho_Chi_Minh").orElseThrow());
     assertTrue(DqSchedule.interval(null, null).isEmpty());
   }
 }

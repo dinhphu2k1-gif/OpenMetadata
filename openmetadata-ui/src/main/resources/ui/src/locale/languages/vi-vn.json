@@ -160,6 +160,7 @@
     "error-generic-create": "Lỗi khi tạo mới quy tắc CLDL.",
     "error-generic-update": "Lỗi khi cập nhật quy tắc CLDL.",
     "test": {
+      "approve-summary": "Phê duyệt sẽ tạo {{testCases}} testcase từ {{specs}} kiểm thử trên {{columns}} cột của CDE liên kết ({{notApplicable}} không áp dụng do kiểu dữ liệu).",
       "filter-title": "Kiểm thử",
       "add": "Thêm kiểm thử",
       "all": "Tất cả",

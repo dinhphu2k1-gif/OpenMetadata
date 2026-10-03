@@ -30,7 +30,8 @@ class DqOutcomeTest {
 
   @Test
   void abortedIsAnExecutionError() {
-    assertEquals(DqOutcome.ABORTED, DqOutcome.evaluate(threshold(">= 90%"), result(TestCaseStatus.Aborted)));
+    assertEquals(
+        DqOutcome.ABORTED, DqOutcome.evaluate(threshold(">= 90%"), result(TestCaseStatus.Aborted)));
   }
 
   @Test
@@ -49,8 +50,11 @@ class DqOutcomeTest {
 
   @Test
   void percentageThresholdFallsBackToNativeStatusWithoutPercentage() {
-    assertEquals(DqOutcome.PASSED, DqOutcome.evaluate(threshold(">= 99.5%"), result(TestCaseStatus.Success)));
-    assertEquals(DqOutcome.FAILED, DqOutcome.evaluate(threshold(">= 99.5%"), result(TestCaseStatus.Failed)));
+    assertEquals(
+        DqOutcome.PASSED,
+        DqOutcome.evaluate(threshold(">= 99.5%"), result(TestCaseStatus.Success)));
+    assertEquals(
+        DqOutcome.FAILED, DqOutcome.evaluate(threshold(">= 99.5%"), result(TestCaseStatus.Failed)));
   }
 
   @Test
@@ -63,17 +67,25 @@ class DqOutcomeTest {
   @Test
   void countThresholdFallsBackToFirstNumericResultValue() {
     final TestCaseResult withValue =
-        result(TestCaseStatus.Failed).withTestResultValue(List.of(new TestResultValue().withName("Row Count").withValue("2")));
+        result(TestCaseStatus.Failed)
+            .withTestResultValue(
+                List.of(new TestResultValue().withName("Row Count").withValue("2")));
     assertEquals(DqOutcome.PASSED, DqOutcome.evaluate(threshold("count <= 2"), withValue));
     assertEquals(DqOutcome.FAILED, DqOutcome.evaluate(threshold("count = 0"), withValue));
   }
 
   @Test
   void aggregatePrioritisesFailedThenAbortedThenNoResult() {
-    assertEquals(DqOutcome.PASSED, DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.PASSED)));
-    assertEquals(DqOutcome.NO_RESULT, DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.NO_RESULT)));
-    assertEquals(DqOutcome.ABORTED, DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.NO_RESULT, DqOutcome.ABORTED)));
-    assertEquals(DqOutcome.FAILED, DqOutcome.aggregate(List.of(DqOutcome.ABORTED, DqOutcome.FAILED, DqOutcome.PASSED)));
+    assertEquals(
+        DqOutcome.PASSED, DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.PASSED)));
+    assertEquals(
+        DqOutcome.NO_RESULT, DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.NO_RESULT)));
+    assertEquals(
+        DqOutcome.ABORTED,
+        DqOutcome.aggregate(List.of(DqOutcome.PASSED, DqOutcome.NO_RESULT, DqOutcome.ABORTED)));
+    assertEquals(
+        DqOutcome.FAILED,
+        DqOutcome.aggregate(List.of(DqOutcome.ABORTED, DqOutcome.FAILED, DqOutcome.PASSED)));
   }
 
   @Test

@@ -44,6 +44,7 @@ import { ManageButtonItemLabel } from '../../../components/common/ManageButtonCo
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
 import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
+import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
@@ -2050,11 +2051,18 @@ const GlossaryHeader = ({
 
       <ConfirmationModal
         bodyText={
-          isGlossary
-            ? t('message.confirm-approve-entity-message', {
-                entity: t('label.glossary'),
-              })
-            : t('message.confirm-approve-glossary-term-message')
+          isGlossary ? (
+            t('message.confirm-approve-entity-message', {
+              entity: t('label.glossary'),
+            })
+          ) : (
+            <>
+              {t('message.confirm-approve-glossary-term-message')}
+              {isDQGlossaryTerm && isApproveModalOpen && (
+                <DQApprovePreview rule={selectedData as GlossaryTerm} />
+              )}
+            </>
+          )
         }
         cancelText={t('label.cancel')}
         confirmText={t('label.approve')}

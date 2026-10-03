@@ -311,29 +311,39 @@ public final class DqTestReconciler {
       return !effective ? "RULE_INACTIVE" : specStillDeclared ? "COLUMN_REMOVED" : "SPEC_REMOVED";
     }
 
+    /**
+     * A failure here must not undo the bindings written above, so it is counted and left to the
+     * retry of the outbox entry.
+     */
     private void syncPipeline(RuleExecRow row) {
-      final boolean live = hasLiveTestCase();
-      TestSuite suite = null;
-      IngestionPipeline pipeline = null;
-      if (live) {
-        suite = DqPipelineGateway.ensureSuite(rule);
-        DqPipelineGateway.addTestCases(suite, touched);
-        pipeline = DqPipelineGateway.ensurePipeline(suite, row.scheduleCron());
-        DqPipelineGateway.setEnabled(pipeline, true);
-      } else if (row.pipelineId() != null) {
-        pipeline = DqPipelineGateway.find(row.pipelineId());
-        if (pipeline != null) {
-          DqPipelineGateway.setEnabled(pipeline, false);
+      String suiteId = row.testSuiteId();
+      String pipelineId = row.pipelineId();
+      try {
+        if (hasLiveTestCase()) {
+          final TestSuite suite = DqPipelineGateway.ensureSuite(rule);
+          suiteId = suite.getId().toString();
+          DqPipelineGateway.addTestCases(suite, touched);
+          final IngestionPipeline pipeline =
+              DqPipelineGateway.ensurePipeline(suite, row.scheduleCron());
+          pipelineId = pipeline.getId().toString();
+          DqPipelineGateway.setEnabled(pipeline, true);
+        } else {
+          disablePipeline(row);
         }
+      } catch (RuntimeException exception) {
+        LOG.warn("Pipeline of rule {} could not be synchronized", rule.code(), exception);
+        errors++;
       }
       dao.updateRuleApplied(
-          ruleId,
-          rule.businessVersion(),
-          appliedHash(),
-          rule.cdeTermId(),
-          suite != null ? suite.getId().toString() : row.testSuiteId(),
-          pipeline != null ? pipeline.getId().toString() : row.pipelineId(),
-          now);
+          ruleId, rule.businessVersion(), appliedHash(), rule.cdeTermId(), suiteId, pipelineId, now);
+    }
+
+    private void disablePipeline(RuleExecRow row) {
+      final IngestionPipeline pipeline =
+          row.pipelineId() == null ? null : DqPipelineGateway.find(row.pipelineId());
+      if (pipeline != null) {
+        DqPipelineGateway.setEnabled(pipeline, false);
+      }
     }
 
     private boolean hasLiveTestCase() {

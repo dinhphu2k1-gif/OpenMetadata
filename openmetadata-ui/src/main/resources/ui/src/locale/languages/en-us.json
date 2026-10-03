@@ -160,6 +160,7 @@
     "error-generic-create": "Error creating DQ rule.",
     "error-generic-update": "Error updating DQ rule.",
     "test": {
+      "approve-summary": "Approving will create {{testCases}} test case(s) from {{specs}} test(s) on {{columns}} column(s) of the linked CDE ({{notApplicable}} not applicable because of the data type).",
       "filter-title": "Test",
       "add": "Add test",
       "all": "All",

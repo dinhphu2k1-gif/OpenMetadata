@@ -27,25 +27,30 @@ class DqTestSpecKeysTest {
   @Test
   void newDeclarationsGetTheNextNumbers() {
     final DqTestSpecs assigned = DqTestSpecKeys.assign(specs(spec(null, "a"), spec("", "b")), 0);
-    assertEquals(List.of("t1", "t2"), assigned.getItems().stream().map(DqTestSpec::getKey).toList());
+    assertEquals(
+        List.of("t1", "t2"), assigned.getItems().stream().map(DqTestSpec::getKey).toList());
   }
 
   @Test
   void keysAreNeverReusedAfterTheHighestWasIssued() {
-    final DqTestSpecs assigned = DqTestSpecKeys.assign(specs(spec("t1", "a"), spec(null, "new")), 3);
-    assertEquals(List.of("t1", "t4"), assigned.getItems().stream().map(DqTestSpec::getKey).toList());
+    final DqTestSpecs assigned =
+        DqTestSpecKeys.assign(specs(spec("t1", "a"), spec(null, "new")), 3);
+    assertEquals(
+        List.of("t1", "t4"), assigned.getItems().stream().map(DqTestSpec::getKey).toList());
   }
 
   @Test
   void aKeyThatWasNeverIssuedIsRejected() {
     final WebApplicationException error =
-        assertThrows(WebApplicationException.class, () -> DqTestSpecKeys.assign(specs(spec("t9", "a")), 2));
+        assertThrows(
+            WebApplicationException.class, () -> DqTestSpecKeys.assign(specs(spec("t9", "a")), 2));
     assertEquals(400, error.getResponse().getStatus());
   }
 
   @Test
   void aMalformedKeyIsRejected() {
-    assertThrows(WebApplicationException.class, () -> DqTestSpecKeys.assign(specs(spec("x1", "a")), 5));
+    assertThrows(
+        WebApplicationException.class, () -> DqTestSpecKeys.assign(specs(spec("x1", "a")), 5));
   }
 
   @Test
