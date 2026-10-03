@@ -108,8 +108,9 @@ Không có cờ bật/tắt: tính năng luôn hoạt động trên `openmetadat
 
 Yêu cầu khi deploy:
 
-1. Build lại image server (`./build-server-image.sh`) và image ingestion từ mã nguồn này. Ingestion cần có
-   `DqrColumnSqlValidator`, nên đặt `INGESTION_IMAGE` trỏ tới image đã build.
+1. Build lại image server (`./build-server-image.sh`) và build image ingestion có `DqrColumnSqlValidator`
+   (`./build-ingestion-image.sh`, chồng 1 file lên image Airflow gốc rồi sửa 2 file nhỏ). Trong `.env` đặt
+   `INGESTION_IMAGE=openmetadata/ingestion:custom-1.13.3`. Thiếu bước này thì khai báo kiểu SQL báo Lỗi thực thi.
 2. Bảng mới nằm trong migration `1.13.3`; `execute-migrate-all` tự tạo khi khởi động.
 
 Nguồn dữ liệu thử nghiệm (MySQL nhỏ, có vi phạm cố ý, tài khoản chỉ đọc `dq_reader`):
