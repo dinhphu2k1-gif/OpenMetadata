@@ -18,6 +18,7 @@ import { GlossaryTermDetailPageWidgetKeys } from '../../../enums/CustomizeDetail
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { WidgetConfig } from '../../../pages/CustomizablePage/CustomizablePage.interface';
 import { getGlossaryTermWidgetFromKey } from '../../../utils/GlossaryTerm/GlossaryTermUtil';
+import DQTestSpecsCard from '../DQRuleTests/DQTestSpecsCard.component';
 import DQGlossaryTermSummary from './DQGlossaryTermSummary';
 
 interface DQGlossaryTermOverviewProps {
@@ -51,6 +52,10 @@ const DQGlossaryTermOverview = ({
       </div>
       <div className="cde-glossary-term-overview-summary dq-glossary-term-overview-summary">
         <DQGlossaryTermSummary glossaryTerm={glossaryTerm} />
+        <DQTestSpecsCard
+          ruleThreshold={glossaryTerm.extension?.qualityThreshold}
+          specs={glossaryTerm.dataQualityTestSpecs}
+        />
       </div>
     </section>
   );

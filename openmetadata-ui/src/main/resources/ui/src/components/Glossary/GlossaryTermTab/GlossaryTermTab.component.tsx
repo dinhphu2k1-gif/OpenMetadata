@@ -151,6 +151,12 @@ import {
   CDE_TAG_CLASSIFICATIONS,
   getCDEGlossaryTableColumns,
 } from './CDEGlossaryTableColumns';
+import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
+import { getDqRuleStatuses } from '../../../rest/dqRuleTestAPI';
+import {
+  DQ_OUTCOME_LABEL_KEY,
+  DQ_TEST_FILTER_STATUSES,
+} from '../DQRuleTests/DQRuleTests.constants';
 import CDEFilterDropdown from './CDEFilterDropdown.component';
 import {
   DQ_TAG_CLASSIFICATIONS,
@@ -723,6 +729,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [selectedDqMethods, setSelectedDqMethods] = useState<string[]>(['all']);
   const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] =
     useState<string[]>(['all']);
+  const [selectedDqTestStatuses, setSelectedDqTestStatuses] = useState<
+    string[]
+  >(['all']);
+  const [dqRuleStatuses, setDqRuleStatuses] =
+    useState<Record<string, string>>();
+  const { isEnabled: isDqTestEnabled } = useDqTestConfig();
   const [dqFilterOptions, setDqFilterOptions] = useState<{
     dimensions: Array<{ label: string; value: string }>;
     methods: Array<{ label: string; value: string }>;
@@ -780,6 +792,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     setSelectedDqOwners(['all']);
     setSelectedDqMethods(['all']);
     setSelectedDqTargetPopulations(['all']);
+    setSelectedDqTestStatuses(['all']);
   }, [activeGlossary?.fullyQualifiedName]);
 
   // Lightweight option fetching for CDE & DQ filters
@@ -1098,6 +1111,34 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       handlePageChange(INITIAL_PAGING_VALUE);
     },
     [handlePageChange]
+  );
+
+  const handleDqTestStatusesChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqTestStatuses(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
+
+  const hasActiveDqTestFilter =
+    isDqTestEnabled && !selectedDqTestStatuses.includes('all');
+
+  useEffect(() => {
+    if (hasActiveDqTestFilter) {
+      getDqRuleStatuses()
+        .then(setDqRuleStatuses)
+        .catch(() => setDqRuleStatuses({}));
+    }
+  }, [hasActiveDqTestFilter, selectedDqTestStatuses]);
+
+  const dqTestStatusOptions = useMemo(
+    () =>
+      DQ_TEST_FILTER_STATUSES.map((status) => ({
+        label: t(DQ_OUTCOME_LABEL_KEY[status]),
+        value: status,
+      })),
+    [t]
   );
 
   const handleDqTargetPopulationsChange = useCallback(
@@ -2871,8 +2912,24 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return [];
     }
 
-    return processTermsWithLoadMore(glossaryTerms);
-  }, [glossaryTerms, processTermsWithLoadMore]);
+    const visibleTerms =
+      isDQGlossary && hasActiveDqTestFilter && dqRuleStatuses
+        ? glossaryTerms.filter((term) =>
+            selectedDqTestStatuses.includes(
+              dqRuleStatuses[term.id ?? ''] ?? 'NOT_DECLARED'
+            )
+          )
+        : glossaryTerms;
+
+    return processTermsWithLoadMore(visibleTerms);
+  }, [
+    glossaryTerms,
+    processTermsWithLoadMore,
+    isDQGlossary,
+    hasActiveDqTestFilter,
+    dqRuleStatuses,
+    selectedDqTestStatuses,
+  ]);
 
   useEffect(() => {
     if (
@@ -3023,6 +3080,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               selectedValues={selectedDqTargetPopulations}
               onChange={handleDqTargetPopulationsChange}
             />
+            {isDqTestEnabled && (
+              <CDEFilterDropdown
+                dataTestId="dq-test-filter"
+                label={t('dq.test.filter-title', 'Kiểm thử')}
+                options={dqTestStatusOptions}
+                selectedValues={selectedDqTestStatuses}
+                onChange={handleDqTestStatusesChange}
+              />
+            )}
           </>
         )}
 
@@ -3083,6 +3149,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedDqOwners,
     selectedDqMethods,
     selectedDqTargetPopulations,
+    isDqTestEnabled,
+    dqTestStatusOptions,
+    selectedDqTestStatuses,
+    handleDqTestStatusesChange,
     handleCdeDomainsChange,
     handleCdeDataSourcesChange,
     handleCdeOwnersChange,

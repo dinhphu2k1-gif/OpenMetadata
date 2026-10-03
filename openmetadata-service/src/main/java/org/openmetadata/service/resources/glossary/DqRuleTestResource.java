@@ -101,6 +101,16 @@ public class DqRuleTestResource {
   }
 
   @GET
+  @Path("/rules/status")
+  @Operation(
+      operationId = "listDqRuleTestStatuses",
+      summary = "Test result status of every effective Rule, for the list filter")
+  public Map<String, String> ruleStatuses(@Context SecurityContext securityContext) {
+    access.requireView(securityContext);
+    return DqResultService.ruleStatuses();
+  }
+
+  @GET
   @Path("/rules/{ruleId}/results")
   @Operation(operationId = "getDqRuleResults", summary = "Results of the tests of a Rule")
   public Map<String, Object> ruleResults(
@@ -152,6 +162,17 @@ public class DqRuleTestResource {
         request.cron(),
         request.timezone(),
         securityContext.getUserPrincipal().getName());
+  }
+
+  @POST
+  @Path("/schedule/preview")
+  @Operation(
+      operationId = "previewDqRuleSchedule",
+      summary = "Validate a schedule and list its next runs")
+  public Map<String, Object> previewSchedule(
+      @Context SecurityContext securityContext, @Valid ScheduleRequest request) {
+    access.requireEdit(securityContext);
+    return DqRuleTestService.previewSchedule(request.cron(), request.timezone());
   }
 
   @POST

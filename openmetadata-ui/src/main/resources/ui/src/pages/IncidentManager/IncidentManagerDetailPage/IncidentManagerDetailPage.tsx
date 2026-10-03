@@ -68,6 +68,7 @@ import {
 } from '../../../utils/RouterUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import DQManagedBadge from '../../../components/Glossary/DQRuleTests/DQManagedBadge.component';
 import { TestCasePageTabs } from '../IncidentManager.interface';
 import './incident-manager-details.less';
 import testCaseClassBase from './TestCaseClassBase';
@@ -116,6 +117,7 @@ const IncidentManagerDetailPage = ({
     versions: [],
   });
   const [isDimensionEdit, setIsDimensionEdit] = useState<boolean>(false);
+  const [isDqManaged, setIsDqManaged] = useState<boolean>(false);
 
   const { getEntityPermissionByFqn } = usePermissionProvider();
   const {
@@ -129,10 +131,11 @@ const IncidentManagerDetailPage = ({
         testCasePermission?.ViewAll || testCasePermission?.ViewBasic,
       editDisplayNamePermission:
         testCasePermission?.EditAll || testCasePermission?.EditDisplayName,
-      hasDeletePermission: testCasePermission?.Delete,
-      hasEditPermission: testCasePermission?.EditAll,
+      // A testcase created by a Data Quality Rule is edited and deleted through the Rule.
+      hasDeletePermission: testCasePermission?.Delete && !isDqManaged,
+      hasEditPermission: testCasePermission?.EditAll && !isDqManaged,
     };
-  }, [testCasePermission]);
+  }, [testCasePermission, isDqManaged]);
 
   const isExpandViewSupported = useMemo(
     () => activeTab === TestCasePageTabs.TEST_CASE_RESULTS,
@@ -450,6 +453,12 @@ const IncidentManagerDetailPage = ({
         gutter={[0, 12]}>
         <Col span={24}>
           <TitleBreadcrumb className="m-b-sm" titleLinks={breadcrumb} />
+        </Col>
+        <Col span={24}>
+          <DQManagedBadge
+            testCaseId={testCase.id}
+            onManagedChange={setIsDqManaged}
+          />
         </Col>
         <Col data-testid="entity-page-header" span={24}>
           <Row gutter={16}>

@@ -544,6 +544,8 @@ export const updateGlossaryTermWorkingVersion = async (
     relatedTerms: payload.relatedTerms ?? [],
     tags: payload.tags ?? [],
     extension,
+    // Only a Data Quality Rule carries test declarations; undefined keeps them as they are.
+    dataQualityTestSpecs: payload.dataQualityTestSpecs,
   };
   const response = await APIClient.patch<
     CdeDraftUpdateRequest,

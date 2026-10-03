@@ -20,6 +20,7 @@ import {
   TermReference,
 } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/type/entityLineage';
+import { DqTestSpecs } from '../../../generated/type/dqTestSpecs';
 
 export interface AddGlossaryTermFormProps {
   editMode: boolean;
@@ -45,4 +46,5 @@ export interface GlossaryTermForm {
   style: GlossaryTerm['style'];
   domains?: EntityReference[];
   extension?: Record<string, unknown>;
+  dataQualityTestSpecs?: DqTestSpecs;
 }

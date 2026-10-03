@@ -19,6 +19,7 @@ import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord
 public record DqRuleContext(
     UUID ruleId,
     String code,
+    String fullyQualifiedName,
     String displayName,
     String description,
     String parentBusinessVersion,
@@ -34,6 +35,7 @@ public record DqRuleContext(
     return new DqRuleContext(
         snapshot.entityId(),
         payload.getName(),
+        payload.getFullyQualifiedName(),
         payload.getDisplayName(),
         payload.getDescription(),
         snapshot.parentBusinessVersion(),

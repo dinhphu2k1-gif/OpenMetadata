@@ -7,6 +7,8 @@ package org.openmetadata.service.glossary.dq;
 
 import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,6 +37,13 @@ public final class DqResultService {
   public static final int DEFAULT_LIMIT = 25;
   public static final int MAX_LIMIT = 200;
   private static final double STALE_FACTOR = 1.5;
+  private static final String STATUS_CACHE_KEY = "statuses";
+  private static final int STATUS_CACHE_SECONDS = 30;
+  private static final Cache<String, Map<String, String>> STATUS_CACHE =
+      Caffeine.newBuilder()
+          .maximumSize(1)
+          .expireAfterWrite(Duration.ofSeconds(STATUS_CACHE_SECONDS))
+          .build();
 
   private DqResultService() {}
 
@@ -94,6 +103,30 @@ public final class DqResultService {
     body.put("rules", rules);
     body.put("testCases", page(filtered, canViewTable, offset, limit, body));
     return body;
+  }
+
+  /**
+   * Status of every effective Rule, for the list filter. Computed from the native results, so it is
+   * kept for a short time to spare the list from reading every testcase on each request.
+   */
+  public static Map<String, String> ruleStatuses() {
+    return STATUS_CACHE.get(
+        STATUS_CACHE_KEY,
+        key -> {
+          final Map<String, String> statuses = new LinkedHashMap<>();
+          for (UUID ruleId : DqRuleSource.effectiveRuleIds()) {
+            statuses.put(ruleId.toString(), statusOfRule(ruleId.toString()));
+          }
+          return statuses;
+        });
+  }
+
+  private static String statusOfRule(String ruleId) {
+    String status = DqOutcome.NOT_DECLARED;
+    if (dao().findRuleExec(ruleId) != null) {
+      status = statusOf(load(ruleId));
+    }
+    return status;
   }
 
   // ---- loading and evaluating ---------------------------------------------------------------
@@ -193,6 +226,7 @@ public final class DqResultService {
     final Map<String, Object> rule = new LinkedHashMap<>();
     rule.put("id", state.context().ruleId());
     rule.put("code", state.context().code());
+    rule.put("fullyQualifiedName", state.context().fullyQualifiedName());
     rule.put("displayName", state.context().displayName());
     rule.put("threshold", state.context().qualityThreshold());
     rule.put("dimension", state.context().dimension());

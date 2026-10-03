@@ -361,6 +361,23 @@ const GlossaryV1 = ({
     ]
   );
 
+  // The create request has no test declarations; a new Rule carries them from its first Draft.
+  const saveTestSpecsOfNewRule = async (
+    term: GlossaryTerm,
+    formData: GlossaryTermForm
+  ) => {
+    if (formData.dataQualityTestSpecs?.items?.length) {
+      const scope = getBusinessVersion(selectedData.businessVersion, '1');
+      const working = await getGlossaryTermWorkingVersion(term.id, scope);
+      await updateGlossaryTermWorkingVersion(
+        term.id,
+        working.workingRevision as number,
+        { ...working, dataQualityTestSpecs: formData.dataQualityTestSpecs },
+        scope
+      );
+    }
+  };
+
   const handleGlossaryTermAdd = async (formData: GlossaryTermForm) => {
     const term = await addGlossaryTerm({
       name: formData.name,
@@ -379,6 +396,7 @@ const GlossaryV1 = ({
         '1'
       ),
     });
+    await saveTestSpecsOfNewRule(term, formData);
     onTermModalSuccess(term);
   };
 
@@ -398,6 +416,7 @@ const GlossaryV1 = ({
           relatedTerms,
           domains,
           extension,
+          dataQualityTestSpecs,
         } = formData || {};
 
         newTermData.name = activeGlossaryTerm.name;
@@ -420,6 +439,9 @@ const GlossaryV1 = ({
           }));
         newTermData.domains = domains;
         newTermData.extension = extension;
+        if (dataQualityTestSpecs !== undefined) {
+          newTermData.dataQualityTestSpecs = dataQualityTestSpecs;
+        }
         await updateGlossaryTerm(activeGlossaryTerm, newTermData);
       }
     } else {

@@ -76,11 +76,25 @@ import { EntityDetailsObjectInterface } from '../../Explore/ExplorePage.interfac
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
+import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
+import DQCdeTestResults from '../DQRuleTests/DQCdeTestResults.component';
+import DQRuleTestResults from '../DQRuleTests/DQRuleTestResults.component';
 import DQGlossaryTermOverview from './DQGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
 import CDETechnicalAssetsTab from './tabs/CDETechnicalAssetsTab.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
+
+/**
+ * The stock Data Observability tab lists native testcases tagged with the term; for a Data Quality
+ * Rule and a CDE it is replaced by the governed results. The version view has no stock tab.
+ */
+const withResultTab = <T extends { key?: string }>(tabs: T[], resultTab: T): T[] =>
+  tabs.some((tab) => tab.key === EntityTabs.DATA_OBSERVABILITY)
+    ? tabs.map((tab) =>
+        tab.key === EntityTabs.DATA_OBSERVABILITY ? { ...tab, ...resultTab } : tab,
+      )
+    : [...tabs, resultTab];
 
 export const CDE_RESTRICTED_TABS = new Set([
   EntityTabs.GLOSSARY_TERMS,
@@ -361,6 +375,8 @@ const GlossaryTermsV1 = ({
     [glossaryTerm],
   );
 
+  const { config: dqTestConfig, isEnabled: isDqTestEnabled } = useDqTestConfig();
+
   const isDQGlossaryTerm = useMemo(
     () =>
       isDataQualityGlossary(
@@ -488,9 +504,22 @@ const GlossaryTermsV1 = ({
           : tab,
       );
 
-      return dqTabs.filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
-      );
+      const resultTab = {
+        label: (
+          <div data-testid="dq-test-results-tab">{t('dq.test.results-tab')}</div>
+        ),
+        key: EntityTabs.DATA_OBSERVABILITY,
+        children: (
+          <DQRuleTestResults
+            capabilities={dqTestConfig?.capabilities}
+            ruleId={glossaryTerm.id}
+          />
+        ),
+      } as (typeof dqTabs)[number];
+
+      return (
+        isDqTestEnabled ? withResultTab(dqTabs, resultTab) : dqTabs
+      ).filter((tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs));
     }
 
     if (isCDEGlossaryTerm) {
@@ -526,9 +555,24 @@ const GlossaryTermsV1 = ({
         } as (typeof cdeTabs)[number]);
       }
 
-      return cdeTabs.filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
-      );
+      const cdeResultTab = {
+        label: (
+          <div data-testid="dq-cde-results-tab">
+            {t('dq.test.data-quality-tab')}
+          </div>
+        ),
+        key: EntityTabs.DATA_OBSERVABILITY,
+        children: (
+          <DQCdeTestResults
+            capabilities={dqTestConfig?.capabilities}
+            cdeId={glossaryTerm.id}
+          />
+        ),
+      } as (typeof cdeTabs)[number];
+
+      return (
+        isDqTestEnabled ? withResultTab(cdeTabs, cdeResultTab) : cdeTabs
+      ).filter((tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs));
     }
 
     return detailTabs;
@@ -548,6 +592,8 @@ const GlossaryTermsV1 = ({
     handleAssetClick,
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
+    isDqTestEnabled,
+    dqTestConfig,
   ]);
 
   useEffect(() => {

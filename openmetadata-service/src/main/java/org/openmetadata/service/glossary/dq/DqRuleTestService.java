@@ -103,6 +103,20 @@ public final class DqRuleTestService {
     return schedule;
   }
 
+  /** Validates a schedule and returns the next runs it would produce. */
+  public static Map<String, Object> previewSchedule(String cron, String timezone) {
+    DqSchedule.validate(cron, timezone);
+    final Map<String, Object> preview = new LinkedHashMap<>();
+    preview.put("cron", cron);
+    preview.put("timezone", timezone == null ? DqSchedule.DEFAULT_TIMEZONE : timezone);
+    preview.put(
+        "nextRuns",
+        DqSchedule.nextRuns(cron, timezone, DqSchedule.PREVIEW_RUNS).stream()
+            .map(run -> run.toInstant().toEpochMilli())
+            .toList());
+    return preview;
+  }
+
   /** Sets or clears (null cron) the schedule of a Rule; effective at once, no approval. */
   public static Map<String, Object> setSchedule(
       String ruleId, String cron, String timezone, String actor) {
