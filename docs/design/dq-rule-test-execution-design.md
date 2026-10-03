@@ -112,7 +112,7 @@ Tỷ lệ đạt chỉ có nghĩa khi mỗi dòng SQL trả về ứng với m�
 trị trùng) trả về nhóm, không phải bản ghi, nên dùng ngưỡng `count`, không dùng ngưỡng phần trăm.
 
 Với mỗi khai báo loại `SQL`, hệ thống tạo một `TestDefinition` riêng cho cặp (Rule identity, `key`), tên
-`DQR__<parentBusinessVersion>__<mã quy tắc>__<key>`, `entityType = COLUMN`, `testPlatforms = [OpenMetadata]`,
+`DQR__<parentBusinessVersion>__<mã an toàn>__<key>`, `entityType = COLUMN`, `testPlatforms = [OpenMetadata]`,
 `validatorClass = DqrColumnSqlValidator`, `sqlExpression` = câu SQL đã duyệt, `supportsRowLevelPassedFailed = true`.
 Definition này là managed (DQT-07) và không xuất hiện trong danh sách chọn của loại `LIBRARY`.
 
@@ -240,7 +240,7 @@ Column không còn gắn CDE đều nằm ngoài tập.
 | Thuộc tính | Giá trị |
 | --- | --- |
 | `entityLink` | `<#E::table::{tableFqn}::columns::{columnName}>` từ `technical_record.columnFqn` |
-| `name` | `dqr__<mã quy tắc>__<key>`; FQN gốc là `{columnFqn}."dqr__<mã>__<key>"`. Mã quy tắc duy nhất trong scope (DQ §5.3) và `key` duy nhất trong Rule nên không trùng trên cùng Column |
+| `name` | `dqr__<mã an toàn>__<key>` (mã an toàn: ký tự ngoài `[A-Za-z0-9_]` đổi thành `_`, vd. `DQ3.1` → `DQ3_1`, để tên không chứa dấu chấm làm sai FQN); FQN gốc là `{columnFqn}.dqr__DQ3_1__t1`. Mã quy tắc duy nhất trong scope (DQ §5.3) và `key` duy nhất trong Rule nên không trùng trên cùng Column |
 | `displayName` | `<Mã quy tắc> · <Tên khai báo>` |
 | `description` | Quy tắc nghiệp vụ của Rule (markdown) |
 | `testDefinition` | Definition của `LIBRARY` hoặc definition managed của khai báo `SQL` |
@@ -253,8 +253,8 @@ Actor tạo/sửa là bot hệ thống `dq-governance-bot`, không phải ngư�
 
 ### 5.3. Suite, pipeline và lịch chạy của Rule
 
-Mỗi Rule identity có một logical TestSuite riêng `DQR__<parentBusinessVersion>__<mã quy tắc>` và một pipeline TestSuite
-gốc gắn với suite đó. Reconciler tạo suite và pipeline ở lần đầu Rule được áp dụng (Approved và có ít nhất một khai
+Mỗi Rule identity có một logical TestSuite riêng `DQR__<parentBusinessVersion>__<mã an toàn>` và một pipeline TestSuite
+gốc tên `DQR_pipeline` gắn với suite đó. Reconciler tạo suite và pipeline ở lần đầu Rule được áp dụng (Approved và có ít nhất một khai
 báo). Mọi testcase của Rule, qua mọi khai báo, nằm trong suite này. Pipeline gom testcase theo Table và dùng connection
 của từng service (`TestSuiteSource._process_logical_suite`).
 
@@ -423,19 +423,26 @@ Không có bảng kết quả riêng (DQT-11).
 
 ## 8. REST
 
+Mọi endpoint nằm dưới `/v1/glossaryTerms/dataQuality` (cùng kiểu với `/v1/glossaryTerms/technical`), do
+`DqRuleTestResource` phục vụ.
+
 | Mục đích | Endpoint |
 | --- | --- |
-| Danh sách `TestDefinition` chọn được cho `LIBRARY` | `GET /v1/glossaryTerms/governed/dataQuality/testDefinitions` |
-| Preview áp dụng (Column của CDE, áp dụng được hay không, theo từng khai báo) | `POST /v1/glossaryTerms/{ruleId}/dataQuality/preview` với `testSpecs` và `cdeTermId` đang nhập |
-| Kết quả Rule (tổng hợp, theo khai báo, testcase, phân trang; lọc `specKey`) | `GET /v1/glossaryTerms/{ruleId}/dataQuality/results` |
-| Xu hướng Rule (lọc `specKey`) | `GET /v1/glossaryTerms/{ruleId}/dataQuality/trend?days=30` |
-| Xem / đặt lịch chạy của Rule (`cron` hoặc `null`, `timezone`) | `GET` / `PUT /v1/glossaryTerms/{ruleId}/dataQuality/schedule` |
-| Chạy ngay | `POST /v1/glossaryTerms/{ruleId}/dataQuality/run`; trả trạng thái lần chạy (pipeline status gốc) |
-| Trạng thái lần chạy gần nhất | `GET /v1/glossaryTerms/{ruleId}/dataQuality/run/latest` |
-| Kết quả CDE (tổng hợp, theo tiêu chí, Rule, testcase) | `GET /v1/glossaryTerms/{cdeId}/dataQuality/results` |
-| Xu hướng CDE | `GET /v1/glossaryTerms/{cdeId}/dataQuality/trend?days=30` |
-| Reconcile toàn bộ (Admin) | `POST /v1/glossaryTerms/governed/dataQuality/reconcile` |
-| Tình trạng reconcile (Admin) | `GET /v1/glossaryTerms/governed/dataQuality/reconcile/status` (outbox lag, binding `ERROR`) |
+| Cờ tính năng và quyền của người gọi | `GET /config` → `{testExecutionEnabled, defaultTimezone, capabilities}` |
+| Danh sách `TestDefinition` chọn được cho `LIBRARY` | `GET /testDefinitions` |
+| Preview áp dụng (Column của CDE, áp dụng được hay không, theo từng khai báo) | `POST /preview` với `{cdeTermId, dataQualityTestSpecs}` |
+| Kiểm tra lịch và xem 5 lần chạy tới | `POST /schedule/preview` với `{cron, timezone}` |
+| Kết quả Rule (tổng hợp, theo khai báo, testcase, phân trang; lọc `specKey`) | `GET /rules/{ruleId}/results` |
+| Xu hướng Rule (lọc `specKey`) | `GET /rules/{ruleId}/trend?days=30` |
+| Xem / đặt lịch chạy của Rule (`cron` hoặc `null`, `timezone`) | `GET` / `PUT /rules/{ruleId}/schedule` |
+| Chạy ngay | `POST /rules/{ruleId}/run` |
+| Trạng thái lần chạy gần nhất | `GET /rules/{ruleId}/run/latest` |
+| Trạng thái kết quả của mọi Rule hiệu lực (cho bộ lọc danh sách; cache 30 giây) | `GET /rules/status` |
+| Kết quả CDE (tổng hợp, theo tiêu chí, Rule, testcase) | `GET /cdes/{cdeId}/results` |
+| Xu hướng CDE | `GET /cdes/{cdeId}/trend?days=30` |
+| Rule nào quản lý một testcase (cho trang testcase gốc) | `GET /testCases/{testCaseId}/managedBy` |
+| Reconcile toàn bộ (Admin) | `POST /reconcile` |
+| Tình trạng reconcile (Admin) | `GET /reconcile/status` (outbox lag, số pipeline, binding `ERROR`) |
 
 Ví dụ response kết quả Rule:
 
@@ -460,7 +467,7 @@ Ví dụ response kết quả Rule:
   ],
   "testCases": [
     {
-      "testCaseId": "uuid", "testCaseFqn": "core.kh.cccd.\"dqr__DQ3.1__t2\"",
+      "testCaseId": "uuid", "testCaseFqn": "core.kh.cccd.dqr__DQ3_1__t2",
       "spec": { "key": "t2", "name": "Đúng 12 chữ số" },
       "column": { "fqn": "core.kh.cccd", "table": "kh", "service": "core" },
       "nativeStatus": "Failed", "thresholdResult": "PASSED",
@@ -608,3 +615,27 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 | Q7 | Đổi lịch chạy có cần phê duyệt không? | **Đã chốt (2026-10-03):** không. Lịch không đổi nội dung kiểm thử, có hiệu lực ngay và ghi audit (§5.3) |
 | Q5 | Testcase do người dùng tự tạo trên cùng Column có tính vào kết quả CDE không? | **Đã chốt (2026-10-03):** không; tab CDE chỉ gộp testcase do Rule sinh ra (có binding, DQT-06) để kết quả khớp danh mục quy tắc đã duyệt |
 | Q6 | Một Rule có cần trộn khai báo `LIBRARY` và `SQL` không? | **Đã chốt (2026-10-03):** có. Loại chọn theo từng khai báo; tag Hình thức kiểm tra chỉ mô tả, không ràng buộc (§4.1) |
+
+## 13. Ghi chú hiện thực (2026-10-03)
+
+Những điểm hiện thực khác hoặc chi tiết hơn so với các mục trên:
+
+- **Cờ tính năng:** biến môi trường `DQ_RULE_TEST_EXECUTION_ENABLED` (mặc định tắt), đọc ở `DqTestExecutionSettings`,
+  UI hỏi qua `GET /config`. Khi tắt: API khai báo/lịch/chạy trả `403 DQ_TEST_EXECUTION_DISABLED`, không ghi outbox, tab
+  kết quả giữ nội dung observability gốc, form không hiện section Khai báo kiểm thử.
+- **Actor `dq-governance-bot`** chỉ là tên ghi vào `updatedBy`; không có entity bot. Khóa managed (§5.6) dựa trên cờ
+  trong tiến trình (`DqManagedWrite`) đặt quanh các lệnh ghi của reconciler, không dựa trên tên người dùng, nên không ai
+  mạo danh được bằng cách đặt tên.
+- **Trường lưu khai báo:** `GlossaryTerm.dataQualityTestSpecs` (DQT-14). Request lưu Draft có cùng tên trường; vắng mặt
+  nghĩa là giữ nguyên, có mặt với `items` rỗng nghĩa là bỏ hết khai báo.
+- **Kích hoạt reconcile:**
+  - Approve Rule (kể cả Sửa phiên bản) ghi `RECONCILE_RULE` trong transaction của `publish`.
+  - Công bố một glossary governed (cutover DD/DQ hoặc duyệt catalog kèm các Rule) ghi `RECONCILE_ALL`, vì tập Rule hiệu
+    lực đổi theo `dataDictionaryVersion` đang gắn và theo snapshot lưu trữ.
+  - Thay đổi TD không ghi outbox DQ trong transaction của TD; thay vào đó entry `PROJECTION` bền vững của TD, khi được
+    xử lý, ghi `RECONCILE_COLUMN` của DQ. Các Column cùng một lô được gộp: mỗi Rule bị ảnh hưởng chỉ reconcile một lần.
+- **Lỗi pipeline không hoàn tác binding:** lỗi tạo suite/pipeline hoặc deploy được đếm là lỗi của lần reconcile (entry
+  outbox thử lại) nhưng binding đã ghi vẫn được giữ.
+- **Bộ lọc Kiểm thử ở danh sách DQ** lọc trên các dòng đã tải của trang hiện tại, theo trạng thái từ `GET /rules/status`.
+- **Chưa có:** thống kê Table có pipeline basic suite chứa testcase managed trong `GET /reconcile/status`; kiểm thử tích
+  hợp (`openmetadata-integration-tests`) và E2E Playwright.

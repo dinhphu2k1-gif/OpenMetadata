@@ -2,17 +2,22 @@
 
 ## Trạng thái thực hiện (cập nhật 2026-10-03)
 
-T0 đang làm: đã xác minh 5 giả định bằng đọc code và chốt nơi lưu `testSpecs` (DQT-14); còn chạy spike validator SQL trên
-Oracle dev (script đã có, chờ nguồn Oracle). Các mốc khác **Chưa làm**.
+Mã nguồn T1–T5 đã được viết trên branch `feat/dq-rule-test-execution`. **Chưa chạy trên môi trường thật**: chưa có
+kiểm thử tích hợp, E2E và chưa chạy spike Oracle (T0). Đã chạy được: unit test backend (74 test), Jest cho các
+component mới (13 test) và biên dịch; pytest của validator ingestion đã viết nhưng chưa chạy được vì môi trường không
+sinh được model Python (`make generate`).
 
 | Mốc | Trạng thái |
 | --- | --- |
-| T0 | Đang làm: còn chạy spike trên Oracle dev |
-| T1 | Chưa làm |
-| T2 | Chưa làm |
-| T3 | Chưa làm |
-| T4 | Chưa làm |
-| T5 | Chưa làm |
+| T0 | Xác minh bằng đọc code xong; còn spike Oracle dev (chủ dự án tự chạy) |
+| T1 | Đã viết: schema, validator, form, card Overview, xem trước, hộp xác nhận Approve |
+| T2 | Đã viết: migration, DAO, reconciler, outbox, suite và pipeline riêng của Rule, validator ingestion |
+| T3 | Đã viết: kích hoạt từ TD và cutover, khóa managed backend và badge UI |
+| T4 | Đã viết: kết quả Rule/CDE, lịch, Chạy ngay, bộ lọc danh sách |
+| T5 | Đã viết: xu hướng, reconcile và trạng thái reconcile |
+
+Việc còn lại trước khi bật production: spike Oracle, kiểm thử tích hợp và E2E, build ingestion từ fork lên Airflow,
+kiểm tra bản ứng dụng cũ đọc snapshot có `dataQualityTestSpecs`.
 
 ## 1. Tài liệu nguồn và mục tiêu bàn giao
 
