@@ -28,6 +28,10 @@ Container nằm trong `omd_network` cùng OpenMetadata và Airflow nên truy c�
 
 ## Các bước thử
 
+Cần Airflow đang chạy (Kiểm thử kết nối, ingest metadata và Chạy ngay đều qua Airflow). Với local-dev: chạy
+`./local-dev.sh ingestion` và chạy server bằng `WITH_INGESTION=true ./local-dev.sh server` (xem `../README.md` §7.1).
+
+
 1. **Service:** Settings → Services → Database → thêm MySQL với host/tài khoản ở trên, chạy ingestion metadata. Kết quả có
    bảng `mysql_service.default.core_kh.kh`, `...crm.customer`, `...card.holder`.
 2. **Từ điển dữ liệu:** tạo CDE `CDE1 · Số CCCD` trong Data Dictionary và Approve phiên bản.
