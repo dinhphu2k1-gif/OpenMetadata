@@ -124,6 +124,22 @@ Trong OpenMetadata khai báo service Oracle với host `dq-sandbox-oracle:1521`,
 
 ### 7.1. Chạy thử bằng local-dev (không build image)
 
+**Một lệnh cho tất cả** (PostgreSQL, OpenSearch, Airflow, Oracle sandbox trong Docker; server và UI chạy nền trên máy,
+log trong `deploy/dev/.dev-run/`):
+
+```bash
+cd deploy/dev
+./dev.sh up              # thêm --migrate khi có migration mới, --no-oracle để không chạy Oracle
+./dev.sh status          # dịch vụ nào đang chạy, RAM từng thành phần
+./dev.sh logs server     # hoặc: ./dev.sh logs ui
+./dev.sh restart-server  # sau khi sửa backend (UI tự cập nhật)
+./dev.sh down            # dừng hết, giữ dữ liệu
+```
+
+Server hoặc UI đang chạy trong terminal riêng thì `dev.sh` để nguyên, không khởi động thêm; `down` không dừng chúng.
+
+Các lệnh tương đương, chạy riêng từng phần:
+
 "Kiểm thử kết nối", ingest metadata và pipeline kiểm thử đều do **Airflow** chạy, không do server. Ở chế độ local-dev
 Airflow tắt mặc định, nên phải bật thêm. Thứ tự, mỗi lệnh server/UI một terminal:
 

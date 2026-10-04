@@ -2,6 +2,8 @@
 
 ## 1. Local dev (khuyen dung khi sua code)
 
+Chay tat ca bang mot lenh: `./dev.sh up` (xem `README.md` muc 7.1). Cac buoc ben duoi la tung lenh rieng.
+
 PostgreSQL va OpenSearch chay trong Docker. Server OpenMetadata, server Portal va UI chay truc tiep tren
 may tu ma nguon, khong build image.
 
