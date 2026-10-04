@@ -231,12 +231,12 @@ public final class DqTestSpecValidator {
     }
   }
 
+  /** The stock SQL validator only counts violations, so a SQL declaration supports count thresholds only. */
   private static boolean supportsPercentage(DqTestSpec spec, TestDefinition definition) {
-    final boolean definitionSupports =
-        spec.getKind() == DqTestSpecKind.SQL
-            || (definition != null
-                && Boolean.TRUE.equals(definition.getSupportsRowLevelPassedFailed()));
-    return definitionSupports && Boolean.TRUE.equals(spec.getComputePassedFailedRowCount());
+    return spec.getKind() == DqTestSpecKind.LIBRARY
+        && definition != null
+        && Boolean.TRUE.equals(definition.getSupportsRowLevelPassedFailed())
+        && Boolean.TRUE.equals(spec.getComputePassedFailedRowCount());
   }
 
   private DqTestSpec approvedSpec(String key) {

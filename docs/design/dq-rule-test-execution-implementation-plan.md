@@ -1,22 +1,21 @@
 # Kế hoạch triển khai Kiểm thử theo Quy tắc chất lượng dữ liệu
 
-## Trạng thái thực hiện (cập nhật 2026-10-03)
+## Trạng thái thực hiện (cập nhật 2026-10-04)
 
 Mã nguồn T1–T5 đã được viết trên branch `feat/dq-rule-test-execution`. **Chưa chạy trên môi trường thật**: chưa có
-kiểm thử tích hợp, E2E và chưa chạy spike Oracle (T0). Đã chạy được: unit test backend (74 test), Jest cho các
-component mới (13 test) và biên dịch; pytest của validator ingestion đã viết nhưng chưa chạy được vì môi trường không
-sinh được model Python (`make generate`).
+kiểm thử tích hợp, E2E. Đã chạy được: unit test backend (74 test), Jest cho các component mới (13 test) và biên
+dịch. Ingestion không sửa: khai báo `SQL` dùng validator gốc (DQT-13, 2026-10-04), nên Airflow dùng image gốc.
 
 | Mốc | Trạng thái |
 | --- | --- |
-| T0 | Xác minh bằng đọc code xong; còn spike Oracle dev (chủ dự án tự chạy) |
+| T0 | Xác minh bằng đọc code xong; spike Oracle hoãn đến khi cần nguồn Oracle/DB2 (DQT-13) |
 | T1 | Đã viết: schema, validator, form, card Overview, xem trước, hộp xác nhận Approve |
-| T2 | Đã viết: migration, DAO, reconciler, outbox, suite và pipeline riêng của Rule, validator ingestion |
+| T2 | Đã viết: migration, DAO, reconciler, outbox, suite và pipeline riêng của Rule |
 | T3 | Đã viết: kích hoạt từ TD và cutover, khóa managed backend và badge UI |
 | T4 | Đã viết: kết quả Rule/CDE, lịch, Chạy ngay, bộ lọc danh sách |
 | T5 | Đã viết: xu hướng, reconcile và trạng thái reconcile |
 
-Việc còn lại trước khi bật production: spike Oracle, kiểm thử tích hợp và E2E, build ingestion từ fork lên Airflow,
+Việc còn lại trước khi đưa lên production: kiểm thử tích hợp và E2E,
 kiểm tra bản ứng dụng cũ đọc snapshot có `dataQualityTestSpecs`.
 
 ## 1. Tài liệu nguồn và mục tiêu bàn giao
@@ -60,8 +59,7 @@ môi trường dev trước khi đưa lên production. Portal chỉ đọc khôn
 | Workflow DQ dùng chung chạy trọn Draft → Submit → Approve và tạo minor version (DQ08–DQ10 trong kế hoạch DQ). Chủ dự án tự xử lý | T1 |
 | Điểm kích hoạt của TD (`TechnicalRecordService`, `TechnicalCutover`, import committer) | T3 |
 | Connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service có CDE | Đưa lên production |
-| Airflow chạy pipeline dùng bản ingestion build từ fork (có `DqrColumnSqlValidator`), không dùng image ingestion gốc | Chạy khai báo `SQL` ở mọi môi trường từ T2 |
-| Một nguồn Oracle dev (và DB2 nếu có) cho spike T0 và test T2 | T0, T2 |
+| Một nguồn Oracle/DB2 dev, khi cần hỗ trợ khai báo `SQL` trên các nguồn này | Sau v1 |
 
 ## 3. Danh sách mốc và phụ thuộc
 
@@ -96,16 +94,11 @@ T3 và T4 có thể làm song song sau T2.
   2. `_process_logical_suite` ([test_suite.py](../../ingestion/src/metadata/data_quality/source/test_suite.py)) với
      nhiều Table và service: đúng, có thể tách lô; không cần sửa.
   3. Validator SQL ([columnRuleLibrarySqlExpressionValidator.py](../../ingestion/src/metadata/data_quality/validations/column/sqlalchemy/columnRuleLibrarySqlExpressionValidator.py)):
-     chọn theo `validatorClass` đúng, nhưng có hai lỗi đếm vi phạm và tên bảng Oracle/DB2 → thiết kế thêm
-     `DqrColumnSqlValidator` (DQT-13).
+     chọn theo `validatorClass` đúng; đếm số dòng trả về và ghép tên bảng sai trên Oracle/DB2 → dùng validator gốc,
+     chấp nhận giới hạn (DQT-13).
   4. Lưu trong `extension`: không phù hợp; payload governed là JSON của `GlossaryTerm` → thêm trường tùy chọn
      `dataQualityTestSpecs` vào schema `GlossaryTerm` (DQT-14). API gốc PUT/PATCH glossary term đã bị chặn.
   5. Pipeline riêng mỗi Rule: API deploy/trigger/status gốc có sẵn; thử pipeline không lịch dời sang T2.
-- Spike còn lại: chạy một câu SQL qua logic của `DqrColumnSqlValidator` (bọc `COUNT(*)`, tên `schema.table`) trên một
-  nguồn Oracle dev; nếu có nguồn DB2 thì chạy thêm. Script spike đứng riêng (`dqr_sql_spike.py`, cần `sqlalchemy`,
-  `jinja2`, driver `oracledb` hoặc `ibm_db_sa`) chạy cùng câu SQL với tên bảng của validator gốc và của
-  `DqrColumnSqlValidator`, in số vi phạm, tổng bản ghi và tỷ lệ đạt. Kết quả mong đợi: tên gốc `default.SCHEMA.TABLE` lỗi,
-  tên `SCHEMA.TABLE` chạy đúng.
 - Câu hỏi nghiệp vụ Q1–Q7 đã chốt ngày 2026-10-03 (DQT §12).
 
 **DoD**
@@ -174,12 +167,7 @@ T3 và T4 có thể làm song song sau T2.
   `supportedDataTypes` của từng khai báo, ghi `ERROR` khi thất bại. Khóa `FOR UPDATE` trên `dq_rule_exec`.
 - Outbox: `GlossaryVersioningService` ghi `RECONCILE_RULE` trong cùng transaction với Approve; xử lý sau commit; worker
   thử lại.
-- Ingestion: validator `DqrColumnSqlValidator` (DQT §4.1, DQT-13) cho runner sqlalchemy, kế thừa
-  `ColumnRuleLibrarySqlExpressionValidator`, ghi đè `get_table_name` (Oracle/DB2 → `schema.table`) và `_run_results`
-  (bọc `SELECT COUNT(*) FROM (…)`), thêm đếm tổng bản ghi khi `computePassedFailedRowCount`. Đăng ký trong
-  `RULE_LIBRARY_VALIDATOR_MODULE_MAP` ([importer.py](../../ingestion/src/metadata/utils/importer.py)) và map param
-  setter của rule library ([param_setter_factory.py](../../ingestion/src/metadata/data_quality/validations/runtime_param_setter/param_setter_factory.py)).
-  Definition managed loại `SQL` đặt `validatorClass = DqrColumnSqlValidator`.
+- Definition managed loại `SQL` đặt `validatorClass = ColumnRuleLibrarySqlExpressionValidator` (validator gốc, DQT-13).
 - Thử deploy pipeline TestSuite không có `scheduleInterval` và trigger thủ công (DQT §11 mục 5).
 
 **DoD/Test**
@@ -196,9 +184,7 @@ T3 và T4 có thể làm song song sau T2.
 - Rule retire toàn bộ thì pipeline bị disable, không bị xóa.
 - Lỗi reconcile không rollback phê duyệt; binding `ERROR` được worker xử lý lại.
 - Testcase bị hard-delete ngoài luồng được tạo lại và ghi audit.
-- Pytest cho `DqrColumnSqlValidator`: tên bảng cho Oracle, DB2, PostgreSQL, MySQL; số vi phạm đọc từ `COUNT(*)` ở
-  database (không `fetchall`); `passedRowsPercentage` khi bật đếm; `Success` khi 0 vi phạm; SQL không an toàn bị từ chối.
-- Khai báo `SQL` chạy thật qua pipeline trên nguồn Oracle dev cho kết quả đúng.
+- Khai báo `SQL` chạy thật qua pipeline trên nguồn MySQL dev (`deploy/dev/dq-sandbox`) cho kết quả đúng.
 - Pipeline không lịch deploy được và chạy được bằng trigger.
 - Pipeline logical suite chạy thật trên môi trường dev cho ít nhất hai service và ghi kết quả vào time-series.
 
@@ -293,11 +279,7 @@ T3 và T4 có thể làm song song sau T2.
 
 ### Ingestion Python
 
-| Nơi | Thay đổi | Mốc |
-| --- | --- | --- |
-| `data_quality/validations/column/sqlalchemy/` (mới) | `DqrColumnSqlValidator` kế thừa validator rule-library gốc | T2 |
-| `utils/importer.py` | Đăng ký module trong `RULE_LIBRARY_VALIDATOR_MODULE_MAP` | T2 |
-| `data_quality/validations/runtime_param_setter/param_setter_factory.py` | Map param setter rule library cho `DqrColumnSqlValidator` | T2 |
+Không sửa (DQT-13).
 
 ### Frontend React/TypeScript
 
@@ -332,7 +314,7 @@ T3 và T4 có thể làm song song sau T2.
 | Unit backend | Cấp key, validator `testSpecs` và SQL, tính tập mong muốn, diff binding theo `key`, tính kết quả theo ngưỡng |
 | Repository integration | Bốn bảng mới, unique/index, `FOR UPDATE`, outbox trên MySQL và PostgreSQL |
 | Resource integration | Mã lỗi, khóa managed, quyền xem dòng testcase, endpoint Admin |
-| Ingestion (pytest) | `DqrColumnSqlValidator`: tên bảng theo nguồn, đếm ở database, tỷ lệ đạt; definition managed chọn đúng validator; logical suite nhiều service; chạy thật trên Oracle dev |
+| Ingestion | Không có test riêng; khai báo `SQL` chạy thật qua pipeline trên nguồn MySQL dev |
 | Unit frontend | Map `testSpecs` ↔ danh sách card, thêm/xóa/sắp xếp, hiển thị kết quả theo khai báo, empty state |
 | E2E | Hành trình chính bên dưới |
 
@@ -371,10 +353,8 @@ Rủi ro sản phẩm và vận hành nằm ở DQT §11. Rủi ro riêng của 
 
 | Rủi ro | Biện pháp |
 | --- | --- |
-| Spike Oracle cho thấy cần đặt tên bảng/cột trong ngoặc kép hoặc xử lý khác | Không bắt đầu T2 trước khi spike xong; cập nhật DQT §4.1 |
 | Thêm trường vào schema `GlossaryTerm` gốc làm khó nâng cấp OpenMetadata | Trường tùy chọn, tên riêng `dataQualityTestSpecs`, không đổi trường có sẵn; thêm vào danh mục kiểm tra khi nâng cấp |
-| Airflow dùng image ingestion gốc nên thiếu `DqrColumnSqlValidator` | Build và deploy ingestion từ fork trước khi bật khai báo `SQL`; reconcile status cảnh báo khi testcase `SQL` lỗi do không nạp được validator |
-| `DqrColumnSqlValidator` lệch validator gốc khi nâng cấp OpenMetadata | Pytest bao các nguồn; thêm vào danh mục kiểm tra khi nâng cấp |
+| Người dùng khai báo `SQL` cho Column trên Oracle/DB2 | Testcase ra Lỗi thực thi (DQT-13); hướng dẫn dùng `LIBRARY` cho các nguồn này |
 | Điểm kích hoạt TD chưa ổn định làm chậm T3 | T4 làm song song với T3; chưa đưa lên production trước khi T3 xong |
 | Reconciler tạo trùng testcase khi chạy song song | Test đồng thời ở T2 là điều kiện merge PR 5 |
 
@@ -382,7 +362,7 @@ Rủi ro sản phẩm và vận hành nằm ở DQT §11. Rủi ro riêng của 
 
 ### Rollout
 
-1. Deploy lên môi trường dev cùng ingestion build từ fork trên Airflow (có `DqrColumnSqlValidator`).
+1. Deploy lên môi trường dev (Airflow dùng image ingestion gốc).
 2. Duyệt vài Rule thật và đối chiếu kết quả với chạy tay.
 3. Xác nhận connection pipeline TestSuite dùng tài khoản chỉ đọc trên mọi service.
 4. Đưa lên production sau khi T3 hoàn tất (khóa managed và kích hoạt TD) và các bước trên đạt.

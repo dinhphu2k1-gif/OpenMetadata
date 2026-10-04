@@ -92,8 +92,6 @@ class RuntimeParameterSetterFactory:
             TableRuleLibrarySqlExpressionValidator.__name__: {
                 RuleLibrarySqlExpressionParamsSetter
             },
-            # SQL tests declared on Data Quality Rules
-            "DqrColumnSqlValidator": {RuleLibrarySqlExpressionParamsSetter},
         }
 
     def get_runtime_param_setters(

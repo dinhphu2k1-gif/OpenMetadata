@@ -39,7 +39,7 @@
 | DQT-10 | Ngưỡng được đánh giá ở tầng governed, trên kết quả gốc của từng testcase. Mỗi khai báo có thể đặt ngưỡng riêng; để trống thì dùng `Ngưỡng chất lượng dữ liệu` của Rule | Validator gốc chỉ trả Success/Failed; ngưỡng `>= 99.5%` hoặc `count <= n` là quy tắc nghiệp vụ. Các kiểm tra khác loại trong một Rule thường cần ngưỡng khác nhau |
 | DQT-11 | Kết quả không bị nhân bản: luôn đọc kết quả mới nhất và lịch sử từ time-series gốc theo `testCaseId` trong binding | Một nguồn sự thật cho kết quả |
 | DQT-12 | Khi Rule, khai báo, CDE hoặc Column không còn hiệu lực, testcase bị **soft-delete** (retire), không hard-delete | Soft-delete giữ kết quả lịch sử cho xem phiên bản đã lưu trữ; khôi phục lại được nếu bộ (Rule, khai báo, Column) quay lại |
-| DQT-13 | Khai báo `SQL` chạy bằng validator riêng `DqrColumnSqlValidator`, kế thừa validator rule-library gốc và cắm vào cơ chế `validatorClass` gốc. Validator để database tự đếm số bản ghi vi phạm và ghép tên bảng đúng cho Oracle/DB2 | Validator gốc đếm số dòng trả về bằng `fetchall()` (kéo toàn bộ bản ghi vi phạm vào bộ nhớ) và ghép tên bảng `database.schema.table` không chạy được trên Oracle/DB2 (§11, T0 mục 3). Chỉ thay validator, pipeline và kết quả vẫn là gốc (DQT-01) |
+| DQT-13 | Khai báo `SQL` chạy bằng validator rule-library **gốc** `ColumnRuleLibrarySqlExpressionValidator`; không viết validator riêng ở ingestion (quyết định 2026-10-04). Câu SQL trả về các bản ghi vi phạm; ngưỡng chỉ dạng `count` | Không sửa tầng ingestion, Airflow dùng image gốc. Chấp nhận giới hạn của validator gốc (§11): không chạy trên Oracle/DB2, kéo toàn bộ bản ghi vi phạm về Airflow để đếm, không tính tỷ lệ đạt. Xem lại khi cần nguồn Oracle/DB2 |
 | DQT-14 | `testSpecs` lưu ở trường tùy chọn mới **`dataQualityTestSpecs`** trong schema entity `GlossaryTerm`, không lưu trong `extension` và không dùng bảng riêng. Chỉ DQ Rule được có giá trị; mọi glossary khác luôn `null` | Payload governed (working, snapshot) là JSON của nguyên `GlossaryTerm`, schema `additionalProperties: false`, nên trường phải nằm trong schema mới đi cùng payload. Khi đó trường tự vào snapshot, `contentHash` và lịch sử phiên bản (DQT-02). `extension` không nhận object tùy ý; bảng riêng phải tự làm lại version và hash (§11, T0 mục 4). API gốc PUT/PATCH glossary term đã bị chặn, nên trường chỉ ghi được qua luồng working version |
 
 ## 3. Mô hình khái niệm
@@ -88,19 +88,13 @@ Mỗi khai báo tự chọn loại; một Rule được **trộn** khai báo `LI
 **Hình thức kiểm tra** (đơn trị, DQ §5) giữ nguyên là trường mô tả nghiệp vụ trong 19 trường, không ràng buộc loại của
 khai báo, tương tự tag Tần suất với lịch chạy (DQT-09).
 
-Loại `SQL` chạy bằng validator riêng `DqrColumnSqlValidator` (DQT-13) trong ingestion, kế thừa
-`ColumnRuleLibrarySqlExpressionValidator` gốc và chỉ ghi đè hai điểm:
-
-| Bước | Cách làm |
-| --- | --- |
-| Render SQL | Như validator gốc: template Jinja2, thay `{{ table_name }}`, `{{ column_name }}` lấy từ `entityLink` của từng testcase và các tham số trong `parameterValues`; kiểm tra `is_safe_sql_query` trước khi chạy |
-| Tên bảng `{{ table_name }}` | **Ghi đè.** `schema.table` cho Oracle, DB2 và các nguồn không có khái niệm database mà validator gốc đã xử lý (MySQL, MariaDB, SQLite, CockroachDB); `database.schema.table` cho các nguồn còn lại. Validator gốc ghép `database.schema.table` cho Oracle/DB2, ra tên dạng `default.SCHEMA.TABLE` không chạy được |
-| Đếm vi phạm | **Ghi đè.** Bọc thành `SELECT COUNT(*) FROM (<SQL đã render>) dqr_q` và đọc giá trị, để database tự đếm. Validator gốc chạy SQL rồi đếm số dòng bằng `fetchall()`, nên câu `SELECT COUNT(*)` luôn trả 1 dòng (luôn Failed) và câu trả về bản ghi vi phạm bị kéo toàn bộ vào bộ nhớ |
-| Tỷ lệ đạt | Khi khai báo bật `computePassedFailedRowCount`: chạy thêm `SELECT COUNT(*) FROM {{ table_name }}` để có tổng bản ghi, ghi `failedRows` = số vi phạm, `passedRows` = tổng − vi phạm, `passedRowsPercentage` |
-| Trạng thái | `Success` khi số vi phạm bằng 0, ngược lại `Failed`; giá trị đếm ghi vào `testResultValue` như validator gốc |
+Loại `SQL` chạy bằng validator rule-library gốc `ColumnRuleLibrarySqlExpressionValidator` (DQT-13): template Jinja2
+được render với `{{ table_name }}`, `{{ column_name }}` lấy từ `entityLink` của từng testcase và các tham số trong
+`parameterValues`; câu SQL được kiểm tra `is_safe_sql_query`, chạy, rồi **số dòng trả về** là số vi phạm; testcase
+`Success` khi bằng 0. Giá trị đếm ghi vào `testResultValue` (`Row Count`).
 
 Vì vậy một câu SQL khai báo một lần chạy được trên mọi bảng gắn với CDE, đúng yêu cầu R2. Câu SQL phải **trả về các bản
-ghi vi phạm, không tự `COUNT`**. Ví dụ:
+ghi vi phạm, không tự `COUNT`** (câu `SELECT COUNT(*)` luôn trả 1 dòng nên luôn Failed). Ví dụ:
 
 ```sql
 SELECT {{ column_name }} FROM {{ table_name }}
@@ -108,12 +102,18 @@ WHERE {{ column_name }} IS NOT NULL
   AND NOT REGEXP_LIKE({{ column_name }}, '^[0-9]{12}$')
 ```
 
-Tỷ lệ đạt chỉ có nghĩa khi mỗi dòng SQL trả về ứng với một bản ghi của bảng. Câu dạng `GROUP BY … HAVING` (vd. đếm giá
-trị trùng) trả về nhóm, không phải bản ghi, nên dùng ngưỡng `count`, không dùng ngưỡng phần trăm.
+Giới hạn của validator gốc:
+
+| Giới hạn | Hệ quả |
+| --- | --- |
+| `{{ table_name }}` là `database.schema.table`, trừ MySQL, MariaDB, SQLite, CockroachDB (`schema.table`) | Không chạy trên **Oracle/DB2** (tên `default.SCHEMA.TABLE` sai cú pháp); testcase ra Lỗi thực thi |
+| Đếm bằng cách đọc hết các dòng trả về | Nhiều bản ghi vi phạm thì chậm và tốn bộ nhớ trên Airflow; nên chỉ select cột khóa |
+| Không tính tổng bản ghi | Khai báo `SQL` chỉ dùng ngưỡng `count = 0` / `count <= n`, không dùng ngưỡng phần trăm |
 
 Với mỗi khai báo loại `SQL`, hệ thống tạo một `TestDefinition` riêng cho cặp (Rule identity, `key`), tên
 `DQR__<parentBusinessVersion>__<mã an toàn>__<key>`, `entityType = COLUMN`, `testPlatforms = [OpenMetadata]`,
-`validatorClass = DqrColumnSqlValidator`, `sqlExpression` = câu SQL đã duyệt, `supportsRowLevelPassedFailed = true`.
+`validatorClass = ColumnRuleLibrarySqlExpressionValidator`, `sqlExpression` = câu SQL đã duyệt,
+`supportsRowLevelPassedFailed = false`.
 Definition này là managed (DQT-07) và không xuất hiện trong danh sách chọn của loại `LIBRARY`.
 
 ### 4.2. Schema `testSpecs`
@@ -194,8 +194,8 @@ Kiểm tra khi Lưu Draft (lỗi cú pháp) và kiểm tra lại đầy đủ kh
   có `{{ column_name }}` và `{{ table_name }}`; biến khác phải có trong `parameterValues`; danh sách select ngoài cùng
   không được chỉ gồm hàm gộp (vd. chỉ `COUNT(*)`), vì SQL phải trả về bản ghi vi phạm (§4.1). Lỗi
   `DQ_TEST_SPEC_SQL_INVALID`, với gợi ý “Câu SQL phải trả về các bản ghi vi phạm, không dùng COUNT(*)”.
-- Ngưỡng hiệu lực (`threshold` của khai báo, hoặc ngưỡng của Rule) (§6.1): ngưỡng phần trăm hợp lệ với `LIBRARY` khi
-  definition hỗ trợ đếm bản ghi đạt/không đạt (`supportsRowLevelPassedFailed`), với `SQL` khi khai báo bật
+- Ngưỡng hiệu lực (`threshold` của khai báo, hoặc ngưỡng của Rule) (§6.1): ngưỡng phần trăm chỉ hợp lệ với `LIBRARY` khi
+  definition hỗ trợ đếm bản ghi đạt/không đạt (`supportsRowLevelPassedFailed`) và khai báo bật
   `computePassedFailedRowCount`; ngưỡng `count` hợp lệ với mọi khai báo. Lỗi `DQ_THRESHOLD_UNSUPPORTED`, chỉ rõ khai báo
   nào.
 - Khai báo có cùng `key` với một khai báo trong version Approved trước không được đổi `kind` hoặc `testDefinitionFqn`
@@ -332,7 +332,7 @@ testcase (`threshold` của khai báo, để trống thì dùng ngưỡng của 
 | Ngưỡng hiệu lực | Số liệu dùng | Đạt khi |
 | --- | --- | --- |
 | Trống | Trạng thái gốc | `Success` |
-| `count = 0`, `count <= n` | Số bản ghi vi phạm: `failedRows`, hoặc giá trị đếm của `DqrColumnSqlValidator` với khai báo `SQL` | Thỏa biểu thức |
+| `count = 0`, `count <= n` | Số bản ghi vi phạm: `failedRows`, hoặc giá trị `Row Count` của validator SQL với khai báo `SQL` | Thỏa biểu thức |
 | `>= x%`, `> x%`, `= x%`, … | `passedRowsPercentage` (cần `computePassedFailedRowCount`) | Thỏa biểu thức |
 
 Trạng thái gốc `Aborted` → **Lỗi thực thi**; chưa có kết quả → **Chưa có kết quả**. Trạng thái gốc vẫn hiển thị cạnh
@@ -501,8 +501,8 @@ khai báo mới chưa có key) để UI chỉ đúng chỗ.
     component tham số của form testcase gốc (`TestCaseFormV1`). Card của khai báo đã từng Approved khóa ô chọn
     definition (DQT-08), gợi ý “Muốn đổi loại kiểm tra, hãy xóa kiểm thử này và thêm kiểm thử mới.”
   - `SQL`: editor SQL (component SQL editor gốc), ghi chú biến `{{ table_name }}`, `{{ column_name }}`, và nhắc “Câu SQL
-    phải trả về các bản ghi vi phạm, không dùng COUNT(*); không có bản ghi nào là đạt.” Công tắc **Tính tỷ lệ đạt**
-    (`computePassedFailedRowCount`) bật thì dùng được ngưỡng phần trăm.
+    phải trả về các bản ghi vi phạm, không dùng COUNT(*); không có bản ghi nào là đạt.” Không có công tắc **Tính tỷ
+    lệ đạt** cho `SQL`; công tắc này chỉ có ở `LIBRARY` khi definition hỗ trợ.
   - Khối **Áp dụng cho**: gọi preview §8, liệt kê Column của CDE đang chọn, với mỗi Column đánh dấu khai báo nào không
     áp dụng và lý do; dòng tổng ghi số testcase sẽ sinh.
 - Overview (DQ §8.5) thêm card **Khai báo kiểm thử**, chỉ đọc, hiển thị theo version đang xem: bảng Tên kiểm thử, Loại,
@@ -583,8 +583,8 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 | Rủi ro | Biện pháp |
 | --- | --- |
 | SQL do người dùng viết chạy trên CSDL nghiệp vụ | Chỉ `SELECT` (§4.3), bắt buộc qua phê duyệt; connection của pipeline TestSuite dùng tài khoản chỉ đọc; timeout truy vấn theo cấu hình ingestion |
-| Nhiều bản ghi vi phạm (hàng triệu dòng) | `DqrColumnSqlValidator` bọc `COUNT(*)` để database tự đếm, không kéo bản ghi về ingestion (DQT-13) |
-| Validator riêng lệch với validator gốc khi nâng cấp OpenMetadata | Kế thừa, chỉ ghi đè hai hàm; unit test bao các nguồn Oracle, DB2, PostgreSQL, MySQL; danh mục kiểm tra khi nâng cấp gồm validator này |
+| Nhiều bản ghi vi phạm (hàng triệu dòng) | Validator gốc đọc hết các dòng trả về; hướng dẫn chỉ select cột khóa. Nếu cần, xem lại validator riêng đếm ở database (DQT-13) |
+| Khai báo `SQL` trên nguồn Oracle/DB2 | Chưa hỗ trợ (DQT-13); dùng `LIBRARY` cho các nguồn này. Xem lại khi đưa nguồn Oracle/DB2 vào |
 | SQL khác phương ngữ giữa các nguồn (Oracle, DB2, PostgreSQL…) | Preview liệt kê service của từng Column; ưu tiên `LIBRARY` khi có definition tương đương. Mỗi khai báo `SQL` dùng một câu cho mọi Column; CDE trải nhiều phương ngữ thì tách Rule hoặc dùng `LIBRARY` |
 | Testcase chạy hai lần (pipeline Table và pipeline của Rule) | Quy ước vận hành §5.3; trang reconcile status liệt kê Table có pipeline basic suite chứa testcase managed |
 | Số pipeline tăng theo số Rule (mỗi Rule một DAG Airflow) | Pipeline chỉ deploy khi Rule được áp dụng; Rule retire thì disable pipeline. Giới hạn số DAG chạy đồng thời bằng pool/concurrency của Airflow. Trang reconcile status thống kê số pipeline và số Rule chạy cùng khung giờ |
@@ -600,7 +600,7 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 | --- | --- | --- | --- | --- |
 | 1 | Testcase index chứa tag thừa kế từ Column | Gần như có: `TestCaseRepository.inheritTags` gộp tag Table và Column khi đọc kèm `tags`; `TestCaseIndex` lấy `entity.getTags()`. Testcase managed hiện trong dashboard DQ gốc khi lọc theo tag CDE | Không đổi. Tab kết quả đọc từ binding (DQT-06), không phụ thuộc index | Ở T3: kiểm tra testcase có được reindex khi TD đổi tag CDE trên Column |
 | 2 | Logical suite nhiều Table và service | Có: `_process_logical_suite` gom theo Table bằng `itertools.groupby` trên danh sách chưa sắp xếp, nên một Table có thể bị tách nhiều lô. Kết quả đúng, chậm hơn | Không đổi. Suite riêng mỗi Rule có ít testcase nên ảnh hưởng nhỏ | Không |
-| 3 | Definition `SQL` managed chạy đúng validator | Cơ chế chọn đúng: ingestion nạp validator theo `validatorClass`. Biến Jinja2 `{{ table_name }}`, `{{ column_name }}` đúng (mô tả `{table}`/`{column}` trong `testDefinition.json` đã cũ). **Hai lỗi**: (A) validator gốc đếm số dòng trả về bằng `fetchall()`, nên `SELECT COUNT(*)` luôn Failed và bản ghi vi phạm bị kéo vào bộ nhớ; (B) tên bảng ghép `database.schema.table`, sai trên Oracle/DB2 | Thêm DQT-13 và validator `DqrColumnSqlValidator` (§4.1); SQL trả về bản ghi vi phạm | Chạy thử validator trên một nguồn Oracle thật: tên bảng, tên cột chữ thường không đặt trong ngoặc kép |
+| 3 | Definition `SQL` managed chạy đúng validator | Cơ chế chọn đúng: ingestion nạp validator theo `validatorClass`. Biến Jinja2 `{{ table_name }}`, `{{ column_name }}` đúng (mô tả `{table}`/`{column}` trong `testDefinition.json` đã cũ). Validator gốc đếm số dòng trả về (nên SQL phải trả về bản ghi vi phạm) và ghép tên bảng `database.schema.table`, sai trên Oracle/DB2 | DQT-13: dùng validator gốc, chấp nhận giới hạn (§4.1) | Khi cần Oracle/DB2: quyết định cách xử lý tên bảng |
 | 4 | Lưu `testSpecs` trong `extension` | Không phù hợp: `validateExtension` bắt mỗi key là custom property đã đăng ký và validate theo kiểu property; không có kiểu nhận object tùy ý. Payload governed là JSON của `GlossaryTerm` (đọc lại bằng `readValue(payload, GlossaryTerm.class)`), schema `additionalProperties: false`, nên không chèn được trường ngoài schema. API gốc `PUT`/`PATCH` glossary term đã bị chặn | DQT-14: thêm trường tùy chọn `dataQualityTestSpecs` vào schema `GlossaryTerm` (§4.2) | Không |
 | 5 | Pipeline riêng mỗi Rule, không lịch, trigger thủ công (DQT-09) | API gốc có sẵn: `POST /v1/services/ingestionPipelines/deploy/{id}`, `POST .../trigger/{id}`, `GET .../{fqn}/pipelineStatus` | Không đổi | Ở T2: thử deploy pipeline TestSuite không có `scheduleInterval` lên Airflow |
 
@@ -638,3 +638,5 @@ Những điểm hiện thực khác hoặc chi tiết hơn so với các mục t
 - **Bộ lọc Kiểm thử ở danh sách DQ** lọc trên các dòng đã tải của trang hiện tại, theo trạng thái từ `GET /rules/status`.
 - **Chưa có:** thống kê Table có pipeline basic suite chứa testcase managed trong `GET /reconcile/status`; kiểm thử tích
   hợp (`openmetadata-integration-tests`) và E2E Playwright.
+- **Validator SQL:** dùng validator rule-library gốc, không có validator riêng và không có image ingestion riêng (DQT-13,
+  2026-10-04).

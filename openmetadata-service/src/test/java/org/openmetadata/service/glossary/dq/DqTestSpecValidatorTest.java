@@ -190,22 +190,21 @@ class DqTestSpecValidatorTest {
   }
 
   @Test
-  void sqlDeclarationsSupportPercentageWhenRowCountsAreOn() {
+  void sqlDeclarationsSupportCountThresholdsOnly() {
     assertEquals(
         DqTestErrors.THRESHOLD_UNSUPPORTED,
         failure(
             DqTestSpecValidator.Mode.FULL,
             null,
             null,
-            specs(sql("t1", "x").withThreshold(">= 99%"))));
+            specs(sql("t1", "x").withThreshold(">= 99%").withComputePassedFailedRowCount(true))));
     assertDoesNotThrow(
         () ->
             validate(
                 DqTestSpecValidator.Mode.FULL,
                 null,
                 null,
-                specs(
-                    sql("t1", "x").withThreshold(">= 99%").withComputePassedFailedRowCount(true))));
+                specs(sql("t1", "x").withThreshold("count <= 3"))));
   }
 
   @Test

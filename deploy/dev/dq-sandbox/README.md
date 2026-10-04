@@ -44,6 +44,7 @@ Container nằm trong `omd_network` cùng OpenMetadata và Airflow nên truy c�
 | Định dạng (SQL) | SQL | `SELECT {{ column_name }} FROM {{ table_name }} WHERE {{ column_name }} IS NULL OR NOT REGEXP_LIKE({{ column_name }}, '^[0-9]{12}$')` | `count <= 3` | `kh` 3 vi phạm Đạt; `customer` 2 Đạt; `holder` 1 NULL (bảng số: `REGEXP_LIKE` trên số vẫn chạy) |
 | Không trùng (SQL) | SQL | `SELECT {{ column_name }} FROM {{ table_name }} WHERE {{ column_name }} IS NOT NULL GROUP BY {{ column_name }} HAVING COUNT(*) > 1` | `count = 0` | `kh` Đạt, `customer` Không đạt (1 nhóm trùng), `holder` Đạt |
 
-Tên bảng trong SQL do validator thay: với MySQL là `schema.table` (ví dụ `core_kh.kh`).
+Tên bảng trong SQL do validator gốc thay: với MySQL là `schema.table` (ví dụ `core_kh.kh`). Khai báo SQL chỉ dùng
+ngưỡng dạng `count`; câu SQL trả về các bản ghi vi phạm, không dùng `COUNT(*)`.
 
 Các câu đếm đã chạy thử trực tiếp trên sandbox: định dạng sai `kh`=3, `customer`=2; nhóm trùng `customer`=1; NULL `holder`=1.

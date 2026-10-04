@@ -193,8 +193,9 @@ const DQTestSpecsField = ({
   const renderSpec = (spec: DqTestSpec, index: number) => {
     const isLocked = Boolean(spec.key && lockedKeys.includes(spec.key));
     const definition = definitionOf(spec.testDefinitionFqn);
+    // The SQL validator only counts violations, so only library tests can compute a pass rate.
     const canComputeRate =
-      spec.kind === DqTestSpecKind.SQL ||
+      spec.kind === DqTestSpecKind.Library &&
       Boolean(definition?.supportsRowLevelPassedFailed);
 
     return (
@@ -290,17 +291,19 @@ const DQTestSpecsField = ({
             <span className="dq-test-spec-hint">{t('dq.test.sql-hint')}</span>
           </div>
         )}
-        <div className="dq-test-spec-row dq-test-spec-inline">
-          <Switch
-            checked={Boolean(spec.computePassedFailedRowCount)}
-            data-testid={`dq-test-compute-${index}`}
-            disabled={!canComputeRate}
-            onChange={(checked) =>
-              update(index, { computePassedFailedRowCount: checked })
-            }
-          />
-          <span>{t('dq.test.compute-rate')}</span>
-        </div>
+        {spec.kind === DqTestSpecKind.Library && (
+          <div className="dq-test-spec-row dq-test-spec-inline">
+            <Switch
+              checked={Boolean(spec.computePassedFailedRowCount)}
+              data-testid={`dq-test-compute-${index}`}
+              disabled={!canComputeRate}
+              onChange={(checked) =>
+                update(index, { computePassedFailedRowCount: checked })
+              }
+            />
+            <span>{t('dq.test.compute-rate')}</span>
+          </div>
+        )}
         <div className="dq-test-spec-row">
           <label>{t('dq.test.threshold')}</label>
           <Input

@@ -34,7 +34,9 @@ import org.openmetadata.service.util.FullyQualifiedName;
 
 /** Creates, updates, retires and restores the OpenMetadata testcases and definitions of a Rule. */
 public final class DqTestCaseGateway {
-  public static final String SQL_VALIDATOR_CLASS = "DqrColumnSqlValidator";
+  /** Stock rule-library validator: counts the records the SQL returns; 0 records means Success. */
+  public static final String SQL_VALIDATOR_CLASS = "ColumnRuleLibrarySqlExpressionValidator";
+
   private static final String COLUMNS_FIELD = "columns";
   private static final TestCaseMapper TEST_CASE_MAPPER = new TestCaseMapper();
 
@@ -131,7 +133,7 @@ public final class DqTestCaseGateway {
             .withTestPlatforms(List.of(TestPlatform.OPEN_METADATA))
             .withSqlExpression(spec.getSqlExpression())
             .withValidatorClass(SQL_VALIDATOR_CLASS)
-            .withSupportsRowLevelPassedFailed(true)
+            .withSupportsRowLevelPassedFailed(false)
             .withEnabled(true)
             .withParameterDefinition(extraParameters(spec))
             .withUpdatedBy(DqManagedWrite.ACTOR)
