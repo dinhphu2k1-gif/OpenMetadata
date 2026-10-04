@@ -34,7 +34,13 @@ Ghi chu:
 - Server doc `deploy/dev/.env` (dang nhap, SSO), roi tro DB sang `localhost:8001` va OpenSearch sang
   `localhost:8086`.
 - Server tren may khong phuc vu UI (mo `:8585/` se loi). Dung UI tren `:3000` / `:3001`.
-- Ket noi Ingestion tat mac dinh. Can chay pipeline thi dung che do Docker o muc 2.
+- Ket noi Ingestion tat mac dinh. Can "Kiem thu ket noi", ingest metadata hoac chay pipeline kiem thu thi bat Airflow
+  trong Docker roi chay server voi `WITH_INGESTION=true`:
+
+  ```bash
+  ./local-dev.sh ingestion                     # Airflow http://localhost:8080 (admin/admin)
+  WITH_INGESTION=true ./local-dev.sh server    # server goi Airflow o localhost:8080; Airflow goi lai server qua gateway omd_network
+  ```
 - Dang nhap basic: `admin@open-metadata.org` / `admin`.
 - `./local-dev.sh portal` ket noi PostgreSQL bang user `portal_ro` (chi doc, tao boi `./local-dev.sh infra`). Portal khong tao du lieu
   khoi tao, nen chay `migrate` roi chay `server` it nhat mot lan truoc khi chay `portal`, va nguoi dung phai duoc tao san trong OM.

@@ -11,6 +11,9 @@
 #   ./local-dev.sh portal      run the Portal server         (API :8595, admin :8596), read-only database user
 #   ./local-dev.sh ui          run Vite for OpenMetadata     (http://localhost:3000 -> :8585)
 #   ./local-dev.sh ui-portal   run Vite for the Portal       (http://localhost:3001 -> :8595)
+#   ./local-dev.sh ingestion   run Airflow in Docker (http://localhost:8080), needed for Test Connection,
+#                              metadata ingestion and test pipelines; then start the server with
+#                              WITH_INGESTION=true ./local-dev.sh server
 #
 # Backend change: Ctrl+C the server, then "./local-dev.sh server" again (it recompiles first).
 # UI change: Vite reloads by itself.
@@ -54,7 +57,19 @@ load_environment() {
     ELASTICSEARCH_PORT=8086
     ELASTICSEARCH_SCHEME=http
     PIPELINE_SERVICE_CLIENT_ENABLED=${PIPELINE_SERVICE_CLIENT_ENABLED:-false}
+    if [ "${WITH_INGESTION:-false}" = true ]; then
+        # Airflow runs in Docker (./local-dev.sh ingestion); the server here calls it on localhost and
+        # gives the ingestion workflows an address of this machine they can reach from the Docker network.
+        PIPELINE_SERVICE_CLIENT_ENABLED=true
+        PIPELINE_SERVICE_CLIENT_ENDPOINT=http://localhost:8080
+        SERVER_HOST_API_URL="http://$(docker_host_gateway):${SERVER_PORT:-8585}/api"
+    fi
     set +a
+}
+
+# Address of this machine seen from the containers of omd_network
+docker_host_gateway() {
+    docker network inspect omd_network -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}'
 }
 
 compile_backend() {
@@ -153,8 +168,13 @@ case "${1:-}" in
         cd "$UI_DIR"
         exec yarn start:portal
         ;;
+    ingestion)
+        # --no-deps: the OpenMetadata server runs on the host, not in Docker
+        docker compose -f "$COMPOSE_FILE" up -d --no-deps ingestion
+        echo "Airflow: http://localhost:8080 (admin/admin). Start the server with: WITH_INGESTION=true ./local-dev.sh server"
+        ;;
     *)
-        sed -n '2,18p' "$0"
+        sed -n '2,21p' "$0"
         exit 1
         ;;
 esac
