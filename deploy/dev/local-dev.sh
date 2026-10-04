@@ -101,7 +101,7 @@ run_java() {
     local classpath
     classpath="$(backend_classpath)"
     cd "$PROJECT_ROOT"
-    exec java ${OPENMETADATA_HEAP_OPTS:--Xmx1G} -Dbootstrap.dir="$PROJECT_ROOT/bootstrap" \
+    exec java ${OPENMETADATA_HEAP_OPTS:--Xms256m -Xmx768m} -Dbootstrap.dir="$PROJECT_ROOT/bootstrap" \
         -cp "$classpath" "$main_class" "$@"
 }
 
@@ -162,10 +162,12 @@ case "${1:-}" in
         ;;
     ui)
         cd "$UI_DIR"
+        export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
         exec yarn start
         ;;
     ui-portal)
         cd "$UI_DIR"
+        export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
         exec yarn start:portal
         ;;
     ingestion)

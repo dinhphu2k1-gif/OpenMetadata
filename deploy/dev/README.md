@@ -112,15 +112,15 @@ Yêu cầu khi deploy:
    Khai báo kiểm thử kiểu SQL chưa chạy được trên nguồn Oracle/DB2 (DQT-13).
 2. Bảng mới nằm trong migration `1.13.3`; `execute-migrate-all` tự tạo khi khởi động.
 
-Nguồn dữ liệu thử nghiệm (MySQL nhỏ, có vi phạm cố ý, tài khoản chỉ đọc `dq_reader`):
+Nguồn dữ liệu thử nghiệm (Oracle 21c nhỏ, có vi phạm cố ý, tài khoản chỉ đọc `dq_reader`, giới hạn RAM):
 
 ```bash
-docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-mysql
-docker compose -f docker-compose.dev.yml --profile dq-sandbox rm -sfv dq-sandbox-mysql    # xóa để nạp lại dữ liệu
+docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-oracle   # lần đầu tạo database 15-30 phút
+docker stop dq-sandbox-oracle                                                         # trả RAM khi không dùng
 ```
 
-Trong OpenMetadata khai báo service MySQL với host `dq-sandbox-mysql`, cổng `3306`, tài khoản `dq_reader` /
-`dq_reader_pw`. Dữ liệu và kịch bản thử: `dq-sandbox/README.md`.
+Trong OpenMetadata khai báo service Oracle với host `dq-sandbox-oracle:1521`, service name `ORCLPDB1`, tài khoản
+`dq_reader` / `dq_reader_pw`. Dữ liệu, giới hạn bộ nhớ và kịch bản thử: `dq-sandbox/README.md`.
 
 ### 7.1. Chạy thử bằng local-dev (không build image)
 
@@ -131,7 +131,7 @@ Airflow tắt mặc định, nên phải bật thêm. Thứ tự, mỗi lệnh s
 cd deploy/dev
 ./local-dev.sh infra                                                       # PostgreSQL + OpenSearch
 ./local-dev.sh migrate                                                     # tạo bảng (lần đầu, hoặc khi sửa migration)
-docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-mysql   # MySQL thử nghiệm
+docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-oracle  # Oracle thử nghiệm
 ./local-dev.sh ingestion                                                   # Airflow http://localhost:8080 (admin/admin)
 WITH_INGESTION=true ./local-dev.sh server                                  # server :8585, gọi được Airflow
 ./local-dev.sh ui                                                          # UI http://localhost:3000
@@ -146,6 +146,6 @@ gateway của `omd_network` (thường `172.16.239.1:8585`).
 | --- | --- | --- |
 | "Kiểm thử kết nối thất bại" ngay cả khi thông tin đúng | Server chạy không có `WITH_INGESTION=true`, hoặc container `openmetadata_ingestion` chưa chạy | Chạy `./local-dev.sh ingestion`, rồi chạy lại server với `WITH_INGESTION=true` |
 | Kiểm thử kết nối treo hoặc Airflow báo không gọi được OpenMetadata | Airflow không tới được server trên máy | Kiểm tra từ container: `docker exec openmetadata_ingestion curl -s http://172.16.239.1:8585/api/v1/system/version`; tường lửa máy phải cho cổng 8585 từ mạng Docker |
-| Không kết nối được MySQL | Sandbox chưa chạy hoặc sai host | `docker ps` thấy `dq-sandbox-mysql`; host phải là `dq-sandbox-mysql:3306` (không dùng `localhost`) |
+| Không kết nối được Oracle | Sandbox chưa chạy, database chưa tạo xong hoặc sai host | `docker logs dq-sandbox-oracle` có "DATABASE IS READY TO USE!"; host `dq-sandbox-oracle:1521` (không dùng `localhost`), service name `ORCLPDB1` |
 | Approve Rule xong không có testcase | Lỗi reconcile | `GET /api/v1/glossaryTerms/dataQuality/reconcile/status` (admin) xem `outboxPending`, `errors`; log server tìm "Data Quality test outbox" |
 | Testcase SQL ra "Lỗi thực thi" | SQL sai cú pháp, dùng `COUNT(*)`, hoặc nguồn Oracle/DB2 | Xem log task trong Airflow; SQL phải trả về các dòng vi phạm (DQT-13) |
