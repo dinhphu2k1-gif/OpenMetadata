@@ -27,7 +27,7 @@ import { MenuInfo } from 'rc-menu/lib/interface';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { cloneDeep, isEmpty, toString } from 'lodash';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ReactComponent as IconTerm } from '../../../assets/svg/book.svg';
@@ -186,7 +186,7 @@ const GlossaryHeader = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { fqn } = useFqn();
-  const { activeGlossary } = useGlossaryStore();
+  const { activeGlossary, createDraftRequest } = useGlossaryStore();
   const cdeRoute = useMemo(
     () =>
       parseCdeRoute({
@@ -1565,15 +1565,31 @@ const GlossaryHeader = ({
     canCreateGlossaryTerm,
   ]);
 
-  const approvalActionButtons = useMemo(() => {
-    if (isVersionView || !canRenderMutationActions) {
-      return null;
-    }
-
+  const openCreateDraftModal = () => {
     const currentVer = businessVersion ?? (isGlossary ? '1' : '1.0');
     const cleanVer = String(currentVer)
       .trim()
       .replace(/^(version:?\s*|v)/i, '');
+    setDraftVersion(suggestNextVersion(cleanVer, isGlossary));
+    setDraftVersionError('');
+    setIsCreateDraftModalOpen(true);
+  };
+
+  const handledDraftRequest = useRef(createDraftRequest);
+  useEffect(() => {
+    if (createDraftRequest === handledDraftRequest.current) {
+      return;
+    }
+    handledDraftRequest.current = createDraftRequest;
+    if (canCreateDraft && canRenderMutationActions) {
+      openCreateDraftModal();
+    }
+  }, [createDraftRequest]);
+
+  const approvalActionButtons = useMemo(() => {
+    if (isVersionView || !canRenderMutationActions) {
+      return null;
+    }
 
     return (
       <Space size={8}>
@@ -1627,11 +1643,7 @@ const GlossaryHeader = ({
         {canCreateDraft && glossaryTermStatus === EntityStatus.Approved && (
           <Button
             className="m-l-xs"
-            onClick={() => {
-              setDraftVersion(suggestNextVersion(cleanVer, isGlossary));
-              setDraftVersionError('');
-              setIsCreateDraftModalOpen(true);
-            }}>
+            onClick={openCreateDraftModal}>
             {t('label.create-draft')}
           </Button>
         )}

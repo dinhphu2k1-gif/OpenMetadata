@@ -11,14 +11,19 @@
  *  limitations under the License.
  */
 
+import { StatusType } from '../../common/StatusBadge/StatusBadge.interface';
 import { DQOutcome, DQRuleStatus } from './DQRuleTests.interface';
 
-export const DQ_OUTCOME_COLOR: Record<DQRuleStatus, string> = {
-  PASSED: 'success',
-  FAILED: 'error',
-  ABORTED: 'warning',
-  NO_RESULT: 'default',
-  NOT_DECLARED: 'default',
+/** StatusBadge look of each outcome; `icon` is the badge icon key, absent for the grey states. */
+export const DQ_OUTCOME_BADGE: Record<
+  DQRuleStatus,
+  { status: StatusType; icon?: string }
+> = {
+  PASSED: { status: StatusType.Success, icon: 'Success' },
+  FAILED: { status: StatusType.Failure, icon: 'Failed' },
+  ABORTED: { status: StatusType.Aborted, icon: 'Aborted' },
+  NO_RESULT: { status: StatusType.Archived },
+  NOT_DECLARED: { status: StatusType.Archived },
 };
 
 export const DQ_OUTCOME_LABEL_KEY: Record<DQRuleStatus, string> = {
@@ -60,3 +65,8 @@ export const DQ_TEST_FILTER_STATUSES: DQRuleStatus[] = [
   'ABORTED',
   'NO_RESULT',
 ];
+
+export const DQ_TEST_DEFINITION_LIMIT = 1000;
+
+/** Method tag of a Rule checked by its own SQL; its new declarations default to SQL. */
+export const DQ_SQL_METHOD_TAG_SUFFIX = 'TechnicalSqlRule';

@@ -11,28 +11,43 @@
  *  limitations under the License.
  */
 
-import { Card, Table, Tag } from 'antd';
+import { Button, Card, Space, Table, Tag, Tooltip } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
 import { useTranslation } from 'react-i18next';
+import { ReactComponent as EditIcon } from '../../../assets/svg/edit-new.svg';
+import { ReactComponent as DeleteIcon } from '../../../assets/svg/ic-delete.svg';
+import { DE_ACTIVE_COLOR } from '../../../constants/constants';
 import {
   DqTestSpec,
   DqTestSpecKind,
   DqTestSpecs,
 } from '../../../generated/type/dqTestSpecs';
 
+export interface DQTestSpecActions {
+  onAdd: () => void;
+  onEdit: (index: number) => void;
+  onRemove: (index: number) => void;
+}
+
 interface DQTestSpecsCardProps {
   specs?: DqTestSpecs;
   ruleThreshold?: string;
+  /** Present when the viewer can change the declarations of this version. */
+  actions?: DQTestSpecActions;
 }
 
 const SQL_PREVIEW_LENGTH = 80;
 
-/** Read-only list of the test declarations of the Rule version being viewed. */
-const DQTestSpecsCard = ({ specs, ruleThreshold }: DQTestSpecsCardProps) => {
+/** The test declarations of the Rule version being viewed. */
+const DQTestSpecsCard = ({
+  specs,
+  ruleThreshold,
+  actions,
+}: DQTestSpecsCardProps) => {
   const { t } = useTranslation();
   const items = specs?.items ?? [];
 
-  if (items.length === 0) {
+  if (items.length === 0 && !actions) {
     return null;
   }
 
@@ -65,17 +80,62 @@ const DQTestSpecsCard = ({ specs, ruleThreshold }: DQTestSpecsCardProps) => {
       title: t('dq.test.effective-threshold'),
       render: (_, spec) => spec.threshold ?? ruleThreshold ?? '-',
     },
+    ...(actions
+      ? [
+          {
+            title: t('label.action-plural'),
+            key: 'actions',
+            width: 90,
+            render: (_: unknown, __: DqTestSpec, index: number) => (
+              <Space size={4}>
+                <Tooltip title={t('dq.test.edit')}>
+                  <Button
+                    className="flex-center"
+                    data-testid={`dq-test-edit-${index}`}
+                    icon={<EditIcon color={DE_ACTIVE_COLOR} width="14px" />}
+                    size="small"
+                    type="text"
+                    onClick={() => actions.onEdit(index)}
+                  />
+                </Tooltip>
+                <Tooltip title={t('dq.test.remove')}>
+                  <Button
+                    className="flex-center"
+                    data-testid={`dq-test-remove-${index}`}
+                    icon={<DeleteIcon color={DE_ACTIVE_COLOR} width="14px" />}
+                    size="small"
+                    type="text"
+                    onClick={() => actions.onRemove(index)}
+                  />
+                </Tooltip>
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
     <Card
       className="dq-test-specs-card"
       data-testid="dq-test-specs-card"
+      extra={
+        actions && (
+          <Button
+            data-testid="dq-test-add"
+            size="small"
+            type="primary"
+            onClick={actions.onAdd}>
+            {t('dq.test.add')}
+          </Button>
+        )
+      }
       size="small"
       title={t('dq.test.title')}>
       <Table<DqTestSpec>
         columns={columns}
         dataSource={items}
+        locale={{ emptyText: t('dq.test.empty') }}
         pagination={false}
         rowKey={(spec) => spec.key ?? spec.name}
         size="small"

@@ -20,13 +20,6 @@ import CDESelector from '../CDESelector/CDESelector.component';
 import { CDE_RELEASE_LEVEL_OPTIONS } from '../../../constants/CDEReleaseLevel.constants';
 import { validateCDEDates } from '../../../utils/CDEDateUtils';
 import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
-import {
-  DqTestSpecKind,
-  DqTestSpecs,
-} from '../../../generated/type/dqTestSpecs';
-import DQTestSpecsField, {
-  isDqTestSpecsValid,
-} from '../DQRuleTests/DQTestSpecsField.component';
 import { DQ_TAG_CLASSIFICATIONS } from '../GlossaryTermTab/DQGlossaryTableColumns';
 import {
   AddGlossaryTermFormProps,
@@ -55,7 +48,6 @@ export interface DQGlossaryTermFormValues {
   releaseLevel?: string;
   effectiveDate?: DateTime | null;
   expirationDate?: DateTime | null;
-  testSpecs?: DqTestSpecs;
 }
 
 interface DQGlossaryTermFormProps extends AddGlossaryTermFormProps {
@@ -71,8 +63,6 @@ const DQGlossaryTermForm = ({
 }: DQGlossaryTermFormProps) => {
   const form = formRef as unknown as FormInstance<DQGlossaryTermFormValues>;
   const { t } = useTranslation();
-  const methodTags = Form.useWatch('methodTags', form);
-  const qualityThreshold = Form.useWatch('qualityThreshold', form);
 
   const existingCdeRelation = glossaryTerm?.relatedTerms?.find((relation) =>
     relation.term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME)
@@ -102,7 +92,6 @@ const DQGlossaryTermForm = ({
         cdeCode: relatedCde?.name ?? extension.cdeCode,
         cdeName:
           relatedCde?.displayName ?? relatedCde?.name ?? extension.cdeName,
-        testSpecs: glossaryTerm.dataQualityTestSpecs,
         qualityThreshold: extension.qualityThreshold,
         ruleExplanation: extension.ruleExplanation,
         otherConstraints: extension.otherConstraints,
@@ -257,25 +246,8 @@ const DQGlossaryTermForm = ({
       mutuallyExclusive: false,
       style: undefined,
       extension: isEmpty(extension) ? undefined : extension,
-      dataQualityTestSpecs: values.testSpecs,
     } as GlossaryTermForm);
   };
-
-  const defaultTestKind = (methodTags ?? []).some((tag: TagLabel) =>
-    tag.tagFQN.endsWith('TechnicalSqlRule')
-  )
-    ? DqTestSpecKind.SQL
-    : DqTestSpecKind.Library;
-
-  const lockedTestKeys = (() => {
-    const minor = Number((glossaryTerm?.businessVersion ?? '').split('.')[1]);
-
-    return editMode && minor > 0
-      ? (glossaryTerm?.dataQualityTestSpecs?.items ?? [])
-          .map((spec) => spec.key)
-          .filter((key): key is string => Boolean(key))
-      : [];
-  })();
 
   const tagField = (
     name: string,
@@ -454,29 +426,6 @@ const DQGlossaryTermForm = ({
           <Input
             data-testid="dq-quality-threshold"
             placeholder="Ví dụ: >= 99.5%, = 100%, count = 0"
-          />
-        </Form.Item>
-      </GlossaryTermFormSection>
-
-      <GlossaryTermFormSection
-        className="cde-form-section-tests"
-        title={t('dq.test.title')}>
-        <Form.Item
-          className="cde-form-field-full"
-          name="testSpecs"
-          rules={[
-            {
-              validator: async (_, value?: DqTestSpecs) =>
-                isDqTestSpecsValid(value)
-                  ? Promise.resolve()
-                  : Promise.reject(new Error(t('dq.test.invalid'))),
-            },
-          ]}>
-          <DQTestSpecsField
-            cdeTermId={selectedCde?.id}
-            defaultKind={defaultTestKind}
-            lockedKeys={lockedTestKeys}
-            ruleThreshold={qualityThreshold}
           />
         </Form.Item>
       </GlossaryTermFormSection>

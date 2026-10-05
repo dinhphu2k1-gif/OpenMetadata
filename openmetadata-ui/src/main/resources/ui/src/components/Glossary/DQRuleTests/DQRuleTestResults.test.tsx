@@ -137,15 +137,71 @@ describe('DQRuleTestResults', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByTestId('dq-outcome-FAILED')).toHaveLength(2);
     expect(screen.getByTestId('dq-schedule-line')).toHaveTextContent(
-      '0 2 * * *'
+      'dq.test.schedule-daily'
     );
     expect(screen.getByText('97.10%')).toBeInTheDocument();
-    expect(screen.getByText('4211')).toBeInTheDocument();
+    expect(screen.getByText(/4.?211/)).toBeInTheDocument();
+    expect(screen.getByTestId('dq-spec-summary')).toHaveTextContent('Not null');
     expect(screen.getByTestId('dq-run-now')).toBeEnabled();
     expect(screen.getByTestId('dq-change-schedule')).toBeInTheDocument();
     expect(
       screen.queryByTestId('dq-no-schedule-warning')
     ).not.toBeInTheDocument();
+  });
+
+  it('shows a custom cron that matches no preset', async () => {
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      schedule: { ...results.schedule, cron: '30 6 * * *' },
+    });
+    render(<DQRuleTestResults ruleId="r1" />);
+
+    expect(await screen.findByTestId('dq-schedule-line')).toHaveTextContent(
+      '30 6 * * *'
+    );
+  });
+
+  it('shows one empty state when no test is declared', async () => {
+    const onDeclare = jest.fn();
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      status: 'NOT_DECLARED',
+      specs: [],
+      testCases: [],
+      summary: { ...summary, specs: 0, applied: 0, passed: 0, failed: 0 },
+    });
+    render(
+      <DQRuleTestResults
+        declareAction={{ label: 'Declare', hint: 'Hint', onClick: onDeclare }}
+        ruleId="r1"
+      />
+    );
+
+    expect(
+      await screen.findByTestId('dq-results-not-declared')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('dq-run-now')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dq-schedule-line')).not.toBeInTheDocument();
+
+    screen.getByTestId('dq-declare-tests').click();
+
+    expect(screen.getByText('Hint')).toBeInTheDocument();
+    expect(onDeclare).toHaveBeenCalled();
+  });
+
+  it('explains when declared tests apply to no column', async () => {
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      status: 'NO_RESULT',
+      testCases: [],
+      summary: { ...summary, applied: 0, passed: 0, failed: 0 },
+    });
+    render(<DQRuleTestResults ruleId="r1" />);
+
+    expect(
+      await screen.findByTestId('dq-results-no-columns')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('dq-declare-tests')).not.toBeInTheDocument();
   });
 
   it('hides run and schedule actions without edit rights', async () => {

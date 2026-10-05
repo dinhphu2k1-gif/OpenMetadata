@@ -12,88 +12,146 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { formatDateTime } from '../../../utils/date-time/DateTimeUtils';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  COLOR_GREY_400,
+  GREEN_3,
+  GREY_200,
+  RED_3,
+} from '../../../constants/Color.constants';
+import {
+  customFormatDateTime,
+  formatDateTime,
+} from '../../../utils/date-time/DateTimeUtils';
 import { DQTrend } from './DQRuleTests.interface';
 
 interface DQTrendChartProps {
   trend?: DQTrend;
-  width?: number;
+  /** Pass-rate threshold in percent, drawn as a dashed line. */
+  threshold?: number;
   height?: number;
 }
 
-const PADDING = 6;
 const MS_PER_DAY = 86_400_000;
+const AXIS_DATE_FORMAT = 'dd/MM';
+const TICK_STYLE = { fontSize: 12, fill: COLOR_GREY_400 };
 
-/** Daily pass rate as a line with a dot per day and a vertical line at each approved version. */
 const DQTrendChart = ({
   trend,
-  width = 360,
-  height = 64,
+  threshold,
+  height = 220,
 }: DQTrendChartProps) => {
   const { t } = useTranslation();
   const points = trend?.points ?? [];
 
   if (points.length === 0) {
     return (
-      <span className="dq-trend-empty" data-testid="dq-trend-empty">
+      <div className="dq-trend-empty" data-testid="dq-trend-empty">
         {t('dq.test.trend-empty')}
-      </span>
+      </div>
     );
   }
 
-  const start = Date.now() - (trend?.days ?? 30) * MS_PER_DAY;
-  const x = (time: number) =>
-    PADDING +
-    ((time - start) / ((trend?.days ?? 30) * MS_PER_DAY)) *
-      (width - 2 * PADDING);
-  const y = (rate: number) => PADDING + (1 - rate) * (height - 2 * PADDING);
-  const coordinates = points.map((point) => ({
+  const end = Date.now();
+  const start = end - (trend?.days ?? 30) * MS_PER_DAY;
+  const data = points.map((point) => ({
     ...point,
-    cx: x(new Date(`${point.date}T12:00:00`).getTime()),
-    cy: y(point.passRate),
+    time: new Date(`${point.date}T12:00:00`).getTime(),
+    rate: Math.round(point.passRate * 10_000) / 100,
   }));
+  const lowest = Math.min(...data.map((point) => point.rate), threshold ?? 100);
+  const yMin = Math.max(0, Math.floor(lowest - 1));
 
   return (
-    <svg
-      aria-label={t('dq.test.trend')}
-      data-testid="dq-trend-chart"
-      height={height}
-      role="img"
-      width={width}>
-      {(trend?.versions ?? []).map((version) => (
-        <line
-          key={`${version.ruleCode}-${version.businessVersion}`}
-          stroke="currentColor"
-          strokeDasharray="3 3"
-          strokeOpacity={0.4}
-          x1={x(version.publishedAt)}
-          x2={x(version.publishedAt)}
-          y1={0}
-          y2={height}>
-          <title>{`v${version.businessVersion} · ${formatDateTime(
-            version.publishedAt
-          )}`}</title>
-        </line>
-      ))}
-      <polyline
-        fill="none"
-        points={coordinates.map((point) => `${point.cx},${point.cy}`).join(' ')}
-        stroke="#1677ff"
-        strokeWidth={2}
-      />
-      {coordinates.map((point) => (
-        <circle
-          cx={point.cx}
-          cy={point.cy}
-          fill="#1677ff"
-          key={point.date}
-          r={3}>
-          <title>{`${point.date}: ${Math.round(point.passRate * 100)}% (${
-            point.passed
-          }/${point.total})`}</title>
-        </circle>
-      ))}
-    </svg>
+    <div data-testid="dq-trend-chart">
+      <ResponsiveContainer height={height} width="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 16, left: 0 }}>
+          <CartesianGrid stroke={GREY_200} vertical={false} />
+          <XAxis
+            axisLine={false}
+            dataKey="time"
+            domain={[start, end]}
+            scale="time"
+            tick={TICK_STYLE}
+            tickFormatter={(time: number) =>
+              customFormatDateTime(time, AXIS_DATE_FORMAT)
+            }
+            tickLine={false}
+            type="number"
+          />
+          <YAxis
+            axisLine={false}
+            domain={[yMin, 100]}
+            tick={TICK_STYLE}
+            tickFormatter={(value: number) => `${value}%`}
+            tickLine={false}
+            width={48}
+          />
+          <Tooltip
+            formatter={(value: number, _name, item) => [
+              `${value}% (${item.payload.passed}/${item.payload.total})`,
+              t('dq.test.column.pass-rate'),
+            ]}
+            labelFormatter={(time: number) =>
+              customFormatDateTime(time, 'dd/MM/yyyy')
+            }
+          />
+          {threshold !== undefined && (
+            <ReferenceLine
+              ifOverflow="extendDomain"
+              stroke={RED_3}
+              strokeDasharray="6 4"
+              y={threshold}
+            />
+          )}
+          {(trend?.versions ?? []).map((version) => (
+            <ReferenceLine
+              key={`${version.ruleCode}-${version.businessVersion}`}
+              label={{
+                value: `v${version.businessVersion}`,
+                position: 'insideTopLeft',
+                fontSize: 11,
+                fill: COLOR_GREY_400,
+              }}
+              stroke={COLOR_GREY_400}
+              strokeDasharray="3 3"
+              x={version.publishedAt}>
+              <title>{formatDateTime(version.publishedAt)}</title>
+            </ReferenceLine>
+          ))}
+          <Area
+            dataKey="rate"
+            dot={{ r: 3, fill: GREEN_3 }}
+            fill={GREEN_3}
+            fillOpacity={0.12}
+            stroke={GREEN_3}
+            strokeWidth={2}
+            type="monotone"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="dq-trend-legend">
+        <span>
+          <span className="dq-trend-legend-line" />
+          {t('dq.test.column.pass-rate')}
+        </span>
+        {threshold !== undefined && (
+          <span>
+            <span className="dq-trend-legend-line threshold" />
+            {t('dq.test.threshold-line', { value: threshold })}
+          </span>
+        )}
+      </div>
+    </div>
   );
 };
 

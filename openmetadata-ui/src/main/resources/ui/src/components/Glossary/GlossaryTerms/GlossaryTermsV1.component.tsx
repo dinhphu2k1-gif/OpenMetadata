@@ -79,6 +79,7 @@ import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
 import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
 import DQCdeTestResults from '../DQRuleTests/DQCdeTestResults.component';
 import DQRuleTestResults from '../DQRuleTests/DQRuleTestResults.component';
+import { useDqTestSpecEditor } from '../DQRuleTests/useDqTestSpecEditor';
 import DQGlossaryTermOverview from './DQGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
@@ -139,7 +140,7 @@ const GlossaryTermsV1 = ({
   const [assetCount, setAssetCount] = useState<number>(0);
   const [previewAsset, setPreviewAsset] =
     useState<EntityDetailsObjectInterface>();
-  const { onAddGlossaryTerm } = useGlossaryStore();
+  const { onAddGlossaryTerm, requestCreateDraft } = useGlossaryStore();
   const { permissions } = useGenericContext<GlossaryTerm>();
   const { customizedPage, isLoading } = useCustomPages(PageType.GlossaryTerm);
   const customizedTabs = useMemo(() => {
@@ -377,6 +378,12 @@ const GlossaryTermsV1 = ({
 
   const { config: dqTestConfig } = useDqTestConfig();
 
+  const isWorkingCopy = glossaryTerm.workingRevision != null;
+  const testSpecEditor = useDqTestSpecEditor({
+    glossaryTerm,
+    onUpdate: handleGlossaryTermUpdate,
+  });
+
   const isDQGlossaryTerm = useMemo(
     () =>
       isDataQualityGlossary(
@@ -386,6 +393,12 @@ const GlossaryTermsV1 = ({
       ),
     [glossaryTerm],
   );
+
+  const canEditTestSpecs =
+    isDQGlossaryTerm &&
+    isWorkingCopy &&
+    !isViewingVersion &&
+    Boolean(dqTestConfig?.capabilities?.canEdit);
 
   useEffect(() => {
     if (activeTab === EntityTabs.RELATIONS_GRAPH) {
@@ -499,7 +512,20 @@ const GlossaryTermsV1 = ({
         tab.key === EntityTabs.OVERVIEW
           ? {
               ...tab,
-              children: <DQGlossaryTermOverview glossaryTerm={glossaryTerm} />,
+              children: (
+                <DQGlossaryTermOverview
+                  glossaryTerm={glossaryTerm}
+                  testSpecActions={
+                    canEditTestSpecs
+                      ? {
+                          onAdd: testSpecEditor.openAdd,
+                          onEdit: testSpecEditor.openEdit,
+                          onRemove: testSpecEditor.remove,
+                        }
+                      : undefined
+                  }
+                />
+              ),
             }
           : tab,
       );
@@ -512,6 +538,20 @@ const GlossaryTermsV1 = ({
         children: (
           <DQRuleTestResults
             capabilities={dqTestConfig?.capabilities}
+            declareAction={
+              canEditTestSpecs
+                ? {
+                    label: t('dq.test.add'),
+                    onClick: testSpecEditor.openAdd,
+                  }
+                : isWorkingCopy
+                ? undefined
+                : {
+                    label: t('dq.test.declare-new-version'),
+                    hint: t('dq.test.declare-hint-approved'),
+                    onClick: requestCreateDraft,
+                  }
+            }
             ruleId={glossaryTerm.id}
           />
         ),
@@ -593,6 +633,10 @@ const GlossaryTermsV1 = ({
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
     dqTestConfig,
+    isWorkingCopy,
+    canEditTestSpecs,
+    testSpecEditor,
+    requestCreateDraft,
   ]);
 
   useEffect(() => {
@@ -787,6 +831,7 @@ const GlossaryTermsV1 = ({
           onSave={handleAssetSave}
         />
       )}
+      {testSpecEditor.modal}
     </GenericProvider>
   );
 };

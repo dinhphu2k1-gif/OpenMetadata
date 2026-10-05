@@ -11,10 +11,10 @@
  *  limitations under the License.
  */
 
-import { Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
+import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import {
-  DQ_OUTCOME_COLOR,
+  DQ_OUTCOME_BADGE,
   DQ_OUTCOME_LABEL_KEY,
 } from './DQRuleTests.constants';
 import { DQRuleStatus } from './DQRuleTests.interface';
@@ -25,11 +25,15 @@ interface DQOutcomeTagProps {
 
 const DQOutcomeTag = ({ status }: DQOutcomeTagProps) => {
   const { t } = useTranslation();
+  const badge = DQ_OUTCOME_BADGE[status];
 
   return (
-    <Tag color={DQ_OUTCOME_COLOR[status]} data-testid={`dq-outcome-${status}`}>
-      {t(DQ_OUTCOME_LABEL_KEY[status])}
-    </Tag>
+    <StatusBadge
+      dataTestId={`dq-outcome-${status}`}
+      displayLabel={t(DQ_OUTCOME_LABEL_KEY[status])}
+      label={badge.icon ?? status}
+      status={badge.status}
+    />
   );
 };
 

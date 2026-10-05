@@ -11,12 +11,40 @@
  *  limitations under the License.
  */
 
-import { Alert, Button, Card, Modal, Space, Table, Tag } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Divider,
+  Modal,
+  Progress,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import { ColumnsType } from 'antd/lib/table';
 import { AxiosError } from 'axios';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { ReactComponent as AllTestsIcon } from '../../../assets/svg/all-activity-v2.svg';
+import { ReactComponent as ChecklistIcon } from '../../../assets/svg/ic-checklist.svg';
+import { ReactComponent as CoverageIcon } from '../../../assets/svg/ic-data-assets-coverage.svg';
+import { ReactComponent as PlayIcon } from '../../../assets/svg/ic-play.svg';
+import {
+  BLUE_2,
+  GREEN_3,
+  GREY_200,
+  RED_3,
+  YELLOW_2,
+} from '../../../constants/Color.constants';
+import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../../enums/common.enum';
 import {
   getDqRuleLatestRun,
   getDqRuleResults,
@@ -24,41 +52,112 @@ import {
   runDqRuleTests,
   setDqRuleSchedule,
 } from '../../../rest/dqRuleTestAPI';
-import { getTestCaseDetailPagePath } from '../../../utils/RouterUtils';
 import { formatDateTime } from '../../../utils/date-time/DateTimeUtils';
+import {
+  calculatePercentage,
+  formatNumberWithComma,
+} from '../../../utils/NumberUtils';
+import { getTestCaseDetailPagePath } from '../../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
+import ErrorPlaceHolder from '../../common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import Loader from '../../common/Loader/Loader';
+import SummaryPieChartCard from '../../DataQuality/SummaryPannel/SummaryPieChartCard/SummaryPieChartCard.component';
+import DQOutcomeTag from './DQOutcomeTag.component';
+import './dq-rule-test-results.less';
 import {
   DQ_RESULT_PAGE_SIZE,
   DQ_RUN_POLL_INTERVAL_MS,
   DQ_RUNNING_STATES,
+  DQ_SCHEDULE_PRESETS,
   DQ_TREND_PERIODS,
 } from './DQRuleTests.constants';
 import {
   DQLatestRun,
+  DQOutcome,
   DQRuleResults,
   DQTestCapabilities,
   DQTestCaseRow,
   DQTrend,
 } from './DQRuleTests.interface';
-import DQOutcomeTag from './DQOutcomeTag.component';
 import DQScheduleModal from './DQScheduleModal.component';
 import DQTrendChart from './DQTrendChart.component';
+
+interface DQDeclareAction {
+  label: string;
+  hint?: string;
+  onClick: () => void;
+}
 
 interface DQRuleTestResultsProps {
   ruleId: string;
   capabilities?: DQTestCapabilities;
+  /** The way to declare tests from this tab; absent when the viewer cannot edit. */
+  declareAction?: DQDeclareAction;
 }
 
+const ALL_FILTER = '__all__';
 const RETIRED_FILTER = '__retired__';
 const NOT_AVAILABLE_CODE = 'DQ_TEST_RUN_NOT_AVAILABLE';
+
+const OUTCOME_STROKE: Record<DQOutcome, string> = {
+  PASSED: GREEN_3,
+  FAILED: RED_3,
+  ABORTED: YELLOW_2,
+  NO_RESULT: GREY_200,
+};
 
 const errorCodeOf = (error: unknown) =>
   (error as AxiosError<{ code?: string }>)?.response?.data?.code;
 
+/** The percent of a threshold such as ">= 99.5%"; undefined for a non-percent threshold. */
+const percentOf = (threshold?: string | null) => {
+  const match = threshold?.match(/(\d+(?:\.\d+)?)\s*%/);
+
+  return match ? Number(match[1]) : undefined;
+};
+
+interface DQResultsEmptyStateProps {
+  testId: string;
+  title: string;
+  description: string;
+  steps?: string[];
+  action?: ReactNode;
+}
+
+const DQResultsEmptyState = ({
+  testId,
+  title,
+  description,
+  steps,
+  action,
+}: DQResultsEmptyStateProps) => (
+  <div className="dq-results-empty" data-testid={testId}>
+    <ErrorPlaceHolder size={SIZE.MEDIUM} type={ERROR_PLACEHOLDER_TYPE.CUSTOM}>
+      <Typography.Title className="m-t-sm m-b-xs" level={5}>
+        {title}
+      </Typography.Title>
+      <Typography.Paragraph className="dq-results-empty-description">
+        {description}
+      </Typography.Paragraph>
+      {steps && (
+        <ol className="dq-results-empty-steps">
+          {steps.map((step, index) => (
+            <li key={step}>
+              <span className="dq-results-empty-step-index">{index + 1}</span>
+              {step}
+            </li>
+          ))}
+        </ol>
+      )}
+      {action}
+    </ErrorPlaceHolder>
+  </div>
+);
+
 const DQRuleTestResults = ({
   ruleId,
   capabilities,
+  declareAction,
 }: DQRuleTestResultsProps) => {
   const { t } = useTranslation();
   const [results, setResults] = useState<DQRuleResults>();
@@ -155,17 +254,38 @@ const DQRuleTestResults = ({
     }
   };
 
+  const changeSpecFilter = (value: string) => {
+    setSpecKey(value === ALL_FILTER ? undefined : value);
+    setPage(1);
+  };
+
   if (isLoading && !results) {
     return <Loader />;
   }
 
+  const declareButton = declareAction && (
+    <div className="dq-results-empty-action">
+      <Button
+        data-testid="dq-declare-tests"
+        type="primary"
+        onClick={declareAction.onClick}>
+        {declareAction.label}
+      </Button>
+      {declareAction.hint && (
+        <Typography.Text className="dq-card-subtitle">
+          {declareAction.hint}
+        </Typography.Text>
+      )}
+    </div>
+  );
+
   if (isNotApplied || !results) {
     return (
-      <Alert
-        showIcon
-        data-testid="dq-results-not-applied"
-        message={t('dq.test.empty-not-approved')}
-        type="info"
+      <DQResultsEmptyState
+        action={declareButton}
+        description={t('dq.test.empty-not-approved')}
+        testId="dq-results-not-applied"
+        title={t('dq.test.not-approved-title')}
       />
     );
   }
@@ -174,6 +294,52 @@ const DQRuleTestResults = ({
   const visibleSpecs = specs.filter((spec) => !spec.retired);
   const hasRetired = specs.some((spec) => spec.retired);
   const hasSchedule = Boolean(schedule.cron);
+  const schedulePreset = DQ_SCHEDULE_PRESETS.find(
+    (preset) => preset.cron === schedule.cron
+  );
+  const archivedBanner = !rule.effective && (
+    <Alert
+      showIcon
+      data-testid="dq-results-archived"
+      message={t('dq.test.archived-banner')}
+      type="warning"
+    />
+  );
+
+  if (status === 'NOT_DECLARED' || summary.applied === 0) {
+    const isNotDeclared = status === 'NOT_DECLARED';
+
+    return (
+      <div className="dq-rule-test-results" data-testid="dq-rule-test-results">
+        {archivedBanner}
+        <DQResultsEmptyState
+          action={declareButton}
+          description={
+            isNotDeclared
+              ? t('dq.test.empty-description')
+              : t('dq.test.no-columns-description')
+          }
+          steps={
+            isNotDeclared
+              ? [
+                  t('dq.test.empty-step-declare'),
+                  t('dq.test.empty-step-approve'),
+                  t('dq.test.empty-step-run'),
+                ]
+              : undefined
+          }
+          testId={
+            isNotDeclared ? 'dq-results-not-declared' : 'dq-results-no-columns'
+          }
+          title={
+            isNotDeclared
+              ? t('dq.test.empty-title')
+              : t('dq.test.no-columns-title')
+          }
+        />
+      </div>
+    );
+  }
 
   const columns: ColumnsType<DQTestCaseRow> = [
     { title: t('dq.test.column.test'), dataIndex: ['spec', 'name'] },
@@ -189,195 +355,339 @@ const DQRuleTestResults = ({
     {
       title: t('dq.test.column.result'),
       render: (_, row) => (
-        <Space>
+        <Space size={4}>
           <DQOutcomeTag status={row.thresholdResult} />
           {row.stale && <Tag color="orange">{t('dq.test.stale')}</Tag>}
           {row.state !== 'ACTIVE' && <Tag>{row.state}</Tag>}
         </Space>
       ),
     },
-    { title: t('dq.test.column.native'), dataIndex: 'nativeStatus' },
     {
       title: t('dq.test.column.pass-rate'),
       dataIndex: 'passedRowsPercentage',
-      render: (value?: number | null) =>
-        value == null ? '' : `${value.toFixed(2)}%`,
+      width: 200,
+      render: (value: number | null, row) =>
+        value == null ? (
+          '--'
+        ) : (
+          <div className="dq-pass-rate">
+            <Progress
+              percent={value}
+              showInfo={false}
+              size="small"
+              strokeColor={OUTCOME_STROKE[row.thresholdResult]}
+            />
+            <span>{`${value.toFixed(2)}%`}</span>
+          </div>
+        ),
     },
-    { title: t('dq.test.column.violations'), dataIndex: 'failedRows' },
+    {
+      title: t('dq.test.column.violations'),
+      dataIndex: 'failedRows',
+      align: 'right',
+      render: (value: number | null) =>
+        value == null ? (
+          '--'
+        ) : (
+          <span className={value > 0 ? 'dq-violations' : undefined}>
+            {formatNumberWithComma(value)}
+          </span>
+        ),
+    },
     {
       title: t('dq.test.column.at'),
       dataIndex: 'timestamp',
-      render: (value?: number | null) => (value ? formatDateTime(value) : ''),
+      render: (value?: number | null) => (value ? formatDateTime(value) : '--'),
     },
+  ];
+
+  const specOptions = [
+    { value: ALL_FILTER, label: t('dq.test.filter-all-tests') },
+    ...visibleSpecs.map((spec) => ({
+      value: spec.key,
+      label: `${spec.name} · ${spec.summary.passed}/${spec.summary.applied}`,
+    })),
+    ...(hasRetired
+      ? [{ value: RETIRED_FILTER, label: t('dq.test.retired') }]
+      : []),
   ];
 
   return (
     <div className="dq-rule-test-results" data-testid="dq-rule-test-results">
-      {!rule.effective && (
-        <Alert
-          showIcon
-          data-testid="dq-results-archived"
-          message={t('dq.test.archived-banner')}
-          type="warning"
-        />
-      )}
-      <Card size="small">
-        <Space wrap align="center">
-          <DQOutcomeTag status={status} />
+      {archivedBanner}
+
+      <Card className="dq-run-bar">
+        <div className="dq-run-bar-items">
+          <div className="dq-run-bar-item">
+            <span className="dq-run-bar-label">{t('dq.test.rule-status')}</span>
+            <DQOutcomeTag status={status} />
+          </div>
           {rule.threshold && (
-            <span>
-              {t('dq.test.threshold-of-rule', { threshold: rule.threshold })}
-            </span>
-          )}
-          <span>
-            {t('dq.test.last-run')}:{' '}
-            {summary.lastRunAt ? formatDateTime(summary.lastRunAt) : '-'}
-          </span>
-          {capabilities?.canRun && (
-            <Button
-              data-testid="dq-run-now"
-              disabled={isRunning || summary.applied === 0}
-              loading={isRunning}
-              type="primary"
-              onClick={runNow}>
-              {isRunning ? t('dq.test.running') : t('dq.test.run-now')}
-            </Button>
-          )}
-        </Space>
-        <div className="dq-rule-test-schedule" data-testid="dq-schedule-line">
-          <strong>{t('dq.test.schedule')}:</strong>{' '}
-          {hasSchedule ? (
             <>
-              <code>{schedule.cron}</code> ({schedule.timezone})
-              {schedule.nextRuns[0] && (
-                <>
-                  {' '}
+              <Divider className="dq-run-bar-divider" type="vertical" />
+              <div className="dq-run-bar-item">
+                <span className="dq-run-bar-label">
+                  {t('dq.test.effective-threshold')}
+                </span>
+                <span className="dq-run-bar-value">{rule.threshold}</span>
+              </div>
+            </>
+          )}
+          <Divider className="dq-run-bar-divider" type="vertical" />
+          <div className="dq-run-bar-item">
+            <span className="dq-run-bar-label">{t('dq.test.last-run')}</span>
+            <span className="dq-run-bar-value">
+              {summary.lastRunAt ? formatDateTime(summary.lastRunAt) : '--'}
+            </span>
+          </div>
+          <Divider className="dq-run-bar-divider" type="vertical" />
+          <div className="dq-run-bar-item">
+            <span className="dq-run-bar-label">{t('dq.test.schedule')}</span>
+            <span className="dq-run-bar-value" data-testid="dq-schedule-line">
+              {hasSchedule ? (
+                <Tooltip title={`${schedule.cron} (${schedule.timezone})`}>
+                  {schedulePreset ? (
+                    t(`dq.test.schedule-${schedulePreset.key}`)
+                  ) : (
+                    <code>{schedule.cron}</code>
+                  )}
+                </Tooltip>
+              ) : (
+                <Tooltip title={t('dq.test.no-schedule')}>
+                  <Typography.Text
+                    data-testid="dq-no-schedule-warning"
+                    type="warning">
+                    {t('dq.test.no-schedule-short')}
+                  </Typography.Text>
+                </Tooltip>
+              )}
+              {hasSchedule && schedule.nextRuns[0] && (
+                <span className="dq-run-bar-muted">
                   · {t('dq.test.next-run')}:{' '}
                   {formatDateTime(schedule.nextRuns[0])}
-                </>
+                </span>
               )}
-            </>
-          ) : (
-            t('dq.test.no-schedule')
-          )}{' '}
-          {canEdit && (
-            <Button
-              data-testid="dq-change-schedule"
-              size="small"
-              type="link"
-              onClick={() => setIsScheduleOpen(true)}>
-              {t('dq.test.change-schedule')}
-            </Button>
-          )}
+              {canEdit && (
+                <Button
+                  className="p-0"
+                  data-testid="dq-change-schedule"
+                  type="link"
+                  onClick={() => setIsScheduleOpen(true)}>
+                  {t('dq.test.change-schedule')}
+                </Button>
+              )}
+            </span>
+          </div>
         </div>
-        {!hasSchedule && (
-          <Alert
-            showIcon
-            data-testid="dq-no-schedule-warning"
-            message={t('dq.test.no-schedule-warning')}
-            type="warning"
-          />
+        {capabilities?.canRun && (
+          <Button
+            data-testid="dq-run-now"
+            disabled={isRunning}
+            icon={!isRunning && <PlayIcon className="dq-run-icon" />}
+            loading={isRunning}
+            type="primary"
+            onClick={runNow}>
+            {isRunning ? t('dq.test.running') : t('dq.test.run-now')}
+          </Button>
         )}
       </Card>
 
-      <Space wrap className="dq-rule-test-cards">
-        <Tag>{t('dq.test.count.specs', { count: summary.specs })}</Tag>
-        <Tag>{t('dq.test.count.columns', { count: summary.applied })}</Tag>
-        <Tag color="success">
-          {t('dq.test.count.passed', { count: summary.passed })}
-        </Tag>
-        <Tag color="error">
-          {t('dq.test.count.failed', { count: summary.failed })}
-        </Tag>
-        <Tag color="warning">
-          {t('dq.test.count.aborted', { count: summary.aborted })}
-        </Tag>
-        <Tag>
-          {t('dq.test.count.not-applicable', { count: summary.notApplicable })}
-        </Tag>
-      </Space>
+      <Row gutter={[16, 16]}>
+        <Col md={8} xs={24}>
+          <SummaryPieChartCard
+            showLegends
+            chartData={[
+              {
+                name: t('dq.test.status.passed'),
+                value: summary.passed,
+                color: GREEN_3,
+              },
+              {
+                name: t('dq.test.status.failed'),
+                value: summary.failed,
+                color: RED_3,
+              },
+              {
+                name: t('dq.test.status.aborted'),
+                value: summary.aborted,
+                color: YELLOW_2,
+              },
+              {
+                name: t('dq.test.status.no-result'),
+                value: summary.noResult,
+                color: GREY_200,
+              },
+            ]}
+            iconData={{ icon: <AllTestsIcon /> }}
+            paddingAngle={2}
+            percentage={calculatePercentage(
+              summary.passed,
+              summary.applied,
+              1,
+              true
+            )}
+            title={t('dq.test.summary-test-cases')}
+            value={summary.applied}
+          />
+        </Col>
+        <Col md={8} xs={24}>
+          <SummaryPieChartCard
+            showLegends
+            chartData={[
+              {
+                name: t('dq.test.applied'),
+                value: summary.applied,
+                color: BLUE_2,
+              },
+              {
+                name: t('dq.test.not-applicable'),
+                value: summary.notApplicable,
+                color: GREY_200,
+              },
+            ]}
+            iconData={{ icon: <CoverageIcon /> }}
+            percentage={calculatePercentage(
+              summary.applied,
+              summary.applied + summary.notApplicable,
+              1,
+              true
+            )}
+            title={t('dq.test.summary-coverage')}
+            value={summary.applied}
+          />
+        </Col>
+        <Col md={8} xs={24}>
+          <Card
+            className="pie-chart-summary-panel dq-spec-summary h-full"
+            data-testid="dq-spec-summary">
+            <div className="summary-title-row">
+              <div className="icon-container">
+                <ChecklistIcon />
+              </div>
+              <Typography.Paragraph className="summary-title">
+                {t('dq.test.summary-specs')}
+              </Typography.Paragraph>
+            </div>
+            <Typography.Paragraph className="summary-value m-b-sm">
+              {summary.specs}
+            </Typography.Paragraph>
+            <div className="dq-spec-summary-list">
+              {visibleSpecs.map((spec) => (
+                <div className="dq-spec-summary-item" key={spec.key}>
+                  <div className="dq-spec-summary-label">
+                    <Typography.Text ellipsis={{ tooltip: spec.name }}>
+                      {spec.name}
+                    </Typography.Text>
+                    <span>
+                      {t('dq.test.spec-passed', {
+                        passed: spec.summary.passed,
+                        total: spec.summary.applied,
+                      })}
+                    </span>
+                  </div>
+                  <Progress
+                    percent={Number(
+                      calculatePercentage(
+                        spec.summary.passed,
+                        spec.summary.applied,
+                        1
+                      )
+                    )}
+                    showInfo={false}
+                    size="small"
+                    strokeColor={OUTCOME_STROKE[spec.status]}
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
-      <div className="dq-rule-test-filter" data-testid="dq-spec-filter">
-        <Tag.CheckableTag
-          checked={specKey === undefined}
-          onChange={() => {
-            setSpecKey(undefined);
-            setPage(1);
-          }}>
-          {t('dq.test.all')}
-        </Tag.CheckableTag>
-        {visibleSpecs.map((spec) => (
-          <Tag.CheckableTag
-            checked={specKey === spec.key}
-            key={spec.key}
-            onChange={() => {
-              setSpecKey(spec.key);
-              setPage(1);
-            }}>
-            {spec.name} · {spec.summary.passed}/{spec.summary.applied}
-          </Tag.CheckableTag>
-        ))}
-        {hasRetired && (
-          <Tag.CheckableTag
-            checked={specKey === RETIRED_FILTER}
-            onChange={() => {
-              setSpecKey(RETIRED_FILTER);
-              setPage(1);
-            }}>
-            {t('dq.test.retired')}
-          </Tag.CheckableTag>
-        )}
-      </div>
+      <Card
+        className="dq-trend-card"
+        extra={
+          <Segmented
+            options={DQ_TREND_PERIODS.map((days) => ({
+              value: days,
+              label: t('dq.test.days', { count: days }),
+            }))}
+            value={trendDays}
+            onChange={(value) => setTrendDays(Number(value))}
+          />
+        }
+        title={
+          <div>
+            <div>{t('dq.test.trend-title')}</div>
+            <Typography.Text className="dq-card-subtitle">
+              {t('dq.test.trend-subtitle')}
+            </Typography.Text>
+          </div>
+        }>
+        <DQTrendChart threshold={percentOf(rule.threshold)} trend={trend} />
+      </Card>
 
-      <div className="dq-rule-test-trend">
-        <Space>
-          <strong>{t('dq.test.trend')}</strong>
-          {DQ_TREND_PERIODS.map((days) => (
-            <Tag.CheckableTag
-              checked={trendDays === days}
-              key={days}
-              onChange={() => setTrendDays(days)}>
-              {t('dq.test.days', { count: days })}
-            </Tag.CheckableTag>
-          ))}
-        </Space>
-        <DQTrendChart trend={trend} />
-      </div>
-
-      {results.hiddenTestCases > 0 && (
-        <Alert
-          showIcon
-          message={t('dq.test.hidden', { count: results.hiddenTestCases })}
-          type="info"
+      <Card
+        className="dq-results-card"
+        extra={
+          <Select
+            className="dq-spec-filter"
+            data-testid="dq-spec-filter"
+            options={specOptions}
+            value={specKey ?? ALL_FILTER}
+            onChange={changeSpecFilter}
+          />
+        }
+        title={
+          <Space size={8}>
+            {t('dq.test.results-title')}
+            <span className="dq-count-badge">{results.paging.total}</span>
+            {results.hiddenTestCases > 0 && (
+              <Typography.Text className="dq-card-subtitle">
+                {t('dq.test.hidden', { count: results.hiddenTestCases })}
+              </Typography.Text>
+            )}
+          </Space>
+        }>
+        <Table<DQTestCaseRow>
+          columns={columns}
+          dataSource={results.testCases}
+          expandable={{
+            rowExpandable: (row) =>
+              Boolean(row.lastError || row.testCaseFqn || row.nativeStatus),
+            expandedRowRender: (row) => (
+              <Space direction="vertical" size={4}>
+                {row.lastError && (
+                  <Alert message={row.lastError} type="error" />
+                )}
+                {row.nativeStatus && (
+                  <Typography.Text type="secondary">
+                    {t('dq.test.native-status', { status: row.nativeStatus })}
+                  </Typography.Text>
+                )}
+                {row.testCaseFqn && (
+                  <Link to={getTestCaseDetailPagePath(row.testCaseFqn)}>
+                    {t('dq.test.open-test-case')}
+                  </Link>
+                )}
+              </Space>
+            ),
+          }}
+          loading={isLoading}
+          locale={{ emptyText: t('dq.test.status.no-result') }}
+          pagination={{
+            current: page,
+            pageSize: DQ_RESULT_PAGE_SIZE,
+            total: results.paging.total,
+            showSizeChanger: false,
+            hideOnSinglePage: true,
+            onChange: setPage,
+          }}
+          rowKey={(row) => `${row.spec.key}-${row.column.fqn}`}
+          scroll={{ x: 960 }}
+          size="small"
         />
-      )}
-      <Table<DQTestCaseRow>
-        columns={columns}
-        dataSource={results.testCases}
-        expandable={{
-          rowExpandable: (row) => Boolean(row.lastError || row.testCaseFqn),
-          expandedRowRender: (row) => (
-            <>
-              {row.lastError && <Alert message={row.lastError} type="error" />}
-              {row.testCaseFqn && (
-                <Link to={getTestCaseDetailPagePath(row.testCaseFqn)}>
-                  {t('dq.test.open-test-case')}
-                </Link>
-              )}
-            </>
-          ),
-        }}
-        loading={isLoading}
-        pagination={{
-          current: page,
-          pageSize: DQ_RESULT_PAGE_SIZE,
-          total: results.paging.total,
-          showSizeChanger: false,
-          onChange: setPage,
-        }}
-        rowKey={(row) => `${row.spec.key}-${row.column.fqn}`}
-        size="small"
-      />
+      </Card>
 
       <DQScheduleModal
         open={isScheduleOpen}

@@ -18,11 +18,14 @@ import { GlossaryTermDetailPageWidgetKeys } from '../../../enums/CustomizeDetail
 import { GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
 import { WidgetConfig } from '../../../pages/CustomizablePage/CustomizablePage.interface';
 import { getGlossaryTermWidgetFromKey } from '../../../utils/GlossaryTerm/GlossaryTermUtil';
-import DQTestSpecsCard from '../DQRuleTests/DQTestSpecsCard.component';
+import DQTestSpecsCard, {
+  DQTestSpecActions,
+} from '../DQRuleTests/DQTestSpecsCard.component';
 import DQGlossaryTermSummary from './DQGlossaryTermSummary';
 
 interface DQGlossaryTermOverviewProps {
   glossaryTerm: GlossaryTerm;
+  testSpecActions?: DQTestSpecActions;
 }
 
 const DQ_BUSINESS_MEANING_WIDGET = {
@@ -31,6 +34,7 @@ const DQ_BUSINESS_MEANING_WIDGET = {
 
 const DQGlossaryTermOverview = ({
   glossaryTerm,
+  testSpecActions,
 }: DQGlossaryTermOverviewProps) => {
   const { t } = useTranslation();
 
@@ -53,6 +57,7 @@ const DQGlossaryTermOverview = ({
       <div className="cde-glossary-term-overview-summary dq-glossary-term-overview-summary">
         <DQGlossaryTermSummary glossaryTerm={glossaryTerm} />
         <DQTestSpecsCard
+          actions={testSpecActions}
           ruleThreshold={glossaryTerm.extension?.qualityThreshold}
           specs={glossaryTerm.dataQualityTestSpecs}
         />
