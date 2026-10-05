@@ -13,7 +13,7 @@
 
 import { AxiosError } from 'axios';
 import { applyPatch, compare } from 'fast-json-patch';
-import { isEmpty, omit } from 'lodash';
+import { isEmpty, isEqual, omit } from 'lodash';
 import { RefObject, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -375,8 +375,7 @@ const GlossaryPage = () => {
                 businessVersion: businessVersion ?? currentBusinessVersion,
                 parentBusinessVersion: currentParentBusinessVersion,
                 termId: current.id,
-                isWorkingDraft:
-                  current.entityStatus !== EntityStatus.Approved,
+                isWorkingDraft: current.entityStatus !== EntityStatus.Approved,
               }),
               { replace: true }
             );
@@ -813,11 +812,21 @@ const GlossaryPage = () => {
         'version',
         'votes',
       ];
+      // The test declarations are replaced as a whole: a patch on one of their items cannot be
+      // applied to a working copy that does not hold the same items.
+      const patchIgnoredFields: Array<keyof GlossaryTerm> = [
+        ...readOnlyFields,
+        'dataQualityTestSpecs',
+      ];
       const jsonPatch = compare(
-        omit(activeGlossary as GlossaryTerm, readOnlyFields),
-        omit(normalizedUpdatedData, readOnlyFields)
+        omit(activeGlossary as GlossaryTerm, patchIgnoredFields),
+        omit(normalizedUpdatedData, patchIgnoredFields)
       );
-      if (isEmpty(jsonPatch)) {
+      const hasSpecsChange = !isEqual(
+        (activeGlossary as GlossaryTerm).dataQualityTestSpecs,
+        normalizedUpdatedData.dataQualityTestSpecs
+      );
+      if (isEmpty(jsonPatch) && !hasSpecsChange) {
         return;
       }
 
@@ -835,6 +844,10 @@ const GlossaryPage = () => {
           true,
           false
         ).newDocument;
+        if (hasSpecsChange) {
+          mergedPayload.dataQualityTestSpecs =
+            normalizedUpdatedData.dataQualityTestSpecs;
+        }
         const workingScope =
           parentBusinessVersion ?? activeGlossary.parentBusinessVersion;
         const response = workingScope

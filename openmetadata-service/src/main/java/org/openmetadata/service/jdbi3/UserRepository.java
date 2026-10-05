@@ -90,6 +90,7 @@ import org.openmetadata.service.search.InheritedFieldEntitySearch.InheritedField
 import org.openmetadata.service.search.InheritedFieldEntitySearch.InheritedFieldResult;
 import org.openmetadata.service.secrets.SecretsManager;
 import org.openmetadata.service.secrets.SecretsManagerFactory;
+import org.openmetadata.service.security.AdminOnlyAccess;
 import org.openmetadata.service.security.SecurityUtil;
 import org.openmetadata.service.security.auth.BotTokenCache;
 import org.openmetadata.service.security.auth.SecurityConfigurationManager;
@@ -311,9 +312,8 @@ public class UserRepository extends EntityRepository<User> {
   }
 
   public void updateUserLastLoginTime(User orginalUser, long lastLoginTime) {
-    if (PortalConfiguration.isActive()) {
-      return;
-    }
+    // Every login method calls this once the user is known and before any token reaches them
+    AdminOnlyAccess.requireAllowedLogin(orginalUser);
     User updatedUser = JsonUtils.deepCopy(orginalUser, User.class);
     JsonPatch patch =
         JsonUtils.getJsonPatch(orginalUser, updatedUser.withLastLoginTime(lastLoginTime));

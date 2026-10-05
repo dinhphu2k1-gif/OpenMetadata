@@ -27,6 +27,9 @@ public final class TechnicalDictionaryErrors {
   public static final String INDEX_UNAVAILABLE = "TD_INDEX_UNAVAILABLE";
   public static final String COLUMN_NOT_FOUND = "TD_COLUMN_NOT_FOUND";
   public static final String COLUMN_ALREADY_DECLARED = "TD_COLUMN_ALREADY_DECLARED";
+  public static final String INVALID_STATUS_TRANSITION = "TD_INVALID_STATUS_TRANSITION";
+  public static final String SELF_APPROVAL_FORBIDDEN = "TD_SELF_APPROVAL_FORBIDDEN";
+  public static final String REJECTION_COMMENT_REQUIRED = "TD_REJECTION_COMMENT_REQUIRED";
 
   private TechnicalDictionaryErrors() {}
 

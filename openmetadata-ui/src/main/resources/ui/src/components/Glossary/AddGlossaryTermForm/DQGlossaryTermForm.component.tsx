@@ -85,7 +85,6 @@ const DQGlossaryTermForm = ({
 
       form.setFieldsValue({
         name: glossaryTerm.name,
-        name: glossaryTerm.name,
         displayName: glossaryTerm.displayName,
         description: glossaryTerm.description,
         version: glossaryTerm.businessVersion ?? '1.0',
@@ -376,6 +375,7 @@ const DQGlossaryTermForm = ({
                       getFieldValue('expirationDate')?.toFormat('yyyy-MM-dd') ??
                       '',
                   });
+
                   return error
                     ? Promise.reject(new Error(t(error)))
                     : Promise.resolve();

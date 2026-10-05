@@ -279,8 +279,7 @@ public class GlossaryRepository extends EntityRepository<Glossary> {
             || subject.hasAnyRole("DATA_PROPOSER")
             || subject.hasAnyRole("Admin");
     return !elevated
-        && (subject.hasAnyRole("BASIC_CONSUMER")
-            || subject.hasAnyRole("DATA_CONSUMER"));
+        && (subject.hasAnyRole("BASIC_CONSUMER") || subject.hasAnyRole("DATA_CONSUMER"));
   }
 
   /** Load CSV provided for bulk upload */

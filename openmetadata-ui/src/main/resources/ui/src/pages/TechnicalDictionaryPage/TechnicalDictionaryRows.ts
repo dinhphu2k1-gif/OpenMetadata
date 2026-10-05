@@ -44,6 +44,13 @@ export const toTechnicalDictionaryRow = (
     key: row.termId,
     termId: row.termId,
     revision: row.revision,
+    status: row.status ?? 'Approved',
+    createdBy: row.createdBy,
+    submittedAt: row.submittedAt,
+    submittedBy: row.submittedBy,
+    reviewedAt: row.reviewedAt,
+    reviewedBy: row.reviewedBy,
+    reviewComment: row.reviewComment,
     databaseName: text(row.database),
     databaseFqn: columnFqn ? parentFqn(columnFqn, 2) : undefined,
     schemaName: text(row.schema),
@@ -77,6 +84,17 @@ export const getTagLabel = (tag?: TechnicalTagValue): string =>
 export const isSourceUnavailable = (row: TechnicalDictionaryRow): boolean =>
   row.sourceStatus === 'Unavailable';
 
+/** UI guard only; the API repeats both the permission and maker-checker checks. */
+export const canReviewTechnicalRecord = (
+  row: TechnicalDictionaryRow,
+  canApprove: boolean,
+  currentUserName?: string
+): boolean =>
+  canApprove &&
+  row.status === 'In Review' &&
+  Boolean(currentUserName) &&
+  row.createdBy !== currentUserName;
+
 /** A not-yet-declared Column as the empty row the declaration form starts from. */
 export const candidateToRow = (
   candidate: TechnicalColumnCandidate
@@ -84,6 +102,7 @@ export const candidateToRow = (
   key: candidate.columnKey,
   termId: '',
   revision: 0,
+  status: 'In Review',
   databaseName: text(candidate.sourceDatabase),
   databaseFqn: parentFqn(candidate.columnFqn, 2),
   schemaName: text(candidate.sourceSchema),

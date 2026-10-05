@@ -23,14 +23,11 @@ import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.schema.utils.ResultList;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.jdbi3.CollectionDAO;
 import org.openmetadata.service.resources.databases.DatasourceConfig;
 import org.openmetadata.service.util.AsyncService;
 import org.openmetadata.service.util.FullyQualifiedName;
 import org.openmetadata.service.util.RestUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Repository for reading and writing audit log entries. */
 @Slf4j
@@ -121,8 +118,6 @@ public class AuditLogRepository {
     }
   }
 
-  private static final Logger PORTAL_AUDIT_LOG = LoggerFactory.getLogger("portal.audit");
-
   public static final EventType AUTH_EVENT_LOGIN = EventType.USER_LOGIN;
   public static final EventType AUTH_EVENT_LOGOUT = EventType.USER_LOGOUT;
 
@@ -132,19 +127,6 @@ public class AuditLogRepository {
    * populated. Runs asynchronously using a virtual thread to avoid blocking the caller.
    */
   public void writeAuthEvent(EventType eventType, String userName, UUID userId) {
-    if (PortalConfiguration.isActive()) {
-      logPortalAuthEvent(eventType, userName, userId);
-    } else {
-      persistAuthEvent(eventType, userName, userId);
-    }
-  }
-
-  /** The Portal cannot write to the database, so its logins and logouts go to the application log. */
-  private void logPortalAuthEvent(EventType eventType, String userName, UUID userId) {
-    PORTAL_AUDIT_LOG.info("event={} user={} userId={}", eventType, userName, userId);
-  }
-
-  private void persistAuthEvent(EventType eventType, String userName, UUID userId) {
     AsyncService.getInstance()
         .execute(
             () -> {

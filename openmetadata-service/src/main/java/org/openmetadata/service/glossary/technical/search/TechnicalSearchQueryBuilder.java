@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 
 /**
@@ -57,6 +58,7 @@ public final class TechnicalSearchQueryBuilder {
     final Map<String, String> fields = new LinkedHashMap<>();
     fields.put(TechnicalRowMatcher.SOURCE_SERVICES, TechnicalIndexFields.SERVICE);
     fields.put(TechnicalRowMatcher.SOURCE_STATUSES, TechnicalIndexFields.SOURCE_STATUS);
+    fields.put(TechnicalRowMatcher.STATUSES, TechnicalIndexFields.STATUS);
     fields.put(
         TechnicalRowMatcher.CDE_TERM_IDS,
         TechnicalIndexFields.path(TechnicalIndexFields.CDE, TechnicalIndexFields.ID));
@@ -196,11 +198,17 @@ public final class TechnicalSearchQueryBuilder {
         Map.of(
             FILTER,
             Map.of(
-                EXISTS,
+                BOOL,
                 Map.of(
-                    FIELD,
-                    TechnicalIndexFields.path(
-                        TechnicalIndexFields.CDE, TechnicalIndexFields.ID)))));
+                    FILTER,
+                    List.of(
+                        term(TechnicalIndexFields.STATUS, TechnicalRecord.STATUS_APPROVED),
+                        Map.of(
+                            EXISTS,
+                            Map.of(
+                                FIELD,
+                                TechnicalIndexFields.path(
+                                    TechnicalIndexFields.CDE, TechnicalIndexFields.ID))))))));
     final Map<String, Object> body = new LinkedHashMap<>();
     body.put("size", 0);
     body.put("track_total_hits", true);
@@ -231,6 +239,7 @@ public final class TechnicalSearchQueryBuilder {
             FILTER,
             List.of(
                 term(TechnicalIndexFields.DATA_DICTIONARY_VERSION, dataDictionaryVersion),
+                term(TechnicalIndexFields.STATUS, TechnicalRecord.STATUS_APPROVED),
                 term(
                     TechnicalIndexFields.path(TechnicalIndexFields.CDE, TechnicalIndexFields.ID),
                     cdeId.toString()))));

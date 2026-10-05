@@ -42,6 +42,14 @@ class TechnicalRowMatcherTest {
   }
 
   @Test
+  void approvalStatusesAreValidated() {
+    assertEquals(
+        List.of(TechnicalRecord.STATUS_IN_REVIEW, TechnicalRecord.STATUS_APPROVED),
+        filters(TechnicalRowMatcher.STATUSES, "In Review,Approved").get("statuses"));
+    assertThrows(BadRequestException.class, () -> filters(TechnicalRowMatcher.STATUSES, "Draft"));
+  }
+
+  @Test
   void tagFiltersMustBelongToTheirClassification() {
     assertEquals(
         List.of("DataTimeliness.T0"),

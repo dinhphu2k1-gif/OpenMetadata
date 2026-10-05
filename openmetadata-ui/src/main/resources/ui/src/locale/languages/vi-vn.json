@@ -158,7 +158,328 @@
     "error-network": "Lỗi kết nối tới máy chủ.",
     "error-missing-existing-id": "Không tìm thấy ID của quy tắc CLDL cần cập nhật.",
     "error-generic-create": "Lỗi khi tạo mới quy tắc CLDL.",
-    "error-generic-update": "Lỗi khi cập nhật quy tắc CLDL."
+    "error-generic-update": "Lỗi khi cập nhật quy tắc CLDL.",
+    "test": {
+      "applied": "Được áp dụng",
+      "approve-summary": "Phê duyệt sẽ tạo {{testCases}} testcase từ {{specs}} kiểm thử trên {{columns}} cột của CDE liên kết ({{notApplicable}} không áp dụng do kiểu dữ liệu).",
+      "declare-hint-approved": "Phiên bản đã phê duyệt không sửa trực tiếp; hãy tạo phiên bản mới rồi khai báo kiểm thử.",
+      "declare-new-version": "Tạo phiên bản mới để khai báo kiểm thử",
+      "edit": "Sửa kiểm thử",
+      "empty-description": "Khai báo kiểm thử và chọn CDE trong phiên bản quy tắc để hệ thống tự tạo testcase trên các cột tương ứng. Kết quả, xu hướng và lịch chạy sẽ hiển thị tại đây.",
+      "empty-step-approve": "Phê duyệt phiên bản",
+      "empty-step-declare": "Khai báo kiểm thử và chọn CDE",
+      "empty-step-run": "Đặt lịch hoặc chạy ngay",
+      "empty-title": "Quy tắc này chưa có kiểm thử",
+      "filter-all-tests": "Tất cả kiểm thử",
+      "filter-title": "Kiểm thử",
+      "add": "Thêm kiểm thử",
+      "all": "Tất cả",
+      "archived-banner": "Quy tắc đã ngừng áp dụng. Kết quả chỉ để tra cứu.",
+      "cde": {
+        "by-dimension": "Theo tiêu chí",
+        "rules": "{{count}} quy tắc",
+        "rules-table": "Quy tắc",
+        "rules-with-tests": "{{count}} có kiểm thử",
+        "test-cases": "{{count}} testcase",
+        "test-cases-table": "Testcase"
+      },
+      "column": {
+        "at": "Thời điểm chạy",
+        "column": "Cột",
+        "columns": "Số cột",
+        "native": "Gốc",
+        "passed-failed": "Đạt/Không đạt",
+        "pass-rate": "Tỷ lệ đạt",
+        "reason": "Chi tiết",
+        "result": "Kết quả",
+        "table": "Bảng",
+        "test": "Kiểm thử",
+        "tests": "Số kiểm thử",
+        "violations": "Bản ghi vi phạm"
+      },
+      "compute-rate": "Tính tỷ lệ đạt",
+      "count": {
+        "aborted": "{{count}} lỗi",
+        "columns": "{{count}} cột",
+        "failed": "{{count}} không đạt",
+        "not-applicable": "{{count}} không áp dụng",
+        "passed": "{{count}} đạt",
+        "specs": "{{count}} kiểm thử"
+      },
+      "data-quality-tab": "Chất lượng dữ liệu",
+      "days": "{{count}} ngày",
+      "definition": "Phép kiểm tra",
+      "definition-locked": "Muốn đổi phép kiểm tra, hãy xóa kiểm thử này và thêm kiểm thử mới.",
+      "description": "Mỗi kiểm thử được tự động áp dụng lên mọi cột của CDE liên kết sau khi quy tắc được phê duyệt.",
+      "effective-threshold": "Ngưỡng",
+      "empty": "Chưa khai báo kiểm thử. Quy tắc chỉ mô tả yêu cầu.",
+      "empty-not-approved": "Kiểm thử sẽ được áp dụng sau khi quy tắc được phê duyệt.",
+      "filter-result": "Kết quả",
+      "filter-rule": "Quy tắc",
+      "hidden": "{{count}} testcase bạn không có quyền xem",
+      "kind": "Cách kiểm tra",
+      "kind-library": "Thư viện",
+      "kind-sql": "SQL",
+      "last-run": "Chạy gần nhất",
+      "managed-by": "Quản lý bởi quy tắc {{code}}",
+      "managed-hint": "Hãy sửa khai báo kiểm thử trong Chất lượng dữ liệu; không sửa hoặc xóa được testcase này tại đây.",
+      "messages": {
+        "regex-match": "Có {{matched}} giá trị khớp biểu thức chính quy trên tổng {{total}} giá trị của cột."
+      },
+      "name": "Tên kiểm thử",
+      "name-duplicate": "Tên kiểm thử đã tồn tại trong quy tắc.",
+      "native-status": "Trạng thái gốc: {{status}}",
+      "next-runs": "Các lần chạy tới",
+      "no-columns-description": "Kiểm thử đã khai báo nhưng chưa áp dụng được lên cột nào. Hãy kiểm tra CDE liên kết và kiểu dữ liệu của các cột.",
+      "no-columns-title": "Chưa có cột nào được áp dụng",
+      "no-schedule-short": "Chưa đặt lịch",
+      "no-schedule-warning": "Quy tắc chưa có lịch chạy.",
+      "not-applicable": "Không áp dụng",
+      "not-approved-title": "Quy tắc chưa được phê duyệt",
+      "open-test-case": "Mở testcase",
+      "pipelines": "Pipeline chạy kiểm thử",
+      "preview": "Xem trước áp dụng",
+      "preview-no-cde": "Chọn CDE để xem trước các cột áp dụng.",
+      "preview-summary": "{{testCases}} testcase trên {{columns}} cột; {{notApplicable}} không áp dụng",
+      "remove": "Xóa",
+      "remove-confirm": "Xóa kiểm thử \"{{name}}\"?",
+      "results-tab": "Kiểm thử",
+      "results-title": "Kết quả testcase",
+      "retired": "Đã ngừng",
+      "rule-status": "Trạng thái quy tắc",
+      "run-confirm": "Chạy {{specs}} kiểm thử trên {{columns}} cột của quy tắc {{code}} ngay bây giờ?",
+      "run-now": "Chạy ngay",
+      "run-queued": "Yêu cầu chạy đã được ghi nhận. Máy chủ OpenMetadata sẽ khởi động pipeline trong vài phút.",
+      "run-started": "Đã bắt đầu chạy.",
+      "run-state": {
+        "failed": "Thất bại",
+        "never": "Chưa chạy",
+        "partialSuccess": "Thành công một phần",
+        "queued": "Đang chờ",
+        "running": "Đang chạy",
+        "success": "Thành công"
+      },
+      "running": "Đang chạy…",
+      "schedule": "Lịch chạy",
+      "schedule-custom": "Biểu thức cron tùy chọn",
+      "schedule-daily": "Hằng ngày lúc 02:00",
+      "schedule-hint": "Chạy các testcase của kiểm thử này theo lịch. Không đặt lịch thì chỉ chạy khi bấm Chạy ngay.",
+      "schedule-invalid": "Lịch chạy không hợp lệ.",
+      "schedule-monthly": "Hằng tháng, ngày 1 lúc 02:00",
+      "schedule-none": "Không đặt lịch",
+      "schedule-quarterly": "Hằng quý, ngày 1 lúc 02:00",
+      "schedule-weekly": "Thứ Hai hằng tuần lúc 02:00",
+      "scope-reason-error": "Không tạo được testcase. Hệ thống đang tự thử lại.",
+      "scope-reason-type": "Phép kiểm tra không nhận kiểu dữ liệu của cột này.",
+      "scope-title": "Phạm vi áp dụng",
+      "spec-passed": "{{passed}}/{{total}} đạt",
+      "sql": "Câu SQL",
+      "sql-hint": "Câu SQL phải trả về các bản ghi vi phạm, không dùng COUNT(*); không có bản ghi nào là đạt. Biến: {{ table_name }}, {{ column_name }}.",
+      "stale": "Quá hạn",
+      "state-error": "Lỗi đồng bộ",
+      "status": {
+        "aborted": "Lỗi thực thi",
+        "failed": "Không đạt",
+        "no-result": "Chưa có kết quả",
+        "not-declared": "Chưa khai báo kiểm thử",
+        "passed": "Đạt"
+      },
+      "summary-coverage": "Phạm vi áp dụng",
+      "summary-specs": "Kiểm thử đã khai báo",
+      "summary-test-cases": "Tổng testcase",
+      "sync-error-description": "{{count}} testcase chưa tạo được nên quy tắc chưa có gì để chạy. Hệ thống tự thử lại mỗi phút; nếu lỗi kéo dài, hãy báo quản trị viên.",
+      "sync-error-title": "Đồng bộ kiểm thử bị lỗi",
+      "threshold": "Ngưỡng riêng",
+      "threshold-line": "Ngưỡng {{value}}%",
+      "threshold-of-rule": "Ngưỡng {{threshold}}",
+      "threshold-placeholder": "Để trống để dùng ngưỡng của quy tắc: {{threshold}}",
+      "threshold-placeholder-none": "Ví dụ: >= 99.5%, count = 0",
+      "threshold-rule": "Theo quy tắc ({{threshold}})",
+      "timezone": "Múi giờ",
+      "title": "Khai báo kiểm thử",
+      "trend": "Xu hướng",
+      "trend-empty": "Chưa có kết quả trong giai đoạn này.",
+      "trend-subtitle": "Tỷ lệ dòng dữ liệu đạt theo ngày, so với ngưỡng của quy tắc",
+      "trend-title": "Xu hướng tỷ lệ đạt",
+      "untitled": "Kiểm thử chưa đặt tên",
+      "select-definition": "Chọn phép kiểm tra",
+      "definitions": {
+        "columnValueMaxToBeBetween": {
+          "description": "Kiểm tra giá trị lớn nhất của cột nằm trong khoảng cho trước.",
+          "name": "Giá trị lớn nhất của cột nằm trong khoảng"
+        },
+        "columnValueMeanToBeBetween": {
+          "description": "Kiểm tra giá trị trung bình của cột nằm trong khoảng cho trước.",
+          "name": "Giá trị trung bình của cột nằm trong khoảng"
+        },
+        "columnValueMedianToBeBetween": {
+          "description": "Kiểm tra giá trị trung vị của cột nằm trong khoảng cho trước.",
+          "name": "Giá trị trung vị của cột nằm trong khoảng"
+        },
+        "columnValueMinToBeBetween": {
+          "description": "Kiểm tra giá trị nhỏ nhất của cột nằm trong khoảng cho trước.",
+          "name": "Giá trị nhỏ nhất của cột nằm trong khoảng"
+        },
+        "columnValueStdDevToBeBetween": {
+          "description": "Kiểm tra độ lệch chuẩn của các giá trị trong cột nằm trong khoảng cho trước.",
+          "name": "Độ lệch chuẩn của cột nằm trong khoảng"
+        },
+        "columnValuesToBeAtExpectedLocation": {
+          "description": "Kiểm tra tọa độ (vĩ độ/kinh độ) nằm trong bán kính cho phép quanh vị trí tham chiếu.",
+          "name": "Giá trị của cột nằm đúng vị trí kỳ vọng"
+        },
+        "columnValueLengthsToBeBetween": {
+          "description": "Kiểm tra độ dài của các giá trị trong cột nằm trong khoảng cho trước.",
+          "name": "Độ dài giá trị của cột nằm trong khoảng"
+        },
+        "columnValuesMissingCount": {
+          "description": "Kiểm tra số giá trị thiếu của cột bằng giá trị cho trước.",
+          "name": "Số giá trị thiếu của cột"
+        },
+        "columnValuesSumToBeBetween": {
+          "description": "Kiểm tra tổng các giá trị trong cột nằm trong khoảng cho trước.",
+          "name": "Tổng giá trị của cột nằm trong khoảng"
+        },
+        "columnValuesToBeBetween": {
+          "description": "Kiểm tra mọi giá trị trong cột nằm trong khoảng cho trước.",
+          "name": "Giá trị của cột nằm trong khoảng"
+        },
+        "columnValuesToBeInSet": {
+          "description": "Kiểm tra mọi giá trị trong cột thuộc tập giá trị cho phép.",
+          "name": "Giá trị của cột thuộc tập cho phép"
+        },
+        "columnValuesToBeNotInSet": {
+          "description": "Kiểm tra không giá trị nào trong cột thuộc tập giá trị bị cấm.",
+          "name": "Giá trị của cột không thuộc tập bị cấm"
+        },
+        "columnValuesToBeNotNull": {
+          "description": "Kiểm tra cột không chứa giá trị NULL.",
+          "name": "Giá trị của cột không được rỗng (NULL)"
+        },
+        "columnValuesToBeUnique": {
+          "description": "Kiểm tra các giá trị trong cột là duy nhất.",
+          "name": "Giá trị của cột không trùng lặp"
+        },
+        "columnValuesToMatchRegex": {
+          "description": "Kiểm tra mọi giá trị trong cột khớp biểu thức chính quy cho trước.",
+          "name": "Giá trị của cột khớp biểu thức chính quy"
+        },
+        "columnValuesToNotMatchRegex": {
+          "description": "Kiểm tra không giá trị nào trong cột khớp biểu thức chính quy cho trước.",
+          "name": "Giá trị của cột không khớp biểu thức chính quy"
+        }
+      },
+      "parameters": {
+        "minValueForMaxInCol": {
+          "description": "Giá trị lớn nhất của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForMaxInCol": {
+          "description": "Giá trị lớn nhất của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "minValueForMeanInCol": {
+          "description": "Giá trị trung bình của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForMeanInCol": {
+          "description": "Giá trị trung bình của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "minValueForMedianInCol": {
+          "description": "Giá trị trung vị của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForMedianInCol": {
+          "description": "Giá trị trung vị của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "minValueForMinInCol": {
+          "description": "Giá trị nhỏ nhất của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForMinInCol": {
+          "description": "Giá trị nhỏ nhất của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "minValueForStdDevInCol": {
+          "description": "Độ lệch chuẩn của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForStdDevInCol": {
+          "description": "Độ lệch chuẩn của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "minValueForColSum": {
+          "description": "Tổng giá trị của cột phải lớn hơn hoặc bằng giá trị này.",
+          "name": "Tối thiểu"
+        },
+        "maxValueForColSum": {
+          "description": "Tổng giá trị của cột phải nhỏ hơn hoặc bằng giá trị này.",
+          "name": "Tối đa"
+        },
+        "locationReferenceType": {
+          "description": "Loại của cột dùng làm tham chiếu vị trí.",
+          "name": "Loại tham chiếu vị trí"
+        },
+        "longitudeColumnName": {
+          "description": "Tên cột kinh độ trong bảng.",
+          "name": "Tên cột kinh độ (X)"
+        },
+        "latitudeColumnName": {
+          "description": "Tên cột vĩ độ trong bảng.",
+          "name": "Tên cột vĩ độ (Y)"
+        },
+        "radius": {
+          "description": "Bán kính tính bằng mét quanh vị trí kỳ vọng; tọa độ phải nằm trong bán kính này.",
+          "name": "Bán kính quanh vị trí kỳ vọng (mét)"
+        },
+        "minLength": {
+          "description": "Độ dài tối thiểu của giá trị; bỏ trống nếu không giới hạn.",
+          "name": "Tối thiểu"
+        },
+        "maxLength": {
+          "description": "Độ dài tối đa của giá trị; bỏ trống nếu không giới hạn.",
+          "name": "Tối đa"
+        },
+        "missingCountValue": {
+          "description": "Số giá trị thiếu phải bằng giá trị này.",
+          "name": "Số giá trị thiếu"
+        },
+        "missingValueMatch": {
+          "description": "Mặc định mọi giá trị NULL và chuỗi rỗng đều được coi là thiếu. Trường này cho phép khai báo thêm các giá trị khác (ví dụ: N/A).",
+          "name": "Giá trị được coi là thiếu"
+        },
+        "minValue": {
+          "description": "Giá trị tối thiểu của cột; bỏ trống nếu không giới hạn.",
+          "name": "Tối thiểu"
+        },
+        "maxValue": {
+          "description": "Giá trị tối đa của cột; bỏ trống nếu không giới hạn.",
+          "name": "Tối đa"
+        },
+        "allowedValues": {
+          "description": "Danh sách các giá trị được phép.",
+          "name": "Các giá trị cho phép"
+        },
+        "matchEnum": {
+          "description": "Nếu bật, mỗi giá trị của cột phải khớp độc lập với tập cho phép.",
+          "name": "Khớp từng giá trị"
+        },
+        "forbiddenValues": {
+          "description": "Danh sách các giá trị không được xuất hiện.",
+          "name": "Các giá trị bị cấm"
+        },
+        "regex": {
+          "description": "Biểu thức chính quy mà giá trị của cột phải khớp.",
+          "name": "Biểu thức chính quy"
+        },
+        "forbiddenRegex": {
+          "description": "Biểu thức chính quy mà giá trị của cột không được khớp.",
+          "name": "Biểu thức chính quy"
+        }
+      }
+    }
   },
   "tech": {
     "technical-dictionary": "Từ điển kỹ thuật",
@@ -238,12 +559,22 @@
     "technical-history-create": "Khai báo",
     "technical-history-delete": "Xóa",
     "technical-history-import": "Nhập Excel",
+    "technical-history-approve": "Phê duyệt",
+    "technical-history-reject": "Từ chối",
+    "technical-history-resubmit": "Gửi duyệt lại",
     "technical-history-reset": "Làm mới",
     "technical-history-update": "Cập nhật",
     "technical-mapped-columns": "Số cột đã gán CDE",
     "technical-previous-snapshots": "Bản chụp các phiên bản trước",
     "technical-rebuild-index": "Dựng lại index",
     "technical-specification-and-reference": "Thông tin đặc tả và quy chiếu",
+    "technical-in-review": "Chờ duyệt",
+    "technical-send-for-approval": "Gửi phê duyệt",
+    "technical-resubmit": "Gửi duyệt lại",
+    "technical-review-record": "Duyệt bản ghi kỹ thuật",
+    "technical-reviewed-by": "Người duyệt",
+    "technical-reviewed-on": "Duyệt lúc",
+    "technical-rejection-reason": "Lý do từ chối",
     "total-technical-columns": "Tổng Cột kỹ thuật",
     "data-tables": "Bảng dữ liệu",
     "source-systems": "Hệ thống nguồn",
@@ -2717,7 +3048,7 @@
     "technical-rebuild-index-help": "Dựng lại chỉ mục tìm kiếm từ cơ sở dữ liệu.",
     "technical-add-column-description": "Tìm và chọn cột cần khai báo vào Từ điển kỹ thuật.",
     "technical-column-already-declared": "Cột này đã được khai báo trong Từ điển kỹ thuật.",
-    "technical-column-declared": "Đã khai báo cột",
+    "technical-column-declared": "Đã gửi bản ghi để phê duyệt",
     "technical-declaration-delete-confirm": "Xóa khai báo của cột này? Thao tác không thể hoàn tác.",
     "technical-declaration-deleted": "Đã xóa khai báo",
     "technical-dictionary-description": "Danh mục ma trận đặc tả kỹ thuật từ Bảng, Cột, Hệ thống nguồn và ánh xạ quy chiếu về Thành tố dữ liệu dùng chung (CDE).",
@@ -3590,11 +3921,16 @@
     "technical-dictionary-load-failed": "Không thể tải Từ điển kỹ thuật",
     "technical-field-information-description": "Thông tin định danh được đồng bộ từ hệ thống nguồn.",
     "technical-import-committed": "Đã cập nhật {{count}} bản ghi",
+    "technical-import-pending-approval": "{{count}} bản ghi đang chờ phê duyệt",
+    "technical-import-result-detail": "{{pending}} bản ghi đang chờ phê duyệt; {{updated}} bản ghi đã duyệt được cập nhật ngay",
     "technical-import-description": "Mỗi dòng được khớp với cột đã khai báo theo cơ sở dữ liệu, schema, bảng và cột; cột chưa khai báo sẽ được khai báo. Mã CDE được tìm trong Từ điển dữ liệu dùng chung v{{version}}. Chỉ các cột có trong file được cập nhật; ô trống sẽ xóa giá trị.",
     "technical-import-truncated": "Chỉ hiển thị các dòng đầu tiên, ưu tiên dòng có lỗi",
     "technical-import-upload": "Bấm hoặc kéo thả file .xlsx vào đây",
     "technical-rank-range": "Thứ hạng phải là số nguyên từ 1 đến {{max}}",
     "technical-record-updated": "Đã cập nhật bản ghi",
+    "technical-approve-confirm": "Phê duyệt bản ghi Từ điển kỹ thuật này? Bản ghi sẽ có hiệu lực ngay.",
+    "technical-record-approved": "Đã phê duyệt bản ghi",
+    "technical-record-rejected": "Đã từ chối bản ghi",
     "technical-assets-empty": "Chưa có cột nào được gán với CDE này",
     "technical-assets-not-available": "Liên kết cột sẽ khả dụng sau khi Từ điển dữ liệu dùng chung v{{version}} được phê duyệt.",
     "technical-assets-snapshot": "Danh sách cột được gán tại thời điểm Từ điển dữ liệu dùng chung v{{version}} được lưu trữ ({{date}}). Chỉ đọc.",

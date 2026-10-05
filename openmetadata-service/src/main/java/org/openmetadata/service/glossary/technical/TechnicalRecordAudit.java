@@ -19,6 +19,9 @@ import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.AuditRow;
 public final class TechnicalRecordAudit {
   public static final String CREATE = "CREATE";
   public static final String UPDATE = "UPDATE";
+  public static final String APPROVE = "APPROVE";
+  public static final String REJECT = "REJECT";
+  public static final String RESUBMIT = "RESUBMIT";
   public static final String DELETE = "DELETE";
   public static final String IMPORT = "IMPORT";
   public static final String RESET = "RESET";
@@ -85,6 +88,12 @@ public final class TechnicalRecordAudit {
       put(fields, "dataType", record.dataType());
       put(fields, "description", record.description());
       put(fields, "sourceStatus", record.sourceStatus());
+      put(fields, "status", record.status());
+      put(fields, "submittedAt", record.submittedAt());
+      put(fields, "submittedBy", record.submittedBy());
+      put(fields, "reviewedAt", record.reviewedAt());
+      put(fields, "reviewedBy", record.reviewedBy());
+      put(fields, "reviewComment", record.reviewComment());
     }
     return fields;
   }

@@ -21,6 +21,7 @@ import { EntityType } from '../../../../../../enums/entity.enum';
 import { Operation } from '../../../../../../generated/entity/policies/accessControl/rule';
 import { PipelineType } from '../../../../../../generated/entity/services/ingestionPipelines/ingestionPipeline';
 import { getLoadingStatus } from '../../../../../../utils/EntityDisplayUtils';
+import { IS_PORTAL_MODE } from '../../../../../../utils/PortalMode';
 import { getLogsViewerPath } from '../../../../../../utils/RouterUtils';
 import './pipeline-actions.less';
 import { PipelineActionsProps } from './PipelineActions.interface';
@@ -152,14 +153,17 @@ function PipelineActions({
       {playPauseButton}
       <Col>
         <Row align="middle" gutter={[8, 8]} wrap={false}>
-          <Col>
-            <Button
-              data-testid="logs-button"
-              icon={<LogsIcon height={12} width={12} />}
-              onClick={handleLogsClick}>
-              {t('label.log-plural')}
-            </Button>
-          </Col>
+          {/* The Portal cannot reach the pipeline service, which serves the logs */}
+          {!IS_PORTAL_MODE && (
+            <Col>
+              <Button
+                data-testid="logs-button"
+                icon={<LogsIcon height={12} width={12} />}
+                onClick={handleLogsClick}>
+                {t('label.log-plural')}
+              </Button>
+            </Col>
+          )}
           {(editPermission || deletePermission) && (
             <Col>
               <PipelineActionsDropdown

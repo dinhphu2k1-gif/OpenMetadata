@@ -40,7 +40,7 @@ public class TechnicalRecordService {
     this.validator = validator;
   }
 
-  /** Declares a Column with its initial values; the record is effective immediately. */
+  /** Declares a Column in review; it becomes effective only after independent approval. */
   public TechnicalRecord declare(TechnicalRecordDeclaration declaration, String actor) {
     final TechnicalColumnSource column = requireColumn(declaration.columnFqn());
     final TechnicalRecordValues values = validator.validate(declaration.values());
@@ -78,6 +78,31 @@ public class TechnicalRecordService {
           return existing;
         });
     TechnicalOutbox.flush();
+  }
+
+  public TechnicalRecord approve(UUID recordId, long expectedRevision, String actor) {
+    final TechnicalRecord approved =
+        write(
+            true,
+            (handle, version) ->
+                review(handle, version, recordId, expectedRevision, actor, true, null));
+    TechnicalOutbox.flush();
+    return approved;
+  }
+
+  public TechnicalRecord reject(
+      UUID recordId, long expectedRevision, String comment, String actor) {
+    if (nullOrEmpty(comment) || comment.isBlank()) {
+      throw TechnicalDictionaryErrors.badRequest(
+          TechnicalDictionaryErrors.REJECTION_COMMENT_REQUIRED, "A rejection comment is required");
+    }
+    final TechnicalRecord rejected =
+        write(
+            false,
+            (handle, version) ->
+                review(handle, version, recordId, expectedRevision, actor, false, comment.trim()));
+    TechnicalOutbox.flush();
+    return rejected;
   }
 
   /**
@@ -139,9 +164,12 @@ public class TechnicalRecordService {
     }
     final long now = System.currentTimeMillis();
     final TechnicalRecord record =
-        withValues(newRecord(column, actor, now), values, null, actor, now);
+        withValues(newRecord(column, actor, now), values, null, actor, now).toBuilder()
+            .cdeAssignedAt(null)
+            .cdeAssignedBy(null)
+            .build();
     requireAssignableCde(record, version);
-    if (checkRank) {
+    if (checkRank && record.isApproved()) {
       requireUniqueRank(dao, record);
     }
     dao.insertRecord(record);
@@ -174,18 +202,36 @@ public class TechnicalRecordService {
       String action,
       boolean checkRank,
       String actor) {
-    final TechnicalRecord record =
-        withValues(existing, values, existing, actor, System.currentTimeMillis());
-    final boolean changed = !sameEditable(existing, record);
+    final long now = System.currentTimeMillis();
+    TechnicalRecord record = withValues(existing, values, existing, actor, now);
+    final boolean resubmitted = existing.isRejected();
+    if (resubmitted) {
+      record =
+          record.toBuilder()
+              .status(TechnicalRecord.STATUS_IN_REVIEW)
+              .submittedAt(now)
+              .submittedBy(actor)
+              .reviewedAt(null)
+              .reviewedBy(null)
+              .reviewComment(null)
+              .build();
+    }
+    final boolean changed = resubmitted || !sameEditable(existing, record);
     if (changed) {
       requireAssignableCde(record, version);
-      if (checkRank) {
+      if (checkRank && record.isApproved()) {
         requireUniqueRank(dao, record);
       }
       if (dao.updateEditable(record, existing.revision()) != 1) {
         throw revisionConflict();
       }
-      TechnicalRecordAudit.record(dao, action, existing, record, version, actor);
+      TechnicalRecordAudit.record(
+          dao,
+          resubmitted ? TechnicalRecordAudit.RESUBMIT : action,
+          existing,
+          record,
+          version,
+          actor);
       TechnicalOutbox.enqueueRecord(dao, record);
     }
     return changed ? record : existing;
@@ -205,10 +251,12 @@ public class TechnicalRecordService {
       long now) {
     final String cde = values.cde() == null ? null : values.cde().toString();
     final boolean cdeChanged = previous == null || !Objects.equals(previous.cdeTermId(), cde);
+    final boolean effective = base.isApproved();
     return base.toBuilder()
         .cdeTermId(cde)
-        .cdeAssignedAt(cde == null ? null : cdeChanged ? (Long) now : base.cdeAssignedAt())
-        .cdeAssignedBy(cde == null ? null : cdeChanged ? actor : base.cdeAssignedBy())
+        .cdeAssignedAt(
+            cde == null || !effective ? null : cdeChanged ? (Long) now : base.cdeAssignedAt())
+        .cdeAssignedBy(cde == null || !effective ? null : cdeChanged ? actor : base.cdeAssignedBy())
         .rank(values.rank())
         .elementType(values.elementType())
         .generationType(values.generationType())
@@ -232,7 +280,7 @@ public class TechnicalRecordService {
   }
 
   private static void requireUniqueRank(TechnicalDictionaryDAO dao, TechnicalRecord record) {
-    if (record.hasCde() && record.rank() != null && record.isAvailable()) {
+    if (record.isApproved() && record.hasCde() && record.rank() != null && record.isAvailable()) {
       final String holder = dao.findRankHolder(record.cdeTermId(), record.rank(), record.id());
       if (holder != null) {
         throw TechnicalDictionaryErrors.conflict(
@@ -258,9 +306,69 @@ public class TechnicalRecordService {
         .into(TechnicalRecord.builder())
         .id(UUID.randomUUID().toString())
         .sourceStatus(TechnicalDictionaryProfile.SOURCE_AVAILABLE)
+        .status(TechnicalRecord.STATUS_IN_REVIEW)
+        .submittedAt(now)
+        .submittedBy(actor)
         .createdAt(now)
         .createdBy(actor)
         .build();
+  }
+
+  private TechnicalRecord review(
+      Handle handle,
+      String version,
+      UUID recordId,
+      long expectedRevision,
+      String actor,
+      boolean approve,
+      String comment) {
+    final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
+    final TechnicalRecord existing = requireRecord(dao, recordId);
+    if (existing.revision() != expectedRevision) {
+      throw revisionConflict();
+    }
+    if (!existing.isInReview()) {
+      throw TechnicalDictionaryErrors.conflict(
+          TechnicalDictionaryErrors.INVALID_STATUS_TRANSITION,
+          "Only a record in review can be approved or rejected");
+    }
+    if (Objects.equals(existing.createdBy(), actor)) {
+      throw TechnicalDictionaryErrors.forbidden(
+          TechnicalDictionaryErrors.SELF_APPROVAL_FORBIDDEN,
+          "The creator cannot review their own Technical Dictionary record");
+    }
+    final long now = System.currentTimeMillis();
+    TechnicalRecord reviewed =
+        existing.toBuilder()
+            .status(approve ? TechnicalRecord.STATUS_APPROVED : TechnicalRecord.STATUS_REJECTED)
+            .reviewedAt(now)
+            .reviewedBy(actor)
+            .reviewComment(comment)
+            .revision(existing.revision() + 1)
+            .updatedAt(now)
+            .updatedBy(actor)
+            .build();
+    if (approve) {
+      requireAssignableCde(reviewed, version);
+      requireUniqueRank(dao, reviewed);
+      reviewed =
+          reviewed.toBuilder()
+              .cdeAssignedAt(reviewed.hasCde() ? now : null)
+              .cdeAssignedBy(reviewed.hasCde() ? actor : null)
+              .build();
+    }
+    if (dao.updateEditable(reviewed, expectedRevision) != 1) {
+      throw revisionConflict();
+    }
+    TechnicalRecordAudit.record(
+        dao,
+        approve ? TechnicalRecordAudit.APPROVE : TechnicalRecordAudit.REJECT,
+        existing,
+        reviewed,
+        version,
+        actor);
+    TechnicalOutbox.enqueueRecord(dao, reviewed);
+    return reviewed;
   }
 
   /** The top-level Column as stored in `table_entity`. */

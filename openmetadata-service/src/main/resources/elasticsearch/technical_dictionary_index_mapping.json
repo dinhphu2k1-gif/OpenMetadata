@@ -124,6 +124,26 @@
       "revision": {
         "type": "long"
       },
+      "status": {
+        "type": "keyword"
+      },
+      "submittedAt": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "submittedBy": {
+        "type": "keyword"
+      },
+      "reviewedAt": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "reviewedBy": {
+        "type": "keyword"
+      },
+      "reviewComment": {
+        "type": "text"
+      },
       "cde": {
         "properties": {
           "id": {

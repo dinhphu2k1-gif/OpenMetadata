@@ -27,7 +27,7 @@ import { MenuInfo } from 'rc-menu/lib/interface';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { cloneDeep, isEmpty, toString } from 'lodash';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ReactComponent as IconTerm } from '../../../assets/svg/book.svg';
@@ -44,6 +44,7 @@ import { ManageButtonItemLabel } from '../../../components/common/ManageButtonCo
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
 import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
+import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
@@ -70,6 +71,7 @@ import {
   exportGlossaryInCSVFormat,
   createGlossaryTermCorrection,
   createGlossaryTermWorkingVersion,
+  discardGlossaryTermWorkingVersion,
   getGlossariesById,
   getGlossaryTermVersionPermissions,
   getGlossaryTerms,
@@ -104,6 +106,7 @@ import {
   getGlossaryTermsVersionsPath,
   getGlossaryVersionsPath,
 } from '../../../utils/RouterUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
 import {
@@ -185,7 +188,7 @@ const GlossaryHeader = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { fqn } = useFqn();
-  const { activeGlossary } = useGlossaryStore();
+  const { activeGlossary, createDraftRequest } = useGlossaryStore();
   const cdeRoute = useMemo(
     () =>
       parseCdeRoute({
@@ -484,6 +487,15 @@ const GlossaryHeader = ({
   const canDeleteBusinessContent =
     canManageBusinessContent &&
     !(isCDEGlossary && glossaryTermStatus === EntityStatus.Approved);
+  const isDeletableDraft =
+    isCustomManagedTerm &&
+    glossaryTermStatus === EntityStatus.Draft &&
+    selectedData.workingRevision != null &&
+    Boolean(workflowPermissions?.canEditWorking);
+  const canShowDelete =
+    canDeleteBusinessContent &&
+    !isCustomManagedGlossary &&
+    (permissions.Delete || isDeletableDraft);
   const canCreateGlossaryTerm =
     canRenderMutationActions &&
     glossaryTermStatus !== EntityStatus.Archived &&
@@ -755,8 +767,7 @@ const GlossaryHeader = ({
       );
       if ((!currentIsArchived || canViewHistory) && !isCurrentListed) {
         const isCorrectionDraft =
-          currentIsWorking &&
-          versions.some((v) => v.label === currentVerClean);
+          currentIsWorking && versions.some((v) => v.label === currentVerClean);
         versions.unshift({
           label: currentVerClean,
           snapshotVersion: isCorrectionDraft
@@ -837,9 +848,39 @@ const GlossaryHeader = ({
     }
   };
 
+  const getParentBusinessVersion = () =>
+    cdeRoute.parentBusinessVersion ??
+    selectedData.parentBusinessVersion ??
+    getBusinessVersion(activeGlossary?.businessVersion, '');
+
+  const discardDraft = async () => {
+    try {
+      await discardGlossaryTermWorkingVersion(
+        selectedData.id,
+        Number(selectedData.workingRevision),
+        getParentBusinessVersion()
+      );
+      showSuccessToast(
+        t('server.entity-deleted-successfully', {
+          entity: getEntityName(selectedData),
+        })
+      );
+      navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
+    } catch (error) {
+      showErrorToast(
+        error as AxiosError,
+        t('server.delete-entity-error', { entity: getEntityName(selectedData) })
+      );
+    }
+  };
+
   const handleDelete = async () => {
     const { id } = selectedData;
-    await onDelete(id);
+    if (isDeletableDraft) {
+      await discardDraft();
+    } else {
+      await onDelete(id);
+    }
     setIsDelete(false);
   };
 
@@ -986,11 +1027,6 @@ const GlossaryHeader = ({
     return updated;
   };
 
-  const getParentBusinessVersion = () =>
-    cdeRoute.parentBusinessVersion ??
-    selectedData.parentBusinessVersion ??
-    getBusinessVersion(activeGlossary?.businessVersion, '');
-
   const navigateToWorkingDraft = (createdBusinessVersion: string) => {
     const parentVersion = getParentBusinessVersion();
     const path = isDQGlossaryTerm
@@ -1093,7 +1129,10 @@ const GlossaryHeader = ({
     if (isCreatingCorrection) {
       return;
     }
-    const correctedVersion = getBusinessVersion(businessVersion ?? undefined, '');
+    const correctedVersion = getBusinessVersion(
+      businessVersion ?? undefined,
+      ''
+    );
     try {
       setIsCreatingCorrection(true);
       const created = await createGlossaryTermCorrection(
@@ -1376,7 +1415,7 @@ const GlossaryHeader = ({
         ] as ItemType[])
       : []),
 
-    ...(permissions.Delete && canDeleteBusinessContent
+    ...(canShowDelete
       ? ([
           {
             label: (
@@ -1564,15 +1603,31 @@ const GlossaryHeader = ({
     canCreateGlossaryTerm,
   ]);
 
-  const approvalActionButtons = useMemo(() => {
-    if (isVersionView || !canRenderMutationActions) {
-      return null;
-    }
-
+  const openCreateDraftModal = () => {
     const currentVer = businessVersion ?? (isGlossary ? '1' : '1.0');
     const cleanVer = String(currentVer)
       .trim()
       .replace(/^(version:?\s*|v)/i, '');
+    setDraftVersion(suggestNextVersion(cleanVer, isGlossary));
+    setDraftVersionError('');
+    setIsCreateDraftModalOpen(true);
+  };
+
+  const handledDraftRequest = useRef(createDraftRequest);
+  useEffect(() => {
+    if (createDraftRequest === handledDraftRequest.current) {
+      return;
+    }
+    handledDraftRequest.current = createDraftRequest;
+    if (canCreateDraft && canRenderMutationActions) {
+      openCreateDraftModal();
+    }
+  }, [createDraftRequest]);
+
+  const approvalActionButtons = useMemo(() => {
+    if (isVersionView || !canRenderMutationActions) {
+      return null;
+    }
 
     return (
       <Space size={8}>
@@ -1624,13 +1679,7 @@ const GlossaryHeader = ({
         )}
 
         {canCreateDraft && glossaryTermStatus === EntityStatus.Approved && (
-          <Button
-            className="m-l-xs"
-            onClick={() => {
-              setDraftVersion(suggestNextVersion(cleanVer, isGlossary));
-              setDraftVersionError('');
-              setIsCreateDraftModalOpen(true);
-            }}>
+          <Button className="m-l-xs" onClick={openCreateDraftModal}>
             {t('label.create-draft')}
           </Button>
         )}
@@ -2050,11 +2099,18 @@ const GlossaryHeader = ({
 
       <ConfirmationModal
         bodyText={
-          isGlossary
-            ? t('message.confirm-approve-entity-message', {
-                entity: t('label.glossary'),
-              })
-            : t('message.confirm-approve-glossary-term-message')
+          isGlossary ? (
+            t('message.confirm-approve-entity-message', {
+              entity: t('label.glossary'),
+            })
+          ) : (
+            <>
+              {t('message.confirm-approve-glossary-term-message')}
+              {isDQGlossaryTerm && isApproveModalOpen && (
+                <DQApprovePreview rule={selectedData as GlossaryTerm} />
+              )}
+            </>
+          )
         }
         cancelText={t('label.cancel')}
         confirmText={t('label.approve')}

@@ -18,6 +18,7 @@ export const TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS = {
   COLUMN_NAME: 'columnName',
   DATA_OWNERS: 'dataOwners',
   SERVICE_NAME: 'serviceName',
+  STATUS: 'status',
   CDE_CODE: 'cdeCode',
   CDE_NAME: 'cdeName',
   SURVIVORSHIP_RANK: 'rank',
@@ -35,13 +36,14 @@ export const TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS = {
 
 const KEYS = TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS;
 
-/** The fourteen fields of the dictionary, in order; the update columns are optional. */
+/** Default dictionary fields in display order; update metadata columns remain optional. */
 export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
   KEYS.DATABASE_NAME,
   KEYS.SCHEMA_NAME,
   KEYS.TABLE_NAME,
   KEYS.COLUMN_NAME,
   KEYS.SERVICE_NAME,
+  KEYS.STATUS,
   KEYS.CDE_CODE,
   KEYS.CDE_NAME,
   KEYS.SURVIVORSHIP_RANK,
@@ -59,13 +61,13 @@ export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
   KEYS.SCHEMA_NAME,
   KEYS.TABLE_NAME,
   KEYS.COLUMN_NAME,
+  KEYS.STATUS,
   KEYS.ACTIONS,
 ];
 
-// v2 drops the version, release type and status columns of the versioned dictionary, so a
-// preference saved for the old layout is not applied again.
+// v3 adds the maker-checker status column, so an older saved layout is not applied again.
 export const TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY =
-  'technicalDictionary.v2';
+  'technicalDictionary.v3';
 
 export const TECHNICAL_CLASSIFICATIONS = {
   ELEMENT_TYPE: 'DataElementType',

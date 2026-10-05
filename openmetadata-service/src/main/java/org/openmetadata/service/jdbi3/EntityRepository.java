@@ -1323,7 +1323,7 @@ public abstract class EntityRepository<T extends EntityInterface> {
   @Transaction
   public final void initializeEntity(T entity) {
     if (PortalConfiguration.isActive()) {
-      LOG.debug("The read-only Portal does not initialize {}", entity.getFullyQualifiedName());
+      LOG.debug("The Portal does not initialize {}", entity.getFullyQualifiedName());
       return;
     }
     T existingEntity = findByNameOrNull(entity.getFullyQualifiedName(), ALL);

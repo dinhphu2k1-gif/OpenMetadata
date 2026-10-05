@@ -151,6 +151,11 @@ import {
   CDE_TAG_CLASSIFICATIONS,
   getCDEGlossaryTableColumns,
 } from './CDEGlossaryTableColumns';
+import { getDqRuleStatuses } from '../../../rest/dqRuleTestAPI';
+import {
+  DQ_OUTCOME_LABEL_KEY,
+  DQ_TEST_FILTER_STATUSES,
+} from '../DQRuleTests/DQRuleTests.constants';
 import CDEFilterDropdown from './CDEFilterDropdown.component';
 import {
   DQ_TAG_CLASSIFICATIONS,
@@ -723,6 +728,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const [selectedDqMethods, setSelectedDqMethods] = useState<string[]>(['all']);
   const [selectedDqTargetPopulations, setSelectedDqTargetPopulations] =
     useState<string[]>(['all']);
+  const [selectedDqTestStatuses, setSelectedDqTestStatuses] = useState<
+    string[]
+  >(['all']);
+  const [dqRuleStatuses, setDqRuleStatuses] =
+    useState<Record<string, string>>();
   const [dqFilterOptions, setDqFilterOptions] = useState<{
     dimensions: Array<{ label: string; value: string }>;
     methods: Array<{ label: string; value: string }>;
@@ -780,6 +790,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     setSelectedDqOwners(['all']);
     setSelectedDqMethods(['all']);
     setSelectedDqTargetPopulations(['all']);
+    setSelectedDqTestStatuses(['all']);
   }, [activeGlossary?.fullyQualifiedName]);
 
   // Lightweight option fetching for CDE & DQ filters
@@ -1100,6 +1111,33 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     [handlePageChange]
   );
 
+  const handleDqTestStatusesChange = useCallback(
+    (vals: string[]) => {
+      setSelectedDqTestStatuses(vals);
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange]
+  );
+
+  const hasActiveDqTestFilter = !selectedDqTestStatuses.includes('all');
+
+  useEffect(() => {
+    if (hasActiveDqTestFilter) {
+      getDqRuleStatuses()
+        .then(setDqRuleStatuses)
+        .catch(() => setDqRuleStatuses({}));
+    }
+  }, [hasActiveDqTestFilter, selectedDqTestStatuses]);
+
+  const dqTestStatusOptions = useMemo(
+    () =>
+      DQ_TEST_FILTER_STATUSES.map((status) => ({
+        label: t(DQ_OUTCOME_LABEL_KEY[status]),
+        value: status,
+      })),
+    [t]
+  );
+
   const handleDqTargetPopulationsChange = useCallback(
     (vals: string[]) => {
       setSelectedDqTargetPopulations(vals);
@@ -1314,11 +1352,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               displayedGlossary.businessVersion as string
             )
           : [];
-        if (
-          !isConsumer &&
-          !isVersionView &&
-          (isCDEGlossary || isDQGlossary)
-        ) {
+        if (!isConsumer && !isVersionView && (isCDEGlossary || isDQGlossary)) {
           const authoringTerms = isCDEGlossary
             ? await getFirstLevelGlossaryTermsPaginated(
                 activeGlossary.fullyQualifiedName,
@@ -2405,7 +2439,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     if (isDQGlossary) {
       const governanceColumnKeys = new Set([
         GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
-        GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS,
       ]);
       const governanceColumns = data
         .filter((column) => governanceColumnKeys.has(String(column.key)))
@@ -2414,13 +2447,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             return {
               ...column,
               width: 140,
-              align: 'center' as const,
-            };
-          }
-          if (column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS) {
-            return {
-              ...column,
-              width: 80,
               align: 'center' as const,
             };
           }
@@ -2436,15 +2462,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       const statusColumn = governanceColumns.find(
         (column) => column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS
       );
-      const actionColumn = governanceColumns.find(
-        (column) => column.key === GLOSSARY_TERM_TABLE_COLUMNS_KEYS.ACTIONS
-      );
 
-      return [
-        ...dqColumns,
-        ...(statusColumn ? [statusColumn] : []),
-        ...(actionColumn ? [actionColumn] : []),
-      ];
+      return [...dqColumns, ...(statusColumn ? [statusColumn] : [])];
     }
 
     if (isCDEGlossary) {
@@ -2871,8 +2890,24 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return [];
     }
 
-    return processTermsWithLoadMore(glossaryTerms);
-  }, [glossaryTerms, processTermsWithLoadMore]);
+    const visibleTerms =
+      isDQGlossary && hasActiveDqTestFilter && dqRuleStatuses
+        ? glossaryTerms.filter((term) =>
+            selectedDqTestStatuses.includes(
+              dqRuleStatuses[term.id ?? ''] ?? 'NOT_DECLARED'
+            )
+          )
+        : glossaryTerms;
+
+    return processTermsWithLoadMore(visibleTerms);
+  }, [
+    glossaryTerms,
+    processTermsWithLoadMore,
+    isDQGlossary,
+    hasActiveDqTestFilter,
+    dqRuleStatuses,
+    selectedDqTestStatuses,
+  ]);
 
   useEffect(() => {
     if (
@@ -3023,6 +3058,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               selectedValues={selectedDqTargetPopulations}
               onChange={handleDqTargetPopulationsChange}
             />
+            <CDEFilterDropdown
+              dataTestId="dq-test-filter"
+              label={t('dq.test.filter-title', 'Kiểm thử')}
+              options={dqTestStatusOptions}
+              selectedValues={selectedDqTestStatuses}
+              onChange={handleDqTestStatusesChange}
+            />
           </>
         )}
 
@@ -3083,6 +3125,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     selectedDqOwners,
     selectedDqMethods,
     selectedDqTargetPopulations,
+    dqTestStatusOptions,
+    selectedDqTestStatuses,
+    handleDqTestStatusesChange,
     handleCdeDomainsChange,
     handleCdeDataSourcesChange,
     handleCdeOwnersChange,
@@ -3363,7 +3408,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                 ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
                 : undefined
             }
-            expandable={isCDEGlossary || isDQGlossary ? undefined : expandableConfig}
+            expandable={
+              isCDEGlossary || isDQGlossary ? undefined : expandableConfig
+            }
             extraTableFilters={extraTableFilters}
             extraTableFiltersClassName={
               isDQGlossary

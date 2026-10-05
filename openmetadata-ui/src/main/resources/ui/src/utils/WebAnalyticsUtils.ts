@@ -24,7 +24,6 @@ import {
 import { PageViewEvent } from '../generated/analytics/webAnalyticEventType/pageViewEvent';
 import { postWebAnalyticEvent } from '../rest/WebAnalyticsAPI';
 import { AnalyticsData } from './../components/WebAnalytics/WebAnalytics.interface';
-import { IS_PORTAL_MODE } from './PortalMode';
 
 const handlePostAnalytic = async (
   webAnalyticEventData: WebAnalyticEventData
@@ -62,17 +61,14 @@ export const trackPageView = (pageData: AnalyticsData, userId?: string) => {
 };
 
 export const getAnalyticInstance = (userId?: string): AnalyticsInstance => {
-  // The read-only Portal cannot store the events, so it sends none
-  const plugins = IS_PORTAL_MODE
-    ? []
-    : [
-        {
-          name: 'OM-Plugin',
-          page: (pageData: AnalyticsData) => {
-            trackPageView(pageData, userId);
-          },
-        },
-      ];
+  const plugins = [
+    {
+      name: 'OM-Plugin',
+      page: (pageData: AnalyticsData) => {
+        trackPageView(pageData, userId);
+      },
+    },
+  ];
 
   return Analytics({ app: 'OpenMetadata', plugins });
 };

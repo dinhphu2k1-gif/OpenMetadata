@@ -27,6 +27,7 @@ import { toTechnicalDictionaryRow } from '../pages/TechnicalDictionaryPage/Techn
 import { searchTechnicalRecords } from '../rest/technicalDictionaryAPI';
 
 const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
+  'statuses',
   'sourceServices',
   'cdeTermIds',
   'elementType',
@@ -184,6 +185,7 @@ export const useTechnicalDictionaryRecords = ({
       {
         q: filters.q,
         sourceServices: filters.sourceServices,
+        statuses: filters.statuses,
         cdeTermIds: filters.cdeTermIds,
         elementTypes: filters.elementType,
         generationTypes: filters.generationType,

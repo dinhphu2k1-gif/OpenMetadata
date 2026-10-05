@@ -1,12 +1,17 @@
-# Plan triển khai — Từ điển kỹ thuật: bản ghi theo khai báo, đọc qua index riêng
+# Plan triển khai lịch sử — Từ điển kỹ thuật: bản ghi theo khai báo, đọc qua index riêng
+
+> **Cảnh báo:** Tài liệu này ghi lại một hướng triển khai cũ và không còn là kế hoạch đích. Quyết định
+> ngày 2026-10-05 yêu cầu mọi bản ghi mới phải qua phê duyệt maker-checker; nhiều phần bên dưới vẫn mô tả
+> mô hình Draft/published hoặc luồng không phiên bản cũ. Khi triển khai tiếp, phải lập plan mới từ
+> [technical-dictionary-design.md](./technical-dictionary-design.md), đặc biệt §7.3, §10, §13 và §15.
 
 > Trạng thái tài liệu: **Phase 1–5 đã code (chưa build/test); Phase 6 (tài liệu) đang cập nhật.** Cập nhật 2026-10-01. Chưa có phần nào được kiểm chứng trên MySQL/PostgreSQL/OpenSearch thật.
 >
-> Thiết kế đích: [Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) (Đã chốt, gồm TDX-01…TDX-11).
+> Thiết kế đích: [Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) (Đã chốt).
 >
-> **Lưu ý:** Thiết kế Từ điển kỹ thuật hợp nhất (không phiên bản) bỏ catalog version,
-> workflow và bảng governed của TD. Các bước của plan này có đụng tới version, workflow, bulk hoặc hai
-> view `current`/`published` cần lập lại theo thiết kế mới trước khi triển khai.
+> **Lưu ý:** Thiết kế đích vẫn bỏ catalog version và bảng governed của TD nhưng có state machine phê duyệt
+> bản ghi mới riêng tại §7.3. Các bước bên dưới có đụng tới generic workflow, bulk hoặc hai view
+> `current`/`published` cần lập lại theo thiết kế mới trước khi triển khai.
 >
 > Ràng buộc: **không build, không chạy test** trong phiên làm việc; mọi bước kiểm chứng ở cuối do bạn chạy.
 

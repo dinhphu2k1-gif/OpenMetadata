@@ -25,12 +25,14 @@ public final class TechnicalImportCommitter {
 
   private final TechnicalRecordService service = new TechnicalRecordService();
 
-  /** Returns the number of records written. */
-  public int commit(String previewVersion, List<PlannedRow> rows, String actor) {
+  public record CommitResult(int committed, int pendingApproval, int updated) {}
+
+  /** Returns written rows split between new records awaiting approval and effective updates. */
+  public CommitResult commit(String previewVersion, List<PlannedRow> rows, String actor) {
     final List<PlannedRow> mutating = rows.stream().filter(PlannedRow::mutates).toList();
-    int written = 0;
+    CommitResult result = new CommitResult(0, 0, 0);
     try {
-      written =
+      result =
           Entity.getJdbi()
               .inTransaction(
                   handle ->
@@ -43,10 +45,10 @@ public final class TechnicalImportCommitter {
       throw conflict("A record was changed concurrently while the import was committing");
     }
     TechnicalOutbox.flush(FLUSH_BATCHES);
-    return written;
+    return result;
   }
 
-  private int apply(
+  private CommitResult apply(
       TechnicalDictionaryDAO dao, String previewVersion, List<PlannedRow> rows, String actor) {
     final StateRow state = TechnicalRecordService.lockState(dao, true);
     final String version = TechnicalDictionaryState.requireActiveVersion(state);
@@ -60,7 +62,8 @@ public final class TechnicalImportCommitter {
         .sorted(Comparator.comparing(PlannedRow::rowNumber))
         .forEach(row -> touched.add(write(dao, version, row, actor)));
     service.requireFinalRanks(dao, touched);
-    return touched.size();
+    final int pendingApproval = (int) touched.stream().filter(TechnicalRecord::isInReview).count();
+    return new CommitResult(touched.size(), pendingApproval, touched.size() - pendingApproval);
   }
 
   private TechnicalRecord write(

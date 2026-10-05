@@ -24,6 +24,12 @@ public final class TechnicalIndexFields {
   public static final String SOURCE_STATUS = "sourceStatus";
   public static final String DATA_DICTIONARY_VERSION = "dataDictionaryVersion";
   public static final String REVISION = "revision";
+  public static final String STATUS = "status";
+  public static final String SUBMITTED_AT = "submittedAt";
+  public static final String SUBMITTED_BY = "submittedBy";
+  public static final String REVIEWED_AT = "reviewedAt";
+  public static final String REVIEWED_BY = "reviewedBy";
+  public static final String REVIEW_COMMENT = "reviewComment";
   public static final String CDE = "cde";
   public static final String DATA_OWNERS = "dataOwners";
   public static final String RANK = "rank";

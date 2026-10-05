@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.TokenInterface;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
-import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.exception.EntityNotFoundException;
 
 @Slf4j
@@ -32,10 +31,7 @@ public class TokenRepository {
   }
 
   public void insertToken(TokenInterface tokenInterface) {
-    // The read-only Portal cannot store tokens: a login there lasts as long as its access token
-    if (!PortalConfiguration.isActive()) {
-      dao.getTokenDAO().insert(JsonUtils.pojoToJson(tokenInterface));
-    }
+    dao.getTokenDAO().insert(JsonUtils.pojoToJson(tokenInterface));
   }
 
   public void deleteToken(String token) {

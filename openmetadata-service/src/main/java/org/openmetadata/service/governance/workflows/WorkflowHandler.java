@@ -76,7 +76,7 @@ public class WorkflowHandler {
   private static WorkflowHandler instance;
   @Getter private static volatile boolean initialized = false;
   private final boolean isMigrationContext;
-  // False in migration and in the read-only Portal: neither may run or clean up workflow jobs
+  // False in migration and in the Portal: neither may run or clean up workflow jobs
   private final boolean runsJobs;
 
   private static final String CONNECTION_VALIDATION_QUERY = "SELECT 1";

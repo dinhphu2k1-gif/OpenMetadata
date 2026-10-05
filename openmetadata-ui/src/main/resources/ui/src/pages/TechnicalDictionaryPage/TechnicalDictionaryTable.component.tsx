@@ -10,7 +10,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import {
+  CheckOutlined,
+  CloseOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+} from '@ant-design/icons';
 import { Button, Tag, Tooltip } from 'antd';
 import { AxiosError } from 'axios';
 import { ColumnsType } from 'antd/lib/table';
@@ -45,7 +50,10 @@ import {
   TechnicalDictionaryCapabilities,
   TechnicalDictionaryRow,
 } from './technicalDictionary.interface';
-import { getTagLabel } from './TechnicalDictionaryRows';
+import {
+  canReviewTechnicalRecord,
+  getTagLabel,
+} from './TechnicalDictionaryRows';
 
 export interface TechnicalDictionaryTableProps {
   rows: TechnicalDictionaryRow[];
@@ -61,6 +69,9 @@ export interface TechnicalDictionaryTableProps {
   onView: (row: TechnicalDictionaryRow) => void;
   onEdit: (row: TechnicalDictionaryRow) => void;
   onDelete: (row: TechnicalDictionaryRow) => void;
+  onApprove: (row: TechnicalDictionaryRow) => void;
+  onReject: (row: TechnicalDictionaryRow) => void;
+  currentUserName?: string;
 }
 
 const Placeholder = () => (
@@ -88,6 +99,9 @@ const TechnicalDictionaryTable = ({
   onView,
   onEdit,
   onDelete,
+  onApprove,
+  onReject,
+  currentUserName,
 }: TechnicalDictionaryTableProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -145,8 +159,15 @@ const TechnicalDictionaryTable = ({
   );
 
   const renderActions = useCallback(
-    (row: TechnicalDictionaryRow) => (
-      <div className="d-flex items-center gap-2">
+    (row: TechnicalDictionaryRow) => {
+      const canReview = canReviewTechnicalRecord(
+        row,
+        capabilities.canApprove,
+        currentUserName
+      );
+
+      return (
+        <div className="d-flex items-center gap-2">
         <Tooltip title={t('label.view')}>
           <Button
             aria-label={t('label.view')}
@@ -171,6 +192,31 @@ const TechnicalDictionaryTable = ({
             />
           </Tooltip>
         )}
+        {canReview && (
+          <Tooltip title={t('label.approve')}>
+            <Button
+              aria-label={t('label.approve')}
+              data-testid={`approve-btn-${row.columnName}`}
+              icon={<CheckOutlined />}
+              size="small"
+              type="text"
+              onClick={() => onApprove(row)}
+            />
+          </Tooltip>
+        )}
+        {canReview && (
+          <Tooltip title={t('label.reject')}>
+            <Button
+              danger
+              aria-label={t('label.reject')}
+              data-testid={`reject-btn-${row.columnName}`}
+              icon={<CloseOutlined />}
+              size="small"
+              type="text"
+              onClick={() => onReject(row)}
+            />
+          </Tooltip>
+        )}
         {capabilities.canEdit && (
           <Tooltip title={t('label.delete-declaration')}>
             <Button
@@ -184,9 +230,20 @@ const TechnicalDictionaryTable = ({
             />
           </Tooltip>
         )}
-      </div>
-    ),
-    [capabilities.canEdit, onDelete, onEdit, onView, t]
+        </div>
+      );
+    },
+    [
+      capabilities.canApprove,
+      capabilities.canEdit,
+      currentUserName,
+      onApprove,
+      onDelete,
+      onEdit,
+      onReject,
+      onView,
+      t,
+    ]
   );
 
   const columns: ColumnsType<TechnicalDictionaryRow> = useMemo(
@@ -255,6 +312,30 @@ const TechnicalDictionaryTable = ({
               </Tag>
             )}
           </>
+        ),
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        width: 130,
+        render: (_, row) => (
+          <Tag
+            color={
+              row.status === 'Approved'
+                ? 'success'
+                : row.status === 'Rejected'
+                ? 'error'
+                : 'processing'
+            }>
+            {t(
+              row.status === 'Approved'
+                ? 'label.approved'
+                : row.status === 'Rejected'
+                ? 'label.rejected'
+                : 'label.technical-in-review'
+            )}
+          </Tag>
         ),
       },
       {

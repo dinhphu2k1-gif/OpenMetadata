@@ -42,8 +42,7 @@ public final class GlossaryAuthorizationResolver {
             || subject.hasAnyRole("DATA_STEWARD")
             || subject.hasAnyRole("DATA_PROPOSER");
     return !managesContent
-        && (subject.hasAnyRole("BASIC_CONSUMER")
-            || subject.hasAnyRole("DATA_CONSUMER"));
+        && (subject.hasAnyRole("BASIC_CONSUMER") || subject.hasAnyRole("DATA_CONSUMER"));
   }
 
   /** Consumer access is always limited to immutable published representations. */

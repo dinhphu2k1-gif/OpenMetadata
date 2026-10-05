@@ -17,9 +17,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Portal mode runs this same server as the read-only Portal service: it serves the Portal UI build
- * and rejects every request that changes data. Login, users, roles, policies and search stay
- * exactly as in OpenMetadata.
+ * Portal mode runs this same server as the Portal service for every non-admin role: it serves the
+ * Portal UI build and leaves the pipeline service, the background workers and the seed data to the
+ * OpenMetadata server. Login, users, roles, policies, search and writes stay exactly as in
+ * OpenMetadata, governed by RBAC.
  */
 @Getter
 @Setter
@@ -36,7 +37,7 @@ public class PortalConfiguration {
     active = configuration.isEnabled();
   }
 
-  /** True when this server is the read-only Portal, whose database user can only read. */
+  /** True when this server is the Portal, which leaves startup writes and background work to OpenMetadata. */
   public static boolean isActive() {
     return active;
   }

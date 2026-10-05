@@ -146,7 +146,7 @@ public class AppResource extends EntityResource<App, AppRepository> {
       searchRepository = Entity.getSearchRepository();
       AppScheduler.initialize(config, dao, searchRepository);
 
-      // The read-only Portal installs no apps: that is done by the OpenMetadata server
+      // The Portal installs no apps: that is done by the OpenMetadata server
       if (!config.getPortalConfiguration().isEnabled()) {
         List<CreateApp> createAppsReq =
             getEntitiesFromSeedData(

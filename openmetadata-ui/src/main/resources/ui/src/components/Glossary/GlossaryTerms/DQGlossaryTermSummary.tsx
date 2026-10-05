@@ -149,8 +149,8 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
               />
             </Popover>
           ) : undefined
-      }
-      label={t('dq.cde-code')}>
+        }
+        label={t('dq.cde-code')}>
         {displayedCde ? (
           <Space size={6}>
             <Typography.Text>{displayedCde.name}</Typography.Text>
@@ -267,6 +267,8 @@ const DQQualityThresholdField = ({ glossaryTerm }: SummaryProps) => {
       action={
         canEdit ? (
           <Popover
+            autoAdjustOverflow
+            destroyTooltipOnHide
             content={
               <div className="d-flex flex-column gap-2" style={{ width: 180 }}>
                 <Input
@@ -283,8 +285,9 @@ const DQQualityThresholdField = ({ glossaryTerm }: SummaryProps) => {
                 </button>
               </div>
             }
+            getPopupContainer={() => document.body}
             open={isEditing}
-            placement="bottomLeft"
+            placement="bottomRight"
             trigger="click"
             onOpenChange={setIsEditing}>
             <EditIconButton

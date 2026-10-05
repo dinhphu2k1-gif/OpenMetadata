@@ -21,6 +21,7 @@ public final class TechnicalRowMatcher {
   public static final String CDE_TERM_IDS = "cdeTermIds";
   public static final String SYSTEM_OWNER_IDS = "systemOwnerIds";
   public static final String SOURCE_STATUSES = "sourceStatuses";
+  public static final String STATUSES = "statuses";
   public static final String ELEMENT_TYPES = "elementTypes";
   public static final String GENERATION_TYPES = "generationTypes";
   public static final String CREATION_METHODS = "creationMethods";
@@ -34,6 +35,11 @@ public final class TechnicalRowMatcher {
       Set.of(
           TechnicalDictionaryProfile.SOURCE_AVAILABLE,
           TechnicalDictionaryProfile.SOURCE_UNAVAILABLE);
+  private static final Set<String> STATUS_VALUES =
+      Set.of(
+          TechnicalRecord.STATUS_IN_REVIEW,
+          TechnicalRecord.STATUS_APPROVED,
+          TechnicalRecord.STATUS_REJECTED);
   private static final int MAX_VALUES = 50;
   private static final Map<String, String> TAG_FILTERS = tagFilters();
 
@@ -55,6 +61,7 @@ public final class TechnicalRowMatcher {
         filters,
         SOURCE_STATUSES,
         allowed(SOURCE_STATUSES, csv(raw.get(SOURCE_STATUSES)), SOURCE_STATUS_VALUES));
+    put(filters, STATUSES, allowed(STATUSES, csv(raw.get(STATUSES)), STATUS_VALUES));
     TAG_FILTERS.forEach(
         (param, classification) ->
             put(filters, param, tagFqns(param, classification, csv(raw.get(param)))));

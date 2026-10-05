@@ -28,8 +28,9 @@ public interface TechnicalDictionaryDAO {
       "id, columnKey, columnFqn, sourceService, sourceDatabase, sourceSchema, sourceTable, "
           + "sourceColumn, dataType, dataLength, dataPrecision, dataScale, description, "
           + "sourceStatus, cdeTermId, cdeAssignedAt, cdeAssignedBy, survivorshipRank, elementType, "
-          + "generationType, creationMethod, timeliness, systemOwnerId, revision, createdAt, "
-          + "createdBy, updatedAt, updatedBy";
+          + "generationType, creationMethod, timeliness, systemOwnerId, "
+          + "status, submittedAt, submittedBy, reviewedAt, reviewedBy, reviewComment, "
+          + "revision, createdAt, createdBy, updatedAt, updatedBy";
 
   // ---- state -------------------------------------------------------------------------------
 
@@ -65,12 +66,14 @@ public interface TechnicalDictionaryDAO {
           + "sourceSchema, sourceTable, sourceColumn, dataType, dataLength, dataPrecision, "
           + "dataScale, description, sourceStatus, cdeTermId, cdeAssignedAt, cdeAssignedBy, "
           + "survivorshipRank, elementType, generationType, creationMethod, timeliness, "
-          + "systemOwnerId, revision, createdAt, createdBy, updatedAt, updatedBy) VALUES (:id, "
+          + "systemOwnerId, status, submittedAt, submittedBy, reviewedAt, reviewedBy, "
+          + "reviewComment, revision, createdAt, createdBy, updatedAt, updatedBy) VALUES (:id, "
           + ":columnKey, :columnFqn, :sourceService, :sourceDatabase, :sourceSchema, :sourceTable, "
           + ":sourceColumn, :dataType, :dataLength, :dataPrecision, :dataScale, :description, "
           + ":sourceStatus, :cdeTermId, :cdeAssignedAt, :cdeAssignedBy, :rank, :elementType, "
-          + ":generationType, :creationMethod, :timeliness, :systemOwnerId, :revision, "
-          + ":createdAt, :createdBy, :updatedAt, :updatedBy)")
+          + ":generationType, :creationMethod, :timeliness, :systemOwnerId, "
+          + ":status, :submittedAt, :submittedBy, :reviewedAt, :reviewedBy, :reviewComment, "
+          + ":revision, :createdAt, :createdBy, :updatedAt, :updatedBy)")
   void insertRecord(@BindMethods TechnicalRecord record);
 
   /** Writes the user-editable values; succeeds only when the revision is the expected one. */
@@ -78,7 +81,9 @@ public interface TechnicalDictionaryDAO {
       "UPDATE technical_record SET cdeTermId = :cdeTermId, cdeAssignedAt = :cdeAssignedAt, "
           + "cdeAssignedBy = :cdeAssignedBy, survivorshipRank = :rank, elementType = :elementType, "
           + "generationType = :generationType, creationMethod = :creationMethod, "
-          + "timeliness = :timeliness, systemOwnerId = :systemOwnerId, revision = :revision, "
+          + "timeliness = :timeliness, systemOwnerId = :systemOwnerId, status = :status, "
+          + "submittedAt = :submittedAt, submittedBy = :submittedBy, reviewedAt = :reviewedAt, "
+          + "reviewedBy = :reviewedBy, reviewComment = :reviewComment, revision = :revision, "
           + "updatedAt = :updatedAt, updatedBy = :updatedBy WHERE id = :id "
           + "AND revision = :expectedRevision")
   int updateEditable(
@@ -128,13 +133,15 @@ public interface TechnicalDictionaryDAO {
   @SqlQuery("SELECT COUNT(*) FROM technical_record")
   long countRecords();
 
-  @SqlQuery("SELECT COUNT(*) FROM technical_record WHERE cdeTermId IS NOT NULL")
+  @SqlQuery(
+      "SELECT COUNT(*) FROM technical_record WHERE cdeTermId IS NOT NULL AND status = 'Approved'")
   long countMappedRecords();
 
   /** The record holding a rank in one CDE, other than {@code exceptId}; Column FQN or null. */
   @SqlQuery(
       "SELECT columnFqn FROM technical_record WHERE cdeTermId = :cdeTermId "
-          + "AND survivorshipRank = :rank AND sourceStatus = 'Available' AND id <> :exceptId "
+          + "AND survivorshipRank = :rank AND sourceStatus = 'Available' "
+          + "AND status = 'Approved' AND id <> :exceptId "
           + "LIMIT 1")
   String findRankHolder(
       @Bind("cdeTermId") String cdeTermId,
@@ -341,6 +348,12 @@ public interface TechnicalDictionaryDAO {
           .creationMethod(rs.getString("creationMethod"))
           .timeliness(rs.getString("timeliness"))
           .systemOwnerId(rs.getString("systemOwnerId"))
+          .status(rs.getString("status"))
+          .submittedAt(nullableLong(rs, "submittedAt"))
+          .submittedBy(rs.getString("submittedBy"))
+          .reviewedAt(nullableLong(rs, "reviewedAt"))
+          .reviewedBy(rs.getString("reviewedBy"))
+          .reviewComment(rs.getString("reviewComment"))
           .revision(rs.getLong("revision"))
           .createdAt(rs.getLong("createdAt"))
           .createdBy(rs.getString("createdBy"))

@@ -91,7 +91,7 @@ public class TechnicalColumnProjection {
 
   private static List<TagLabel> desiredTags(TechnicalRecord record) {
     final List<TagLabel> tags = new ArrayList<>();
-    if (record != null && record.isAvailable()) {
+    if (record != null && record.isApproved() && record.isAvailable()) {
       cdeTag(record).ifPresent(tags::add);
       Stream.of(
               record.elementType(),

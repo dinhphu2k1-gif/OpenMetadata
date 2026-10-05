@@ -67,8 +67,10 @@ import org.openmetadata.sdk.PipelineServiceClientInterface;
 import org.openmetadata.sdk.exception.PipelineServiceClientException;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
+import org.openmetadata.service.config.PortalConfiguration;
 import org.openmetadata.service.events.lifecycle.EntityLifecycleEventDispatcher;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.logstorage.LogStorageInterface;
 import org.openmetadata.service.logstorage.S3LogStorage.LogStreamListener;
 import org.openmetadata.service.monitoring.IngestionProgressTracker;
@@ -272,6 +274,20 @@ public class IngestionPipelineRepository extends EntityRepository<IngestionPipel
   public void prepare(IngestionPipeline ingestionPipeline, boolean update) {
     var service = getCachedParentOrLoad(ingestionPipeline.getService(), "", Include.NON_DELETED);
     ingestionPipeline.setService(service.getEntityReference());
+  }
+
+  /**
+   * The Portal has no pipeline service client: a change that needs a new deployment is queued, and
+   * the OpenMetadata server deploys it.
+   */
+  @Override
+  protected void postUpdate(IngestionPipeline original, IngestionPipeline updated) {
+    super.postUpdate(original, updated);
+    if (PortalConfiguration.isActive()
+        && Boolean.TRUE.equals(original.getDeployed())
+        && requiresRedeployment(original, updated)) {
+      DqTestOutbox.enqueueIngestionPipelineSync(updated.getId(), updated.getName());
+    }
   }
 
   protected boolean requiresRedeployment(IngestionPipeline original, IngestionPipeline updated) {
@@ -497,6 +513,8 @@ public class IngestionPipelineRepository extends EntityRepository<IngestionPipel
     // Delete deployed pipeline in the Pipeline Service Client
     if (pipelineServiceClient != null) {
       pipelineServiceClient.deletePipeline(entity);
+    } else if (PortalConfiguration.isActive()) {
+      DqTestOutbox.enqueueIngestionPipelineSync(entity.getId(), entity.getName());
     } else {
       LOG.debug(
           "Skipping pipeline service delete for '{}' because pipeline service client is not configured.",
@@ -837,9 +855,11 @@ public class IngestionPipelineRepository extends EntityRepository<IngestionPipel
       }
 
       if (pipelineServiceClient == null) {
-        LOG.warn(
-            "Pipeline '{}' requires redeployment but pipeline service client is not configured. Skipping deployment.",
-            updated.getName());
+        if (!PortalConfiguration.isActive()) {
+          LOG.warn(
+              "Pipeline '{}' requires redeployment but pipeline service client is not configured. Skipping deployment.",
+              updated.getName());
+        }
         return;
       }
 

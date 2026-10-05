@@ -36,6 +36,12 @@ public record TechnicalRecord(
     String creationMethod,
     String timeliness,
     String systemOwnerId,
+    String status,
+    Long submittedAt,
+    String submittedBy,
+    Long reviewedAt,
+    String reviewedBy,
+    String reviewComment,
     long revision,
     long createdAt,
     String createdBy,
@@ -49,4 +55,20 @@ public record TechnicalRecord(
   public boolean hasCde() {
     return cdeTermId != null;
   }
+
+  public boolean isApproved() {
+    return STATUS_APPROVED.equals(status);
+  }
+
+  public boolean isInReview() {
+    return STATUS_IN_REVIEW.equals(status);
+  }
+
+  public boolean isRejected() {
+    return STATUS_REJECTED.equals(status);
+  }
+
+  public static final String STATUS_IN_REVIEW = "In Review";
+  public static final String STATUS_APPROVED = "Approved";
+  public static final String STATUS_REJECTED = "Rejected";
 }

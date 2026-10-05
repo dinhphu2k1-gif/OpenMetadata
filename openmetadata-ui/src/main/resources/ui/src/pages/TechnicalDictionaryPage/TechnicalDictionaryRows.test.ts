@@ -12,6 +12,7 @@
  */
 import { TechnicalRecordApiRow } from '../../rest/technicalDictionaryAPI';
 import {
+  canReviewTechnicalRecord,
   candidateToRow,
   getTagLabel,
   isSourceUnavailable,
@@ -33,6 +34,8 @@ const apiRow = (
   description: 'Tên khách hàng',
   sourceStatus: 'Available',
   revision: 3,
+  status: 'Approved',
+  createdBy: 'maker',
   cde: { id: 'cde-1', code: 'CDE1', name: 'Tên khách hàng' },
   dataOwners: [{ id: 'owner-1', name: 'Ban KHCL' }],
   rank: 2,
@@ -53,6 +56,8 @@ describe('toTechnicalDictionaryRow', () => {
 
     expect(row.key).toBe('term-1');
     expect(row.revision).toBe(3);
+    expect(row.status).toBe('Approved');
+    expect(row.createdBy).toBe('maker');
     expect(row.databaseName).toBe('core');
     expect(row.tableName).toBe('CUSTOMER');
     expect(row.columnName).toBe('NAME');
@@ -122,5 +127,22 @@ describe('candidateToRow', () => {
     expect(row.tableFqn).toBe('ipcas.core.dbo.CUSTOMER');
     expect(row.cdeCode).toBe('');
     expect(row.sourceStatus).toBe('Available');
+    expect(row.status).toBe('In Review');
+  });
+});
+
+describe('canReviewTechnicalRecord', () => {
+  const row = toTechnicalDictionaryRow(
+    apiRow({ status: 'In Review', createdBy: 'maker' })
+  );
+
+  it('allows an independent approver to review an in-review record', () => {
+    expect(canReviewTechnicalRecord(row, true, 'checker')).toBe(true);
+  });
+
+  it('hides review actions from the maker and users without approval permission', () => {
+    expect(canReviewTechnicalRecord(row, true, 'maker')).toBe(false);
+    expect(canReviewTechnicalRecord(row, false, 'checker')).toBe(false);
+    expect(canReviewTechnicalRecord(row, true, undefined)).toBe(false);
   });
 });

@@ -25,6 +25,10 @@
         { "$ref": "../../type/basic.json#/definitions/entityExtension" },
         { "type": "null" }
       ]
+    },
+    "dataQualityTestSpecs": {
+      "description": "Test declarations of a Data Quality Rule working Draft. Rejected for Data Dictionary terms.",
+      "$ref": "../../type/dqTestSpecs.json"
     }
   },
   "required": [

@@ -52,6 +52,23 @@ class TechnicalRecordAuditTest {
   }
 
   @Test
+  void approvalAndRejectionMetadataAreAudited() {
+    TechnicalRecord reviewed =
+        record().toBuilder()
+            .status(TechnicalRecord.STATUS_REJECTED)
+            .reviewedAt(123L)
+            .reviewedBy("checker")
+            .reviewComment("Missing evidence")
+            .build();
+
+    List<Map<String, Object>> changes = TechnicalRecordAudit.changes(record(), reviewed);
+
+    assertEquals("Rejected", change(changes, "status").get("newValue"));
+    assertEquals("checker", change(changes, "reviewedBy").get("newValue"));
+    assertEquals("Missing evidence", change(changes, "reviewComment").get("newValue"));
+  }
+
+  @Test
   void aCreationListsEveryValueAndNoChangeListsNothing() {
     assertTrue(TechnicalRecordAudit.changes(record(), record()).isEmpty());
     assertEquals(

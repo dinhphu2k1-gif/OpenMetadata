@@ -14,6 +14,7 @@ import { AxiosResponse } from 'axios';
 import APIClient from './index';
 
 export type TechnicalSourceStatus = 'Available' | 'Unavailable';
+export type TechnicalRecordStatus = 'In Review' | 'Approved' | 'Rejected';
 export type TechnicalAssetSource = 'CURRENT' | 'SNAPSHOT' | 'NONE';
 
 export interface TechnicalTagValue {
@@ -50,6 +51,12 @@ export interface TechnicalRecordApiRow {
   sourceStatus: TechnicalSourceStatus;
   dataDictionaryVersion?: string;
   revision: number;
+  status: TechnicalRecordStatus;
+  submittedAt?: number;
+  submittedBy?: string;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  reviewComment?: string;
   cde?: TechnicalCdeValue;
   dataOwners?: TechnicalNamedReference[];
   rank?: number;
@@ -67,6 +74,7 @@ export interface TechnicalRecordApiRow {
 export interface TechnicalCapabilities {
   canView: boolean;
   canEdit: boolean;
+  canApprove: boolean;
   canImport: boolean;
   canExport: boolean;
 }
@@ -89,6 +97,7 @@ export interface TechnicalRecordQuery {
   cdeTermIds?: string[];
   systemOwnerIds?: string[];
   sourceStatuses?: string[];
+  statuses?: TechnicalRecordStatus[];
   elementTypes?: string[];
   generationTypes?: string[];
   creationMethods?: string[];
@@ -218,6 +227,7 @@ export const searchTechnicalRecords = async (
         cdeTermIds: csv(query.cdeTermIds),
         systemOwnerIds: csv(query.systemOwnerIds),
         sourceStatuses: csv(query.sourceStatuses),
+        statuses: csv(query.statuses),
         elementTypes: csv(query.elementTypes),
         generationTypes: csv(query.generationTypes),
         creationMethods: csv(query.creationMethods),
@@ -274,6 +284,36 @@ export const updateTechnicalRecord = async (
   >(`/glossaryTerms/technical/records/${termId}`, request, {
     // The client sends PATCH as JSON Patch by default; this body is a plain JSON update request.
     headers: { 'Content-Type': 'application/json' },
+  });
+
+  return response.data;
+};
+
+export const approveTechnicalRecord = async (
+  termId: string,
+  expectedRevision: number
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.post<
+    { expectedRevision: number },
+    AxiosResponse<TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}/approve`, {
+    expectedRevision,
+  });
+
+  return response.data;
+};
+
+export const rejectTechnicalRecord = async (
+  termId: string,
+  expectedRevision: number,
+  comment: string
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.post<
+    { expectedRevision: number; comment: string },
+    AxiosResponse<TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}/reject`, {
+    expectedRevision,
+    comment,
   });
 
   return response.data;
@@ -362,7 +402,11 @@ export const previewTechnicalImport = async (
 };
 
 export const commitTechnicalImport = async (importSessionId: string) => {
-  const response = await APIClient.post<{ committed: number }>(
+  const response = await APIClient.post<{
+    committed: number;
+    pendingApproval: number;
+    updated: number;
+  }>(
     `/glossaryTerms/import/technical/${importSessionId}/commit`
   );
 

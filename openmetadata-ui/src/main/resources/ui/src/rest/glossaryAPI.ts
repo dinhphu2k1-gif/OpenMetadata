@@ -353,14 +353,13 @@ export const previewCdeImport = async (
 ): Promise<CdeImportPreview> => {
   const data = new FormData();
   data.append('file', file);
-  const response = await APIClient.post<FormData, AxiosResponse<CdeImportPreview>>(
-    '/glossaryTerms/import/preview',
-    data,
-    {
-      params: { glossary: glossaryId, parentBusinessVersion, existingCodePolicy },
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }
-  );
+  const response = await APIClient.post<
+    FormData,
+    AxiosResponse<CdeImportPreview>
+  >('/glossaryTerms/import/preview', data, {
+    params: { glossary: glossaryId, parentBusinessVersion, existingCodePolicy },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 
   return response.data;
 };
@@ -469,6 +468,26 @@ export const createGlossaryTermWorkingVersion = async (
   return response.data;
 };
 
+export const discardGlossaryTermWorkingVersion = async (
+  id: string,
+  expectedRevision: number,
+  parentBusinessVersion: string
+) => {
+  const response = await APIClient.delete<{
+    discarded: boolean;
+    termDeleted: boolean;
+  }>(`/glossaryTerms/${id}/working`, {
+    params: {
+      expectedRevision,
+      parentBusinessVersion:
+        normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+        parentBusinessVersion,
+    },
+  });
+
+  return response.data;
+};
+
 export const createGlossaryTermCorrection = async (
   id: string,
   businessVersion: string,
@@ -544,6 +563,8 @@ export const updateGlossaryTermWorkingVersion = async (
     relatedTerms: payload.relatedTerms ?? [],
     tags: payload.tags ?? [],
     extension,
+    // Only a Data Quality Rule carries test declarations; undefined keeps them as they are.
+    dataQualityTestSpecs: payload.dataQualityTestSpecs,
   };
   const response = await APIClient.patch<
     CdeDraftUpdateRequest,
@@ -606,8 +627,7 @@ export async function transitionGlossaryTermWorkflow(
       action === 'createDraft'
         ? undefined
         : {
-            parentBusinessVersion:
-              resolvedParentBusinessVersion,
+            parentBusinessVersion: resolvedParentBusinessVersion,
           },
   });
 
@@ -731,10 +751,7 @@ export const getGlossaryTermsVersionsList = async (
 ) => {
   const response = await APIClient.get<
     GlossaryTerm[] | { data?: GlossaryTerm[] }
-  >(
-    `/glossaryTerms/${id}/published`,
-    { params: { parentBusinessVersion } }
-  );
+  >(`/glossaryTerms/${id}/published`, { params: { parentBusinessVersion } });
   // Depending on the backend/proxy version, collection responses can be
   // returned either as a bare array or in the standard `{ data: [...] }`
   // envelope. Keep the version selector compatible with both contracts.
@@ -912,8 +929,8 @@ export const getFirstLevelGlossaryTermsPaginated = async (
   >(apiUrl, {
     params: {
       ...(parentFQN === 'Data Dictionary' ||
-        parentFQN === DATA_QUALITY_GLOSSARY_NAME ||
-        glossaryId
+      parentFQN === DATA_QUALITY_GLOSSARY_NAME ||
+      glossaryId
         ? { glossary: glossaryId ?? parentFQN }
         : { directChildrenOf: parentFQN }),
       fields: fields ?? [

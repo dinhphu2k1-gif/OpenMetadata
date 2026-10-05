@@ -2,17 +2,20 @@
 # Local development without building images. PostgreSQL and OpenSearch run in Docker; the
 # OpenMetadata server, the Portal server and the Vite dev servers run on the host from the source tree.
 #
-#   ./local-dev.sh infra       start PostgreSQL + OpenSearch, stop the Docker server and portal,
-#                              and create the read-only database user of the Portal
+#   ./local-dev.sh infra       start PostgreSQL + OpenSearch, stop the Docker server and portal
 #   ./local-dev.sh compile     compile the backend (openmetadata-service)
 #   ./local-dev.sh migrate     run the database migrations
 #   ./local-dev.sh reindex     rebuild the OpenSearch indexes from PostgreSQL
 #   ./local-dev.sh server      run the OpenMetadata server   (API :8585, admin :8586)
-#   ./local-dev.sh portal      run the Portal server         (API :8595, admin :8596), read-only database user
+#   ./local-dev.sh portal      run the Portal server         (API :8595, admin :8596), same database as the server
 #   ./local-dev.sh ui          run Vite for OpenMetadata     (http://localhost:3000 -> :8585)
 #   ./local-dev.sh ui-portal   run Vite for the Portal       (http://localhost:3001 -> :8595)
+#   ./local-dev.sh ingestion   run Airflow in Docker (http://localhost:8080), needed for Test Connection,
+#                              metadata ingestion and test pipelines; then start the server with
+#                              WITH_INGESTION=true ./local-dev.sh server
 #
-# Backend change: Ctrl+C the server, then "./local-dev.sh server" again (it recompiles first).
+# Backend change: Ctrl+C the server, then "./local-dev.sh server" again (it recompiles first, only the
+# changed sources; FULL_COMPILE=true recompiles everything, SKIP_COMPILE=true does not compile).
 # UI change: Vite reloads by itself.
 set -e
 
@@ -25,8 +28,13 @@ APP_CLASS=org.openmetadata.service.OpenMetadataApplication
 OPS_CLASS=org.openmetadata.service.util.OpenMetadataOperations
 CONFIG_FILE="$PROJECT_ROOT/conf/openmetadata.yaml"
 
+# resolve.skip: the swagger plugin scans every resource class on each compile, which is not needed locally.
+# The compiler recompiles all 1727 sources on every run because ReportsHandler.java produces no class;
+# without incremental compilation only the sources newer than their class are compiled. A change to a
+# signature used by an unchanged class then needs FULL_COMPILE=true.
 MVN_FAST_FLAGS=(
     -o
+    -Dresolve.skip=true
     -Dmaven.test.skip=true
     -Dcheckstyle.skip=true
     -Dspotbugs.skip=true
@@ -54,12 +62,31 @@ load_environment() {
     ELASTICSEARCH_PORT=8086
     ELASTICSEARCH_SCHEME=http
     PIPELINE_SERVICE_CLIENT_ENABLED=${PIPELINE_SERVICE_CLIENT_ENABLED:-false}
+    if [ "${WITH_INGESTION:-false}" = true ]; then
+        # Airflow runs in Docker (./local-dev.sh ingestion); the server here calls it on localhost and
+        # gives the ingestion workflows an address of this machine they can reach from the Docker network.
+        PIPELINE_SERVICE_CLIENT_ENABLED=true
+        PIPELINE_SERVICE_CLIENT_ENDPOINT=http://localhost:8080
+        SERVER_HOST_API_URL="http://$(docker_host_gateway):${SERVER_PORT:-8585}/api"
+    fi
     set +a
 }
 
+# Address of this machine seen from the containers of omd_network
+docker_host_gateway() {
+    docker network inspect omd_network -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}'
+}
+
 compile_backend() {
+    local incremental=(-Dmaven.compiler.useIncrementalCompilation=false)
+    if [ "${SKIP_COMPILE:-false}" = true ]; then
+        return 0
+    fi
+    if [ "${FULL_COMPILE:-false}" = true ]; then
+        incremental=()
+    fi
     cd "$PROJECT_ROOT"
-    mvn -q compile -pl openmetadata-service "${MVN_FAST_FLAGS[@]}"
+    mvn -q compile -pl openmetadata-service "${MVN_FAST_FLAGS[@]}" "${incremental[@]}"
 }
 
 # Dependencies are resolved the way the release package resolves them (openmetadata-dist), so the jar
@@ -86,27 +113,8 @@ run_java() {
     local classpath
     classpath="$(backend_classpath)"
     cd "$PROJECT_ROOT"
-    exec java ${OPENMETADATA_HEAP_OPTS:--Xmx1G} -Dbootstrap.dir="$PROJECT_ROOT/bootstrap" \
+    exec java ${OPENMETADATA_HEAP_OPTS:--Xms256m -Xmx768m} -Dbootstrap.dir="$PROJECT_ROOT/bootstrap" \
         -cp "$classpath" "$main_class" "$@"
-}
-
-# The Portal reaches the database through a user that can only read, so a write it attempts fails here
-# exactly as it does in production. A read-only session is not a "primary" server for the driver.
-use_portal_database_user() {
-    export DB_USER=portal_ro DB_USER_PASSWORD="${PORTAL_RO_PASSWORD:-portal_ro_password}"
-    export DB_PG_TARGET_SERVER_TYPE=any
-}
-
-# Idempotent: creates the read-only user, or updates its password and grants on an existing database
-apply_portal_role() {
-    local attempt
-    for attempt in $(seq 1 30); do
-        docker exec openmetadata_postgresql psql -U postgres -d openmetadata_db -tAc 'select 1' > /dev/null 2>&1 && break
-        sleep 3
-    done
-    docker exec -i openmetadata_postgresql psql -v ON_ERROR_STOP=1 -q -U postgres \
-        -v portal_password="${PORTAL_RO_PASSWORD:-portal_ro_password}" \
-        < "$SCRIPT_DIR/postgres-init/portal-read-only-role.sql"
 }
 
 run_server() {
@@ -114,7 +122,8 @@ run_server() {
     load_environment
     export SERVER_PORT="$1" SERVER_ADMIN_PORT="$2" OM_PORTAL_ENABLED="$3"
     if [ "$3" = true ]; then
-        use_portal_database_user
+        # The Portal never reaches the pipeline service: the server deploys the pipelines it changes
+        export PIPELINE_SERVICE_CLIENT_ENABLED=false
     fi
     export AUTHENTICATION_PUBLIC_KEYS="${AUTHENTICATION_PUBLIC_KEYS:-[http://localhost:$1/api/v1/system/config/jwks]}"
     run_java "$APP_CLASS" server "$CONFIG_FILE"
@@ -124,7 +133,6 @@ case "${1:-}" in
     infra)
         docker compose -f "$COMPOSE_FILE" stop openmetadata-server portal 2>/dev/null || true
         docker compose -f "$COMPOSE_FILE" up -d postgresql opensearch
-        apply_portal_role
         ;;
     compile)
         compile_backend
@@ -147,14 +155,21 @@ case "${1:-}" in
         ;;
     ui)
         cd "$UI_DIR"
+        export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
         exec yarn start
         ;;
     ui-portal)
         cd "$UI_DIR"
+        export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1024}"
         exec yarn start:portal
         ;;
+    ingestion)
+        # --no-deps: the OpenMetadata server runs on the host, not in Docker
+        docker compose -f "$COMPOSE_FILE" up -d --no-deps ingestion
+        echo "Airflow: http://localhost:8080 (admin/admin). Start the server with: WITH_INGESTION=true ./local-dev.sh server"
+        ;;
     *)
-        sed -n '2,18p' "$0"
+        sed -n '2,21p' "$0"
         exit 1
         ;;
 esac

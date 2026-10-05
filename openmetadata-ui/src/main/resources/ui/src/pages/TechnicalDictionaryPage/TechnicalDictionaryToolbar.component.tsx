@@ -103,6 +103,21 @@ const TechnicalDictionaryToolbar = ({
         onChange={(event) => onSearchText(event.target.value)}
       />
       <CDEFilterDropdown
+        dataTestId="technical-dictionary-filter-status"
+        label={t('label.status')}
+        options={[
+          { value: 'In Review', label: t('label.technical-in-review') },
+          { value: 'Approved', label: t('label.approved') },
+          { value: 'Rejected', label: t('label.rejected') },
+        ]}
+        selectedValues={filters.statuses}
+        onChange={(values) =>
+          onFilters({
+            statuses: withoutAll(values) as TechnicalDictionaryFilters['statuses'],
+          })
+        }
+      />
+      <CDEFilterDropdown
         dataTestId="technical-dictionary-filter-source"
         label={t('label.source')}
         options={options.services.map((service) => ({

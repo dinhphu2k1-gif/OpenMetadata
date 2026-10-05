@@ -21,6 +21,7 @@ import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
 import { Tag } from '../../generated/entity/classification/tag';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { TechnicalColumnCandidate } from '../../rest/technicalDictionaryAPI';
+import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 
@@ -35,7 +36,7 @@ export interface TechnicalRecordFormValues {
   systemOwnerId?: string;
 }
 
-export type TechnicalRecordModalMode = 'view' | 'edit' | 'create';
+export type TechnicalRecordModalMode = 'view' | 'edit' | 'create' | 'review';
 
 /** Lets `create` mode pick the physical Column to declare, inline in the same form. */
 export interface TechnicalColumnPickerProps {
@@ -59,6 +60,8 @@ interface TechnicalRecordModalProps {
   onSave: (values: TechnicalRecordFormValues) => void;
   /** Present when the caller may cancel the declaration of this record. */
   onDelete?: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
 }
 
 const tagSelectOptions = (tags: Tag[]) =>
@@ -86,17 +89,20 @@ const TechnicalRecordModal = ({
   onCancel,
   onSave,
   onDelete,
+  onApprove,
+  onReject,
 }: TechnicalRecordModalProps) => {
   const { t } = useTranslation();
   const [form] = Form.useForm<TechnicalRecordFormValues>();
   const [pendingCde, setPendingCde] = useState<GlossaryTerm | null>();
-  const isReadOnly = mode === 'view';
+  const isReadOnly = mode === 'view' || mode === 'review';
   const isCreate = mode === 'create';
   const isSaveDisabled = isSaving || (isCreate && !row);
   const titleKey = {
     view: 'label.view-technical-field',
     edit: 'label.edit-technical-field',
     create: 'label.add-column',
+    review: 'label.technical-review-record',
   }[mode];
 
   useEffect(() => {
@@ -167,7 +173,24 @@ const TechnicalRecordModal = ({
         <Button color="secondary" key="cancel-btn" onPress={onCancel}>
           {t(isReadOnly ? 'label.close' : 'label.cancel')}
         </Button>,
-        ...(isReadOnly
+        ...(mode === 'review'
+          ? [
+              <Button
+                color="primary-destructive"
+                data-testid="technical-record-reject"
+                key="reject-btn"
+                onPress={onReject}>
+                {t('label.reject')}
+              </Button>,
+              <Button
+                color="primary"
+                data-testid="technical-record-approve"
+                key="approve-btn"
+                onPress={onApprove}>
+                {t('label.approve')}
+              </Button>,
+            ]
+          : isReadOnly
           ? []
           : [
               <Button
@@ -177,7 +200,13 @@ const TechnicalRecordModal = ({
                 isLoading={isSaving}
                 key="save-btn"
                 onPress={handleOk}>
-                {t('label.save')}
+                {t(
+                  isCreate
+                    ? 'label.technical-send-for-approval'
+                    : row?.status === 'Rejected'
+                    ? 'label.technical-resubmit'
+                    : 'label.save'
+                )}
               </Button>,
             ]),
       ]}
@@ -280,6 +309,44 @@ const TechnicalRecordModal = ({
             label={t('label.description')}>
             <Input.TextArea autoSize disabled value={row?.description} />
           </Form.Item>
+          {row?.status && (
+            <Form.Item label={t('label.status')}>
+              <Input disabled value={t(
+                row.status === 'Approved'
+                  ? 'label.approved'
+                  : row.status === 'Rejected'
+                  ? 'label.rejected'
+                  : 'label.technical-in-review'
+              )} />
+            </Form.Item>
+          )}
+          {row?.submittedBy && (
+            <Form.Item label={t('label.submitted-by')}>
+              <Input disabled value={row.submittedBy} />
+            </Form.Item>
+          )}
+          {row?.submittedAt && (
+            <Form.Item label={t('label.submitted-on')}>
+              <Input disabled value={formatDateTime(row.submittedAt)} />
+            </Form.Item>
+          )}
+          {row?.reviewedBy && (
+            <Form.Item label={t('label.technical-reviewed-by')}>
+              <Input disabled value={row.reviewedBy} />
+            </Form.Item>
+          )}
+          {row?.reviewedAt && (
+            <Form.Item label={t('label.technical-reviewed-on')}>
+              <Input disabled value={formatDateTime(row.reviewedAt)} />
+            </Form.Item>
+          )}
+          {row?.reviewComment && (
+            <Form.Item
+              className="cde-form-field-full"
+              label={t('label.technical-rejection-reason')}>
+              <Input.TextArea autoSize disabled value={row.reviewComment} />
+            </Form.Item>
+          )}
         </GlossaryTermFormSection>
 
         <GlossaryTermFormSection

@@ -180,6 +180,14 @@ CREATE TABLE IF NOT EXISTS technical_record (
   updatedBy varchar(256) NOT NULL,
   CONSTRAINT uq_technical_record_column UNIQUE (columnKey)
 );
+-- Existing records were effective before maker-checker was introduced.
+ALTER TABLE technical_record
+  ADD COLUMN status varchar(16) NOT NULL DEFAULT 'Approved',
+  ADD COLUMN submittedAt bigint,
+  ADD COLUMN submittedBy varchar(256),
+  ADD COLUMN reviewedAt bigint,
+  ADD COLUMN reviewedBy varchar(256),
+  ADD COLUMN reviewComment text;
 CREATE INDEX IF NOT EXISTS idx_technical_record_cde_rank
   ON technical_record (cdeTermId, survivorshipRank);
 
@@ -223,3 +231,71 @@ CREATE TABLE IF NOT EXISTS technical_outbox (
   PRIMARY KEY (kind, subjectKey)
 );
 CREATE INDEX IF NOT EXISTS idx_technical_outbox_enqueued ON technical_outbox (enqueuedAt);
+
+-- Data Quality Rule test execution: Rule -> TestSuite/pipeline, declaration and Column bindings.
+CREATE TABLE IF NOT EXISTS dq_rule_exec (
+  ruleTermId varchar(36) PRIMARY KEY,
+  parentBusinessVersion varchar(16) NOT NULL,
+  ruleCode varchar(256) NOT NULL,
+  appliedBusinessVersion varchar(16),
+  appliedSpecsHash varchar(64),
+  cdeTermId varchar(36),
+  testSuiteId varchar(36),
+  pipelineId varchar(36),
+  scheduleCron varchar(128),
+  scheduleTimezone varchar(64),
+  scheduleUpdatedBy varchar(256),
+  scheduleUpdatedAt bigint,
+  revision bigint NOT NULL DEFAULT 1,
+  updatedAt bigint NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dq_rule_exec_cde ON dq_rule_exec (cdeTermId);
+
+CREATE TABLE IF NOT EXISTS dq_rule_test_spec_exec (
+  ruleTermId varchar(36) NOT NULL,
+  specKey varchar(16) NOT NULL,
+  name varchar(256) NOT NULL,
+  kind varchar(16) NOT NULL,
+  testDefinitionFqn varchar(512),
+  managedTestDefinitionId varchar(36),
+  appliedSpecHash varchar(64),
+  state varchar(16) NOT NULL,
+  retiredAt bigint,
+  updatedAt bigint NOT NULL,
+  PRIMARY KEY (ruleTermId, specKey)
+);
+
+CREATE TABLE IF NOT EXISTS dq_rule_test_binding (
+  id varchar(36) PRIMARY KEY,
+  ruleTermId varchar(36) NOT NULL,
+  specKey varchar(16) NOT NULL,
+  columnKey varchar(36) NOT NULL,
+  columnFqn text NOT NULL,
+  cdeTermId varchar(36),
+  testCaseId varchar(36),
+  testCaseFqn text,
+  state varchar(16) NOT NULL,
+  stateReason varchar(64),
+  lastError text,
+  attempts integer NOT NULL DEFAULT 0,
+  activatedAt bigint,
+  retiredAt bigint,
+  createdAt bigint NOT NULL,
+  updatedAt bigint NOT NULL,
+  CONSTRAINT uq_dq_rule_test_binding UNIQUE (ruleTermId, specKey, columnKey)
+);
+CREATE INDEX IF NOT EXISTS idx_dq_binding_cde_state ON dq_rule_test_binding (cdeTermId, state);
+CREATE INDEX IF NOT EXISTS idx_dq_binding_spec_state ON dq_rule_test_binding (ruleTermId, specKey, state);
+CREATE INDEX IF NOT EXISTS idx_dq_binding_column ON dq_rule_test_binding (columnKey);
+CREATE INDEX IF NOT EXISTS idx_dq_binding_test_case ON dq_rule_test_binding (testCaseId);
+
+CREATE TABLE IF NOT EXISTS dq_test_outbox (
+  kind varchar(24) NOT NULL,
+  subjectKey varchar(64) NOT NULL,
+  payload text,
+  enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  lastError text,
+  PRIMARY KEY (kind, subjectKey)
+);
+CREATE INDEX IF NOT EXISTS idx_dq_test_outbox_enqueued ON dq_test_outbox (enqueuedAt);

@@ -40,6 +40,7 @@ import org.openmetadata.schema.security.scim.ScimConfiguration;
 import org.openmetadata.schema.security.secrets.SecretsManagerConfiguration;
 import org.openmetadata.schema.service.configuration.elasticsearch.ElasticSearchConfiguration;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.config.AdminOnlyConfiguration;
 import org.openmetadata.service.config.BulkOperationConfiguration;
 import org.openmetadata.service.config.CacheConfiguration;
 import org.openmetadata.service.config.OMWebConfiguration;
@@ -219,6 +220,16 @@ public class OpenMetadataApplicationConfig extends Configuration {
 
   @JsonProperty("portal")
   private PortalConfiguration portalConfiguration = new PortalConfiguration();
+
+  @JsonProperty("adminOnly")
+  private AdminOnlyConfiguration adminOnlyConfiguration = new AdminOnlyConfiguration();
+
+  public AdminOnlyConfiguration getAdminOnlyConfiguration() {
+    if (adminOnlyConfiguration == null) {
+      adminOnlyConfiguration = new AdminOnlyConfiguration();
+    }
+    return adminOnlyConfiguration;
+  }
 
   public PortalConfiguration getPortalConfiguration() {
     if (portalConfiguration == null) {

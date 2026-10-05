@@ -15,6 +15,7 @@ import org.openmetadata.schema.type.Relationship;
 import org.openmetadata.schema.type.change.ChangeSource;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.CatalogExceptionMessage;
+import org.openmetadata.service.glossary.dq.DqManagedGuard;
 import org.openmetadata.service.resources.dqtests.TestDefinitionResource;
 import org.openmetadata.service.util.EntityUtil;
 import org.openmetadata.service.util.EntityUtil.RelationIncludes;
@@ -44,6 +45,7 @@ public class TestDefinitionRepository extends EntityRepository<TestDefinition> {
 
   @Override
   public void prepare(TestDefinition entity, boolean update) {
+    DqManagedGuard.requireNotManaged(entity);
     // validate test platforms
     if (CommonUtil.nullOrEmpty(entity.getTestPlatforms())) {
       throw new IllegalArgumentException("testPlatforms must not be empty");
@@ -111,6 +113,7 @@ public class TestDefinitionRepository extends EntityRepository<TestDefinition> {
 
   @Override
   protected void preDelete(TestDefinition entity, String deletedBy) {
+    DqManagedGuard.requireNotManaged(entity);
     // Prevent deletion of system test definitions
     if (entity.getProvider() == ProviderType.SYSTEM) {
       throw new BadRequestException(

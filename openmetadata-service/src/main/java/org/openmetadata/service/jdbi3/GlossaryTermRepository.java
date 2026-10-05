@@ -3191,8 +3191,7 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
             || subject.hasAnyRole("DATA_PROPOSER")
             || subject.hasAnyRole("Admin");
     return !elevated
-        && (subject.hasAnyRole("BASIC_CONSUMER")
-            || subject.hasAnyRole("DATA_CONSUMER"));
+        && (subject.hasAnyRole("BASIC_CONSUMER") || subject.hasAnyRole("DATA_CONSUMER"));
   }
 
   @Override

@@ -1,0 +1,90 @@
+{
+  "$id": "https://open-metadata.org/schema/type/dqTestSpecs.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DqTestSpecs",
+  "description": "Test declarations of a Data Quality Rule. Every item becomes one TestCase per Column of the Rule's CDE once the Rule is Approved.",
+  "type": "object",
+  "javaType": "org.openmetadata.schema.type.DqTestSpecs",
+  "definitions": {
+    "dqTestSpecKind": {
+      "description": "LIBRARY uses an existing column-level TestDefinition; SQL runs a Rule-owned query that returns the violating records.",
+      "javaType": "org.openmetadata.schema.type.DqTestSpecKind",
+      "type": "string",
+      "enum": ["LIBRARY", "SQL"]
+    },
+    "dqTestSpec": {
+      "description": "One test declaration of a Data Quality Rule.",
+      "javaType": "org.openmetadata.schema.type.DqTestSpec",
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "Server-issued identifier, stable within the Rule identity and never reused. Empty on a new declaration.",
+          "type": "string",
+          "pattern": "^t[1-9][0-9]*$"
+        },
+        "name": {
+          "description": "Display name, unique within the Rule (case-insensitive).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "$ref": "#/definitions/dqTestSpecKind"
+        },
+        "testDefinitionFqn": {
+          "description": "Fully qualified name of the column-level TestDefinition. Required for LIBRARY.",
+          "type": "string"
+        },
+        "sqlExpression": {
+          "description": "Jinja2 SELECT template returning the violating records, using {{ table_name }} and {{ column_name }}. Required for SQL.",
+          "type": "string"
+        },
+        "parameterValues": {
+          "description": "Values of the TestDefinition parameters (LIBRARY) or of extra template variables (SQL).",
+          "type": "array",
+          "items": {
+            "$ref": "../tests/testCase.json#/definitions/testCaseParameterValue"
+          },
+          "default": []
+        },
+        "computePassedFailedRowCount": {
+          "description": "Compute passed and failed row counts so that percentage thresholds can be evaluated.",
+          "type": "boolean",
+          "default": false
+        },
+        "threshold": {
+          "description": "Threshold of this declaration. When empty the quality threshold of the Rule applies.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "scheduleCron": {
+          "description": "Five-field cron expression that runs the testcases of this declaration. Empty means the declaration only runs on demand.",
+          "type": "string",
+          "maxLength": 128
+        },
+        "scheduleTimezone": {
+          "description": "IANA time zone of the schedule. Defaults to Asia/Ho_Chi_Minh.",
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["name", "kind"],
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "default": 1
+    },
+    "items": {
+      "description": "Declarations in display order. An empty list means the Rule only describes a requirement.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/dqTestSpec"
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false
+}

@@ -78,6 +78,12 @@ public final class TechnicalDocumentBuilder {
     putSource(row, record);
     row.put(TechnicalIndexFields.DATA_DICTIONARY_VERSION, dataDictionaryVersion);
     row.put(TechnicalIndexFields.REVISION, record.revision());
+    row.put(TechnicalIndexFields.STATUS, record.status());
+    putIfPresent(row, TechnicalIndexFields.SUBMITTED_AT, record.submittedAt());
+    putIfPresent(row, TechnicalIndexFields.SUBMITTED_BY, record.submittedBy());
+    putIfPresent(row, TechnicalIndexFields.REVIEWED_AT, record.reviewedAt());
+    putIfPresent(row, TechnicalIndexFields.REVIEWED_BY, record.reviewedBy());
+    putIfPresent(row, TechnicalIndexFields.REVIEW_COMMENT, record.reviewComment());
     putCde(row, record, dataDictionaryVersion);
     putIfPresent(row, TechnicalIndexFields.RANK, record.rank());
     putTag(row, TechnicalIndexFields.ELEMENT_TYPE, record.elementType());

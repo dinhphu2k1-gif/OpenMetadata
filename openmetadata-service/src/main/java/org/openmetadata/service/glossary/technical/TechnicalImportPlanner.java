@@ -25,7 +25,8 @@ import org.openmetadata.service.glossary.technical.TechnicalImportPlan.RowPatch;
 /**
  * Turns a parsed import sheet into row plans. Rows are matched to declared records by source
  * location, or declare the Column when it has no record yet; only columns present in the file are
- * applied, an empty cell clears the value, and ranks are checked on the final state of the file.
+ * applied, an empty cell clears the value, and ranks are checked on the final effective state of
+ * approved records. Pending records are checked again if they are approved later.
  */
 public final class TechnicalImportPlanner {
   public static final String DATABASE = "Tên cơ sở dữ liệu";
@@ -100,7 +101,7 @@ public final class TechnicalImportPlanner {
   }
 
   /** A planned row with the final values it leaves behind, needed by the rank check. */
-  record Planned(PlannedRow row, TechnicalRecordValues finalValues) {}
+  record Planned(PlannedRow row, TechnicalRecordValues finalValues, boolean effective) {}
 
   private Planned planRow(TechnicalImportSheet.Row row, Map<String, Integer> firstSeen) {
     final String location = locationOf(row);
@@ -239,7 +240,11 @@ public final class TechnicalImportPlanner {
               invalid.substring(invalid.indexOf('|') + 1)));
       result = failed(row, location, errors);
     } else {
-      result = new Planned(planned(row, location, target, patch, current, merged), merged);
+      result =
+          new Planned(
+              planned(row, location, target, patch, current, merged),
+              merged,
+              target.record() != null && target.record().isApproved());
     }
     return result;
   }
@@ -293,7 +298,8 @@ public final class TechnicalImportPlanner {
             null,
             errors,
             new ArrayList<>()),
-        TechnicalRecordValues.EMPTY);
+        TechnicalRecordValues.EMPTY,
+        false);
   }
 
   private static ImportError error(
@@ -325,8 +331,9 @@ public final class TechnicalImportPlanner {
   }
 
   /**
-   * A rank of a CDE may be held by one record only. The check is made on the state the file leaves
-   * behind, so two records can swap ranks in one import.
+   * A rank of a CDE may be held by one approved record only. The check is made on the effective
+   * state the file leaves behind, so two approved records can swap ranks in one import while new or
+   * resubmitted records wait for their approval-time check.
    */
   private static final class RankCheck {
     private final List<Planned> planned;
@@ -353,7 +360,7 @@ public final class TechnicalImportPlanner {
     private PlannedRow check(Planned item, Map<String, Integer> firstRowOfRank) {
       final String key = rankKey(item.finalValues());
       PlannedRow row = item.row();
-      if (key != null && !row.hasErrors()) {
+      if (item.effective() && key != null && !row.hasErrors()) {
         final Integer earlier = firstRowOfRank.putIfAbsent(key, row.rowNumber());
         final String conflict =
             earlier == null ? holderConflict(item) : "dòng " + earlier + " của file";

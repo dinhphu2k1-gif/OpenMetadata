@@ -34,6 +34,7 @@ import {
   getEditIngestionPath,
   getTestSuiteIngestionPath,
 } from '../../../../../../utils/RouterUtils';
+import { IS_PORTAL_MODE } from '../../../../../../utils/PortalMode';
 import { getTestSuiteFQN } from '../../../../../../utils/TestSuiteUtils';
 import KillIngestionModal from '../../../../../Modals/KillIngestionPipelineModal/KillIngestionPipelineModal';
 import './pipeline-actions-dropdown.less';
@@ -221,7 +222,8 @@ function PipelineActionsDropdown({
       },
       {
         label: t('label.kill'),
-        hidden: !editPermission,
+        // The Portal cannot reach the pipeline service, which stops the runs
+        hidden: !editPermission || IS_PORTAL_MODE,
         icon: <KillIcon height={12} width={12} />,
         onClick: () => {
           setIsKillModalOpen(true);

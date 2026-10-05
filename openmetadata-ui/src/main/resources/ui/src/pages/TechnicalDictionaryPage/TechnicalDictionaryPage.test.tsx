@@ -12,8 +12,10 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
+  approveTechnicalRecord,
   deleteTechnicalRecord,
   exportTechnicalSnapshot,
+  rejectTechnicalRecord,
   updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast } from '../../utils/ToastUtils';
@@ -26,6 +28,8 @@ const ROW = {
   key: 'term-1',
   termId: 'term-1',
   revision: 3,
+  status: 'Approved',
+  createdBy: 'maker',
   columnName: 'NAME',
   columnFqn: 'ipcas.core.dbo.CUSTOMER.NAME',
   description: 'Tên khách hàng',
@@ -45,6 +49,7 @@ const mockContextState = {
   capabilities: {
     canView: true,
     canEdit: true,
+    canApprove: true,
     canImport: true,
     canExport: true,
   },
@@ -60,6 +65,10 @@ jest.mock('react-router-dom', () => ({
 
 jest.mock('../../hooks/authHooks', () => ({
   useAuth: () => ({ isAdminUser: false }),
+}));
+jest.mock('../../hooks/useApplicationStore', () => ({
+  useApplicationStore: (selector: (state: any) => unknown) =>
+    selector({ currentUser: { name: 'checker' } }),
 }));
 jest.mock('../../hooks/useTechnicalDictionaryContext', () => ({
   useTechnicalDictionaryContext: () => mockContextState,
@@ -94,6 +103,7 @@ jest.mock('../../hooks/useTechnicalDictionaryRecords', () => ({
 }));
 jest.mock('../../rest/technicalDictionaryAPI', () => ({
   deleteTechnicalRecord: jest.fn().mockResolvedValue(undefined),
+  approveTechnicalRecord: jest.fn().mockResolvedValue({}),
   exportTechnicalDictionary: jest.fn(),
   exportTechnicalSnapshot: jest
     .fn()
@@ -105,6 +115,7 @@ jest.mock('../../rest/technicalDictionaryAPI', () => ({
     mapped: 1,
   }),
   rebuildTechnicalIndex: jest.fn(),
+  rejectTechnicalRecord: jest.fn().mockResolvedValue({}),
   updateTechnicalRecord: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('../../utils/ToastUtils', () => ({
@@ -146,17 +157,23 @@ jest.mock('./TechnicalDictionaryTable.component', () => ({
     onEdit,
     onDelete,
     onView,
+    onApprove,
+    onReject,
     rows,
   }: {
     rows: TechnicalDictionaryRow[];
     onEdit: (row: TechnicalDictionaryRow) => void;
     onView: (row: TechnicalDictionaryRow) => void;
     onDelete: (row: TechnicalDictionaryRow) => void;
+    onApprove: (row: TechnicalDictionaryRow) => void;
+    onReject: (row: TechnicalDictionaryRow) => void;
   }) => (
     <div data-testid="table">
       <button onClick={() => onEdit(rows[0])}>edit</button>
       <button onClick={() => onView(rows[0])}>view</button>
       <button onClick={() => onDelete(rows[0])}>delete</button>
+      <button onClick={() => onApprove(rows[0])}>approve-row</button>
+      <button onClick={() => onReject(rows[0])}>reject-row</button>
     </div>
   ),
 }));
@@ -172,10 +189,14 @@ jest.mock('./TechnicalRecordModal.component', () => ({
     open,
     onSave,
     mode,
+    onApprove,
+    onReject,
   }: {
     open: boolean;
     mode: string;
     onSave: (values: unknown) => void;
+    onApprove?: () => void;
+    onReject?: () => void;
   }) =>
     open ? (
       <div data-testid={`record-modal-${mode}`}>
@@ -190,6 +211,8 @@ jest.mock('./TechnicalRecordModal.component', () => ({
           save
         </button>
         <button onClick={() => onSave({ cde: null })}>clear-cde</button>
+        {onApprove && <button onClick={onApprove}>approve-modal</button>}
+        {onReject && <button onClick={onReject}>reject-modal</button>}
       </div>
     ) : null,
 }));
@@ -215,6 +238,9 @@ describe('TechnicalDictionaryPage', () => {
     mockContextState.context.dataDictionaryVersion = '2';
     mockContextState.context.resetAt = undefined;
     mockContextState.capabilities.canEdit = true;
+    mockContextState.capabilities.canApprove = true;
+    ROW.status = 'Approved';
+    ROW.createdBy = 'maker';
   });
 
   it('shows an error result instead of a table when the context cannot be loaded', () => {
@@ -240,7 +266,7 @@ describe('TechnicalDictionaryPage', () => {
     expect(screen.queryByTestId('table')).not.toBeInTheDocument();
   });
 
-  it('saves the edited values with the revision that was read, without a workflow', async () => {
+  it('saves approved-record edits immediately with the revision that was read', async () => {
     render(<TechnicalDictionaryPage isEmbedded />);
 
     fireEvent.click(screen.getByText('edit'));
@@ -288,6 +314,40 @@ describe('TechnicalDictionaryPage', () => {
     );
 
     expect(mockReloadRecords).toHaveBeenCalled();
+  });
+
+  it('approves an in-review record with the revision that was displayed', async () => {
+    ROW.status = 'In Review';
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('approve-row'));
+    fireEvent.click(screen.getByText('approve-modal'));
+    fireEvent.click(
+      screen.getByTestId('confirmation').querySelector('button') as Element
+    );
+
+    await waitFor(() =>
+      expect(approveTechnicalRecord).toHaveBeenCalledWith('term-1', 3)
+    );
+  });
+
+  it('requires and sends a rejection reason', async () => {
+    ROW.status = 'In Review';
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('reject-row'));
+    fireEvent.change(screen.getByTestId('technical-rejection-comment'), {
+      target: { value: 'Missing evidence' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'label.reject' }));
+
+    await waitFor(() =>
+      expect(rejectTechnicalRecord).toHaveBeenCalledWith(
+        'term-1',
+        3,
+        'Missing evidence'
+      )
+    );
   });
 
   it('reloads the list and explains a revision conflict', async () => {

@@ -28,6 +28,7 @@ import org.glassfish.jersey.media.multipart.FormDataParam;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
 import org.openmetadata.service.glossary.technical.TechnicalImportCommitter;
+import org.openmetadata.service.glossary.technical.TechnicalImportCommitter.CommitResult;
 import org.openmetadata.service.glossary.technical.TechnicalImportLookupsImpl;
 import org.openmetadata.service.glossary.technical.TechnicalImportService;
 import org.openmetadata.service.glossary.technical.TechnicalImportService.PreviewScope;
@@ -111,18 +112,20 @@ public class TechnicalDictionaryImportResource {
         actor,
         session -> {
           access.requireEdit(securityContext);
-          final int committed =
+          final CommitResult result =
               committer.commit(session.dataDictionaryVersion(), session.rows(), actor);
           LOG.info(
               "Technical Dictionary import committed actor={} importSessionId={} dataDictionaryVersion={} rows={} fileHash={}",
               actor,
               importSessionId,
               session.dataDictionaryVersion(),
-              committed,
+              result.committed(),
               session.fileHash());
           return Map.of(
               "importSessionId", importSessionId,
-              "committed", committed,
+              "committed", result.committed(),
+              "pendingApproval", result.pendingApproval(),
+              "updated", result.updated(),
               "dataDictionaryVersion", session.dataDictionaryVersion());
         });
   }

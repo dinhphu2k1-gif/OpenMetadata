@@ -76,11 +76,32 @@ import { EntityDetailsObjectInterface } from '../../Explore/ExplorePage.interfac
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
+import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
+import DQCdeTestResults from '../DQRuleTests/DQCdeTestResults.component';
+import DQRuleTestResults from '../DQRuleTests/DQRuleTestResults.component';
+import DQTestSpecsCard from '../DQRuleTests/DQTestSpecsCard.component';
+import { useDqTestSpecEditor } from '../DQRuleTests/useDqTestSpecEditor';
 import DQGlossaryTermOverview from './DQGlossaryTermOverview';
 import { GlossaryTermsV1Props } from './GlossaryTermsV1.interface';
 import { AssetsTabRef } from './tabs/AssetsTabs.component';
 import CDETechnicalAssetsTab from './tabs/CDETechnicalAssetsTab.component';
 import { AssetsOfEntity } from './tabs/AssetsTabs.interface';
+
+/**
+ * The stock Data Observability tab lists native testcases tagged with the term; for a Data Quality
+ * Rule and a CDE it is replaced by the governed results. The version view has no stock tab.
+ */
+const withResultTab = <T extends { key?: string }>(
+  tabs: T[],
+  resultTab: T
+): T[] =>
+  tabs.some((tab) => tab.key === EntityTabs.DATA_OBSERVABILITY)
+    ? tabs.map((tab) =>
+        tab.key === EntityTabs.DATA_OBSERVABILITY
+          ? { ...tab, ...resultTab }
+          : tab
+      )
+    : [...tabs, resultTab];
 
 export const CDE_RESTRICTED_TABS = new Set([
   EntityTabs.GLOSSARY_TERMS,
@@ -114,23 +135,23 @@ const GlossaryTermsV1 = ({
         pathname: location.pathname,
         search: location.search,
       }),
-    [glossaryFqn, location.pathname, location.search],
+    [glossaryFqn, location.pathname, location.search]
   );
   const { businessVersion, parentBusinessVersion } = cdeRoute;
   const assetTabRef = useRef<AssetsTabRef>(null);
   const [assetModalVisible, setAssetModalVisible] = useState(false);
   const [feedCount, setFeedCount] = useState<FeedCounts>(
-    FEED_COUNT_INITIAL_DATA,
+    FEED_COUNT_INITIAL_DATA
   );
   const [assetCount, setAssetCount] = useState<number>(0);
   const [previewAsset, setPreviewAsset] =
     useState<EntityDetailsObjectInterface>();
-  const { onAddGlossaryTerm } = useGlossaryStore();
+  const { onAddGlossaryTerm, requestCreateDraft } = useGlossaryStore();
   const { permissions } = useGenericContext<GlossaryTerm>();
   const { customizedPage, isLoading } = useCustomPages(PageType.GlossaryTerm);
   const customizedTabs = useMemo(() => {
     const tabs = customizedPage?.tabs?.filter(
-      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH,
+      (tab) => tab.id !== EntityTabs.RELATIONS_GRAPH
     );
 
     return tabs?.length ? tabs : undefined;
@@ -142,8 +163,8 @@ const GlossaryTermsV1 = ({
     () =>
       viewedVersion
         ? { ...viewedVersion, changeDescription: undefined }
-        : (transitionedWorking ?? currentGlossaryTerm),
-    [viewedVersion, transitionedWorking, currentGlossaryTerm],
+        : transitionedWorking ?? currentGlossaryTerm,
+    [viewedVersion, transitionedWorking, currentGlossaryTerm]
   );
   useEffect(() => {
     if (
@@ -160,17 +181,17 @@ const GlossaryTermsV1 = ({
   const handleVersionSelect = useCallback(
     (snapshot: GlossaryTerm) => {
       const snapshotBusinessVersion = getBusinessVersion(
-        snapshot.businessVersion,
+        snapshot.businessVersion
       );
       const currentBusinessVersion = getBusinessVersion(
-        currentGlossaryTerm.businessVersion,
+        currentGlossaryTerm.businessVersion
       );
       const isLatestVersion =
         snapshot.id === currentGlossaryTerm.id &&
         snapshot.version === currentGlossaryTerm.version &&
         compareBusinessVersions(
           snapshotBusinessVersion,
-          currentBusinessVersion,
+          currentBusinessVersion
         ) === 0;
       if (isLatestVersion) {
         setViewedVersion(null);
@@ -182,7 +203,7 @@ const GlossaryTermsV1 = ({
         const dataQualityTerm = isDataQualityGlossary(
           glossaryFqn,
           currentGlossaryTerm.glossary?.name,
-          currentGlossaryTerm.glossary?.displayName,
+          currentGlossaryTerm.glossary?.displayName
         );
         navigate(
           dataQualityTerm
@@ -192,13 +213,12 @@ const GlossaryTermsV1 = ({
                     currentGlossaryTerm.fullyQualifiedName ??
                     glossaryFqn ??
                     currentGlossaryTerm.name,
-                  parentBusinessVersion,
+                  parentBusinessVersion
                 ),
                 businessVersion: snapshotBusinessVersion,
                 parentBusinessVersion,
                 termId: snapshot.id ?? currentGlossaryTerm.id,
-                isWorkingDraft:
-                  snapshot.entityStatus !== EntityStatus.Approved,
+                isWorkingDraft: snapshot.entityStatus !== EntityStatus.Approved,
               })
             : getCdeDetailPath({
                 fqn: getScopedCdeFqn(
@@ -206,14 +226,13 @@ const GlossaryTermsV1 = ({
                     currentGlossaryTerm.fullyQualifiedName ||
                     snapshot.fullyQualifiedName ||
                     currentGlossaryTerm.name,
-                  parentBusinessVersion,
+                  parentBusinessVersion
                 ),
                 businessVersion: snapshotBusinessVersion,
                 parentBusinessVersion,
                 termId: snapshot.id ?? currentGlossaryTerm.id,
-                isWorkingDraft:
-                  snapshot.entityStatus !== EntityStatus.Approved,
-              }),
+                isWorkingDraft: snapshot.entityStatus !== EntityStatus.Approved,
+              })
         );
       } else {
         const searchParams = new URLSearchParams(location.search);
@@ -231,7 +250,7 @@ const GlossaryTermsV1 = ({
       location.search,
       navigate,
       parentBusinessVersion,
-    ],
+    ]
   );
 
   useEffect(() => {
@@ -239,7 +258,7 @@ const GlossaryTermsV1 = ({
     setViewedVersion(null);
     if (businessVersion) {
       const currentVer = getBusinessVersion(
-        currentGlossaryTerm.businessVersion,
+        currentGlossaryTerm.businessVersion
       );
 
       if (compareBusinessVersions(currentVer, businessVersion) === 0) {
@@ -293,7 +312,7 @@ const GlossaryTermsV1 = ({
           const approvedVersions = versions.filter(
             (item) =>
               String(item.entityStatus ?? 'Approved').toLowerCase() ===
-              'approved',
+              'approved'
           );
           if (approvedVersions.length > 0) {
             candidate1_0 = approvedVersions[approvedVersions.length - 1];
@@ -345,10 +364,10 @@ const GlossaryTermsV1 = ({
             : getGlossaryTermDetailsPath(glossaryFqn, tab),
           ...(location.search ? { search: location.search } : {}),
         },
-        { replace: true },
+        { replace: true }
       );
     },
-    [glossaryFqn, location.search, navigate, version],
+    [glossaryFqn, location.search, navigate, version]
   );
 
   const isCDEGlossaryTerm = useMemo(
@@ -356,20 +375,34 @@ const GlossaryTermsV1 = ({
       isDataDictionaryGlossary(
         glossaryTerm.fullyQualifiedName,
         glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName,
+        glossaryTerm.glossary?.displayName
       ),
-    [glossaryTerm],
+    [glossaryTerm]
   );
+
+  const { config: dqTestConfig } = useDqTestConfig();
+
+  const isWorkingCopy = glossaryTerm.workingRevision != null;
+  const testSpecEditor = useDqTestSpecEditor({
+    glossaryTerm,
+    onUpdate: handleGlossaryTermUpdate,
+  });
 
   const isDQGlossaryTerm = useMemo(
     () =>
       isDataQualityGlossary(
         glossaryTerm.fullyQualifiedName,
         glossaryTerm.glossary?.name,
-        glossaryTerm.glossary?.displayName,
+        glossaryTerm.glossary?.displayName
       ),
-    [glossaryTerm],
+    [glossaryTerm]
   );
+
+  const canEditTestSpecs =
+    isDQGlossaryTerm &&
+    isWorkingCopy &&
+    !isViewingVersion &&
+    Boolean(dqTestConfig?.capabilities?.canEdit);
 
   useEffect(() => {
     if (activeTab === EntityTabs.RELATIONS_GRAPH) {
@@ -385,12 +418,7 @@ const GlossaryTermsV1 = ({
     ) {
       activeTabHandler(EntityTabs.OVERVIEW);
     }
-  }, [
-    isCDEGlossaryTerm,
-    isDQGlossaryTerm,
-    activeTab,
-    activeTabHandler,
-  ]);
+  }, [isCDEGlossaryTerm, isDQGlossaryTerm, activeTab, activeTabHandler]);
 
   const handleFeedCount = useCallback((data: FeedCounts) => {
     setFeedCount(data);
@@ -400,7 +428,7 @@ const GlossaryTermsV1 = ({
     getFeedCounts(
       EntityType.GLOSSARY_TERM,
       glossaryTerm.fullyQualifiedName ?? '',
-      handleFeedCount,
+      handleFeedCount
     );
   };
 
@@ -440,12 +468,12 @@ const GlossaryTermsV1 = ({
       setPreviewAsset(asset);
       onAssetClick?.(asset);
     },
-    [onAssetClick],
+    [onAssetClick]
   );
 
   const viewCustomPropertiesPermission = useMemo(
     () => getPrioritizedViewPermission(permissions, Operation.ViewCustomFields),
-    [permissions],
+    [permissions]
   );
 
   const tabItems = useMemo(() => {
@@ -475,7 +503,7 @@ const GlossaryTermsV1 = ({
       items,
       customizedTabs,
       EntityTabs.OVERVIEW,
-      isViewingVersion,
+      isViewingVersion
     );
 
     if (isDQGlossaryTerm) {
@@ -485,11 +513,50 @@ const GlossaryTermsV1 = ({
               ...tab,
               children: <DQGlossaryTermOverview glossaryTerm={glossaryTerm} />,
             }
-          : tab,
+          : tab
       );
 
-      return dqTabs.filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
+      const resultTab = {
+        label: (
+          <div data-testid="dq-test-results-tab">
+            {t('dq.test.results-tab')}
+          </div>
+        ),
+        key: EntityTabs.DATA_OBSERVABILITY,
+        children: (
+          <div className="dq-tests-tab" data-testid="dq-tests-tab">
+            <DQTestSpecsCard
+              actions={
+                canEditTestSpecs
+                  ? {
+                      onAdd: testSpecEditor.openAdd,
+                      onEdit: testSpecEditor.openEdit,
+                      onRemove: testSpecEditor.remove,
+                    }
+                  : undefined
+              }
+              ruleThreshold={glossaryTerm.extension?.qualityThreshold}
+              specs={glossaryTerm.dataQualityTestSpecs}
+            />
+            <DQRuleTestResults
+              capabilities={dqTestConfig?.capabilities}
+              declareAction={
+                isWorkingCopy
+                  ? undefined
+                  : {
+                      label: t('dq.test.declare-new-version'),
+                      hint: t('dq.test.declare-hint-approved'),
+                      onClick: requestCreateDraft,
+                    }
+              }
+              ruleId={glossaryTerm.id}
+            />
+          </div>
+        ),
+      } as (typeof dqTabs)[number];
+
+      return withResultTab(dqTabs, resultTab).filter(
+        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
       );
     }
 
@@ -500,7 +567,7 @@ const GlossaryTermsV1 = ({
               ...tab,
               children: <CDEGlossaryTermOverview glossaryTerm={glossaryTerm} />,
             }
-          : tab,
+          : tab
       );
 
       // The stock tab list has no Assets tab for a version view, and the tag search behind it finds
@@ -526,8 +593,23 @@ const GlossaryTermsV1 = ({
         } as (typeof cdeTabs)[number]);
       }
 
-      return cdeTabs.filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs),
+      const cdeResultTab = {
+        label: (
+          <div data-testid="dq-cde-results-tab">
+            {t('dq.test.data-quality-tab')}
+          </div>
+        ),
+        key: EntityTabs.DATA_OBSERVABILITY,
+        children: (
+          <DQCdeTestResults
+            capabilities={dqTestConfig?.capabilities}
+            cdeId={glossaryTerm.id}
+          />
+        ),
+      } as (typeof cdeTabs)[number];
+
+      return withResultTab(cdeTabs, cdeResultTab).filter(
+        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
       );
     }
 
@@ -548,6 +630,11 @@ const GlossaryTermsV1 = ({
     handleAssetClick,
     isCDEGlossaryTerm,
     isDQGlossaryTerm,
+    dqTestConfig,
+    isWorkingCopy,
+    canEditTestSpecs,
+    testSpecEditor,
+    requestCreateDraft,
   ]);
 
   useEffect(() => {
@@ -562,19 +649,14 @@ const GlossaryTermsV1 = ({
     if (!isVersionView && !isCDEGlossaryTerm && !isDQGlossaryTerm) {
       getEntityFeedCount();
     }
-  }, [
-    glossaryFqn,
-    isVersionView,
-    isCDEGlossaryTerm,
-    isDQGlossaryTerm,
-  ]);
+  }, [glossaryFqn, isVersionView, isCDEGlossaryTerm, isDQGlossaryTerm]);
 
   const updatedGlossaryTerm = useMemo(() => {
     const name = isViewingVersion
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.NAME,
-          glossaryTerm.name,
+          glossaryTerm.name
         )
       : glossaryTerm.name;
 
@@ -582,7 +664,7 @@ const GlossaryTermsV1 = ({
       ? getEntityVersionByField(
           glossaryTerm.changeDescription as ChangeDescription,
           EntityField.DISPLAYNAME,
-          glossaryTerm.displayName,
+          glossaryTerm.displayName
         )
       : glossaryTerm.displayName;
 
@@ -597,8 +679,7 @@ const GlossaryTermsV1 = ({
     const isReadOnlyWorkflowState =
       glossaryTerm.entityStatus === EntityStatus.InReview ||
       glossaryTerm.entityStatus === EntityStatus.Rejected ||
-      (isDQGlossaryTerm &&
-        glossaryTerm.entityStatus !== EntityStatus.Draft);
+      (isDQGlossaryTerm && glossaryTerm.entityStatus !== EntityStatus.Draft);
 
     if (!isReadOnlyWorkflowState) {
       return permissions;
@@ -619,7 +700,7 @@ const GlossaryTermsV1 = ({
   const isExpandViewSupported = useMemo(
     () =>
       checkIfExpandViewSupported(tabItems[0], activeTab, PageType.GlossaryTerm),
-    [tabItems[0], activeTab],
+    [tabItems[0], activeTab]
   );
 
   if (isLoading) {
@@ -677,7 +758,7 @@ const GlossaryTermsV1 = ({
                     glossaryTerm.fullyQualifiedName ??
                     glossaryFqn,
                   businessVersion: getBusinessVersion(
-                    updatedTerm.businessVersion,
+                    updatedTerm.businessVersion
                   ),
                   parentBusinessVersion,
                   termId: updatedTerm.id,
@@ -692,11 +773,11 @@ const GlossaryTermsV1 = ({
                         ...target,
                         fqn: getScopedGovernedTermFqn(
                           target.fqn,
-                          parentBusinessVersion,
+                          parentBusinessVersion
                         ),
                       })
                     : getCdeDetailPath(target),
-                  { replace: true },
+                  { replace: true }
                 );
               }
               if (action !== 'createDraft') {
@@ -735,13 +816,14 @@ const GlossaryTermsV1 = ({
           entityFqn={glossaryTerm.fullyQualifiedName}
           open={assetModalVisible}
           queryFilter={getQueryFilterToExcludeTerm(
-            glossaryTerm.fullyQualifiedName,
+            glossaryTerm.fullyQualifiedName
           )}
           type={AssetsOfEntity.GLOSSARY}
           onCancel={() => setAssetModalVisible(false)}
           onSave={handleAssetSave}
         />
       )}
+      {testSpecEditor.modal}
     </GenericProvider>
   );
 };

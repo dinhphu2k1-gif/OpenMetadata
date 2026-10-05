@@ -132,6 +132,8 @@ const TechnicalImportPage = () => {
   const [validatedRows, setValidatedRows] = useState<GridRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [committed, setCommitted] = useState(0);
+  const [pendingApproval, setPendingApproval] = useState(0);
+  const [updated, setUpdated] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -204,6 +206,8 @@ const TechnicalImportPage = () => {
     setValidatedRows([]);
     setStatusFilter('all');
     setCommitted(0);
+    setPendingApproval(0);
+    setUpdated(0);
     setIsCompleted(false);
   };
 
@@ -280,6 +284,8 @@ const TechnicalImportPage = () => {
     try {
       const result = await commitTechnicalImport(preview.importSessionId);
       setCommitted(result.committed);
+      setPendingApproval(result.pendingApproval);
+      setUpdated(result.updated);
       setIsCompleted(true);
     } catch (error) {
       showErrorToast(error as AxiosError);
@@ -584,6 +590,10 @@ const TechnicalImportPage = () => {
                   </Button>,
                 ]}
                 status="success"
+                subTitle={t('message.technical-import-result-detail', {
+                  pending: pendingApproval,
+                  updated,
+                })}
                 title={t('message.technical-import-committed', {
                   count: committed,
                 })}

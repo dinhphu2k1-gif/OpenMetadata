@@ -81,6 +81,8 @@ import org.openmetadata.sdk.exception.PipelineServiceClientException;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.OpenMetadataApplicationConfig;
 import org.openmetadata.service.clients.pipeline.PipelineServiceClientFactory;
+import org.openmetadata.service.config.PortalConfiguration;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.jdbi3.IngestionPipelineRepository;
 import org.openmetadata.service.jdbi3.ListFilter;
 import org.openmetadata.service.limits.Limits;
@@ -772,6 +774,9 @@ public class IngestionPipelineResource
       @Context SecurityContext securityContext) {
     Fields fields = getFields(FIELD_OWNERS);
     IngestionPipeline pipeline = repository.get(uriInfo, id, fields);
+    if (PortalConfiguration.isActive()) {
+      return toggleOnPortal(uriInfo, securityContext, pipeline);
+    }
     // This call updates the state in Airflow as well as the `enabled` field on the
     // IngestionPipeline
     if (pipelineServiceClient == null) {
@@ -854,6 +859,9 @@ public class IngestionPipelineResource
       })
   public PipelineServiceClientResponse getRESTStatus(
       @Context UriInfo uriInfo, @Context SecurityContext securityContext) {
+    if (PortalConfiguration.isActive()) {
+      return queued("Pipelines are deployed by the OpenMetadata server");
+    }
     if (pipelineServiceClient == null) {
       return new PipelineServiceClientResponse()
           .withCode(200)
@@ -1302,6 +1310,17 @@ public class IngestionPipelineResource
     return addHref(uriInfo, ingestionPipeline);
   }
 
+  /** Switches the stored state; the OpenMetadata server then applies it to the pipeline service. */
+  private Response toggleOnPortal(
+      UriInfo uriInfo, SecurityContext securityContext, IngestionPipeline pipeline) {
+    decryptOrNullify(securityContext, pipeline, true);
+    pipeline.setEnabled(!Boolean.TRUE.equals(pipeline.getEnabled()));
+    Response response = createOrUpdate(uriInfo, securityContext, pipeline);
+    DqTestOutbox.enqueueIngestionPipelineSync(pipeline.getId(), pipeline.getName());
+    decryptOrNullify(securityContext, (IngestionPipeline) response.getEntity(), false);
+    return response;
+  }
+
   private void unmask(IngestionPipeline ingestionPipeline) {
     repository.setFullyQualifiedName(ingestionPipeline);
     IngestionPipeline originalIngestionPipeline =
@@ -1310,8 +1329,29 @@ public class IngestionPipelineResource
         .unmaskIngestionPipeline(ingestionPipeline, originalIngestionPipeline);
   }
 
+  /**
+   * The Portal cannot reach the pipeline service. The deployment is queued and the OpenMetadata
+   * server carries it out, which also applies the schedule the pipeline holds.
+   */
+  private PipelineServiceClientResponse queueDeployment(UUID id, SecurityContext securityContext) {
+    authorizer.authorize(
+        securityContext,
+        new OperationContext(entityType, MetadataOperation.DEPLOY),
+        getResourceContextById(id));
+    final IngestionPipeline pipeline = repository.find(id, Include.NON_DELETED);
+    DqTestOutbox.enqueueIngestionPipelineSync(pipeline.getId(), pipeline.getName());
+    return queued("The deployment is queued; the OpenMetadata server deploys the pipeline");
+  }
+
+  private PipelineServiceClientResponse queued(String reason) {
+    return new PipelineServiceClientResponse().withCode(200).withReason(reason);
+  }
+
   private PipelineServiceClientResponse deployPipelineInternal(
       UUID id, UriInfo uriInfo, SecurityContext securityContext) {
+    if (PortalConfiguration.isActive()) {
+      return queueDeployment(id, securityContext);
+    }
     if (pipelineServiceClient == null) {
       return new PipelineServiceClientResponse()
           .withCode(200)
@@ -1343,6 +1383,10 @@ public class IngestionPipelineResource
       UUID id, UriInfo uriInfo, SecurityContext securityContext, String botName) {
     OperationContext operationContext = new OperationContext(entityType, MetadataOperation.TRIGGER);
     authorizer.authorize(securityContext, operationContext, getResourceContextById(id));
+    if (PortalConfiguration.isActive()) {
+      DqTestOutbox.enqueueIngestionPipelineTrigger(id);
+      return queued("The run is queued; the OpenMetadata server starts it");
+    }
     if (pipelineServiceClient == null) {
       return new PipelineServiceClientResponse()
           .withCode(200)

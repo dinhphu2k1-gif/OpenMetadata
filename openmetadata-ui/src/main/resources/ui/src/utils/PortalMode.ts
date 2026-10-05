@@ -12,8 +12,9 @@
  */
 
 /**
- * The Portal is this same UI built with VITE_APP_MODE=portal and served by the server in read-only
- * Portal mode. Login, permissions and screens are those of OpenMetadata; the Portal only fixes the
- * menu to what the Basic Consumer persona sees.
+ * The Portal is this same UI built with VITE_APP_MODE=portal and served by the server in Portal
+ * mode, for every role except Admin. Login, permissions, screens and the menu of the user's persona
+ * are those of OpenMetadata. The Portal hides the system settings, and pipelines are deployed by
+ * the OpenMetadata server, so their log and stop actions are not available.
  */
 export const IS_PORTAL_MODE = import.meta.env.VITE_APP_MODE === 'portal';

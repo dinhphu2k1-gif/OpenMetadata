@@ -90,6 +90,7 @@ import org.openmetadata.service.apps.scheduler.AppScheduler;
 import org.openmetadata.service.audit.AuditLogEventPublisher;
 import org.openmetadata.service.audit.AuditLogRepository;
 import org.openmetadata.service.cache.CacheConfig;
+import org.openmetadata.service.config.AdminOnlyConfiguration;
 import org.openmetadata.service.config.CacheConfiguration;
 import org.openmetadata.service.config.OMWebBundle;
 import org.openmetadata.service.config.OMWebConfiguration;
@@ -134,9 +135,9 @@ import org.openmetadata.service.rdf.RdfUpdater;
 import org.openmetadata.service.resources.CollectionRegistry;
 import org.openmetadata.service.resources.audit.AuditLogResource;
 import org.openmetadata.service.resources.databases.DatasourceConfig;
+import org.openmetadata.service.resources.filters.AdminOnlyFilter;
 import org.openmetadata.service.resources.filters.ETagRequestFilter;
 import org.openmetadata.service.resources.filters.ETagResponseFilter;
-import org.openmetadata.service.resources.filters.PortalReadOnlyFilter;
 import org.openmetadata.service.resources.settings.SettingsCache;
 import org.openmetadata.service.resources.system.DiagnosticsResource;
 import org.openmetadata.service.resources.system.IndexResource;
@@ -236,6 +237,8 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
           KeyStoreException,
           NoSuchAlgorithmException {
     PortalConfiguration.activate(catalogConfig.getPortalConfiguration());
+    AdminOnlyConfiguration.activate(
+        catalogConfig.getAdminOnlyConfiguration(), catalogConfig.getPortalConfiguration());
 
     this.environment = environment;
 
@@ -374,10 +377,10 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // Register Event Handler
     registerEventFilter(catalogConfig, environment);
 
-    // The Portal service is this server in read-only mode
-    if (catalogConfig.getPortalConfiguration().isEnabled()) {
-      LOG.info("Portal mode: rejecting every request that changes data");
-      environment.jersey().register(PortalReadOnlyFilter.class);
+    // In admin-only mode this server is for Admin users and bots; everyone else uses the Portal
+    if (AdminOnlyConfiguration.isActive()) {
+      LOG.info("Admin-only mode: only Admin users and bots may use this server");
+      environment.jersey().register(AdminOnlyFilter.class);
     }
 
     // Register ETag Filters for optimistic concurrency control
@@ -389,15 +392,12 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // cannot leak across requests that share a Jetty worker thread.
     environment.jersey().register(ImpersonationCleanupFilter.class);
 
-    // Register User Activity Tracking. The read-only Portal cannot store the activity it would
-    // track.
-    if (!catalogConfig.getPortalConfiguration().isEnabled()) {
-      registerUserActivityTracking(environment);
-    }
+    registerUserActivityTracking(environment);
 
     environment.lifecycle().manage(new ManagedShutdown());
 
-    // The read-only Portal has no write access to the database, so it runs none of these workers
+    // The OpenMetadata server runs the background workers. The Portal never does, so that they do
+    // not run twice
     if (!catalogConfig.getPortalConfiguration().isEnabled()) {
       registerBackgroundWorkers(catalogConfig, environment);
     }
@@ -423,7 +423,7 @@ public class OpenMetadataApplication extends Application<OpenMetadataApplication
     // Register Auth Handlers (must be before MCP for SSO initialization)
     registerAuthServlets(catalogConfig, environment);
 
-    // Register MCP (depends on Auth Handlers for SSO). The read-only Portal exposes no MCP tools.
+    // Register MCP (depends on Auth Handlers for SSO). The Portal exposes no MCP tools.
     if (!catalogConfig.getPortalConfiguration().isEnabled()) {
       registerMCPServer(catalogConfig, environment);
     }

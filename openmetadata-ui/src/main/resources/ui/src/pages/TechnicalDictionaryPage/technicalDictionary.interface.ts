@@ -13,6 +13,7 @@
 import {
   TechnicalCapabilities,
   TechnicalNamedReference,
+  TechnicalRecordStatus,
   TechnicalSourceStatus,
   TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
@@ -22,6 +23,13 @@ export interface TechnicalDictionaryRow {
   key: string;
   termId: string;
   revision: number;
+  status: TechnicalRecordStatus;
+  createdBy?: string;
+  submittedAt?: number;
+  submittedBy?: string;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  reviewComment?: string;
   databaseName: string;
   databaseFqn?: string;
   schemaName: string;
@@ -51,6 +59,7 @@ export interface TechnicalDictionaryRow {
 /** Filters that are reflected in the URL and sent to the server. */
 export interface TechnicalDictionaryFilters {
   q: string;
+  statuses: TechnicalRecordStatus[];
   sourceServices: string[];
   cdeTermIds: string[];
   elementType: string[];
@@ -61,6 +70,7 @@ export interface TechnicalDictionaryFilters {
 
 export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
   q: '',
+  statuses: [],
   sourceServices: [],
   cdeTermIds: [],
   elementType: [],
@@ -75,6 +85,7 @@ export type TechnicalDictionaryCapabilities = TechnicalCapabilities;
 export const NO_TECHNICAL_CAPABILITIES: TechnicalDictionaryCapabilities = {
   canView: false,
   canEdit: false,
+  canApprove: false,
   canImport: false,
   canExport: false,
 };

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 
 class TechnicalSearchQueryBuilderTest {
@@ -66,6 +67,7 @@ class TechnicalSearchQueryBuilderTest {
         Map.of(
             TechnicalRowMatcher.SOURCE_SERVICES, List.of("ipcas"),
             TechnicalRowMatcher.SOURCE_STATUSES, List.of("Unavailable"),
+            TechnicalRowMatcher.STATUSES, List.of(TechnicalRecord.STATUS_IN_REVIEW),
             TechnicalRowMatcher.CDE_TERM_IDS, List.of("cde-1"),
             TechnicalRowMatcher.SYSTEM_OWNER_IDS, List.of("team-1"),
             TechnicalRowMatcher.ELEMENT_TYPES, List.of("DataElementType.AtomicDataElement"),
@@ -78,6 +80,7 @@ class TechnicalSearchQueryBuilderTest {
 
     assertTrue(hasTerm(filter, "terms", "service", "ipcas"));
     assertTrue(hasTerm(filter, "terms", "sourceStatus", "Unavailable"));
+    assertTrue(hasTerm(filter, "terms", "status", TechnicalRecord.STATUS_IN_REVIEW));
     assertTrue(hasTerm(filter, "terms", "cde.id", "cde-1"));
     assertTrue(hasTerm(filter, "terms", "systemOwner.id", "team-1"));
     assertTrue(hasTerm(filter, "terms", "elementType.fqn", "DataElementType.AtomicDataElement"));
@@ -176,7 +179,15 @@ class TechnicalSearchQueryBuilderTest {
         "service", body.path("aggs").path("sources").path("cardinality").path("field").asText());
     assertEquals(
         "cde.id",
-        body.path("aggs").path("mapped").path("filter").path("exists").path("field").asText());
+        body.path("aggs")
+            .path("mapped")
+            .path("filter")
+            .path("bool")
+            .path("filter")
+            .get(1)
+            .path("exists")
+            .path("field")
+            .asText());
     assertTrue(
         hasTerm(clauses(body.path("query"), "filter"), "term", "dataDictionaryVersion", VERSION));
   }
@@ -188,6 +199,7 @@ class TechnicalSearchQueryBuilderTest {
         clauses(json(TechnicalSearchQueryBuilder.cdeQuery(VERSION, cde)), "filter");
 
     assertTrue(hasTerm(filter, "term", "dataDictionaryVersion", VERSION));
+    assertTrue(hasTerm(filter, "term", "status", TechnicalRecord.STATUS_APPROVED));
     assertTrue(hasTerm(filter, "term", "cde.id", cde.toString()));
   }
 

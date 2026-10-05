@@ -654,9 +654,14 @@ health:
         failureAttempts: 2
         successAttempts: 1
 
-# Portal mode runs this server as the read-only Portal service with the Portal UI build
+# Portal mode runs this server as the Portal service (for the non-admin roles) with the Portal UI build
 portal:
   enabled: ${OM_PORTAL_ENABLED:-false}
+
+# Admin-only mode: only Admin users and bots may log in to and call this server; the other roles use the Portal.
+# Ignored when portal.enabled is true.
+adminOnly:
+  enabled: ${OM_ADMIN_ONLY:-false}
 
 limits:
   enable: ${LIMITS_ENABLED:-false}

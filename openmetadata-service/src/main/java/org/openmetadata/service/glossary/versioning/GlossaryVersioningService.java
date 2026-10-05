@@ -34,6 +34,7 @@ import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
@@ -592,6 +593,7 @@ public class GlossaryVersioningService {
                     if (publicationHook != null) {
                       publicationHook.onPublished(handle, working, result);
                     }
+                    DqTestOutbox.onPublished(handle, result);
                     requireUpdated(
                         dao.deleteWorking(
                             entityType, entityId, parentBusinessVersion, expectedRevision));
@@ -616,6 +618,7 @@ public class GlossaryVersioningService {
     if (GLOSSARY.equals(entityType)) {
       TechnicalOutbox.drainAsync();
     }
+    DqTestOutbox.drainAsync();
     return published;
   }
 
@@ -705,6 +708,7 @@ public class GlossaryVersioningService {
     if (publicationHook != null) {
       publicationHook.onPublished(handle, working, result);
     }
+    DqTestOutbox.onPublished(handle, result);
     requireUpdated(
         dao.deleteWorking(
             working.entityType(),
@@ -848,6 +852,28 @@ public class GlossaryVersioningService {
         && !EntityStatus.REJECTED.value().equals(working.entityStatus())) {
       throw new BadRequestException("Only Draft or Rejected working content can be deleted");
     }
+  }
+
+  /** Checks that a Draft or Rejected working version exists in the scope and can be discarded. */
+  public WorkingVersionRecord requireDiscardableWorking(
+      String entityType, UUID entityId, String parentBusinessVersion) {
+    requireEntityType(entityType);
+    final WorkingVersionRecord working = getWorking(entityType, entityId, parentBusinessVersion);
+    if (!EntityStatus.DRAFT.value().equals(working.entityStatus())
+        && !EntityStatus.REJECTED.value().equals(working.entityStatus())) {
+      throw new BadRequestException("Only a Draft or Rejected working version can be discarded");
+    }
+    return working;
+  }
+
+  /** Deletes the working version only; the published versions of the entity stay untouched. */
+  public void discardWorking(
+      String entityType, UUID entityId, String parentBusinessVersion, long expectedRevision) {
+    final GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
+    if (dao.deleteWorking(entityType, entityId, parentBusinessVersion, expectedRevision) == 0) {
+      throw conflict("The working version was changed; reload it before discarding");
+    }
+    refreshIndexes(entityType, entityId, null);
   }
 
   /** Flushes snapshot outbox events idempotently; failures remain pending for a later request. */

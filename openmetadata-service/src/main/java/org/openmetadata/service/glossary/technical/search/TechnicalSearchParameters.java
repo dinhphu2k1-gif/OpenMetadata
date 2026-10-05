@@ -26,6 +26,7 @@ public final class TechnicalSearchParameters {
           TechnicalRowMatcher.CDE_TERM_IDS,
           TechnicalRowMatcher.SYSTEM_OWNER_IDS,
           TechnicalRowMatcher.SOURCE_STATUSES,
+          TechnicalRowMatcher.STATUSES,
           TechnicalRowMatcher.ELEMENT_TYPES,
           TechnicalRowMatcher.GENERATION_TYPES,
           TechnicalRowMatcher.CREATION_METHODS,

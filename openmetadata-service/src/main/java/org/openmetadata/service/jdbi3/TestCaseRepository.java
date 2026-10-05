@@ -97,6 +97,7 @@ import org.openmetadata.schema.utils.EntityInterfaceUtil;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.dq.DqManagedGuard;
 import org.openmetadata.service.resources.dqtests.TestCaseResource;
 import org.openmetadata.service.resources.dqtests.TestSuiteMapper;
 import org.openmetadata.service.resources.feeds.MessageParser;
@@ -664,6 +665,9 @@ public class TestCaseRepository extends EntityRepository<TestCase> {
 
   @Override
   public void prepare(TestCase test, boolean update) {
+    if (update) {
+      DqManagedGuard.requireNotManaged(test);
+    }
     EntityLink entityLink = EntityLink.parse(test.getEntityLink());
     EntityUtil.validateEntityLink(entityLink);
 
@@ -1406,6 +1410,7 @@ public class TestCaseRepository extends EntityRepository<TestCase> {
 
   @Override
   protected void preDelete(TestCase entity, String deletedBy) {
+    DqManagedGuard.requireNotManaged(entity);
     if (EntityStatus.IN_REVIEW.equals(entity.getEntityStatus())) {
       checkUpdatedByReviewer(entity, deletedBy);
     }

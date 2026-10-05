@@ -174,6 +174,15 @@ CREATE TABLE IF NOT EXISTS `technical_record` (
   KEY `idx_technical_record_cde_rank` (`cdeTermId`, `survivorshipRank`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- Existing records were effective before maker-checker was introduced.
+ALTER TABLE `technical_record`
+  ADD COLUMN `status` varchar(16) NOT NULL DEFAULT 'Approved' AFTER `systemOwnerId`,
+  ADD COLUMN `submittedAt` bigint unsigned DEFAULT NULL AFTER `status`,
+  ADD COLUMN `submittedBy` varchar(256) DEFAULT NULL AFTER `submittedAt`,
+  ADD COLUMN `reviewedAt` bigint unsigned DEFAULT NULL AFTER `submittedBy`,
+  ADD COLUMN `reviewedBy` varchar(256) DEFAULT NULL AFTER `reviewedAt`,
+  ADD COLUMN `reviewComment` mediumtext AFTER `reviewedBy`;
+
 CREATE TABLE IF NOT EXISTS `technical_record_audit` (
   `id` varchar(36) NOT NULL,
   `recordId` varchar(36) NOT NULL,
@@ -212,4 +221,74 @@ CREATE TABLE IF NOT EXISTS `technical_outbox` (
   `lastError` text,
   PRIMARY KEY (`kind`, `subjectKey`),
   KEY `idx_technical_outbox_enqueued` (`enqueuedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Data Quality Rule test execution: Rule -> TestSuite/pipeline, declaration and Column bindings.
+CREATE TABLE IF NOT EXISTS `dq_rule_exec` (
+  `ruleTermId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(16) NOT NULL,
+  `ruleCode` varchar(256) NOT NULL,
+  `appliedBusinessVersion` varchar(16) DEFAULT NULL,
+  `appliedSpecsHash` varchar(64) DEFAULT NULL,
+  `cdeTermId` varchar(36) DEFAULT NULL,
+  `testSuiteId` varchar(36) DEFAULT NULL,
+  `pipelineId` varchar(36) DEFAULT NULL,
+  `scheduleCron` varchar(128) DEFAULT NULL,
+  `scheduleTimezone` varchar(64) DEFAULT NULL,
+  `scheduleUpdatedBy` varchar(256) DEFAULT NULL,
+  `scheduleUpdatedAt` bigint unsigned DEFAULT NULL,
+  `revision` bigint unsigned NOT NULL DEFAULT 1,
+  `updatedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`ruleTermId`),
+  KEY `idx_dq_rule_exec_cde` (`cdeTermId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `dq_rule_test_spec_exec` (
+  `ruleTermId` varchar(36) NOT NULL,
+  `specKey` varchar(16) NOT NULL,
+  `name` varchar(256) NOT NULL,
+  `kind` varchar(16) NOT NULL,
+  `testDefinitionFqn` varchar(512) DEFAULT NULL,
+  `managedTestDefinitionId` varchar(36) DEFAULT NULL,
+  `appliedSpecHash` varchar(64) DEFAULT NULL,
+  `state` varchar(16) NOT NULL,
+  `retiredAt` bigint unsigned DEFAULT NULL,
+  `updatedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`ruleTermId`, `specKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `dq_rule_test_binding` (
+  `id` varchar(36) NOT NULL,
+  `ruleTermId` varchar(36) NOT NULL,
+  `specKey` varchar(16) NOT NULL,
+  `columnKey` varchar(36) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `cdeTermId` varchar(36) DEFAULT NULL,
+  `testCaseId` varchar(36) DEFAULT NULL,
+  `testCaseFqn` text,
+  `state` varchar(16) NOT NULL,
+  `stateReason` varchar(64) DEFAULT NULL,
+  `lastError` text,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `activatedAt` bigint unsigned DEFAULT NULL,
+  `retiredAt` bigint unsigned DEFAULT NULL,
+  `createdAt` bigint unsigned NOT NULL,
+  `updatedAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dq_rule_test_binding` (`ruleTermId`, `specKey`, `columnKey`),
+  KEY `idx_dq_binding_cde_state` (`cdeTermId`, `state`),
+  KEY `idx_dq_binding_spec_state` (`ruleTermId`, `specKey`, `state`),
+  KEY `idx_dq_binding_column` (`columnKey`),
+  KEY `idx_dq_binding_test_case` (`testCaseId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `dq_test_outbox` (
+  `kind` varchar(24) NOT NULL,
+  `subjectKey` varchar(64) NOT NULL,
+  `payload` mediumtext,
+  `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `lastError` text,
+  PRIMARY KEY (`kind`, `subjectKey`),
+  KEY `idx_dq_test_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

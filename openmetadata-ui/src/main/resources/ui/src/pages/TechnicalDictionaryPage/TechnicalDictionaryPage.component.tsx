@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Alert, Button, Result } from 'antd';
+import { Alert, Button, Input, Modal as AntModal, Result } from 'antd';
 import { AxiosError } from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,14 +22,17 @@ import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import { ROUTES } from '../../constants/constants';
 import { TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME } from '../../constants/Glossary.contant';
 import { useAuth } from '../../hooks/authHooks';
+import { useApplicationStore } from '../../hooks/useApplicationStore';
 import { useTechnicalDictionaryContext } from '../../hooks/useTechnicalDictionaryContext';
 import { useTechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { useTechnicalDictionaryRecords } from '../../hooks/useTechnicalDictionaryRecords';
 import {
   deleteTechnicalRecord,
+  approveTechnicalRecord,
   exportTechnicalDictionary,
   exportTechnicalSnapshot,
   rebuildTechnicalIndex,
+  rejectTechnicalRecord,
   updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
 import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
@@ -111,6 +114,7 @@ const TechnicalDictionaryPage = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdminUser } = useAuth();
+  const currentUser = useApplicationStore((state) => state.currentUser);
   const {
     context,
     dataDictionaryVersion,
@@ -134,6 +138,8 @@ const TechnicalDictionaryPage = ({
   const [confirmation, setConfirmation] = useState<PendingConfirmation>();
   const [isConfirming, setIsConfirming] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [rejecting, setRejecting] = useState<TechnicalDictionaryRow>();
+  const [rejectComment, setRejectComment] = useState('');
 
   useEffect(() => {
     setBannerDismissed(readDismissed(context?.resetAt));
@@ -235,6 +241,50 @@ const TechnicalDictionaryPage = ({
     },
     [failRecordAction, modal, refreshData, t]
   );
+
+  const handleApprove = useCallback(
+    (row: TechnicalDictionaryRow) => {
+      setConfirmation({
+        header: t('label.approve'),
+        body: t('message.technical-approve-confirm'),
+        confirmText: t('label.approve'),
+        onConfirm: async () => {
+          try {
+            await approveTechnicalRecord(row.termId, row.revision);
+            showSuccessToast(t('message.technical-record-approved'));
+            setModal(undefined);
+            refreshData();
+          } catch (failure) {
+            await failRecordAction(failure);
+          }
+        },
+      });
+    },
+    [failRecordAction, refreshData, t]
+  );
+
+  const handleReject = useCallback(async () => {
+    if (!rejecting || !rejectComment.trim()) {
+      return;
+    }
+    setIsConfirming(true);
+    try {
+      await rejectTechnicalRecord(
+        rejecting.termId,
+        rejecting.revision,
+        rejectComment.trim()
+      );
+      showSuccessToast(t('message.technical-record-rejected'));
+      setRejecting(undefined);
+      setRejectComment('');
+      setModal(undefined);
+      refreshData();
+    } catch (failure) {
+      await failRecordAction(failure);
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [failRecordAction, refreshData, rejectComment, rejecting, t]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -360,6 +410,7 @@ const TechnicalDictionaryPage = ({
           )}
           <TechnicalDictionaryTable
             capabilities={capabilities}
+            currentUserName={currentUser?.name}
             emptyContent={
               hasActiveFilters ? undefined : (
                 <div data-testid="technical-dictionary-empty">
@@ -384,9 +435,14 @@ const TechnicalDictionaryPage = ({
             rows={records.rows}
             total={records.total}
             onDelete={handleDelete}
+            onApprove={(row) => setModal({ mode: 'review', row })}
             onEdit={(row) => setModal({ mode: 'edit', row })}
             onPageChange={records.setPage}
             onPageSizeChange={records.setPageSize}
+            onReject={(row) => {
+              setRejectComment('');
+              setRejecting(row);
+            }}
             onView={(row) => setModal({ mode: 'view', row })}
           />
           <TechnicalRecordModal
@@ -403,6 +459,19 @@ const TechnicalDictionaryPage = ({
                 : undefined
             }
             onSave={handleSave}
+            onApprove={
+              modal?.mode === 'review' && modal
+                ? () => handleApprove(modal.row)
+                : undefined
+            }
+            onReject={
+              modal?.mode === 'review' && modal
+                ? () => {
+                    setRejectComment('');
+                    setRejecting(modal.row);
+                  }
+                : undefined
+            }
           />
           <TechnicalAddColumnModal
             dataDictionaryVersion={dataDictionaryVersion}
@@ -423,6 +492,24 @@ const TechnicalDictionaryPage = ({
         onCancel={() => setConfirmation(undefined)}
         onConfirm={handleConfirm}
       />
+      <AntModal
+        confirmLoading={isConfirming}
+        okButtonProps={{ disabled: !rejectComment.trim() }}
+        okText={t('label.reject')}
+        open={Boolean(rejecting)}
+        title={t('label.technical-rejection-reason')}
+        onCancel={() => {
+          setRejecting(undefined);
+          setRejectComment('');
+        }}
+        onOk={handleReject}>
+        <Input.TextArea
+          data-testid="technical-rejection-comment"
+          placeholder={t('label.technical-rejection-reason')}
+          value={rejectComment}
+          onChange={(event) => setRejectComment(event.target.value)}
+        />
+      </AntModal>
       <TechnicalSnapshotsModal
         open={snapshotsOpen}
         onClose={() => setSnapshotsOpen(false)}

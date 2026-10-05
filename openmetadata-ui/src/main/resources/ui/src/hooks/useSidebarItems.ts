@@ -17,12 +17,10 @@ import {
   hideBasicConsumerMarketplaceOverview,
   isBasicConsumerPersona,
 } from '../utils/Persona/BasicConsumerNavigation';
-import leftSidebarClassBase from '../utils/LeftSidebarClassBase';
-import { IS_PORTAL_MODE } from '../utils/PortalMode';
 import { useApplicationStore } from './useApplicationStore';
 import { useCustomPages } from './useCustomPages';
 
-const useAdministrationSidebarItems = () => {
+export const useSidebarItems = () => {
   const { navigation } = useCustomPages('Navigation');
   const { plugins = [] } = useApplicationsProvider();
   const { selectedPersona } = useApplicationStore();
@@ -37,10 +35,3 @@ const useAdministrationSidebarItems = () => {
 
   return sideBarItems;
 };
-
-// The Portal has a fixed menu and reads no navigation preferences, so it skips the persona lookups.
-const usePortalSidebarItems = () => leftSidebarClassBase.getSidebarItems();
-
-export const useSidebarItems = IS_PORTAL_MODE
-  ? usePortalSidebarItems
-  : useAdministrationSidebarItems;

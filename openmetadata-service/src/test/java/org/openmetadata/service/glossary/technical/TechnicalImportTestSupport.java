@@ -58,6 +58,7 @@ final class TechnicalImportTestSupport {
         .sourceTable(table)
         .sourceColumn(column)
         .sourceStatus(TechnicalDictionaryProfile.SOURCE_AVAILABLE)
+        .status(TechnicalRecord.STATUS_APPROVED)
         .revision(3)
         .build();
   }

@@ -44,6 +44,7 @@ import org.openmetadata.service.glossary.technical.TechnicalHistory;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.TechnicalRecordDeclaration;
+import org.openmetadata.service.glossary.technical.TechnicalRecordReview;
 import org.openmetadata.service.glossary.technical.TechnicalRecordService;
 import org.openmetadata.service.glossary.technical.TechnicalRecordUpdate;
 import org.openmetadata.service.glossary.technical.search.TechnicalDocumentBuilder;
@@ -118,6 +119,7 @@ public class TechnicalDictionaryResource {
       @QueryParam("cdeTermIds") String cdeTermIds,
       @QueryParam("systemOwnerIds") String systemOwnerIds,
       @QueryParam("sourceStatuses") String sourceStatuses,
+      @QueryParam("statuses") String statuses,
       @QueryParam("elementTypes") String elementTypes,
       @QueryParam("generationTypes") String generationTypes,
       @QueryParam("creationMethods") String creationMethods,
@@ -133,6 +135,7 @@ public class TechnicalDictionaryResource {
             cdeTermIds,
             systemOwnerIds,
             sourceStatuses,
+            statuses,
             elementTypes,
             generationTypes,
             creationMethods,
@@ -175,7 +178,7 @@ public class TechnicalDictionaryResource {
   @Path("/records")
   @Operation(
       operationId = "declareTechnicalDictionaryColumn",
-      summary = "Declare a Column with its initial values; the record is effective immediately")
+      summary = "Declare a Column and send the new record for independent approval")
   public Response declare(
       @Context SecurityContext securityContext, @NotNull TechnicalRecordDeclaration declaration) {
     access.requireEdit(securityContext);
@@ -197,7 +200,8 @@ public class TechnicalDictionaryResource {
   @Path("/records/{id}")
   @Operation(
       operationId = "updateTechnicalDictionaryRecord",
-      summary = "Replace the editable values of a record; the change is effective immediately")
+      summary =
+          "Replace editable values; rejected records return to review, approved edits are immediate")
   public Map<String, Object> update(
       @Context SecurityContext securityContext,
       @PathParam("id") UUID recordId,
@@ -215,6 +219,37 @@ public class TechnicalDictionaryResource {
             securityContext.getUserPrincipal().getName()));
   }
 
+  @POST
+  @Path("/records/{id}/approve")
+  @Operation(operationId = "approveTechnicalDictionaryRecord", summary = "Approve a new record")
+  public Map<String, Object> approve(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireApprove(securityContext);
+    requireExpectedRevision(review);
+    return row(
+        recordService.approve(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/records/{id}/reject")
+  @Operation(operationId = "rejectTechnicalDictionaryRecord", summary = "Reject a new record")
+  public Map<String, Object> reject(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireApprove(securityContext);
+    requireExpectedRevision(review);
+    return row(
+        recordService.reject(
+            recordId,
+            review.expectedRevision(),
+            review.comment(),
+            securityContext.getUserPrincipal().getName()));
+  }
+
   @DELETE
   @Path("/records/{id}")
   @Operation(
@@ -225,6 +260,10 @@ public class TechnicalDictionaryResource {
       @PathParam("id") UUID recordId,
       @NotNull @QueryParam("expectedRevision") Long expectedRevision) {
     access.requireEdit(securityContext);
+    if (expectedRevision == null) {
+      throw TechnicalDictionaryErrors.badRequest(
+          TechnicalDictionaryErrors.INVALID_FIELD, "expectedRevision is required");
+    }
     recordService.delete(recordId, expectedRevision, securityContext.getUserPrincipal().getName());
     final Map<String, Object> result = new LinkedHashMap<>();
     result.put("termId", recordId);
@@ -316,6 +355,13 @@ public class TechnicalDictionaryResource {
                 TechnicalDictionaryErrors.conflict(
                     TechnicalDictionaryErrors.DATA_DICTIONARY_NOT_ACTIVE,
                     "There is no active Approved Data Dictionary version"));
+  }
+
+  private static void requireExpectedRevision(TechnicalRecordReview review) {
+    if (review.expectedRevision() == null) {
+      throw TechnicalDictionaryErrors.badRequest(
+          TechnicalDictionaryErrors.INVALID_FIELD, "expectedRevision is required");
+    }
   }
 
   private static TechnicalRecord requireRecord(UUID recordId) {
