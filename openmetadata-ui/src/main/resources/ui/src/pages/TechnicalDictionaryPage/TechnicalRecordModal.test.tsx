@@ -172,6 +172,45 @@ describe('TechnicalRecordModal create mode', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('offers an edit action next to Close in view mode when the caller may edit', () => {
+    const onEdit = jest.fn();
+    render(
+      <TechnicalRecordModal
+        open
+        isSaving={false}
+        mode="view"
+        options={OPTIONS}
+        row={candidateToRow(CANDIDATE)}
+        onCancel={jest.fn()}
+        onEdit={onEdit}
+        onSave={jest.fn()}
+      />
+    );
+
+    screen.getByTestId('technical-record-edit').click();
+
+    expect(onEdit).toHaveBeenCalled();
+  });
+
+  it('has no edit action once the form is already editable', () => {
+    render(
+      <TechnicalRecordModal
+        open
+        isSaving={false}
+        mode="edit"
+        options={OPTIONS}
+        row={candidateToRow(CANDIDATE)}
+        onCancel={jest.fn()}
+        onEdit={jest.fn()}
+        onSave={jest.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('technical-record-edit')
+    ).not.toBeInTheDocument();
+  });
+
   it('does not show the picker in edit mode', () => {
     render(
       <TechnicalRecordModal

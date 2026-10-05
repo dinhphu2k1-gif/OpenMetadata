@@ -81,7 +81,10 @@ describe('SurvivorshipRules Helper & Logic', () => {
 
       render(<SurvivorshipBadge rule={rule} />);
 
-      expect(screen.getByText('Hạng 2')).toBeInTheDocument();
+      expect(rule?.rank).toBe(2);
+      expect(screen.getByTestId('survivorship-rank')).toHaveTextContent(
+        'label.rank-number'
+      );
     });
 
     it('reads nested column rank without glossary survivorship rules', () => {
@@ -186,36 +189,31 @@ describe('SurvivorshipRules Helper & Logic', () => {
   });
 
   describe('SurvivorshipBadge Component', () => {
-    it('should render Golden Source badge for Rank 1', () => {
+    it('marks rank 1 with a star', () => {
       render(
         <SurvivorshipBadge
           rule={{ assetFqn: 'fqn.a', rank: 1, note: 'Core system' }}
         />
       );
 
-      expect(screen.getByText('🥇')).toBeInTheDocument();
-      expect(screen.getByText('Hạng 1 (Nguồn Vàng)')).toBeInTheDocument();
+      expect(screen.getByTestId('survivorship-rank-star')).toBeInTheDocument();
+      expect(screen.getByTestId('survivorship-rank')).toHaveClass(
+        'survivorship-rank--top'
+      );
     });
 
-    it('should render Rank 2 badge', () => {
-      render(<SurvivorshipBadge rule={{ assetFqn: 'fqn.b', rank: 2 }} />);
+    it.each([2, 3, 5])('shows rank %i as plain text without a star', (rank) => {
+      render(<SurvivorshipBadge rule={{ assetFqn: 'fqn.b', rank }} />);
 
-      expect(screen.getByText('🥈')).toBeInTheDocument();
-      expect(screen.getByText('Hạng 2')).toBeInTheDocument();
-    });
-
-    it('should render Rank 3 badge', () => {
-      render(<SurvivorshipBadge rule={{ assetFqn: 'fqn.c', rank: 3 }} />);
-
-      expect(screen.getByText('🥉')).toBeInTheDocument();
-      expect(screen.getByText('Hạng 3')).toBeInTheDocument();
-    });
-
-    it('should render Rank N badge for rank > 3 without limit', () => {
-      render(<SurvivorshipBadge rule={{ assetFqn: 'fqn.d', rank: 5 }} />);
-
-      expect(screen.getByText('🏷️')).toBeInTheDocument();
-      expect(screen.getByText('Hạng 5')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('survivorship-rank-star')
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('survivorship-rank')).not.toHaveClass(
+        'survivorship-rank--top'
+      );
+      expect(screen.getByTestId('survivorship-rank')).toHaveTextContent(
+        'label.rank-number'
+      );
     });
 
     it('should return null when rule or rank is missing', () => {

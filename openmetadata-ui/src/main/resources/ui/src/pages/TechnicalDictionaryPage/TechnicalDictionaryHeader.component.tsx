@@ -10,6 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { CheckOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Space, Tooltip } from 'antd';
 import { MenuProps } from 'antd/lib/menu';
 import { useState } from 'react';
@@ -20,7 +21,9 @@ import { ReactComponent as ImportIcon } from '../../assets/svg/ic-import.svg';
 import { ReactComponent as RefreshIcon } from '../../assets/svg/ic-refresh.svg';
 import { ReactComponent as VersionIcon } from '../../assets/svg/ic-version.svg';
 import { ReactComponent as IconDropdown } from '../../assets/svg/menu.svg';
+import { CopyToClipboardButton } from '../../components/common/CopyToClipboardButton/CopyToClipboardButton';
 import { ManageButtonItemLabel } from '../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
+import { TECHNICAL_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import { TechnicalDictionaryCapabilities } from './technicalDictionary.interface';
 
 interface TechnicalDictionaryHeaderProps {
@@ -28,6 +31,7 @@ interface TechnicalDictionaryHeaderProps {
   dataDictionaryVersion?: string;
   capabilities: TechnicalDictionaryCapabilities;
   isAdmin: boolean;
+  onAddColumn: () => void;
   onExport: () => void;
   onImport: () => void;
   onOpenSnapshots: () => void;
@@ -38,6 +42,7 @@ const TechnicalDictionaryHeader = ({
   dataDictionaryVersion,
   capabilities,
   isAdmin,
+  onAddColumn,
   onExport,
   onImport,
   onOpenSnapshots,
@@ -125,10 +130,37 @@ const TechnicalDictionaryHeader = ({
               <h1 className="tech-dict-title">
                 {t('label.technical-dictionary')}
               </h1>
+              {dataDictionaryVersion && (
+                <span
+                  className="tech-dict-version-badge"
+                  data-testid="technical-dictionary-version-badge">
+                  <CheckOutlined />
+                  {t('label.technical-follows-data-dictionary', {
+                    version: dataDictionaryVersion,
+                  })}
+                </span>
+              )}
+            </div>
+            <div className="tech-dict-subtitle">
+              <span data-testid="technical-dictionary-name">
+                {TECHNICAL_DICTIONARY_GLOSSARY_NAME}
+              </span>
+              <CopyToClipboardButton
+                copyText={TECHNICAL_DICTIONARY_GLOSSARY_NAME}
+              />
             </div>
           </div>
         </div>
         <Space>
+          {capabilities.canEdit && dataDictionaryVersion && (
+            <Button
+              data-testid="technical-dictionary-add-column"
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={onAddColumn}>
+              {t('label.add-column')}
+            </Button>
+          )}
           <Dropdown
             align={{ targetOffset: [-12, 0] }}
             menu={{ items: moreMenuItems }}

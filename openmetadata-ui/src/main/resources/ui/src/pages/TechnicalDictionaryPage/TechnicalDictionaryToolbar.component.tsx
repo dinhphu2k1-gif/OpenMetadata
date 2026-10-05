@@ -98,7 +98,7 @@ const TechnicalDictionaryToolbar = ({
         data-testid="technical-dictionary-search"
         placeholder={t('label.search-technical-dictionary')}
         prefix={<SearchOutlined className="text-grey-muted" />}
-        style={{ width: 280 }}
+        style={{ width: 340 }}
         value={searchText}
         onChange={(event) => onSearchText(event.target.value)}
       />

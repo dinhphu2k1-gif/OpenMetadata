@@ -154,26 +154,14 @@ jest.mock(
 jest.mock('./TechnicalDictionaryTable.component', () => ({
   __esModule: true,
   default: ({
-    onEdit,
-    onDelete,
     onView,
-    onApprove,
-    onReject,
     rows,
   }: {
     rows: TechnicalDictionaryRow[];
-    onEdit: (row: TechnicalDictionaryRow) => void;
     onView: (row: TechnicalDictionaryRow) => void;
-    onDelete: (row: TechnicalDictionaryRow) => void;
-    onApprove: (row: TechnicalDictionaryRow) => void;
-    onReject: (row: TechnicalDictionaryRow) => void;
   }) => (
     <div data-testid="table">
-      <button onClick={() => onEdit(rows[0])}>edit</button>
-      <button onClick={() => onView(rows[0])}>view</button>
-      <button onClick={() => onDelete(rows[0])}>delete</button>
-      <button onClick={() => onApprove(rows[0])}>approve-row</button>
-      <button onClick={() => onReject(rows[0])}>reject-row</button>
+      <button onClick={() => onView(rows[0])}>open-row</button>
     </div>
   ),
 }));
@@ -191,12 +179,16 @@ jest.mock('./TechnicalRecordModal.component', () => ({
     mode,
     onApprove,
     onReject,
+    onEdit,
+    onDelete,
   }: {
     open: boolean;
     mode: string;
     onSave: (values: unknown) => void;
     onApprove?: () => void;
     onReject?: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
   }) =>
     open ? (
       <div data-testid={`record-modal-${mode}`}>
@@ -211,6 +203,8 @@ jest.mock('./TechnicalRecordModal.component', () => ({
           save
         </button>
         <button onClick={() => onSave({ cde: null })}>clear-cde</button>
+        {onEdit && <button onClick={onEdit}>edit-modal</button>}
+        {onDelete && <button onClick={onDelete}>delete-modal</button>}
         {onApprove && <button onClick={onApprove}>approve-modal</button>}
         {onReject && <button onClick={onReject}>reject-modal</button>}
       </div>
@@ -269,7 +263,8 @@ describe('TechnicalDictionaryPage', () => {
   it('saves approved-record edits immediately with the revision that was read', async () => {
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('edit-modal'));
     fireEvent.click(await screen.findByText('save'));
 
     await waitFor(() => expect(updateTechnicalRecord).toHaveBeenCalledTimes(1));
@@ -290,7 +285,8 @@ describe('TechnicalDictionaryPage', () => {
   it('clears the CDE when the user clears the selector', async () => {
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('edit-modal'));
     fireEvent.click(await screen.findByText('clear-cde'));
 
     await waitFor(() => expect(updateTechnicalRecord).toHaveBeenCalled());
@@ -303,7 +299,9 @@ describe('TechnicalDictionaryPage', () => {
   it('deletes a declaration with its revision after confirmation', async () => {
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('delete'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('edit-modal'));
+    fireEvent.click(screen.getByText('delete-modal'));
 
     expect(deleteTechnicalRecord).not.toHaveBeenCalled();
 
@@ -320,7 +318,7 @@ describe('TechnicalDictionaryPage', () => {
     ROW.status = 'In Review';
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('approve-row'));
+    fireEvent.click(screen.getByText('open-row'));
     fireEvent.click(screen.getByText('approve-modal'));
     fireEvent.click(
       screen.getByTestId('confirmation').querySelector('button') as Element
@@ -335,7 +333,8 @@ describe('TechnicalDictionaryPage', () => {
     ROW.status = 'In Review';
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('reject-row'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('reject-modal'));
     fireEvent.change(screen.getByTestId('technical-rejection-comment'), {
       target: { value: 'Missing evidence' },
     });
@@ -356,7 +355,8 @@ describe('TechnicalDictionaryPage', () => {
     });
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('edit-modal'));
     fireEvent.click(await screen.findByText('save'));
 
     await waitFor(() =>
@@ -374,7 +374,8 @@ describe('TechnicalDictionaryPage', () => {
     });
     render(<TechnicalDictionaryPage isEmbedded />);
 
-    fireEvent.click(screen.getByText('edit'));
+    fireEvent.click(screen.getByText('open-row'));
+    fireEvent.click(screen.getByText('edit-modal'));
     fireEvent.click(await screen.findByText('save'));
 
     await waitFor(() => expect(mockContextState.reload).toHaveBeenCalled());
@@ -382,6 +383,37 @@ describe('TechnicalDictionaryPage', () => {
     expect(showErrorToast).toHaveBeenCalledWith(
       'message.technical-dictionary-was-reset'
     );
+  });
+
+  it('opens an approved record read-only and lets an editor switch to the form', () => {
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('open-row'));
+
+    expect(screen.getByTestId('record-modal-view')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('edit-modal'));
+
+    expect(screen.getByTestId('record-modal-edit')).toBeInTheDocument();
+  });
+
+  it('opens a record waiting for another reviewer in review mode', () => {
+    ROW.status = 'In Review';
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('open-row'));
+
+    expect(screen.getByTestId('record-modal-review')).toBeInTheDocument();
+  });
+
+  it('does not offer the edit form to a user who cannot edit', () => {
+    mockContextState.capabilities.canEdit = false;
+    render(<TechnicalDictionaryPage isEmbedded />);
+
+    fireEvent.click(screen.getByText('open-row'));
+
+    expect(screen.queryByText('edit-modal')).not.toBeInTheDocument();
+    expect(screen.queryByText('delete-modal')).not.toBeInTheDocument();
   });
 
   it('offers the previous snapshot in the banner after a reset', async () => {

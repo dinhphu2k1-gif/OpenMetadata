@@ -60,6 +60,8 @@ interface TechnicalRecordModalProps {
   onSave: (values: TechnicalRecordFormValues) => void;
   /** Present when the caller may cancel the declaration of this record. */
   onDelete?: () => void;
+  /** Present when the caller may switch a read-only view into the edit form. */
+  onEdit?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
 }
@@ -83,6 +85,7 @@ const TechnicalRecordModal = ({
   onCancel,
   onSave,
   onDelete,
+  onEdit,
   onApprove,
   onReject,
 }: TechnicalRecordModalProps) => {
@@ -167,6 +170,17 @@ const TechnicalRecordModal = ({
         <Button color="secondary" key="cancel-btn" onPress={onCancel}>
           {t(isReadOnly ? 'label.close' : 'label.cancel')}
         </Button>,
+        ...(onEdit && isReadOnly
+          ? [
+              <Button
+                color="secondary"
+                data-testid="technical-record-edit"
+                key="edit-btn"
+                onPress={onEdit}>
+                {t('label.edit')}
+              </Button>,
+            ]
+          : []),
         ...(mode === 'review'
           ? [
               <Button

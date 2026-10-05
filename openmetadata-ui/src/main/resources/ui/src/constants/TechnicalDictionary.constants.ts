@@ -12,10 +12,7 @@
  */
 
 export const TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS = {
-  DATABASE_NAME: 'databaseName',
-  SCHEMA_NAME: 'schemaName',
-  TABLE_NAME: 'tableName',
-  COLUMN_NAME: 'columnName',
+  FIELD_NAME: 'fieldName',
   DATA_OWNERS: 'dataOwners',
   SERVICE_NAME: 'serviceName',
   STATUS: 'status',
@@ -31,17 +28,14 @@ export const TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS = {
   DESCRIPTION: 'description',
   UPDATED_AT: 'updatedAt',
   UPDATED_BY: 'updatedBy',
-  ACTIONS: 'actions',
 };
 
 const KEYS = TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS;
 
 /** Default dictionary fields in display order; update metadata columns remain optional. */
 export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
-  KEYS.DATABASE_NAME,
-  KEYS.SCHEMA_NAME,
-  KEYS.TABLE_NAME,
-  KEYS.COLUMN_NAME,
+  KEYS.FIELD_NAME,
+  KEYS.STATUS,
   KEYS.SERVICE_NAME,
   KEYS.CDE_CODE,
   KEYS.CDE_NAME,
@@ -52,22 +46,16 @@ export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
   KEYS.CREATION_METHOD,
   KEYS.TIMELINESS,
   KEYS.DESCRIPTION,
-  KEYS.STATUS,
-  KEYS.ACTIONS,
 ];
 
 export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
-  KEYS.DATABASE_NAME,
-  KEYS.SCHEMA_NAME,
-  KEYS.TABLE_NAME,
-  KEYS.COLUMN_NAME,
+  KEYS.FIELD_NAME,
   KEYS.STATUS,
-  KEYS.ACTIONS,
 ];
 
-// v4 moves the status column to the end, so an older saved layout is not applied again.
+// v5 merges the four source columns into one field column, so an older saved layout is not applied again.
 export const TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY =
-  'technicalDictionary.v4';
+  'technicalDictionary.v5';
 
 export const TECHNICAL_CLASSIFICATIONS = {
   ELEMENT_TYPE: 'DataElementType',

@@ -10,19 +10,19 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import {
-  CheckOutlined,
-  CloseOutlined,
-  DeleteOutlined,
-  EyeOutlined,
-} from '@ant-design/icons';
-import { Button, Tag, Tooltip } from 'antd';
+import { Button, Tag } from 'antd';
 import { AxiosError } from 'axios';
 import { ColumnsType } from 'antd/lib/table';
-import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import React, {
+  Fragment,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { ReactComponent as EditIcon } from '../../assets/svg/edit-new.svg';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
@@ -50,14 +50,8 @@ import {
   getGlossaryTermDetailsPath,
 } from '../../utils/RouterUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
-import {
-  TechnicalDictionaryCapabilities,
-  TechnicalDictionaryRow,
-} from './technicalDictionary.interface';
-import {
-  canReviewTechnicalRecord,
-  getTagLabel,
-} from './TechnicalDictionaryRows';
+import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import { getTagLabel } from './TechnicalDictionaryRows';
 
 export interface TechnicalDictionaryTableProps {
   rows: TechnicalDictionaryRow[];
@@ -65,17 +59,11 @@ export interface TechnicalDictionaryTableProps {
   total: number;
   page: number;
   pageSize: number;
-  capabilities: TechnicalDictionaryCapabilities;
   extraTableFilters?: React.ReactNode;
   emptyContent?: React.ReactNode;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onView: (row: TechnicalDictionaryRow) => void;
-  onEdit: (row: TechnicalDictionaryRow) => void;
-  onDelete: (row: TechnicalDictionaryRow) => void;
-  onApprove: (row: TechnicalDictionaryRow) => void;
-  onReject: (row: TechnicalDictionaryRow) => void;
-  currentUserName?: string;
 }
 
 const Placeholder = () => (
@@ -98,27 +86,24 @@ const TAG_VARIANTS = {
   timeliness: 'frequency',
 } as const;
 
+const stopRowClick = (event: React.SyntheticEvent) => event.stopPropagation();
+
 const TechnicalDictionaryTable = ({
   rows,
   isLoading,
   total,
   page,
   pageSize,
-  capabilities,
   extraTableFilters,
   emptyContent,
   onPageChange,
   onPageSizeChange,
   onView,
-  onEdit,
-  onDelete,
-  onApprove,
-  onReject,
-  currentUserName,
 }: TechnicalDictionaryTableProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const handleCdeClick = useCallback(
     async (termId: string) => {
@@ -160,7 +145,8 @@ const TechnicalDictionaryTable = ({
         <Link
           className="tech-entity-link"
           title={name}
-          to={getEntityDetailsPath(type, fqn, tab)}>
+          to={getEntityDetailsPath(type, fqn, tab)}
+          onClick={stopRowClick}>
           {name}
         </Link>
       ) : (
@@ -171,139 +157,86 @@ const TechnicalDictionaryTable = ({
     []
   );
 
-  const renderActions = useCallback(
-    (row: TechnicalDictionaryRow) => {
-      const canReview = canReviewTechnicalRecord(
-        row,
-        capabilities.canApprove,
-        currentUserName
-      );
-
-      return (
-        <div className="d-flex items-center gap-2">
-        <Tooltip title={t('label.view')}>
-          <Button
-            aria-label={t('label.view')}
-            className="text-grey-muted flex-center"
-            data-testid={`view-btn-${row.columnName}`}
-            icon={<EyeOutlined />}
-            size="small"
-            type="text"
-            onClick={() => onView(row)}
-          />
-        </Tooltip>
-        {capabilities.canEdit && (
-          <Tooltip title={t('label.edit')}>
-            <Button
-              aria-label={t('label.edit')}
-              className="text-grey-muted flex-center"
-              data-testid={`edit-btn-${row.columnName}`}
-              icon={<EditIcon height={14} width={14} />}
-              size="small"
-              type="text"
-              onClick={() => onEdit(row)}
-            />
-          </Tooltip>
-        )}
-        {canReview && (
-          <Tooltip title={t('label.approve')}>
-            <Button
-              aria-label={t('label.approve')}
-              data-testid={`approve-btn-${row.columnName}`}
-              icon={<CheckOutlined />}
-              size="small"
-              type="text"
-              onClick={() => onApprove(row)}
-            />
-          </Tooltip>
-        )}
-        {canReview && (
-          <Tooltip title={t('label.reject')}>
-            <Button
-              danger
-              aria-label={t('label.reject')}
-              data-testid={`reject-btn-${row.columnName}`}
-              icon={<CloseOutlined />}
-              size="small"
-              type="text"
-              onClick={() => onReject(row)}
-            />
-          </Tooltip>
-        )}
-        {capabilities.canEdit && (
-          <Tooltip title={t('label.delete-declaration')}>
-            <Button
-              aria-label={t('label.delete-declaration')}
-              className="text-danger"
-              data-testid={`delete-btn-${row.columnName}`}
-              icon={<DeleteOutlined />}
-              size="small"
-              type="text"
-              onClick={() => onDelete(row)}
-            />
-          </Tooltip>
-        )}
-        </div>
-      );
-    },
-    [
-      capabilities.canApprove,
-      capabilities.canEdit,
-      currentUserName,
-      onApprove,
-      onDelete,
-      onEdit,
-      onReject,
-      onView,
-      t,
-    ]
+  const renderFieldPath = useCallback(
+    (row: TechnicalDictionaryRow) =>
+      [
+        {
+          name: row.databaseName,
+          fqn: row.databaseFqn,
+          type: EntityType.DATABASE,
+        },
+        {
+          name: row.schemaName,
+          fqn: row.schemaFqn,
+          type: EntityType.DATABASE_SCHEMA,
+        },
+        {
+          name: row.tableName,
+          fqn: row.tableFqn,
+          type: EntityType.TABLE,
+          tab: EntityTabs.SCHEMA,
+        },
+      ]
+        .filter((segment) => segment.name)
+        .map((segment, index) => (
+          <Fragment key={segment.type}>
+            {index > 0 && (
+              <span aria-hidden="true" className="tech-field-path-separator">
+                /
+              </span>
+            )}
+            {renderLink(segment.name, segment.fqn, segment.type, segment.tab)}
+          </Fragment>
+        )),
+    [renderLink]
   );
 
   const columns: ColumnsType<TechnicalDictionaryRow> = useMemo(
     () => [
       {
-        title: t('label.database-name'),
-        dataIndex: KEYS.DATABASE_NAME,
-        key: KEYS.DATABASE_NAME,
+        title: t('label.field-name'),
+        dataIndex: KEYS.FIELD_NAME,
+        key: KEYS.FIELD_NAME,
         fixed: 'left',
-        width: 150,
-        render: (_, row) =>
-          renderLink(row.databaseName, row.databaseFqn, EntityType.DATABASE),
-      },
-      {
-        title: t('label.schema-name'),
-        dataIndex: KEYS.SCHEMA_NAME,
-        key: KEYS.SCHEMA_NAME,
-        fixed: 'left',
-        width: 130,
-        render: (_, row) =>
-          renderLink(row.schemaName, row.schemaFqn, EntityType.DATABASE_SCHEMA),
-      },
-      {
-        title: t('label.table-name'),
-        dataIndex: KEYS.TABLE_NAME,
-        key: KEYS.TABLE_NAME,
-        fixed: 'left',
-        width: 190,
-        render: (_, row) =>
-          renderLink(
-            row.tableName,
-            row.tableFqn,
-            EntityType.TABLE,
-            EntityTabs.SCHEMA
-          ),
-      },
-      {
-        title: t('label.column-name'),
-        dataIndex: KEYS.COLUMN_NAME,
-        key: KEYS.COLUMN_NAME,
-        fixed: 'left',
-        width: 160,
+        width: 260,
         render: (_, row) => (
-          <span className="tech-column-name" title={row.columnName}>
-            {row.columnName}
-          </span>
+          <div className="tech-field-cell">
+            <button
+              className="tech-field-name"
+              data-testid={`view-btn-${row.columnName}`}
+              title={row.columnName}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onView(row);
+              }}>
+              {row.columnName}
+            </button>
+            <div className="tech-field-path">{renderFieldPath(row)}</div>
+          </div>
         ),
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        width: 140,
+        render: (_, row) => {
+          const status = TECHNICAL_STATUS_TO_ENTITY_STATUS[row.status];
+
+          return (
+            <StatusBadge
+              dataTestId={`status-${row.columnName}`}
+              displayLabel={
+                row.status === 'In Review'
+                  ? t('label.technical-in-review')
+                  : undefined
+              }
+              label={status}
+              status={getEntityStatusClass(status)}
+            />
+          );
+        },
       },
       {
         title: t('label.source'),
@@ -339,7 +272,12 @@ const TechnicalDictionaryTable = ({
               data-testid={`cde-code-${row.cdeCode}`}
               title={row.cdeName || row.cdeCode}
               type="link"
-              onClick={() => row.cdeTermId && handleCdeClick(row.cdeTermId)}>
+              onClick={(event) => {
+                event.stopPropagation();
+                if (row.cdeTermId) {
+                  handleCdeClick(row.cdeTermId);
+                }
+              }}>
               {row.cdeCode}
             </Button>
           ) : (
@@ -432,38 +370,8 @@ const TechnicalDictionaryTable = ({
         width: 140,
         render: (_, row) => row.updatedBy || <Placeholder />,
       },
-      {
-        title: t('label.status'),
-        dataIndex: KEYS.STATUS,
-        key: KEYS.STATUS,
-        width: 130,
-        render: (_, row) => {
-          const status = TECHNICAL_STATUS_TO_ENTITY_STATUS[row.status];
-
-          return (
-            <StatusBadge
-              dataTestId={`status-${row.columnName}`}
-              displayLabel={
-                row.status === 'In Review'
-                  ? t('label.technical-in-review')
-                  : undefined
-              }
-              label={status}
-              status={getEntityStatusClass(status)}
-            />
-          );
-        },
-      },
-      {
-        title: t('label.action-plural'),
-        dataIndex: KEYS.ACTIONS,
-        key: KEYS.ACTIONS,
-        fixed: 'right',
-        width: 110,
-        render: (_, row) => renderActions(row),
-      },
     ],
-    [handleCdeClick, renderActions, renderLink, renderTag, t]
+    [handleCdeClick, onView, renderFieldPath, renderTag, t]
   );
 
   const paginationProps = useMemo(
@@ -504,7 +412,7 @@ const TechnicalDictionaryTable = ({
       style={{ position: 'relative' }}>
       <Table
         resizableColumns
-        className="cde-glossary-terms-table glossary-terms-table"
+        className="cde-glossary-terms-table glossary-terms-table tech-dict-table"
         columns={columns}
         containerClassName="cde-glossary-table-container"
         customPaginationProps={paginationProps}
@@ -517,7 +425,15 @@ const TechnicalDictionaryTable = ({
         loading={isLoading}
         locale={emptyContent ? { emptyText: emptyContent } : undefined}
         pagination={false}
+        rowClassName="tech-dict-row"
         rowKey="key"
+        rowSelection={{
+          type: 'checkbox',
+          fixed: true,
+          columnWidth: 32,
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
+        }}
         size="small"
         staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
         sticky={{
@@ -527,6 +443,7 @@ const TechnicalDictionaryTable = ({
               '.page-layout-v1-vertical-scroll'
             ) ?? document.body,
         }}
+        onRow={(row) => ({ onClick: () => onView(row) })}
       />
     </div>
   );

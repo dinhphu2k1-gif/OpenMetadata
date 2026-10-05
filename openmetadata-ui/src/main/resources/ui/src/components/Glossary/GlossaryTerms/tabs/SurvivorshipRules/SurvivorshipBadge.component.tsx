@@ -11,114 +11,50 @@
  *  limitations under the License.
  */
 
-import { Tag, Tooltip } from 'antd';
-import React, { useMemo } from 'react';
+import { StarFilled } from '@ant-design/icons';
+import { Tooltip } from 'antd';
+import classNames from 'classnames';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { SurvivorshipRule } from './survivorship.interface';
+import './survivorship-badge.less';
 
 interface SurvivorshipBadgeProps {
   rule?: SurvivorshipRule;
 }
 
+/** Only rank 1 is emphasised with a star; other ranks stay plain text. */
 export const SurvivorshipBadge: React.FC<SurvivorshipBadgeProps> = ({
   rule,
 }) => {
+  const { t } = useTranslation();
   const rank = rule?.rank;
   const note = rule?.note;
 
-  const badgeInfo = useMemo(() => {
-    if (!rank) {
-      return null;
-    }
-    switch (rank) {
-      case 1:
-        return {
-          icon: '🥇',
-          label: 'Hạng 1',
-          style: {
-            backgroundColor: '#fffbe6',
-            borderColor: '#ffe58f',
-            color: '#d48806',
-            fontWeight: 600,
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          },
-        };
-      case 2:
-        return {
-          icon: '🥈',
-          label: 'Hạng 2',
-          style: {
-            backgroundColor: '#f5f5f5',
-            borderColor: '#d9d9d9',
-            color: '#595959',
-            fontWeight: 600,
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          },
-        };
-      case 3:
-        return {
-          icon: '🥉',
-          label: 'Hạng 3',
-          style: {
-            backgroundColor: '#fff7e6',
-            borderColor: '#ffd591',
-            color: '#d46b08',
-            fontWeight: 600,
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          },
-        };
-      default:
-        return {
-          icon: '🏷️',
-          label: `Hạng ${rank}`,
-          style: {
-            backgroundColor: '#fff0f2',
-            borderColor: '#ffccd3',
-            color: '#AE1C3F',
-            fontWeight: 500,
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          },
-        };
-    }
-  }, [rank]);
-
-  if (!badgeInfo) {
+  if (!rank) {
     return null;
   }
 
-  const { icon, label, style } = badgeInfo;
-
+  const isTop = rank === 1;
   const badgeContent = (
-    <Tag className="survivorship-badge m-0" style={style}>
-      <span>{icon}</span>
-      <span>{label}</span>
-    </Tag>
+    <span
+      className={classNames('survivorship-rank', {
+        'survivorship-rank--top': isTop,
+      })}
+      data-testid="survivorship-rank">
+      {isTop && (
+        <StarFilled
+          className="survivorship-rank-icon"
+          data-testid="survivorship-rank-star"
+        />
+      )}
+      {t('label.rank-number', { rank })}
+    </span>
   );
 
   if (note) {
     return (
-      <Tooltip title={`Quy tắc sinh tồn: ${note}`}>
-        {badgeContent}
-      </Tooltip>
+      <Tooltip title={`Quy tắc sinh tồn: ${note}`}>{badgeContent}</Tooltip>
     );
   }
 

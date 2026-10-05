@@ -47,6 +47,7 @@ import TechnicalRecordModal, {
 } from './TechnicalRecordModal.component';
 import TechnicalSnapshotsModal from './TechnicalSnapshotsModal.component';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import { canReviewTechnicalRecord } from './TechnicalDictionaryRows';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
 
@@ -286,6 +287,18 @@ const TechnicalDictionaryPage = ({
     }
   }, [failRecordAction, refreshData, rejectComment, rejecting, t]);
 
+  const handleOpenRecord = useCallback(
+    (row: TechnicalDictionaryRow) => {
+      const canReview = canReviewTechnicalRecord(
+        row,
+        capabilities.canApprove,
+        currentUser?.name
+      );
+      setModal({ mode: canReview ? 'review' : 'view', row });
+    },
+    [capabilities.canApprove, currentUser?.name]
+  );
+
   const handleExport = useCallback(async () => {
     try {
       const file = await exportTechnicalDictionary();
@@ -409,8 +422,6 @@ const TechnicalDictionaryPage = ({
             />
           )}
           <TechnicalDictionaryTable
-            capabilities={capabilities}
-            currentUserName={currentUser?.name}
             emptyContent={
               hasActiveFilters ? undefined : (
                 <div data-testid="technical-dictionary-empty">
@@ -420,7 +431,7 @@ const TechnicalDictionaryPage = ({
             }
             extraTableFilters={
               <TechnicalDictionaryToolbar
-                canAddColumn={capabilities.canEdit}
+                canAddColumn={isEmbedded && capabilities.canEdit}
                 filters={records.filters}
                 options={options}
                 searchText={records.searchText}
@@ -434,16 +445,9 @@ const TechnicalDictionaryPage = ({
             pageSize={records.pageSize}
             rows={records.rows}
             total={records.total}
-            onDelete={handleDelete}
-            onApprove={(row) => setModal({ mode: 'review', row })}
-            onEdit={(row) => setModal({ mode: 'edit', row })}
             onPageChange={records.setPage}
             onPageSizeChange={records.setPageSize}
-            onReject={(row) => {
-              setRejectComment('');
-              setRejecting(row);
-            }}
-            onView={(row) => setModal({ mode: 'view', row })}
+            onView={handleOpenRecord}
           />
           <TechnicalRecordModal
             dataDictionaryVersion={dataDictionaryVersion}
@@ -452,16 +456,20 @@ const TechnicalDictionaryPage = ({
             open={Boolean(modal)}
             options={options}
             row={modal?.row}
+            onApprove={
+              modal?.mode === 'review' && modal
+                ? () => handleApprove(modal.row)
+                : undefined
+            }
             onCancel={() => setModal(undefined)}
             onDelete={
               capabilities.canEdit && modal
                 ? () => handleDelete(modal.row)
                 : undefined
             }
-            onSave={handleSave}
-            onApprove={
-              modal?.mode === 'review' && modal
-                ? () => handleApprove(modal.row)
+            onEdit={
+              capabilities.canEdit && modal && modal.mode !== 'edit'
+                ? () => setModal({ mode: 'edit', row: modal.row })
                 : undefined
             }
             onReject={
@@ -472,6 +480,7 @@ const TechnicalDictionaryPage = ({
                   }
                 : undefined
             }
+            onSave={handleSave}
           />
           <TechnicalAddColumnModal
             dataDictionaryVersion={dataDictionaryVersion}
@@ -541,11 +550,28 @@ const TechnicalDictionaryPage = ({
           capabilities={capabilities}
           dataDictionaryVersion={dataDictionaryVersion}
           isAdmin={isAdminUser}
+          onAddColumn={() => setAddColumnOpen(true)}
           onExport={handleExport}
           onImport={() => navigate(ROUTES.TECHNICAL_DICTIONARY_IMPORT)}
           onOpenSnapshots={() => setSnapshotsOpen(true)}
           onRebuildIndex={handleRebuildIndex}
         />
+        <div className="tech-dict-tab-card">
+          <div className="tech-dict-tab-list" role="tablist">
+            <span
+              aria-selected
+              className="tech-dict-tab active"
+              data-testid="technical-dictionary-tab"
+              role="tab">
+              {t('label.technical-field-plural')}
+              <span
+                className="tech-dict-tab-count"
+                data-testid="technical-dictionary-count">
+                {records.total}
+              </span>
+            </span>
+          </div>
+        </div>
         {content}
       </div>
     </PageLayoutV1>

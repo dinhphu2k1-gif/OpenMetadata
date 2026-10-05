@@ -20,22 +20,18 @@ import {
 describe('TechnicalDictionary constants', () => {
   it('uses a preference key that drops the layout of the versioned dictionary', () => {
     expect(TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY).toBe(
-      'technicalDictionary.v4'
+      'technicalDictionary.v5'
     );
   });
 
-  it('lists the fields in the documented order with status last before the action column', () => {
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(16);
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(0, 4)).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
-    ]);
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-3)).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
+  it('lists the field and its status first, then the dictionary fields in the documented order', () => {
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(12);
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(0, 2)).toEqual([
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
+    ]);
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-1)).toEqual([
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
     ]);
   });
 
@@ -48,14 +44,10 @@ describe('TechnicalDictionary constants', () => {
     );
   });
 
-  it('keeps the four source columns, the status and the actions always visible', () => {
+  it('keeps the field and its status always visible', () => {
     expect(TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
     ]);
   });
 });
