@@ -101,34 +101,32 @@ jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
 );
 
 jest.mock(
-  '../../common/TagSelectableList/TagSelectableList.component',
+  '../../common/ClassificationSelect/useClassificationOptions',
   () => ({
-    TagSelectableList: jest
+    useClassificationOptions: jest
       .fn()
-      .mockImplementation(
-        ({ children, classificationFilter, onUpdate }) => (
-          <div data-testid={`mock-tag-suggestion-${classificationFilter}`}>
-            {children}
-            <button
-              data-testid={`mock-add-tag-${classificationFilter}`}
-              type="button"
-              onClick={() =>
-                onUpdate?.([
-                  {
-                    tagFQN: `${classificationFilter}.Tag1`,
-                    name: 'Tag1',
-                    source: TagSource.Classification,
-                    labelType: LabelType.Manual,
-                    state: State.Confirmed,
-                  },
-                ])
-              }>
-              Add Tag {classificationFilter}
-            </button>
-          </div>
-        )
-      ),
+      .mockReturnValue({ options: [], isLoading: false }),
   })
+);
+
+jest.mock(
+  '../../common/ClassificationSelect/ClassificationSelect.component',
+  () =>
+    jest.fn().mockImplementation(({ dataTestId, onChange, value = [] }) => {
+      const classification = String(dataTestId).replace('cde-classification-', '');
+
+      return (
+        <div data-testid={`mock-classification-select-${classification}`}>
+          <span>{value.join(',')}</span>
+          <button
+            data-testid={`mock-add-tag-${classification}`}
+            type="button"
+            onClick={() => onChange?.([...value, `${classification}.Tag1`])}>
+            Add Tag {classification}
+          </button>
+        </div>
+      );
+    })
 );
 
 const mockGlossaryTerm: GlossaryTerm = {

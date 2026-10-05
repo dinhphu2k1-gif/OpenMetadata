@@ -43,7 +43,6 @@ export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
   KEYS.TABLE_NAME,
   KEYS.COLUMN_NAME,
   KEYS.SERVICE_NAME,
-  KEYS.STATUS,
   KEYS.CDE_CODE,
   KEYS.CDE_NAME,
   KEYS.SURVIVORSHIP_RANK,
@@ -53,6 +52,7 @@ export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
   KEYS.CREATION_METHOD,
   KEYS.TIMELINESS,
   KEYS.DESCRIPTION,
+  KEYS.STATUS,
   KEYS.ACTIONS,
 ];
 
@@ -65,9 +65,9 @@ export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
   KEYS.ACTIONS,
 ];
 
-// v3 adds the maker-checker status column, so an older saved layout is not applied again.
+// v4 moves the status column to the end, so an older saved layout is not applied again.
 export const TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY =
-  'technicalDictionary.v3';
+  'technicalDictionary.v4';
 
 export const TECHNICAL_CLASSIFICATIONS = {
   ELEMENT_TYPE: 'DataElementType',

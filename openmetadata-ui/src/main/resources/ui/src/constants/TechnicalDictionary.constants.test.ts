@@ -20,20 +20,21 @@ import {
 describe('TechnicalDictionary constants', () => {
   it('uses a preference key that drops the layout of the versioned dictionary', () => {
     expect(TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY).toBe(
-      'technicalDictionary.v2'
+      'technicalDictionary.v4'
     );
   });
 
-  it('lists the fourteen fields in the documented order plus the action column', () => {
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(15);
+  it('lists the fields in the documented order with status last before the action column', () => {
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(16);
     expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(0, 4)).toEqual([
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
     ]);
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-2)).toEqual([
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-3)).toEqual([
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
     ]);
   });
@@ -47,12 +48,13 @@ describe('TechnicalDictionary constants', () => {
     );
   });
 
-  it('keeps the four source columns and the actions always visible', () => {
+  it('keeps the four source columns, the status and the actions always visible', () => {
     expect(TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS).toEqual([
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DATABASE_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SCHEMA_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.TABLE_NAME,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.COLUMN_NAME,
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.ACTIONS,
     ]);
   });

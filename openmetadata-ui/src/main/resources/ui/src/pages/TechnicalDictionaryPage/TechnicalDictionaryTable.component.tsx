@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { ReactComponent as EditIcon } from '../../assets/svg/edit-new.svg';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
+import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
 import {
   renderDictionaryMarkdown,
@@ -39,6 +40,9 @@ import {
   TECHNICAL_PAGE_SIZE_OPTIONS,
 } from '../../constants/TechnicalDictionary.constants';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
+import { TechnicalRecordStatus } from '../../rest/technicalDictionaryAPI';
+import { getEntityStatusClass } from '../../utils/EntityStatusUtils';
 import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { getGlossaryTermsById } from '../../rest/glossaryAPI';
 import {
@@ -77,6 +81,15 @@ export interface TechnicalDictionaryTableProps {
 const Placeholder = () => (
   <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
 );
+
+const TECHNICAL_STATUS_TO_ENTITY_STATUS: Record<
+  TechnicalRecordStatus,
+  EntityStatus
+> = {
+  Approved: EntityStatus.Approved,
+  Rejected: EntityStatus.Rejected,
+  'In Review': EntityStatus.InReview,
+};
 
 const TAG_VARIANTS = {
   elementType: 'method',
@@ -315,30 +328,6 @@ const TechnicalDictionaryTable = ({
         ),
       },
       {
-        title: t('label.status'),
-        dataIndex: KEYS.STATUS,
-        key: KEYS.STATUS,
-        width: 130,
-        render: (_, row) => (
-          <Tag
-            color={
-              row.status === 'Approved'
-                ? 'success'
-                : row.status === 'Rejected'
-                ? 'error'
-                : 'processing'
-            }>
-            {t(
-              row.status === 'Approved'
-                ? 'label.approved'
-                : row.status === 'Rejected'
-                ? 'label.rejected'
-                : 'label.technical-in-review'
-            )}
-          </Tag>
-        ),
-      },
-      {
         title: t('label.cde-code-ref'),
         dataIndex: KEYS.CDE_CODE,
         key: KEYS.CDE_CODE,
@@ -442,6 +431,28 @@ const TechnicalDictionaryTable = ({
         key: KEYS.UPDATED_BY,
         width: 140,
         render: (_, row) => row.updatedBy || <Placeholder />,
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        width: 130,
+        render: (_, row) => {
+          const status = TECHNICAL_STATUS_TO_ENTITY_STATUS[row.status];
+
+          return (
+            <StatusBadge
+              dataTestId={`status-${row.columnName}`}
+              displayLabel={
+                row.status === 'In Review'
+                  ? t('label.technical-in-review')
+                  : undefined
+              }
+              label={status}
+              status={getEntityStatusClass(status)}
+            />
+          );
+        },
       },
       {
         title: t('label.action-plural'),

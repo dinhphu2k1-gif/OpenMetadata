@@ -3,41 +3,41 @@
  *  Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { DownOutlined } from '@ant-design/icons';
-import { Form, FormInstance, Input, Select, Tag } from 'antd';
+import { Form, FormInstance, Input } from 'antd';
 import { isEmpty } from 'lodash';
 import { DateTime } from 'luxon';
-import {
-  forwardRef,
-  HTMLAttributes,
-  ReactNode,
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCDEReleaseLevelValue } from '../../../constants/CDEReleaseLevel.constants';
 import { EntityType } from '../../../enums/entity.enum';
-import { TagLabel } from '../../../generated/entity/data/glossaryTerm';
+import {
+  LabelType,
+  State,
+  TagLabel,
+  TagSource,
+} from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useEntityRules } from '../../../hooks/useEntityRules';
 import { mergeCDEDates, validateCDEDates } from '../../../utils/CDEDateUtils';
 import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
+import ClassificationSelect from '../../common/ClassificationSelect/ClassificationSelect.component';
+import SingleClassificationSelect from '../../common/ClassificationSelect/SingleClassificationSelect.component';
+import { useClassificationOptions } from '../../common/ClassificationSelect/useClassificationOptions';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
 import RichTextEditor from '../../common/RichTextEditor/RichTextEditor';
-import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/UserTeamSelectableList.component';
 import {
   CDE_TAG_CLASSIFICATIONS,
-  renderCDEClassificationTags,
   renderCDEOwners,
 } from '../GlossaryTermTab/CDEGlossaryTableColumns';
 import {
   AddGlossaryTermFormProps,
   GlossaryTermForm,
 } from './AddGlossaryTermForm.interface';
+import { CDEFormSelectTrigger } from './CDEFormSelectTrigger.component';
 import GlossaryTermFormSection from './GlossaryTermFormSection.component';
 import GovernedVersionFields from './GovernedVersionFields.component';
 
@@ -63,53 +63,6 @@ export interface CDEGlossaryTermFormValues {
   moi_quan_he_voi_thuc_the?: string;
 }
 
-type CDEFormSelectTriggerProps = Omit<
-  HTMLAttributes<HTMLDivElement>,
-  'children'
-> & {
-  content?: ReactNode;
-  placeholder: string;
-  values?: string[];
-};
-
-const CDEFormSelectTrigger = forwardRef<
-  HTMLDivElement,
-  CDEFormSelectTriggerProps
->(
-  (
-    { className, content, onKeyDown, placeholder, values = [], ...props },
-    ref
-  ) => {
-    const displayValue = values.filter(Boolean).join(', ');
-    const hasValue = Boolean(content || displayValue);
-
-    return (
-      <div
-        {...props}
-        className={`cde-form-select-trigger ${
-          hasValue ? 'cde-form-select-trigger--populated' : ''
-        } ${className ?? ''}`}
-        ref={ref}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(event) => {
-          onKeyDown?.(event);
-          if (!event.defaultPrevented && ['Enter', ' '].includes(event.key)) {
-            event.preventDefault();
-            event.currentTarget.click();
-          }
-        }}>
-        <span className="cde-form-select-trigger-value">
-          {content || displayValue || placeholder}
-        </span>
-        <DownOutlined />
-      </div>
-    );
-  }
-);
-
-CDEFormSelectTrigger.displayName = 'CDEFormSelectTrigger';
-
 interface CDETagSelectorProps {
   classification: string;
   placeholder: string;
@@ -119,6 +72,17 @@ interface CDETagSelectorProps {
   onChange?: (tags: TagLabel[]) => void;
 }
 
+const CDE_CLASSIFICATION_TEST_ID_PREFIX = 'cde-classification-';
+
+const toTagLabel = (fqn: string, label?: string): TagLabel => ({
+  tagFQN: fqn,
+  name: fqn.split('.').at(-1),
+  displayName: label,
+  source: TagSource.Classification,
+  labelType: LabelType.Manual,
+  state: State.Confirmed,
+});
+
 export const CDETagSelector = ({
   classification,
   onChange,
@@ -127,34 +91,29 @@ export const CDETagSelector = ({
   variant,
   value = [],
 }: CDETagSelectorProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { options, isLoading } = useClassificationOptions(classification);
+
+  const handleChange = (fqns: string[]) =>
+    onChange?.(
+      fqns.map(
+        (fqn) =>
+          value.find((tag) => tag.tagFQN === fqn) ??
+          toTagLabel(fqn, options.find((option) => option.value === fqn)?.label)
+      )
+    );
 
   return (
-    <TagSelectableList
-      classificationFilter={classification}
-      hasPermission
-      popoverProps={{
-        open: isOpen,
-        overlayClassName: 'cde-tag-select-popover',
-        placement: 'bottomLeft',
-        onOpenChange: setIsOpen,
-      }}
+    <ClassificationSelect
+      dataTestId={`${CDE_CLASSIFICATION_TEST_ID_PREFIX}${classification}`}
+      loading={isLoading}
+      mode="multiple"
+      options={options}
+      placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
-      selectedTags={value}
-      onCancel={() => setIsOpen(false)}
-      onUpdate={async (tags) => {
-        onChange?.(tags);
-        setIsOpen(false);
-      }}>
-      <CDEFormSelectTrigger
-        content={
-          value.length
-            ? renderCDEClassificationTags(value, classification, variant)
-            : undefined
-        }
-        placeholder={placeholder}
-      />
-    </TagSelectableList>
+      value={value.map((tag) => tag.tagFQN)}
+      variant={variant}
+      onChange={handleChange}
+    />
   );
 };
 
@@ -474,34 +433,24 @@ const CDEGlossaryTermForm = ({
           />
         </Form.Item>
         <Form.Item label={t('cde.release-level')} name="releaseLevel">
-          <Select
-            allowClear
-            className="cde-form-enum-select"
-            data-testid="cde-release-level"
-            dropdownClassName="cde-enum-field-dropdown"
-            getPopupContainer={() => document.body}
+          <SingleClassificationSelect
+            dataTestId="cde-release-level"
             options={[
               {
-                displayLabel: (
-                  <Tag className="cde-value-pill cde-value-pill-release">
-                    {t('cde.release-level-ceo')}
-                  </Tag>
-                ),
                 label: t('cde.release-level-ceo'),
                 value: 'CEO',
+                variant: 'release',
               },
               {
-                displayLabel: (
-                  <Tag className="cde-value-pill cde-value-pill-release">
-                    {t('cde.release-level-ttqldl')}
-                  </Tag>
-                ),
                 label: t('cde.release-level-ttqldl'),
                 value: 'TTQLDL',
+                variant: 'release',
               },
             ]}
-            optionLabelProp="displayLabel"
             placeholder={t('cde.select-release-level')}
+            searchPlaceholder={t('label.search-for-type', {
+              type: t('cde.release-level'),
+            })}
           />
         </Form.Item>
         {(['effectiveDate', 'expirationDate'] as const).map((key) => (
@@ -568,33 +517,16 @@ const CDEGlossaryTermForm = ({
           t('cde.select-personal-data')
         )}
         <Form.Item label={t('cde.data-quality-rules')} name="dataQualityRules">
-          <Select
-            allowClear
-            className="cde-form-enum-select"
-            dropdownClassName="cde-enum-field-dropdown"
-            getPopupContainer={() => document.body}
+          <SingleClassificationSelect
+            dataTestId="cde-data-quality-rules"
             options={[
-              {
-                displayLabel: (
-                  <Tag className="cde-value-pill cde-value-pill-quality">
-                    {t('label.yes')}
-                  </Tag>
-                ),
-                label: t('label.yes'),
-                value: 'true',
-              },
-              {
-                displayLabel: (
-                  <Tag className="cde-value-pill cde-value-pill-neutral">
-                    {t('label.no')}
-                  </Tag>
-                ),
-                label: t('label.no'),
-                value: 'false',
-              },
+              { label: t('label.yes'), value: 'true', variant: 'quality' },
+              { label: t('label.no'), value: 'false', variant: 'neutral' },
             ]}
-            optionLabelProp="displayLabel"
             placeholder={t('cde.select-data-quality-rules')}
+            searchPlaceholder={t('label.search-for-type', {
+              type: t('cde.data-quality-rules'),
+            })}
           />
         </Form.Item>
       </GlossaryTermFormSection>

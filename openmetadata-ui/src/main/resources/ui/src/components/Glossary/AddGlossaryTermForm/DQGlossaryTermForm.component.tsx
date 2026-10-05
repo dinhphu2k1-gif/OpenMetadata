@@ -3,7 +3,7 @@
  *  Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { Form, FormInstance, Input, Select } from 'antd';
+import { Form, FormInstance, Input } from 'antd';
 import { isEmpty } from 'lodash';
 import { DateTime } from 'luxon';
 import { useEffect, useState } from 'react';
@@ -14,6 +14,7 @@ import {
   TagLabel,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
+import SingleClassificationSelect from '../../common/ClassificationSelect/SingleClassificationSelect.component';
 import RichTextEditor from '../../common/RichTextEditor/RichTextEditor';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import CDESelector from '../CDESelector/CDESelector.component';
@@ -346,10 +347,16 @@ const DQGlossaryTermForm = ({
           className="dq-form-release-level cde-form-field-full"
           label={t('cde.release-level')}
           name="releaseLevel">
-          <Select
-            allowClear
-            className="cde-form-enum-select"
-            options={CDE_RELEASE_LEVEL_OPTIONS}
+          <SingleClassificationSelect
+            dataTestId="dq-release-level"
+            options={CDE_RELEASE_LEVEL_OPTIONS.map((option) => ({
+              ...option,
+              variant: 'release',
+            }))}
+            placeholder={t('cde.select-release-level')}
+            searchPlaceholder={t('label.search-for-type', {
+              type: t('cde.release-level'),
+            })}
           />
         </Form.Item>
         {(['effectiveDate', 'expirationDate'] as const).map((key) => (

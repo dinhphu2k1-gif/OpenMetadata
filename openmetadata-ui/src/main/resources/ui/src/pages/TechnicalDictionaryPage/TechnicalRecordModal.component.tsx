@@ -18,12 +18,12 @@ import GlossaryTermFormSection from '../../components/Glossary/AddGlossaryTermFo
 import CDESelector from '../../components/Glossary/CDESelector/CDESelector.component';
 import { TECHNICAL_MAX_RANK } from '../../constants/TechnicalDictionary.constants';
 import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
-import { Tag } from '../../generated/entity/classification/tag';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { TechnicalColumnCandidate } from '../../rest/technicalDictionaryAPI';
 import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import TechnicalTagSelect from './TechnicalTagSelect.component';
 
 /** Editable values collected from the modal. `cde` is undefined when unchanged, null when cleared. */
 export interface TechnicalRecordFormValues {
@@ -63,12 +63,6 @@ interface TechnicalRecordModalProps {
   onApprove?: () => void;
   onReject?: () => void;
 }
-
-const tagSelectOptions = (tags: Tag[]) =>
-  tags.map((tag) => ({
-    value: tag.fullyQualifiedName as string,
-    label: tag.displayName || tag.name,
-  }));
 
 const columnOptionLabel = (candidate: TechnicalColumnCandidate) =>
   [candidate.sourceTable, candidate.sourceColumn].filter(Boolean).join(' · ');
@@ -311,13 +305,16 @@ const TechnicalRecordModal = ({
           </Form.Item>
           {row?.status && (
             <Form.Item label={t('label.status')}>
-              <Input disabled value={t(
-                row.status === 'Approved'
-                  ? 'label.approved'
-                  : row.status === 'Rejected'
-                  ? 'label.rejected'
-                  : 'label.technical-in-review'
-              )} />
+              <Input
+                disabled
+                value={t(
+                  row.status === 'Approved'
+                    ? 'label.approved'
+                    : row.status === 'Rejected'
+                    ? 'label.rejected'
+                    : 'label.technical-in-review'
+                )}
+              />
             </Form.Item>
           )}
           {row?.submittedBy && (
@@ -392,35 +389,43 @@ const TechnicalRecordModal = ({
             />
           </Form.Item>
           <Form.Item label={t('label.data-element-type')} name="elementType">
-            <Select
-              allowClear
-              className="cde-form-enum-select"
-              options={tagSelectOptions(options.elementTypes)}
-              popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
+            <TechnicalTagSelect
+              dataTestId="technical-elementType-select"
+              disabled={isReadOnly}
+              label={t('label.data-element-type')}
+              loading={options.isLoading}
+              tags={options.elementTypes}
+              variant="method"
             />
           </Form.Item>
           <Form.Item label={t('label.generation-type')} name="generationType">
-            <Select
-              allowClear
-              className="cde-form-enum-select"
-              options={tagSelectOptions(options.generationTypes)}
-              popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
+            <TechnicalTagSelect
+              dataTestId="technical-generationType-select"
+              disabled={isReadOnly}
+              label={t('label.generation-type')}
+              loading={options.isLoading}
+              tags={options.generationTypes}
+              variant="quality"
             />
           </Form.Item>
           <Form.Item label={t('label.creation-method')} name="creationMethod">
-            <Select
-              allowClear
-              className="cde-form-enum-select"
-              options={tagSelectOptions(options.creationMethods)}
-              popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
+            <TechnicalTagSelect
+              dataTestId="technical-creationMethod-select"
+              disabled={isReadOnly}
+              label={t('label.creation-method')}
+              loading={options.isLoading}
+              tags={options.creationMethods}
+              variant="source"
             />
           </Form.Item>
           <Form.Item label={t('label.timeliness')} name="timeliness">
-            <Select
-              allowClear
-              className="cde-form-enum-select"
-              options={tagSelectOptions(options.timeliness)}
-              popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
+            <TechnicalTagSelect
+              dataTestId="technical-timeliness-select"
+              disabled={isReadOnly}
+              label={t('label.timeliness')}
+              loading={options.isLoading}
+              tags={options.timeliness}
+              variant="frequency"
             />
           </Form.Item>
         </GlossaryTermFormSection>

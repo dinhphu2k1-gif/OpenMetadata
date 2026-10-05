@@ -84,6 +84,15 @@ jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
     )
 );
 
+jest.mock(
+  '../../common/ClassificationSelect/useClassificationOptions',
+  () => ({
+    useClassificationOptions: jest
+      .fn()
+      .mockReturnValue({ options: [], isLoading: false }),
+  })
+);
+
 jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
   jest.fn().mockImplementation(({ classificationFilter, onChange }) => (
     <div data-testid={`mock-tag-suggestion-${classificationFilter}`}>
