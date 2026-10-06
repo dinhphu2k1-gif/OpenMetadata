@@ -1,6 +1,7 @@
 # Thiết kế Từ điển kỹ thuật (Technical Dictionary)
 
 > Trạng thái tài liệu: **Đã chốt**, cập nhật quyết định phê duyệt bản ghi mới ngày 2026-10-05; duyệt hàng loạt, từ chối không cần lý do và bản nháp ngày 2026-10-06.
+> Giao diện (§11), chủ quản dữ liệu (TD-D11) và hiện trạng triển khai (§16) đã được đối chiếu lại với code ngày 2026-10-06.
 > Đây là tài liệu thiết kế duy nhất của Từ điển kỹ thuật (TD).
 >
 > Tài liệu hợp nhất ba tài liệu trước đây và thay thế chúng:
@@ -53,16 +54,16 @@ và gán (tùy chọn) với một CDE của DD. Thiết kế đi qua ba lần �
 | TDX-07 | Import được tạo bản ghi cho Column chưa khai báo | |
 | TDX-09 | Không có cấu hình phạm vi Column; người dùng chọn Column cụ thể khi khai báo | |
 | TDX-11 | Bản ghi TD không được ghi vào các index glossary chung; chỉ có trong index riêng | |
-| TD-D06 | Không có trang chi tiết; bảng và modal phải đủ thông tin | |
+| TD-D06 | Mỗi bản ghi có **trang chi tiết riêng** `/technical-dictionary/:termId` (thông tin, sửa từng trường tại chỗ, lịch sử, duyệt). Modal chỉ còn dùng cho **Thêm cột** | Thay quyết định cũ “không có trang chi tiết”; §11.3 |
 | TD-D08 | Database là nguồn sự thật; tag trên Column và search index là projection qua outbox | |
 | TD-D10 | Chủ sở hữu dữ liệu suy ra từ `owners` của CDE được quy chiếu, không nhập ở TD | Một nguồn sự thật, không lệch giữa các Column cùng CDE |
-| TD-D11 | Chủ sở hữu hệ thống là tham chiếu tới một Team, không dùng trường `owners` của OpenMetadata | Có kiểm tra tồn tại, lọc theo ID; tránh policy "owner được sửa" cấp quyền ngoài ý muốn |
+| TD-D11 | Chủ sở hữu hệ thống (UI gọi là **Chủ quản dữ liệu**) là **danh sách** tham chiếu tới Team và/hoặc User `[{id, type}]`, không dùng trường `owners` của OpenMetadata | Có kiểm tra tồn tại, lọc theo ID; tránh policy "owner được sửa" cấp quyền ngoài ý muốn. Giá trị cũ là một UUID Team vẫn đọc được (§4) |
 | TD-D12 | Thời gian là Classification `DataTimeliness`, đơn trị, danh sách chuẩn hóa được nghiệp vụ duyệt | Nhất quán với ba trường phân loại còn lại |
 | TD-D13 | Mô tả lấy từ Column (server-owned), không sửa ở TD | Mô tả do ingestion và trang Table quản lý |
 | TD-D14 | Không giữ liên kết lịch sử khi đổi tên Column/Table | OpenMetadata không có định danh Column ổn định qua đổi tên; Import cho phép gán lại nhanh |
 | TD-D15 | Thứ hạng `1..999`, bắt buộc khi có CDE, duy nhất trong cùng CDE trên bản ghi `Approved` còn nguồn; kiểm tra lại khi phê duyệt và mỗi lần sửa bản ghi đã duyệt (§7.2) | |
 | TD-D16 | Liên kết CDE chỉ lưu `termId`, không lưu version; bao trùm mọi version `vN.x` của CDE | Column chứa dữ liệu của thành tố nghiệp vụ, không phụ thuộc lần sửa minor của CDE |
-| TD-D17 | Bảng hiển thị **14 trường**, không có cột Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống; header không có thẻ thống kê | Quyết định giao diện, §11 |
+| TD-D17 | Bảng không có cột Chủ sở hữu dữ liệu (suy ra từ CDE); header không có thẻ thống kê. Cột Chủ quản dữ liệu (chủ sở hữu hệ thống) hiển thị mặc định. Bốn cột Database/Schema/Bảng/Cột gộp thành một cột **Tên trường**. File Export giữ 14 cột và không có cột chủ sở hữu | Quyết định giao diện, §11 và §12.1 |
 | TD-D18 | Phê duyệt bản ghi mới theo maker-checker: người tạo không được tự phê duyệt; quyền phê duyệt tách khỏi quyền khai báo/sửa | §10 |
 
 ## 3. Identity và thông tin nguồn
@@ -122,7 +123,7 @@ Tag chỉ nhận giá trị trong allowlist classification tương ứng; UI và
 | `cdeAssignedAt`, `cdeAssignedBy` | | Lần đầu đặt khi phê duyệt; sau đó cập nhật mỗi khi đổi CDE; dùng cho endpoint `technicalAssets` |
 | `rank` | `smallint` null | Thứ hạng `1..999` |
 | `elementType`, `generationType`, `creationMethod`, `timeliness` | `varchar` null | Tag FQN của bốn classification |
-| `systemOwnerId` | `uuid` null | Team |
+| `systemOwnerId` | `text` null | Chủ quản dữ liệu (TD-D11): JSON `[{"id", "type": "team"\|"user"}]`. Giá trị cũ là một UUID trần được đọc là một Team. Tên cột giữ nguyên để không phải migration |
 | `status` | `varchar(16)` | `Draft` / `In Review` / `Approved` / `Rejected`; bản ghi mới (khai báo và Import) là `Draft` |
 | `submittedAt`, `submittedBy` | | Lần gửi duyệt gần nhất; rỗng khi bản ghi còn là bản nháp |
 | `reviewedAt`, `reviewedBy`, `reviewComment` | | Quyết định phê duyệt/từ chối gần nhất. Từ chối không có lý do: `reviewComment` luôn rỗng (cột giữ lại cho dữ liệu cũ) |
@@ -131,13 +132,25 @@ Tag chỉ nhận giá trị trong allowlist classification tương ứng; UI và
 
 Index phụ: `(cdeTermId, rank)` cho kiểm tra Thứ hạng và endpoint `technicalAssets`.
 
+`technical_record_change_request`: đề xuất sửa/xóa một bản ghi `Approved` (§7.4), tối đa một dòng cho mỗi record
+(`UNIQUE(recordId)`).
+
+| Cột | Ghi chú |
+| --- | --- |
+| `id`, `recordId` | |
+| `operation` | `UPDATE` / `DELETE` |
+| `baseRevision` | Revision của record lúc tạo đề xuất; lệch lúc duyệt thì `TD_CHANGE_REQUEST_STALE` |
+| `proposedValues` | JSON giá trị đề xuất (rỗng với `DELETE`) |
+| `status`, `revision` | `Draft` / `InReview` / `Rejected`; `revision` là khóa lạc quan của chính đề xuất |
+| `createdAt/By`, `updatedAt/By`, `submittedAt/By`, `reviewedAt/By`, `reviewComment` | Như bản ghi; `reviewComment` luôn rỗng |
+
 `technical_record_audit`: lịch sử thay đổi, không bị xóa khi TD làm mới.
 
 | Cột | Ghi chú |
 | --- | --- |
 | `id`, `recordId`, `columnFqn`, `dataDictionaryVersion` | |
-| `action` | `CREATE`, `UPDATE`, `APPROVE`, `REJECT`, `RESUBMIT`, `DELETE`, `IMPORT`, `RESET` |
-| `changes` | JSON `[{field, oldValue, newValue}]`; CDE ghi cả mã CDE để đọc được sau khi identity bị lưu trữ |
+| `action` | Bản ghi: `CREATE`, `UPDATE`, `SUBMIT`, `APPROVE`, `REJECT`, `RESUBMIT`, `DELETE`, `IMPORT`, `RESET`. Đề xuất thay đổi: `CREATE_CHANGE`, `UPDATE_CHANGE`, `SUBMIT_CHANGE`, `RESUBMIT_CHANGE`, `APPROVE_CHANGE`, `REJECT_CHANGE`, `CANCEL_CHANGE`, `RESET_CHANGE` |
+| `changes` | JSON `[{field, oldValue, newValue}]` với `field` là `cde`, `rank`, `elementType`, `generationType`, `creationMethod`, `timeliness`, `systemOwner`; CDE ghi cả mã CDE để đọc được sau khi identity bị lưu trữ |
 | `actor`, `at` | |
 
 `technical_binding_snapshot`: bản chụp bất biến các liên kết Column–CDE tại mỗi lần cutover DD. Chỉ chứa
@@ -148,7 +161,7 @@ của DD đã lưu trữ.
 | --- | --- |
 | `dataDictionaryVersion`, `recordId` | PK. `dataDictionaryVersion` là `N` của DD bị lưu trữ |
 | `columnKey`, `cdeTermId` (NOT NULL), `cdeCode`, `cdeName`, `rank`, `columnFqn`, `frozenAt` | Mã/Tên CDE resolve lúc chụp; không resolve lại sau này |
-| `payload` | JSON dòng phẳng đầy đủ tại thời điểm chụp, gồm nhãn tag và tên Team |
+| `payload` | JSON dòng phẳng đầy đủ tại thời điểm chụp, gồm nhãn tag và tên Team/User chủ quản |
 
 Index phụ: `(cdeTermId)` cho endpoint `technicalAssets` của CDE đã lưu trữ.
 
@@ -182,12 +195,13 @@ không có `versioningMode`, không đăng ký trong `GovernedGlossaryProfileReg
 | | `dataType`, `description` | keyword / text | hiển thị, search mô tả |
 | | `sourceStatus` | keyword | filter Tình trạng nguồn |
 | CDE | `cde.id`, `cde.code`, `cde.name`, `cde.assignedAt`, `cde.assignedBy` | keyword + text | filter CDE, search Mã/Tên CDE, endpoint `technicalAssets`. `code`, `name` là bản CDE resolve khi dựng document |
-| | `dataOwners[].id`, `dataOwners[].name` | keyword | Chủ sở hữu dữ liệu hiển thị trong modal |
+| | `dataOwners[].id`, `dataOwners[].name` | keyword | Chủ sở hữu dữ liệu suy ra từ CDE; chỉ có trong API/index, giao diện không hiển thị |
 | Đặc tả | `rank` | integer | hiển thị, cảnh báo trùng |
 | | `elementType`, `generationType`, `creationMethod`, `timeliness` | keyword (tag FQN) + label | filter |
-| | `systemOwner.id`, `systemOwner.name` | keyword | filter, modal |
+| | `systemOwners[].id`, `systemOwners[].name`, `systemOwners[].type` | keyword | filter, cột Chủ quản dữ liệu, trang chi tiết. Tên được làm tươi khi đọc (`TechnicalOwnerLabels`) |
 | Khác | `revision` | long | UI gửi kèm khi ghi |
-| | `submittedAt`, `submittedBy`, `reviewedAt`, `reviewedBy`, `reviewComment` | date / keyword / text | hiển thị trạng thái và quyết định duyệt |
+| | `submittedAt`, `submittedBy`, `reviewedAt`, `reviewedBy`, `reviewComment`, `createdBy` | date / keyword / text | trạng thái, quyết định duyệt và kiểm tra tự duyệt |
+| | `hasPendingChange`, `changeRequestId`, `changeRequestStatus`, `changeOperation`, `changeCreatedBy` | boolean / keyword | đánh dấu bản ghi `Approved` đang có đề xuất (§7.4); không chứa nội dung đề xuất |
 | | `updatedAt`, `updatedBy` | date / keyword | hiển thị |
 
 Dữ liệu CDE (mã, tên, chủ sở hữu) được lưu sẵn trong document để search và hiển thị không phải truy
@@ -197,8 +211,9 @@ Postgres; §6.2 mô tả cách giữ nó đúng khi CDE thay đổi.
 
 - Server luôn tự dựng truy vấn; UI chỉ gửi tham số (`q`, các filter, `limit`, `offset`).
 - Search `q`: khớp một phần (ngram) trên database, schema, bảng, cột, Mã CDE, Tên CDE.
-- Filter trên UI: Nguồn, Loại thành tố, Loại trường dữ liệu,
-  Phương thức tạo, Thời gian. Filter tag gửi tag FQN. Giao diện không còn filter Mã CDE quy chiếu, Tình trạng nguồn và Chủ sở hữu hệ thống (TD-D17); tham số `cdeMapping`, `cdeTermIds`, `sourceStatuses`, `systemOwnerIds` vẫn được API hỗ trợ.
+- Filter trên UI: Trạng thái, Nguồn, Loại thành tố, Loại trường dữ liệu,
+  Phương thức tạo, Thời gian. Filter tag gửi tag FQN. Giao diện không có filter Mã CDE quy chiếu, Tình trạng nguồn và Chủ quản dữ liệu; tham số `cdeMapping`, `cdeTermIds`, `sourceStatuses`, `systemOwnerIds` vẫn được API hỗ trợ.
+- Với người có `canEdit`/`canApprove`, kết quả `search` được **mở rộng** sau truy vấn: bản ghi `Approved` có đề xuất `UPDATE` trở thành hai dòng cùng `termId` (`rowRole = APPROVED` rồi `rowRole = CHANGE` mang giá trị đề xuất và trạng thái của đề xuất). Đề xuất `DELETE` giữ một dòng. Filter trạng thái chỉ giữ nửa dòng có trạng thái khớp. Consumer không nhận dòng `CHANGE` và không nhận metadata đề xuất.
 - API hỗ trợ thêm filter `statuses`; UI hiển thị nhanh `Tất cả / Bản nháp / Chờ duyệt / Đã duyệt / Bị từ chối` (không có `Bản nháp` với Consumer).
 - Sort mặc định **Thứ hạng tăng dần (bản ghi chưa có Thứ hạng xếp cuối), rồi `columnFqn` tăng dần**, rồi `recordId`; phân trang `from/size`, `limit` chỉ nhận 10/15/25/50. Giới hạn
   10.000 kết quả đầu (`max_result_window`); vượt giới hạn cần thu hẹp filter.
@@ -260,7 +275,7 @@ Khai báo, phê duyệt, từ chối, gửi duyệt lại, sửa, xóa, commit I
 - Mã/Tên thành tố và Chủ sở hữu dữ liệu resolve theo snapshot `Approved` mới nhất của CDE trong `vN`.
 - CDE bị thu hồi hết phiên bản Approved: bản ghi giữ liên kết, UI hiển thị mã CDE kèm cảnh báo
   **“CDE không còn phiên bản được phê duyệt.”** Lưu bản ghi đó bị từ chối cho tới khi đổi hoặc bỏ CDE.
-- Selector: placeholder **“Tìm theo mã hoặc tên CDE”**, mỗi CDE một option `Mã CDE · Tên thành tố`.
+- Selector CDE (`CDESelectableList`, mở từ biểu tượng sửa của trường Mã CDE trên trang chi tiết, và trong modal Thêm cột), mỗi CDE một option `Mã CDE · Tên thành tố`.
 - Chưa có DD Approved (TDV-06): trang TD hiển thị **“Chưa có Từ điển dữ liệu dùng chung được phê duyệt.
   Từ điển kỹ thuật sẽ khả dụng sau khi phê duyệt phiên bản đầu tiên.”** Nút **Thêm cột** và Import bị ẩn.
 
@@ -284,9 +299,9 @@ Thứ hạng xác định Column nào được ưu tiên khi nhiều Column cùn
 
 Luồng chỉ áp dụng cho lần khai báo đầu tiên của một Column:
 
-1. Người có `canEdit` chọn Column, nhập thông tin và bấm **Lưu nháp**. `POST /records` tạo bản ghi `Draft`,
+1. Người có `canEdit` chọn Column trong modal **Thêm cột** (§11.4), nhập thông tin và bấm **Lưu nháp**. `POST /records` tạo bản ghi `Draft`,
    ghi `CREATE` và đồng bộ document vào index, nhưng chưa projection tag và chưa chờ duyệt. Người có `canEdit`
-   sửa được bản nháp (vẫn là `Draft`) hoặc xóa nó.
+   sửa được bản nháp (vẫn là `Draft`) hoặc xóa nó trên trang chi tiết (§11.3).
 1a. Người có `canEdit` mở bản nháp và bấm **Gửi phê duyệt** (hoặc đánh dấu nhiều bản nháp rồi **Gửi phê duyệt
    ({k})**, §11.6). `POST /records/{id}/submit` kiểm tra revision, trạng thái `Draft` và CDE còn gán được,
    chuyển sang `In Review`, ghi `submittedAt/submittedBy` và audit `SUBMIT`. Bản ghi `Rejected` không có thao tác gửi
@@ -328,6 +343,9 @@ dòng nếu proposal đang `InReview` và ghim cả record revision lẫn change
 proposal đã đổi sau preview. Cutover DD ghi
 `RESET_CHANGE`, xóa proposal trước khi xóa record để không để lại dữ liệu mồ côi.
 
+Trên giao diện (§11.3): **Sửa phiên bản** tạo đề xuất `UPDATE` ở `Draft` sao chép giá trị đã duyệt rồi mở `view=working` để sửa từng trường;
+**Đề nghị xóa** tạo đề xuất `DELETE`; **Hủy bản nháp thay đổi** gọi `DELETE /change-request`. Danh sách hiển thị bản đã duyệt và bản đề xuất thành hai dòng (§5.3, §11.2).
+
 ## 8. Column nguồn thay đổi
 
 - Ingest làm đổi kiểu, độ dài hoặc mô tả Column: cập nhật thẳng các trường nguồn của bản ghi, ghi audit
@@ -346,7 +364,7 @@ Sau khi DD đã phê duyệt nguyên tử các CDE và publish `vN+1`, trong **c
 
 1. Khóa `FOR UPDATE` dòng `technical_dictionary_state`.
 2. Chụp các bản ghi có `status = Approved AND cdeTermId IS NOT NULL` vào `technical_binding_snapshot`, kèm mã/tên CDE resolve
-   theo snapshot `Approved` mới nhất của `vN`, nhãn tag, Team và `frozenAt`.
+   theo snapshot `Approved` mới nhất của `vN`, nhãn tag, Team/User chủ quản và `frozenAt`.
 3. Ghi một dòng audit `RESET` cho **mỗi** bản ghi, kể cả chưa gán CDE (danh sách Column cần gỡ tag).
 4. Xóa toàn bộ `technical_record`.
 5. Cập nhật `technical_dictionary_state`: `dataDictionaryVersion = N+1`, `previousDataDictionaryVersion = N`,
@@ -384,7 +402,7 @@ Lỗi ở bất kỳ bước nào làm rollback toàn bộ phê duyệt DD. Kh�
 
 | Capability | Ý nghĩa | Nguồn |
 | --- | --- | --- |
-| `canView` | Xem danh sách, modal, lịch sử thay đổi, bản chụp | Policy `ViewAll`/`ViewBasic` trên glossary `Technical Dictionary` |
+| `canView` | Xem danh sách, trang chi tiết, bản chụp. Lịch sử thay đổi chỉ gồm các sự kiện đã có hiệu lực với Consumer (§5.1) | Policy `ViewAll`/`ViewBasic` trên glossary `Technical Dictionary` |
 | `canEdit` | Khai báo (bản nháp), sửa, gửi duyệt, gửi duyệt lại, xóa bản ghi | Policy `EditAll` hoặc `EditGlossaryTerms` trên glossary `Technical Dictionary` |
 | `canApprove` | Phê duyệt hoặc từ chối bản ghi mới | `DATA_STEWARD`, Admin hoặc policy `ApproveWorking`; vẫn phải khác người tạo |
 | `canImport` | Import | Bằng `canEdit` |
@@ -398,100 +416,109 @@ Lỗi ở bất kỳ bước nào làm rollback toàn bộ phê duyệt DD. Kh�
 
 ## 11. Giao diện
 
-### 11.1. Route và header
+### 11.1. Route, header và chế độ xem
 
 ```text
-/technical-dictionary
+/technical-dictionary                         danh sách (có thể nhúng trong trang glossary `Technical Dictionary`)
+/technical-dictionary/import                  Import (§12.2)
+/technical-dictionary/:termId?businessVersion=v&view=working   chi tiết bản ghi (§11.3)
 ```
 
-Không có UUID, `scopeId`, `businessVersion` hay route chi tiết bản ghi.
+`termId` là `recordId`. `businessVersion` là phiên bản DD đang xem (mặc định là phiên bản đang gắn); `view=working` mở
+bản đề xuất thay đổi của bản ghi `Approved` (§7.4). Trang danh sách cũng được `GlossaryTermTab` hiển thị (`isEmbedded`)
+khi người dùng mở glossary hệ thống `Technical Dictionary`; bản nhúng không có header riêng và đặt nút **Thêm cột** ở thanh công cụ của bảng.
 
 ```text
 Quản trị / Từ điển kỹ thuật
 
-[Icon] Từ điển kỹ thuật                                                                  [⋯]
+[Icon] Từ điển kỹ thuật  [Phiên bản: vN — Đã duyệt ▾]                         [Thêm cột] [⋯]
+       Technical Dictionary [copy]
+[ Trường dữ liệu  {tổng} ]
 ┌────────────────────────────────────────────────────────────────────────────────────┐
-│ [Tìm kiếm] [Nguồn] [Loại TT] [Loại trường] [Phương thức] [Thời gian]  [Thêm cột] [Tùy chỉnh] │
+│ [Tìm kiếm] [Trạng thái] [Nguồn] [Loại TT] [Loại trường] [Phương thức] [Thời gian] [Tùy chỉnh] │
 ├────────────────────────────────────────────────────────────────────────────────────┤
-│ Database │ Schema │ Bảng │ Cột │ Nguồn │ Mã CDE │ ... │ Mô tả │ Hành động           │
+│ ☐ │ Tên trường │ Nguồn │ Mã CDE │ ... │ Mô tả │ Trạng thái                          │
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Header không có badge trạng thái tổng, bộ chọn phiên bản, action vòng đời catalog **và không có thẻ thống kê**;
-  trạng thái phê duyệt nằm trên từng bản ghi.
-- Lề trái/phải của hàng tiêu đề bằng 0 để tiêu đề và nút `⋯` thẳng hàng với mép bảng (bảng tràn sát mép vùng nội dung).
-- Không hiển thị nhãn “Theo Từ điển dữ liệu dùng chung v{N}” cạnh tiêu đề; phiên bản DD đang gắn chỉ dùng nội bộ và trong tên file Export.
-- Menu `⋯`: Xuất Excel, Nhập Excel (`canImport`), **Bản chụp các phiên bản trước** (§12.3), Dựng lại index (Admin).
-  Menu dùng đúng kiểu menu quản lý của OpenMetadata (như header glossary): mỗi mục có icon, tên và một dòng mô
-  tả (`ManageButtonItemLabel`), rộng 350px, đóng lại sau khi chọn.
+- Header gồm tiêu đề, **bộ chọn phiên bản** (`TechnicalVersionBadges`: phiên bản đang gắn trạng thái Đã duyệt, rồi các
+  DD đã lưu trữ có bản chụp), dòng phụ là tên glossary kèm nút sao chép, và một thẻ tab **Trường dữ liệu** kèm tổng số
+  bản ghi. Không có thẻ thống kê (TD-D17). Phiên bản chỉ là bộ chọn xem lại; bản đang gắn vẫn là TD hiện hành duy nhất (TDV-01).
+- **Xem bản chụp** (chọn phiên bản đã lưu trữ, hoặc nút **Xem bản chụp v{N-1}** ở banner): danh sách đọc
+  `GET /technical/snapshots/{v}/records` — chỉ đọc, chỉ có ô tìm kiếm, không checkbox, không **Thêm cột**, hàng mở trang chi tiết của bản chụp.
+- Nút **Thêm cột** (`canEdit`, có DD đang gắn, không ở chế độ bản chụp) nằm ở header (trang độc lập) hoặc thanh công cụ (bản nhúng).
+- Menu `⋯`: **Xuất Excel** (`canExport`), **Nhập gán CDE** (`canImport`), **Bản chụp các phiên bản trước** (§12.3), **Dựng lại index** (Admin).
+  Hai mục đầu chỉ có khi đã có DD đang gắn. Menu dùng đúng kiểu menu quản lý của OpenMetadata (như header glossary): mỗi mục có icon,
+  tên và một dòng mô tả (`ManageButtonItemLabel`), rộng 350px, đóng lại sau khi chọn.
 - Banner sau lần làm mới, hiển thị tới khi người dùng đóng hoặc sau 30 ngày: **“Từ điển kỹ thuật đã được làm
-  mới ngày {resetAt} khi Từ điển dữ liệu dùng chung v{N} được phê duyệt. [Tải bản chụp v{N-1}] để nhập lại
-  các cột đã duyệt và gán CDE.”**
-- Trạng thái trống: **“Chưa có cột nào được khai báo”**; hành động nằm ở nút **Thêm cột** trên thanh công
-  cụ và mục **Nhập gán CDE** trong menu `⋯`.
+  mới ngày {resetAt} khi Từ điển dữ liệu dùng chung v{N} được phê duyệt.”** kèm hai nút **Xem bản chụp v{N-1}** và **Tải bản chụp v{N-1}**
+  (để nhập lại các cột đã duyệt và gán CDE).
+- Trạng thái trống: **“Chưa có cột nào được khai báo”**; hành động nằm ở nút **Thêm cột** và mục **Nhập gán CDE** trong menu `⋯`.
 
-### 11.2. Bảng — 14 trường
+### 11.2. Bảng
 
-Checkbox chọn hàng dùng để duyệt hàng loạt (§11.6). Cột **Hành động** là control UI, không tính vào 14 trường.
+Checkbox chọn hàng dùng để gửi duyệt/duyệt hàng loạt (§11.6). Bảng **không có cột Hành động**: bấm vào một dòng hoặc tên trường mở trang chi tiết (§11.3).
 
-| STT | Trường | Nguồn | Ghi chú |
+| Cột | Mặc định | Nguồn | Ghi chú |
 | --- | --- | --- | --- |
-| 1–4 | Tên cơ sở dữ liệu, Tên Schema, Tên Bảng, Tên cột | Hệ thống | Cố định trái |
-| 5 | Nguồn | Hệ thống | `service` |
-| 6 | Mã CDE quy chiếu | Người dùng | Tùy chọn. Là liên kết: bấm vào sẽ tra FQN của CDE theo `termId` (`GET /v1/glossaryTerms/{id}`) rồi mở trang chi tiết thuật ngữ |
-| 7 | Tên thành tố CDE | Suy ra | Read-only |
-| 8 | Thứ hạng | Người dùng | §7.2 |
-| 9 | Loại dữ liệu | Hệ thống | Kèm length/precision/scale |
-| 10 | Loại thành tố | Người dùng | Tag `DataElementType` |
-| 11 | Loại trường dữ liệu | Người dùng | Tag `FieldGenerationType` |
-| 12 | Phương thức tạo | Người dùng | Tag `DataCreationMethod` |
-| 13 | Thời gian | Người dùng | Tag `DataTimeliness` |
-| 14 | Mô tả | Hệ thống | TD-D13 |
+| **Tên trường** | Hiện, cố định trái, không tắt được | Hệ thống | Tên cột (bấm mở chi tiết) và dòng đường dẫn `Database / Schema / Bảng`, mỗi đoạn là liên kết tới thực thể trong OpenMetadata |
+| Nguồn | Hiện | Hệ thống | `service`; kèm badge **Nguồn không còn** khi `sourceStatus = Unavailable` |
+| Mã CDE quy chiếu | Hiện | Người dùng | Tùy chọn. Bấm sẽ tra FQN của CDE theo `termId` (`GET /v1/glossaryTerms/{id}`) rồi mở trang chi tiết thuật ngữ |
+| Tên thành tố CDE | Hiện | Suy ra | Read-only |
+| Thứ hạng | Hiện | Người dùng | Badge survivorship, §7.2 |
+| Loại dữ liệu | Hiện | Hệ thống | |
+| Chủ quản dữ liệu | Hiện | Người dùng | Tên các Team/User của TD-D11, nối bằng dấu phẩy |
+| Loại thành tố, Loại trường dữ liệu, Phương thức tạo, Thời gian | Hiện | Người dùng | Bốn tag classification (§3.3), hiển thị dạng thẻ màu |
+| Mô tả | Hiện | Hệ thống | TD-D13 |
+| **Trạng thái** | Hiện, cố định, không tắt được | Hệ thống | Badge `Bản nháp` / `Chờ duyệt` / `Đã duyệt` / `Bị từ chối`. Bản ghi `Approved` có đề xuất kèm thẻ `Có bản nháp thay đổi` / `Thay đổi chờ duyệt` / `Thay đổi bị từ chối` / `Chờ duyệt xóa` |
+| Cập nhật lúc, Cập nhật bởi | Ẩn | Hệ thống | Tùy chọn qua **Tùy chỉnh** |
 
-- **Không có** cột Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống (TD-D17). Modal cũng không hiển thị hai
-  thông tin này; chúng chỉ còn trong template Import (Chủ sở hữu hệ thống, §12.2) và dữ liệu. File Export cũng không có hai cột này (§12.1).
-- Thứ tự dòng cố định do server: Thứ hạng tăng dần (chưa có Thứ hạng xếp cuối), rồi `columnFqn` (§5.3). Thứ hạng chỉ
-  duy nhất trong cùng CDE nên các CDE khác nhau có cùng hạng sẽ đứng cạnh nhau. Bấm tiêu đề cột không đổi thứ tự.
-- Cột control **Trạng thái** hiển thị badge `Bản nháp` / `Chờ duyệt` / `Đã duyệt` / `Bị từ chối` và không tính vào 14
-  trường nghiệp vụ. Cột tùy chọn, mặc định ẩn: **Cập nhật lúc**, **Cập nhật bởi**.
-- Bốn cột Database, Schema, Bảng, Cột cố định trái; **Hành động** cố định phải, chỉ rộng đủ cho icon.
-  Scrollbar ngang luôn nhìn thấy ở đáy vùng bảng, cách footer; không che row.
-- Giá trị thiếu hiển thị `--`; action có tooltip và accessible name.
-- Column preference key `technicalDictionary.v3`, để cấu hình cột trước khi có trạng thái maker-checker
-  không được áp dụng lại.
-- Row action: **Xem/Sửa** (mở modal), **Xóa** (`canEdit`, có xác nhận). Không có nút Phê duyệt/Từ chối trên từng
-  dòng: duyệt từng bản ghi trong modal (§11.3), duyệt nhiều bản ghi bằng thanh xử lý hàng loạt (§11.6); cập nhật
-  hàng loạt giá trị dùng Import.
-- Filter (đặt trực tiếp trên thanh công cụ, không có popover **Bộ lọc khác**): Trạng thái, Nguồn, Loại thành tố,
-  Loại trường dữ liệu, Phương thức tạo, Thời gian. Kết hợp filter, reset page, chống
-  stale response; filter khác mặc định đồng bộ URL.
+- Không có cột Chủ sở hữu dữ liệu (suy ra từ CDE, chỉ còn trong API/index). Khóa lưu cấu hình cột `technicalDictionary.v6`; đổi khóa
+  để cấu hình cũ không bị áp dụng lại khi bố cục thay đổi.
+- Thứ tự dòng cố định do server: Thứ hạng tăng dần (chưa có Thứ hạng xếp cuối), rồi `columnFqn` (§5.3). Bấm tiêu đề cột không đổi thứ tự.
+- **Hai dòng cho một bản ghi đang được đề xuất sửa** (§5.3): dòng giá trị đã duyệt rồi dòng đề xuất với trạng thái
+  của đề xuất. Cả hai mở cùng trang chi tiết; dòng đề xuất mở ở chế độ `view=working`.
+- Giá trị thiếu hiển thị `--`. Phân trang số trang với `limit` 10/15/25/50, mặc định 25.
+- Filter đặt trực tiếp trên thanh công cụ: Trạng thái (`Bản nháp` chỉ có với `canEdit`/`canApprove`), Nguồn, Loại thành tố,
+  Loại trường dữ liệu, Phương thức tạo, Thời gian. Kết hợp filter, reset page, chống stale response; filter khác mặc định đồng bộ URL.
 
-### 11.3. Modal
+### 11.3. Trang chi tiết bản ghi
 
-- Một modal cho Xem, Sửa, Thêm cột và duyệt, **cùng bố cục và cùng kiểu form** (header/footer cố định, chỉ body cuộn,
-  căn giữa, một cột trên mobile). Thêm cột có ô **Chọn cột** ở đầu; Sửa có thêm nút **Xóa**; chế độ Xem và
-  duyệt chỉ đọc. Có `canEdit` thì các trường editable mở sửa ngay ngoài chế độ duyệt.
-- Nhóm **Nguồn** (chỉ đọc): Database, Schema, Bảng, Cột, Nguồn, Loại dữ liệu, Mô tả, badge tình trạng nguồn.
-- Nhóm **Quy chiếu và đặc tả** (editable): Mã CDE (Tên thành tố tự điền, read-only), Thứ hạng, Loại thành tố,
-  Loại trường dữ liệu, Phương thức tạo, Thời gian. Không có Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống (TD-D17).
-  Khi Lưu, Chủ sở hữu hệ thống đã có được giữ nguyên.
-- Cảnh báo trùng Thứ hạng hiển thị ngay tại field kèm bản ghi đang giữ Thứ hạng đó.
-- Modal **không** hiển thị lịch sử thay đổi (TD-D17). Audit vẫn được ghi vào `technical_record_audit` và đọc được qua API `/history`.
-- Modal hiển thị badge trạng thái cạnh tiêu đề; không hiển thị người gửi, ngày gửi, người duyệt, ngày duyệt hay lý
-  do, chỉ còn nhóm **Nguồn** và nhóm **Quy chiếu và đặc tả**. Chế độ duyệt là chỉ đọc, footer: **Đóng** (kèm **Sửa**
-  khi có `canEdit`) bên trái · **Từ chối** (viền đỏ, nền trắng) · **Phê duyệt** (primary) bên phải. Hai nút mở hộp
-  xác nhận §11.6 với một bản ghi.
-- Footer sửa: **Xóa** (trái, chữ đỏ) · **Hủy** · **Lưu**; bản ghi `Rejected` dùng **Gửi duyệt lại** thay cho **Lưu**. Lưu gửi `expectedRevision`; xung đột trả
-  `409 TD_RECORD_REVISION_CONFLICT`, UI báo cột đã được người khác cập nhật và tải lại giá trị mới.
+Thay cho modal xem/sửa/duyệt trước đây. Bố cục giống trang chi tiết của Từ điển dữ liệu: breadcrumb `Từ điển kỹ thuật / {Tên cột}`, header
+(tên cột, bộ chọn phiên bản, `columnFqn` kèm nút sao chép, nút hành động), hai tab **Tổng quan** và **Lịch sử thay đổi**.
+
+- **Tổng quan**: khối **Mô tả** (từ Column, TD-D13) rồi ba nhóm:
+  - *Thông tin nguồn*: Nguồn, Bảng nguồn (`database / schema / table`), Loại dữ liệu, **Chủ quản dữ liệu** (chọn nhiều Team/User).
+  - *Tham chiếu CDE*: Mã CDE (liên kết tới CDE), Tên thành tố (tự điền), Thứ hạng (sửa tại chỗ, `1..999`).
+  - *Đặc tả kỹ thuật*: Loại thành tố, Loại trường dữ liệu, Phương thức tạo, Thời gian.
+- **Sửa từng trường tại chỗ**: mỗi trường editable có biểu tượng sửa riêng, lưu ngay khi chọn xong và gửi `expectedRevision`; xung đột
+  (`TD_RECORD_REVISION_CONFLICT`, `TD_CHANGE_REQUEST_STALE`) báo người khác đã cập nhật và tải lại. Gán CDE khi chưa có Thứ hạng bị chặn bằng thông báo yêu cầu Thứ hạng. Sửa được khi bản ghi là
+  `Draft`/`Rejected` (hoặc đang xem bản đề xuất `Draft`/`Rejected`) và người dùng có `canEdit`; bản `Approved` hoặc `In Review` chỉ đọc. Lưu bản `Rejected` gửi duyệt lại (§7.3).
+- **Hành động ở header** (không áp dụng khi đang xem bản chụp):
+
+| Điều kiện | Nút |
+| --- | --- |
+| `Draft`, `canEdit` | **Gửi phê duyệt** |
+| `In Review`, `canApprove`, khác người tạo | **Từ chối** (viền đỏ), **Phê duyệt** — mở hộp xác nhận §11.6 với một bản ghi |
+| `Approved`, chưa có đề xuất, `canEdit` | **Sửa phiên bản** (tạo đề xuất `UPDATE` ở `Draft`, chuyển sang `view=working`) |
+| Menu `⋯` | `Draft`/`Rejected`: **Xóa khai báo**; `Approved`: **Đề nghị xóa** (đề xuất `DELETE`); đề xuất đang mở: **Hủy bản nháp thay đổi** |
+
+  Xóa bản chưa Approved có hiệu lực ngay (TDV-07); mọi thao tác trên bản `Approved` đi qua đề xuất (§7.4). Đề xuất `DELETE` chỉ đọc.
+- **Lịch sử thay đổi** (`TechnicalHistoryPanel`, `GET /records/{id}/history`, 10 dòng/trang): thời gian, người thực hiện, hành động và từng thay đổi `giá trị cũ → mới`. Ẩn khi xem bản chụp.
+- **Xem bản chụp**: bộ chọn phiên bản liệt kê các DD đã lưu trữ từng có Column này (`GET /records/{id}/versions`, kèm `currentRecordId`). Chọn một phiên bản nạp `GET /snapshots/{v}/records/{id}` ở trạng thái `Archived`, chỉ đọc, không có tab Lịch sử,
+  có nút **Tải bản chụp v{K}**; chọn lại phiên bản hiện tại thì về `currentRecordId`.
+- Bản ghi đã bị làm mới hoặc xóa trả `404 TD_RECORD_NOT_FOUND`: trang báo không tìm thấy và quay lại danh sách.
 
 ### 11.4. Thêm cột
 
-Nút **Thêm cột** (khi có `canEdit`, chỉ ở thanh công cụ của bảng) mở một modal dùng form sửa. Ô **Chọn cột**
+Nút **Thêm cột** (khi có `canEdit`) mở **modal Thêm cột** (`TechnicalRecordModal` ở chế độ `create`; modal còn mã cho các chế độ xem/sửa/duyệt nhưng giao diện không còn dùng). Ô **Chọn cột**
 ở đầu form tìm theo tên bảng hoặc tên cột, hiển thị `Bảng · Cột`, kiểu dữ liệu, `service / database / schema`
-(Column đã khai báo hiển thị mờ kèm nhãn, không chọn được). Chọn Column tự điền các trường nguồn chỉ đọc;
+(Column đã khai báo hiển thị mờ kèm nhãn **Đã khai báo**, không chọn được). Chọn Column tự điền các trường nguồn chỉ đọc (Database, Schema, Bảng, Cột, Nguồn, Loại dữ liệu, Mô tả);
+nhóm **Quy chiếu và đặc tả** gồm Mã CDE (Tên thành tố tự điền), Thứ hạng và bốn tag classification. **Chủ quản dữ liệu không nhập ở modal**; đặt sau trên trang chi tiết hoặc qua Import.
 **Lưu nháp** bị khóa tới khi đã chọn Column, và tạo bản ghi ở trạng thái `Draft`; bản ghi chưa chờ duyệt và
 chỉ có hiệu lực sau khi được gửi duyệt rồi phê duyệt (§7.3). Mỗi lần khai báo một Column; khai
 báo hàng loạt dùng Import. Tìm Column dùng `column_search_index` (chỉ đọc) kèm index TD để đánh dấu Column đã khai báo.
+Khai báo Column đã có bản ghi: `TD_COLUMN_ALREADY_DECLARED`, modal báo và tải lại danh sách ứng viên.
 
 ### 11.5. Tab Tài sản của CDE
 
@@ -541,11 +568,12 @@ báo hàng loạt dùng Import. Tìm Column dùng `column_search_index` (chỉ �
   có icon, không có danh sách bản ghi; thân là một câu hỏi (ví dụ `Bạn có chắc chắn muốn gửi phê duyệt {k} bản ghi
   đang ở trạng thái Bản nháp sang trạng thái Chờ duyệt?`); footer góc dưới bên phải gồm **Hủy** và **Xác nhận** cách
   nhau 8px (**Xác nhận** màu đỏ cảnh báo khi từ chối). Không có ô lý do.
-- Xử lý một bản ghi từ modal (bản nháp có nút **Gửi phê duyệt** ở chế độ xem; bản ghi chờ duyệt có **Từ chối** ·
-  **Phê duyệt**) gọi API từng bản ghi (§13.1); xử lý từ thanh hàng loạt gọi API hàng loạt.
-- **Đề xuất thay đổi bản ghi đã duyệt (§7.4) không xử lý hàng loạt.** Dòng `Approved` có `hasPendingChange` được
-  tính là `Đã phê duyệt` trong chip và không nằm trong `k` hay `m`; người dùng mở từng bản ghi để gửi, phê duyệt
-  hoặc từ chối đề xuất, vì người duyệt cần xem so sánh giá trị đã duyệt với giá trị đề xuất trước khi quyết định.
+- Xử lý một bản ghi từ trang chi tiết (bản nháp có nút **Gửi phê duyệt**; bản ghi chờ duyệt có **Từ chối** · **Phê duyệt**) gọi API từng bản ghi
+  (§13.1), hoặc API `change-request` nếu đang xem bản đề xuất; xử lý từ thanh hàng loạt gọi API hàng loạt.
+- **Dòng đề xuất thay đổi (§7.4) cũng chọn và xử lý hàng loạt được.** Dòng `CHANGE` mang trạng thái của đề xuất nên tính vào `k` khi là `Draft`
+  và vào `m` khi `InReview` do người khác tạo (`changeCreatedBy`). Vì không có endpoint hàng loạt cho đề xuất, các dòng này đi qua API
+  `change-request/submit|approve|reject` từng dòng song song, còn bản ghi thường vẫn đi qua endpoint hàng loạt; kết quả được gộp lại theo đúng thứ tự dòng đã chọn.
+  Dòng `Approved` (nửa đã duyệt của bản ghi có đề xuất) không có thao tác. Người duyệt muốn xem so sánh trước khi quyết định thì mở trang chi tiết `view=working`.
 - **Kết quả:** tất cả thành công thì hiện toast `Đã phê duyệt {m} bản ghi` / `Đã từ chối {m} bản ghi` và tải lại danh
   sách. Có bản ghi lỗi thì hiện modal kết quả cùng kiểu modal chuẩn (tiêu đề `Đã phê duyệt {x}/{m} bản ghi` kèm nút ✕, danh sách từng bản
   ghi với ✓ hoặc ✕ kèm thông báo lỗi của máy chủ, cuộn được, nút **Đóng**); bản ghi lỗi giữ nguyên trạng thái trước đó (`Draft` hoặc `In Review`). Lỗi của
@@ -555,13 +583,15 @@ báo hàng loạt dùng Import. Tìm Column dùng `column_search_index` (chỉ �
 
 ### 12.1. Export
 
-- Xuất toàn bộ danh sách (duyệt index bằng point-in-time), theo thứ tự cột của template Import (§12.2).
-  Thứ tự dòng của file vẫn theo `columnFqn`, không theo Thứ hạng như bảng trên giao diện.
+- Xuất toàn bộ danh sách (duyệt index bằng point-in-time). Thứ tự dòng của file theo `columnFqn`, không theo Thứ hạng như bảng trên giao diện.
 - Tên file `TuDienKyThuat_Agribank_TDDLv{N}_YYYYMMDD_HHmm.xlsx`, sheet `Technical Dictionary`; `v{N}` là phiên
   bản DD đang gắn để file tự nói rõ mã CDE thuộc DD nào. Không chứa UUID, `columnKey` hoặc FQN kỹ thuật.
-- File Excel gồm **14 cột**, đúng 14 trường của bảng (§11.2); không có cột Chủ sở hữu dữ liệu và Chủ sở hữu hệ thống (TD-D17).
-  File Export vẫn Import được vì Import chỉ cập nhật các cột editable có mặt trong file (§12.2); tuy nhiên không
-  còn cách đổi Chủ sở hữu hệ thống qua file Export, chỉ qua template Import hoặc modal.
+- File Excel gồm **14 cột** (`TechnicalExcelExporter.HEADERS`): Tên cơ sở dữ liệu, Tên Schema, Tên Bảng, Tên cột, Nguồn, Mã CDE quy chiếu,
+  Tên thành tố CDE, Thứ hạng, Loại dữ liệu, Loại thành tố, Loại trường dữ liệu, Phương thức tạo, Thời gian, Mô tả. Giữ bốn cột vị trí riêng
+  (khác cột **Tên trường** gộp trên bảng) và không có cột Chủ quản dữ liệu hay Chủ sở hữu dữ liệu (TD-D17).
+  File Export vẫn Import được vì Import chỉ cập nhật các cột editable có mặt trong file (§12.2); không
+  đổi được Chủ quản dữ liệu qua file Export, chỉ qua template Import hoặc trang chi tiết.
+  Export không đọc bản đề xuất: file chứa giá trị của index, tức giá trị đã duyệt cùng các bản ghi chưa duyệt (với người có `canEdit`/`canApprove`).
 
 ### 12.2. Import
 
@@ -584,8 +614,9 @@ cùng bố cục với trang nhập CDE của Từ điển dữ liệu dùng chu
 - Cột editable: Mã CDE quy chiếu, Thứ hạng, Loại thành tố, Loại trường dữ liệu, Phương thức tạo, Thời gian,
   Chủ sở hữu hệ thống. Cột nhận diện: bốn cột vị trí và Nguồn. Cột server-owned hoặc suy ra (Tên thành tố,
   Chủ sở hữu dữ liệu, Loại dữ liệu, Mô tả) trong file bị bỏ qua.
-- Tag resolve theo `displayName` trong đúng classification; Chủ sở hữu hệ thống resolve theo `displayName` của
-  Team. Không tìm thấy hoặc trùng tên là lỗi dòng; không tự tạo Team/tag.
+- Tag resolve theo `displayName` trong đúng classification; cột **Chủ sở hữu hệ thống** của template resolve theo `displayName` của
+  **Team** (một giá trị). Chủ quản dữ liệu là User hoặc nhiều chủ chỉ đặt được trên trang chi tiết. Không tìm thấy hoặc trùng tên là lỗi dòng; không tự tạo Team/tag.
+- Template có 12 cột: bốn cột vị trí, Nguồn, Mã CDE quy chiếu, Thứ hạng, bốn cột tag, Chủ sở hữu hệ thống.
 - Mã CDE resolve trong DD `vN` đang gắn, chỉ nhận CDE `Approved`. Nếu có cột Tên thành tố thì phải khớp.
 - **Chỉ cập nhật các cột editable có mặt trong file.** Cột vắng mặt giữ nguyên; cột có mặt nhưng ô trống thì
   xóa giá trị. File tối thiểu gồm bốn cột vị trí và Mã CDE.
@@ -630,13 +661,15 @@ POST   /v1/glossaryTerms/technical/records/bulk/approve         # canApprove; bo
 POST   /v1/glossaryTerms/technical/records/bulk/reject          # như trên
 DELETE /v1/glossaryTerms/technical/records/{id}?expectedRevision=
 GET    /v1/glossaryTerms/technical/records/{id}/history?limit=&offset=
+GET    /v1/glossaryTerms/technical/records/{id}/versions               # DD đã lưu trữ từng có Column này + currentRecordId (chọn phiên bản ở trang chi tiết)
 GET    /v1/glossaryTerms/technical/export
 GET    /v1/glossaryTerms/import/technical/template
 POST   /v1/glossaryTerms/import/technical/preview
 POST   /v1/glossaryTerms/import/technical/{importSessionId}/commit
 GET    /v1/glossaryTerms/technical/snapshots
 GET    /v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/export
-GET    /v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/records
+GET    /v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/records?q=&limit=&offset=   # danh sách bản chụp, chỉ đọc (xem bản chụp, §11.1)
+GET    /v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/records/{id}                # một bản ghi bản chụp (trang chi tiết, §11.3)
 GET    /v1/glossaryTerms/{cdeId}/technicalAssets?limit=&offset= # tab Tài sản khi xem phiên bản CDE (§11.5)
 POST   /v1/glossaryTerms/technical/index/rebuild                # Admin
 ```
@@ -681,6 +714,11 @@ trả `400 TD_INVALID_FIELD`; không có quyền (`canEdit` cho `submit`, `canAp
 | `TD_RANK_REQUIRED`, `TD_RANK_DUPLICATE` | 400 / 409 | §7.2 |
 | `TD_COLUMN_NOT_FOUND`, `TD_COLUMN_ALREADY_DECLARED` | 404 / 409 | Column không tồn tại / đã khai báo |
 | `TD_SERVER_OWNED_FIELD`, `TD_INVALID_FIELD` | 400 | §3.2 |
+| `TD_APPROVED_EDIT_REQUIRES_CHANGE_REQUEST` | 409 | Sửa hoặc xóa trực tiếp bản ghi `Approved`; phải tạo đề xuất (§7.4) |
+| `TD_CHANGE_REQUEST_NOT_FOUND` | 404 | Bản ghi không có đề xuất thay đổi |
+| `TD_CHANGE_REQUEST_EXISTS` | 409 | Đề xuất đang `InReview` nên không tạo hoặc ghi đè được (cả khi Import) |
+| `TD_CHANGE_REQUEST_STALE` | 409 | Bản `Approved` hoặc đề xuất đã đổi sau `baseRevision`/revision của đề xuất; tải lại |
+| `TD_NOT_INITIALIZED` | — | Trạng thái TD chưa được khởi tạo |
 | `TD_IMPORT_ROW_NOT_MATCHED`, `TD_IMPORT_CONFLICT`, `TD_IMPORT_SESSION_INVALID` | 400 / 409 | Gồm trường hợp DD đã đổi version (§9.3) |
 | `TD_INTERNAL_ERROR` | — | Chỉ xuất hiện trong kết quả hàng loạt: bản ghi gặp lỗi không lường trước, chi tiết ở nhật ký máy chủ |
 | `TD_INDEX_UNAVAILABLE` | 503 | OpenSearch không khả dụng: đọc lỗi, ghi vẫn thành công và vào outbox |
@@ -721,8 +759,8 @@ Mã chung (`WORKING_REVISION_CONFLICT`, ...) của Governed Glossary không áp 
 11. Mọi thay đổi và quyết định phê duyệt (người dùng, Import, approve/reject/resubmit, ingest, làm mới) có
     dòng audit, đọc được qua API `/history` (giao diện không hiển thị).
 12. Đọc danh sách/export không quét Postgres; ghi luôn kiểm tra trên Postgres rồi đồng bộ index.
-13. Bảng đúng 14 trường và thứ tự §11.2, không có cột Chủ sở hữu; header không có thẻ thống kê; bốn cột trái
-    và cột Hành động cố định; scrollbar đúng thiết kế.
+13. Bảng đúng các cột và thứ tự §11.2: cột Tên trường gộp, cột Trạng thái, có Chủ quản dữ liệu, không có Chủ sở hữu dữ liệu và không có cột Hành động; header có bộ chọn phiên bản
+    nhưng không có thẻ thống kê; cột Tên trường và Trạng thái cố định; bấm dòng mở trang chi tiết; scrollbar đúng thiết kế.
 14. `DATA_PROPOSER` tạo được bản ghi/proposal nhưng không tự phê duyệt; Data Steward/Admin khác người tạo duyệt.
     Sửa hoặc xóa record `Approved` chỉ có hiệu lực sau `APPROVE_CHANGE`.
 15. Từ chối không cần lý do ở cả API từng bản ghi, API hàng loạt và giao diện; không còn ô nhập lý do.
@@ -732,12 +770,14 @@ Mã chung (`WORKING_REVISION_CONFLICT`, ...) của Governed Glossary không áp 
 17. Bản nháp: `POST /records` và Import chỉ tạo `Draft`; chỉ người có `canEdit` gửi duyệt được (từng bản ghi hoặc hàng
     loạt); bản nháp không bị projection; Consumer không thấy bản nháp ở danh sách, thống kê, export, chi tiết và lịch
     sử.
-18. Consumer chỉ đọc record `Approved`; audit proposal chưa được duyệt và toàn bộ metadata/payload pending-change
+18. Trang chi tiết (§11.3) sửa từng trường tại chỗ cho bản `Draft`/`Rejected` và đề xuất `Draft`/`Rejected`; bản `Approved` chỉ sửa qua **Sửa phiên bản**;
+    xem được bản chụp của các DD đã lưu trữ ở chế độ chỉ đọc, kể cả khi Column không còn trong danh sách hiện hành.
+19. Consumer chỉ đọc record `Approved`; audit proposal chưa được duyệt và toàn bộ metadata/payload pending-change
     không được trả về. `APPROVE_CHANGE` có thể xuất hiện trong history vì đó là thay đổi đã có hiệu lực.
 
 ## 16. Hiện trạng triển khai
 
-Đã triển khai trong nhánh làm việc: schema (migration `1.13.3` và `bootstrap/sql/schema`), DAO
+Đã triển khai (đối chiếu code ngày 2026-10-06, HEAD `b5a2a656d4`): schema (migration `1.13.3` và `bootstrap/sql/schema`), DAO
 `TechnicalDictionaryDAO`, ghi record (`TechnicalRecordService`), cutover trong transaction phê duyệt DD
 (`TechnicalCutover`), outbox (`TechnicalOutbox`), index phẳng, REST (`TechnicalDictionaryResource`,
 `TechnicalDictionaryImportResource`), endpoint `technicalAssets` và UI. Đã bỏ profile `TECHNICAL_DICTIONARY`
@@ -746,6 +786,8 @@ khỏi Governed Glossary, bootstrap/bulk workflow và các bảng governed của
 Luồng maker-checker tại §7.3 đã được bổ sung: bản ghi mới/import mới ở `Draft` rồi gửi duyệt sang `In Review`, có
 capability và endpoint submit/approve/reject (từng bản ghi và hàng loạt, từ chối không cần lý do), bản nháp ẩn với Consumer, chặn tự duyệt, audit đầy đủ, lọc trạng thái trên index và UI duyệt từng bản ghi hoặc hàng loạt. Chỉ dữ liệu
 `Approved` được projection, xuất hiện trong tab Tài sản và được tính là đã gán CDE.
+
+Đề xuất sửa/xóa bản ghi `Approved` (§7.4), trang chi tiết và xem bản chụp (§11.1, §11.3), Chủ quản dữ liệu nhiều Team/User (TD-D11) và hiển thị hai dòng cho bản ghi đang có đề xuất (§5.3) đã có ở cả backend và giao diện.
 
 Khác biệt so với mô tả ở trên:
 
@@ -756,16 +798,17 @@ Khác biệt so với mô tả ở trên:
 | §4 `technical_binding_snapshot` | Nhân đôi mọi cột | Cột khóa và cột `payload` JSON là dòng phẳng đầy đủ | Export và `technicalAssets` dùng đúng dòng phẳng của index |
 | §6.1 | Ghi index ngay rồi mới xếp hàng khi lỗi | Ghi `INDEX`/`PROJECTION` vào outbox trong transaction rồi xử lý ngay sau commit | Không mất sự kiện nếu tiến trình dừng giữa commit và ghi index |
 | §9.2 | Xử lý `RESET` trong request phê duyệt | `RESET` chạy nền qua worker của outbox | Gỡ tag trên hàng chục nghìn Column có thể mất vài phút |
-| §12.1 | Export theo 14 trường của bảng | Export và template Import vẫn 16 cột, gồm hai cột Chủ sở hữu (`TechnicalExcelExporter.HEADERS`) | Chưa đổi theo TD-D17; cần chốt có bỏ hai cột khỏi Excel hay không |
 | §13.1 | — | `/technical/stats` vẫn còn nhưng UI không gọi | Chỉ giao diện đã đổi theo TD-D17 |
-| §11.3 | Chủ sở hữu hệ thống nhập được ở Import | Không còn nhập được ở modal; `systemOwnerId` vẫn có ở API, Import/Export | Chưa có nơi nhập trên UI nếu chưa dùng Import |
+| §11.4, §12.2 | Chủ quản dữ liệu nhập ở mọi nơi như nhau | Modal Thêm cột không có trường này; trang chi tiết chọn nhiều Team/User; template Import chỉ nhận **một Team** theo tên | Nhập User hoặc nhiều chủ qua Import chưa được hỗ trợ |
+| §11.4 | Modal dùng chung cho xem/sửa/duyệt/thêm | `TechnicalRecordModal` còn mã cho `view`/`edit`/`review` nhưng UI chỉ dùng `create` | Các chế độ đó được thay bằng trang chi tiết; có thể dọn mã |
+| §11.3 | Trang chi tiết sửa bản ghi `Approved` trực tiếp | `Approved` chỉ đọc; phải **Sửa phiên bản** để tạo đề xuất | Maker-checker cho sửa/xóa (TDV-02) |
 | Dữ liệu cũ | Bản ghi TD hiện hữu giữ hiệu lực | Migration thêm trạng thái với mặc định `Approved`; glossary cũ và các `GlossaryTerm` của mô hình cũ không được dọn tự động | Tránh làm mất hiệu lực dữ liệu đang dùng |
 
-Đối chiếu code ngày 2026-10-05: `TechnicalExcelExporter.HEADERS` vẫn 16 cột và `/technical/stats` vẫn tồn tại.
+Đối chiếu code ngày 2026-10-06: `TechnicalExcelExporter.HEADERS` đã là 14 cột và `/technical/stats` vẫn tồn tại nhưng giao diện không gọi.
 Chưa có tài liệu kiểm thử `docs/test` cho TD.
 
 Chưa kiểm chứng: SQL chưa chạy trên MySQL/PostgreSQL thật, luồng OpenSearch chưa chạy thật; thay đổi giao
-diện TD-D17 chưa được build/test; duyệt hàng loạt và từ chối không lý do (2026-10-06) mới được viết cùng test, chưa build và chưa chạy test. Chỉ `en-us` và `vi-vn` có khóa i18n mới; các locale còn lại chưa đồng bộ.
+diện TD-D17, trang chi tiết, đề xuất thay đổi và duyệt hàng loạt chưa được build/chạy test trong lần cập nhật tài liệu này (chỉ đối chiếu bằng đọc code). Chỉ `en-us` và `vi-vn` có khóa i18n mới; các locale còn lại chưa đồng bộ.
 
 ## 17. Ảnh hưởng tới tài liệu và mã nguồn khác
 
@@ -776,7 +819,9 @@ diện TD-D17 chưa được build/test; duyệt hàng loạt và từ chối kh
 | `GlossaryVersioningService` | Thêm bước §9.1 vào transaction cutover; publish-preview §9.4 |
 | `TechnicalColumnProjection` | Tính tag từ `technical_record`; xử lý `RESET` |
 | `GovernedGlossaryProfileRegistry`, `TechnicalDictionaryBootstrap` | Bỏ profile TD; bootstrap chỉ tạo glossary phân quyền và bảng |
-| UI `TechnicalDictionaryPage/*` | Header §11.1, 14 cột §11.2, modal §11.3 |
+| UI `TechnicalDictionaryPage/*` | Header và chế độ xem §11.1, bảng §11.2, trang chi tiết §11.3 (`TechnicalRecordDetailPage`), modal Thêm cột §11.4, duyệt hàng loạt §11.6 |
+| `GlossaryTermTab` | Glossary `Technical Dictionary` hiển thị `TechnicalDictionaryPage` ở chế độ nhúng (§11.1) |
+| Route | `/technical-dictionary`, `/technical-dictionary/import`, `/technical-dictionary/:termId` |
 
 ## 18. Tài liệu tham khảo
 

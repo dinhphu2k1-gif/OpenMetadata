@@ -4,7 +4,7 @@
     "displayName": "Loại trường dữ liệu trong hệ thống",
     "description": "Cơ chế phát sinh giá trị của trường kỹ thuật.",
     "provider": "system",
-    "mutuallyExclusive": "true"
+    "mutuallyExclusive": "false"
   },
   "createTags": [
     {

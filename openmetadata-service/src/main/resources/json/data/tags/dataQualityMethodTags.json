@@ -1,0 +1,21 @@
+{
+  "createClassification": {
+    "name": "DataQualityMethod",
+    "displayName": "Hình thức kiểm tra",
+    "description": "Phương pháp kiểm tra chất lượng dữ liệu",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "TechnicalSqlRule",
+      "displayName": "Kiểm tra bằng Quy tắc kỹ thuật (SQL)",
+      "description": "Kiểm tra tự động bằng truy vấn SQL"
+    },
+    {
+      "name": "DataProfiling",
+      "displayName": "Kiểm tra tự động (Data Profiling)",
+      "description": "Kiểm tra bằng công cụ Data Profiler"
+    }
+  ]
+}

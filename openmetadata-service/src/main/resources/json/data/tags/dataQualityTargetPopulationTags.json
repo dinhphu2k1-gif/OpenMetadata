@@ -1,0 +1,31 @@
+{
+  "createClassification": {
+    "name": "DataQualityTargetPopulation",
+    "displayName": "Các tiêu chí cơ sở",
+    "description": "Tập dữ liệu và phạm vi áp dụng quy tắc chất lượng dữ liệu",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "EntireCustomerBase",
+      "displayName": "Toàn nền khách hàng",
+      "description": "Áp dụng trên toàn bộ nền khách hàng"
+    },
+    {
+      "name": "IndividualCustomers",
+      "displayName": "Khách hàng cá nhân",
+      "description": "Áp dụng trên khách hàng cá nhân"
+    },
+    {
+      "name": "CustomersWithInfo",
+      "displayName": "Toàn bộ khách hàng có thông tin",
+      "description": "Áp dụng trên khách hàng đã có thông tin phát sinh"
+    },
+    {
+      "name": "CreditRiskData",
+      "displayName": "Dữ liệu rủi ro tín dụng",
+      "description": "Áp dụng trên dữ liệu quản trị rủi ro tín dụng"
+    }
+  ]
+}

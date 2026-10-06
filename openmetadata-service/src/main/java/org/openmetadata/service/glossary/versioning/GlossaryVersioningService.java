@@ -30,10 +30,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
+import org.openmetadata.schema.entity.data.Glossary;
 import org.openmetadata.schema.entity.data.GlossaryTerm;
 import org.openmetadata.schema.type.EntityStatus;
+import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
@@ -561,6 +566,8 @@ public class GlossaryVersioningService {
                           predecessor == null ? null : predecessor.businessVersion(),
                           working.businessVersion(),
                           actor);
+                      advanceDataQualityCatalog(
+                          dao, entityId, working.businessVersion(), now, actor);
                     }
                     dao.upsertPublishedHead(
                         entityType,
@@ -1419,6 +1426,99 @@ public class GlossaryVersioningService {
     return revisions;
   }
 
+  /**
+   * Approving a Data Dictionary version replaces the Data Quality catalog with it: the Approved
+   * catalog is archived and an empty Draft of the same business version is opened, so Rules are
+   * authored again against the new Data Dictionary scope.
+   */
+  private static void advanceDataQualityCatalog(
+      GlossaryVersionDAO dao, UUID dictionaryId, String newVersion, long now, String actor) {
+    try {
+      final Glossary dictionary = Entity.getEntity(Entity.GLOSSARY, dictionaryId, "", Include.ALL);
+      final boolean isDataDictionary =
+          GovernedGlossaryProfileRegistry.find(dictionary)
+              .filter(GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY::equals)
+              .isPresent();
+      if (!isDataDictionary) {
+        return;
+      }
+      final Glossary catalog = DqCatalog.requireGlossary();
+      final PublishedSnapshotRecord predecessor =
+          dao.lockLatestPublished(GLOSSARY, catalog.getId());
+      if (predecessor == null
+          || predecessor.archivedAt() != null
+          || dao.lockWorking(GLOSSARY, catalog.getId(), null) != null) {
+        return;
+      }
+      if (!new BigInteger(newVersion)
+          .equals(new BigInteger(predecessor.businessVersion()).add(BigInteger.ONE))) {
+        LOG.warn(
+            "Data Quality catalog {} is not the predecessor of Data Dictionary {}; it was left"
+                + " unchanged",
+            predecessor.businessVersion(),
+            newVersion);
+        return;
+      }
+      cutOverPredecessor(dao, predecessor, catalog.getId(), now, actor);
+      final Object payload =
+          normalizeWorkingPayload(
+              withEmptyTermRevisions(emptyWorkingPayload(GLOSSARY, catalog, predecessor)),
+              newVersion,
+              EntityStatus.DRAFT.value());
+      dao.insertWorking(
+          UUID.randomUUID(),
+          GLOSSARY,
+          catalog.getId(),
+          null,
+          null,
+          newVersion,
+          EntityStatus.DRAFT.value(),
+          catalog.getVersion(),
+          JsonUtils.pojoToJson(payload),
+          now,
+          actor);
+    } catch (EntityNotFoundException exception) {
+      // No Data Quality glossary exists yet, so there is no catalog to advance.
+    }
+  }
+
+  /** Archives every unarchived term snapshot of a glossary in one Data Dictionary scope. */
+  private static void archiveScopedTerms(
+      GlossaryVersionDAO dao,
+      UUID glossaryId,
+      String parentBusinessVersion,
+      long now,
+      String actor) {
+    for (PublishedSnapshotRecord term :
+        dao.listUnarchivedTermSnapshotsForGlossaryAndParent(glossaryId, parentBusinessVersion)) {
+      requireUpdated(dao.archiveSnapshot(term.snapshotId(), now, actor));
+      dao.deletePublishedHead(GLOSSARY_TERM, term.entityId(), term.snapshotId());
+      dao.insertOutbox(
+          UUID.randomUUID(), term.snapshotId(), "PUBLISHED_SNAPSHOT_ARCHIVE", term.payload(), now);
+    }
+    dao.deleteWorkingByGlossaryAndParent(GLOSSARY_TERM, glossaryId, parentBusinessVersion);
+  }
+
+  /**
+   * Data Quality Rules are bound to one Data Dictionary scope, so the Rules of the replaced
+   * version are archived with it instead of staying Approved while no longer effective.
+   */
+  private static void archiveDataQualityRules(
+      GlossaryVersionDAO dao, UUID glossaryId, String replacedVersion, long now, String actor) {
+    try {
+      final Glossary replaced = Entity.getEntity(Entity.GLOSSARY, glossaryId, "", Include.ALL);
+      final boolean isDataDictionary =
+          GovernedGlossaryProfileRegistry.find(replaced)
+              .filter(GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY::equals)
+              .isPresent();
+      if (isDataDictionary) {
+        archiveScopedTerms(dao, DqCatalog.requireGlossary().getId(), replacedVersion, now, actor);
+      }
+    } catch (EntityNotFoundException exception) {
+      // No Data Quality glossary exists yet, so there are no Rules to archive.
+    }
+  }
+
   private static void cutOverPredecessor(
       GlossaryVersionDAO dao,
       PublishedSnapshotRecord predecessor,
@@ -1437,15 +1537,8 @@ public class GlossaryVersioningService {
       PublishedSnapshotRecord term = approvedTerms.get(index);
       dao.insertSnapshotTerm(predecessor.snapshotId(), term.snapshotId(), index);
     }
-    for (PublishedSnapshotRecord term :
-        dao.listUnarchivedTermSnapshotsForGlossaryAndParent(glossaryId, predecessorVersion)) {
-      requireUpdated(dao.archiveSnapshot(term.snapshotId(), now, actor));
-      dao.deletePublishedHead(GLOSSARY_TERM, term.entityId(), term.snapshotId());
-      dao.insertOutbox(
-          UUID.randomUUID(), term.snapshotId(), "PUBLISHED_SNAPSHOT_ARCHIVE", term.payload(), now);
-    }
-
-    dao.deleteWorkingByGlossaryAndParent(GLOSSARY_TERM, glossaryId, predecessorVersion);
+    archiveScopedTerms(dao, glossaryId, predecessorVersion, now, actor);
+    archiveDataQualityRules(dao, glossaryId, predecessorVersion, now, actor);
     requireUpdated(dao.archiveSnapshot(predecessor.snapshotId(), now, actor));
     // During a live cutover this removes the predecessor head; during repair the old buggy
     // publish may already have replaced that head with the successor.

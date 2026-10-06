@@ -4,7 +4,7 @@
     "displayName": "Phương thức tạo dữ liệu",
     "description": "Cách thức cấu hình hoặc xử lý giá trị của trường kỹ thuật.",
     "provider": "system",
-    "mutuallyExclusive": "true"
+    "mutuallyExclusive": "false"
   },
   "createTags": [
     {

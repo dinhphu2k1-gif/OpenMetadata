@@ -1,0 +1,31 @@
+{
+  "createClassification": {
+    "name": "DataQualityFrequency",
+    "displayName": "Tần suất",
+    "description": "Chu kỳ kiểm tra và đánh giá chất lượng dữ liệu",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "Quarterly",
+      "displayName": "Hàng Quý",
+      "description": "Thực hiện định kỳ hàng quý"
+    },
+    {
+      "name": "MonthlyOrQuarterly",
+      "displayName": "Tháng/Quý",
+      "description": "Thực hiện theo tháng hoặc quý"
+    },
+    {
+      "name": "Monthly",
+      "displayName": "Hàng Tháng",
+      "description": "Thực hiện định kỳ hàng tháng"
+    },
+    {
+      "name": "Daily",
+      "displayName": "Hàng Ngày",
+      "description": "Thực hiện kiểm tra hàng ngày"
+    }
+  ]
+}

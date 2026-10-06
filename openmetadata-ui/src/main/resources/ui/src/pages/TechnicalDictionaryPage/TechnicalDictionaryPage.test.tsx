@@ -15,13 +15,11 @@ import {
   bulkApproveTechnicalRecords,
   bulkRejectTechnicalRecords,
   bulkSubmitTechnicalRecords,
-  exportTechnicalSnapshot,
   getTechnicalChangeRequest,
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import TechnicalDictionaryPage, {
-  isResetBannerVisible,
 } from './TechnicalDictionaryPage.component';
 
 const ROW = {
@@ -393,21 +391,6 @@ describe('TechnicalDictionaryPage', () => {
     expect(screen.queryByText('delete-modal')).not.toBeInTheDocument();
   });
 
-  it('offers the previous snapshot in the banner after a reset', async () => {
-    mockContextState.context.resetAt = Date.now();
-
-    render(<TechnicalDictionaryPage isEmbedded />);
-
-    expect(
-      screen.getByTestId('technical-dictionary-reset-banner')
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('technical-reset-banner-download'));
-
-    await waitFor(() =>
-      expect(exportTechnicalSnapshot).toHaveBeenCalledWith('1')
-    );
-  });
 });
 
 describe('TechnicalDictionaryPage record pages', () => {
@@ -467,15 +450,6 @@ describe('TechnicalDictionaryPage snapshot view', () => {
 
   afterEach(() => {
     mockSnapshotVersion = undefined;
-  });
-
-  it('opens the previous version from the reset banner', () => {
-    mockContextState.context.resetAt = Date.now();
-
-    render(<TechnicalDictionaryPage isEmbedded />);
-    fireEvent.click(screen.getByTestId('technical-reset-banner-view'));
-
-    expect(mockViewSnapshot).toHaveBeenCalledWith('1');
   });
 
   it('offers no way to act on a frozen row, even to an editor and approver', () => {
@@ -847,20 +821,5 @@ describe('TechnicalDictionaryPage bulk review', () => {
     rerender(<TechnicalDictionaryPage isEmbedded />);
 
     expect(screen.queryByTestId('technical-bulk-bar')).not.toBeInTheDocument();
-  });
-});
-
-describe('isResetBannerVisible', () => {
-  const now = 1_700_000_000_000;
-  const DAY = 24 * 60 * 60 * 1000;
-
-  it('shows for a month after a reset', () => {
-    expect(isResetBannerVisible(now - 29 * DAY, now, false)).toBe(true);
-    expect(isResetBannerVisible(now - 31 * DAY, now, false)).toBe(false);
-  });
-
-  it('stays hidden when there was no reset or the user closed it', () => {
-    expect(isResetBannerVisible(undefined, now, false)).toBe(false);
-    expect(isResetBannerVisible(now, now, true)).toBe(false);
   });
 });

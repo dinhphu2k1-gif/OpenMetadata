@@ -1,0 +1,36 @@
+{
+  "createClassification": {
+    "name": "DataQualityDimension",
+    "displayName": "Tiêu chí chất lượng dữ liệu",
+    "description": "Các chiều đo lường và đánh giá chất lượng dữ liệu",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "Completeness",
+      "displayName": "Tính đầy đủ",
+      "description": "Dữ liệu đầy đủ, không thiếu sót thông tin"
+    },
+    {
+      "name": "Accuracy",
+      "displayName": "Tính chính xác",
+      "description": "Dữ liệu phản ánh chính xác thực tế"
+    },
+    {
+      "name": "Consistency",
+      "displayName": "Tính nhất quán",
+      "description": "Dữ liệu đồng bộ giữa các hệ thống"
+    },
+    {
+      "name": "Compliance",
+      "displayName": "Tính tuân thủ",
+      "description": "Dữ liệu tuân thủ quy định và chuẩn mực"
+    },
+    {
+      "name": "Timeliness",
+      "displayName": "Tính kịp thời",
+      "description": "Dữ liệu sẵn sàng và được cập nhật đúng hạn"
+    }
+  ]
+}

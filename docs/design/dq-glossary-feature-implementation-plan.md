@@ -358,6 +358,7 @@ Với một backend engineer, một frontend engineer và QA tham gia liên tụ
 - Catalog version `N+1` là Draft mới; policy mặc định không tự kế thừa rule từ `N` để đồng nhất CDE. Nếu nghiệp vụ cần clone, phải là chức năng explicit có preview, không fallback ngầm.
 - Approve `N+1` atomically đóng băng manifest Approved `N.x`, archive `N`, xử lý non-Approved predecessor theo retention policy và activate `N+1`.
 - Active catalog có membership động theo Approved DQ Rule cùng scope; archive manifest bất biến.
+- Approve phiên bản `N+1` của Data Dictionary (không phải của catalog DQ) archive trong cùng transaction mọi Rule DQ thuộc scope `N` (snapshot chuyển Archived, bỏ published head, xóa working) để Rule không còn hiện Approved khi đã hết hiệu lực; `N+1` bắt đầu không có Rule. Cùng transaction đó, catalog DQ `N` được archive và catalog DQ `N+1` được mở ở trạng thái Draft rỗng (chỉ khi `N+1` đúng bằng version catalog DQ hiện tại + 1); duyệt catalog `N+1` mới kích hoạt các Rule của scope mới.
 - Header/version selector và Consumer default route dùng shared behavior CDE.
 
 **DoD/Test**

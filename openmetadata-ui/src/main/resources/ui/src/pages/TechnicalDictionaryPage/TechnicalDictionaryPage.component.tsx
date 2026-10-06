@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Alert, Button, Result, Space } from 'antd';
+import { Alert, Result } from 'antd';
 import { AxiosError } from 'axios';
 import { Key, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,10 +33,8 @@ import {
   TechnicalBulkReviewOutcome,
   TechnicalBulkReviewResult,
   exportTechnicalDictionary,
-  exportTechnicalSnapshot,
   rebuildTechnicalIndex,
 } from '../../rest/technicalDictionaryAPI';
-import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
 import TechnicalBulkActionBar from './TechnicalBulkActionBar.component';
@@ -81,9 +79,6 @@ const BULK_ACTIONS = {
   approve: bulkApproveTechnicalRecords,
   reject: bulkRejectTechnicalRecords,
 };
-const RESET_BANNER_DAYS = 30;
-const RESET_BANNER_STORAGE_PREFIX = 'technicalDictionary.resetBanner.';
-const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 const RECORD_NOT_FOUND = 'TD_RECORD_NOT_FOUND';
 
 const saveBlob = (blob: Blob, fileName: string) => {
@@ -142,35 +137,6 @@ const runBulk = async (
   return { succeeded: results.length - failed, failed, results };
 };
 
-/** The banner is shown for a month after a reset unless the user closed it. */
-export const isResetBannerVisible = (
-  resetAt: number | null | undefined,
-  now: number,
-  dismissed: boolean
-): boolean =>
-  Boolean(resetAt) &&
-  !dismissed &&
-  now - (resetAt as number) <= RESET_BANNER_DAYS * MILLIS_PER_DAY;
-
-const readDismissed = (resetAt?: number | null): boolean => {
-  try {
-    return (
-      Boolean(resetAt) &&
-      localStorage.getItem(`${RESET_BANNER_STORAGE_PREFIX}${resetAt}`) === '1'
-    );
-  } catch {
-    return false;
-  }
-};
-
-const rememberDismissed = (resetAt?: number | null) => {
-  try {
-    localStorage.setItem(`${RESET_BANNER_STORAGE_PREFIX}${resetAt}`, '1');
-  } catch {
-    // Storage may be unavailable; the banner then simply shows again.
-  }
-};
-
 const TechnicalDictionaryPage = ({
   isEmbedded = false,
 }: TechnicalDictionaryPageProps) => {
@@ -195,7 +161,6 @@ const TechnicalDictionaryPage = ({
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([]);
   const [review, setReview] = useState<PendingReview>();
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -229,10 +194,6 @@ const TechnicalDictionaryPage = ({
       ),
     [capabilities.canApprove, currentUser?.name, selectedRows]
   );
-
-  useEffect(() => {
-    setBannerDismissed(readDismissed(context?.resetAt));
-  }, [context?.resetAt]);
 
   const refreshData = useCallback(() => {
     records.reload();
@@ -317,20 +278,6 @@ const TechnicalDictionaryPage = ({
     }
   }, [fail]);
 
-  const handleDownloadPreviousSnapshot = useCallback(async () => {
-    if (!context?.previousDataDictionaryVersion) {
-      return;
-    }
-    try {
-      const file = await exportTechnicalSnapshot(
-        context.previousDataDictionaryVersion
-      );
-      saveBlob(file.blob, file.fileName);
-    } catch (failure) {
-      fail(failure);
-    }
-  }, [context?.previousDataDictionaryVersion, fail]);
-
   const handleRebuildIndex = useCallback(async () => {
     try {
       await rebuildTechnicalIndex();
@@ -340,11 +287,6 @@ const TechnicalDictionaryPage = ({
       fail(failure);
     }
   }, [fail, refreshData, t]);
-
-  const dismissBanner = useCallback(() => {
-    rememberDismissed(context?.resetAt);
-    setBannerDismissed(true);
-  }, [context?.resetAt]);
 
   const hasActiveFilters =
     Boolean(records.filters.q) ||
@@ -369,12 +311,6 @@ const TechnicalDictionaryPage = ({
     );
   }
 
-  const showBanner = isResetBannerVisible(
-    context.resetAt,
-    Date.now(),
-    bannerDismissed
-  );
-
   const notBoundContent = (
     <Result
       data-testid="technical-dictionary-not-bound"
@@ -390,48 +326,6 @@ const TechnicalDictionaryPage = ({
           ? 'tech-dict-content-card tech-dict-content-card-embedded'
           : 'tech-dict-content-card'
       }>
-      {showBanner && context.resetAt && (
-        <Alert
-          closable
-          showIcon
-          action={
-            context.previousDataDictionaryVersion ? (
-              <Space size={0}>
-                <Button
-                  data-testid="technical-reset-banner-view"
-                  size="small"
-                  type="link"
-                  onClick={() =>
-                    records.viewSnapshot(
-                      context.previousDataDictionaryVersion ?? undefined
-                    )
-                  }>
-                  {t('label.technical-view-snapshot', {
-                    version: context.previousDataDictionaryVersion,
-                  })}
-                </Button>
-                <Button
-                  data-testid="technical-reset-banner-download"
-                  size="small"
-                  type="link"
-                  onClick={handleDownloadPreviousSnapshot}>
-                  {t('label.technical-download-snapshot', {
-                    version: context.previousDataDictionaryVersion,
-                  })}
-                </Button>
-              </Space>
-            ) : undefined
-          }
-          className="m-b-md"
-          data-testid="technical-dictionary-reset-banner"
-          message={t('message.technical-dictionary-reset-banner', {
-            date: formatDateTime(context.resetAt),
-            version: dataDictionaryVersion,
-          })}
-          type="info"
-          onClose={dismissBanner}
-        />
-      )}
       {!dataDictionaryVersion ? (
         notBoundContent
       ) : (

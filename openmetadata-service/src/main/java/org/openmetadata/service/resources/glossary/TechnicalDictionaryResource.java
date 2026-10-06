@@ -34,6 +34,7 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.technical.TechnicalBulkReview;
 import org.openmetadata.service.glossary.technical.TechnicalCatalog;
 import org.openmetadata.service.glossary.technical.TechnicalChangeRequestCreate;
@@ -60,6 +61,8 @@ import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilde
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchCriteria;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchParameters;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchService;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.SnapshotRow;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.SnapshotSummary;
@@ -508,7 +511,7 @@ public class TechnicalDictionaryResource {
   public Map<String, Object> snapshots(@Context SecurityContext securityContext) {
     access.requireView(securityContext);
     final List<Map<String, Object>> summaries =
-        dao().listSnapshotSummaries().stream()
+        withReplacedVersions(dao().listSnapshotSummaries()).stream()
             .sorted(
                 Comparator.comparing(
                         SnapshotSummary::dataDictionaryVersion, GlossaryBusinessVersion::compare)
@@ -801,6 +804,31 @@ public class TechnicalDictionaryResource {
   }
 
   private static final int SNAPSHOT_PAGE = 1_000;
+
+  /**
+   * A replaced Data Dictionary version stays selectable even when none of its records was frozen,
+   * for example when the Technical Dictionary was empty at the cutover.
+   */
+  private static List<SnapshotSummary> withReplacedVersions(List<SnapshotSummary> frozen) {
+    final Map<String, SnapshotSummary> byVersion = new LinkedHashMap<>();
+    frozen.forEach(summary -> byVersion.put(summary.dataDictionaryVersion(), summary));
+    try {
+      Entity.getJdbi()
+          .onDemand(GlossaryVersionDAO.class)
+          .listPublished(
+              GlossaryVersioningService.GLOSSARY, TechnicalDictionaryState.dataDictionary().getId())
+          .stream()
+          .filter(version -> version.archivedAt() != null)
+          .forEach(
+              archived ->
+                  byVersion.putIfAbsent(
+                      archived.businessVersion(),
+                      new SnapshotSummary(archived.businessVersion(), 0, archived.archivedAt())));
+    } catch (EntityNotFoundException exception) {
+      // The Data Dictionary does not exist yet, so nothing has been replaced.
+    }
+    return List.copyOf(byVersion.values());
+  }
 
   private static Map<String, Object> summary(SnapshotSummary summary) {
     final Map<String, Object> view = new LinkedHashMap<>();

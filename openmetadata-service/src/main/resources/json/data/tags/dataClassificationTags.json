@@ -1,0 +1,26 @@
+{
+  "createClassification": {
+    "name": "DataClassification",
+    "displayName": "Phân loại dữ liệu",
+    "description": "Mức độ bảo mật của dữ liệu theo quy chế an toàn thông tin",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "Confidential",
+      "displayName": "Bí mật",
+      "description": "Dữ liệu thuộc cấp độ bảo mật cao, giới hạn quyền truy cập nghiêm ngặt"
+    },
+    {
+      "name": "Internal",
+      "displayName": "Nội bộ",
+      "description": "Dữ liệu phục vụ hoạt động nội bộ của tổ chức"
+    },
+    {
+      "name": "Public",
+      "displayName": "Công cộng",
+      "description": "Dữ liệu được phép công bố công khai rộng rãi"
+    }
+  ]
+}

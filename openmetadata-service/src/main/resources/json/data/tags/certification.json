@@ -3,7 +3,7 @@
     "name": "Certification",
     "description": "Certifying Data Asset will provide the users with a clear idea of how reliable a Data Asset is.",
     "provider": "system",
-    "mutuallyExclusive": "true"
+    "mutuallyExclusive": "false"
   },
   "createTags": [
     {

@@ -492,6 +492,7 @@ const GlossaryPage = () => {
       const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
       const reqCdeVer = getBusinessVersion(businessVersion, '');
 
+      let workingFallback: GlossaryTerm | undefined;
       try {
         // The working row is keyed by the requested Data Dictionary scope, not
         // by the live glossary version. A newer Data Dictionary working
@@ -504,11 +505,17 @@ const GlossaryPage = () => {
           reqParentVer
         );
         const workingVersion = getBusinessVersion(working.businessVersion, '');
+        // A working correction shares its businessVersion with the Approved
+        // snapshot it corrects. Only open the draft when the route asks for
+        // it (view=working); otherwise the Approved row must show Approved.
         if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
-          setIsTermHistorical(false);
-          setActiveGlossary(working as ModifiedGlossary);
+          if (isWorkingDraft) {
+            setIsTermHistorical(false);
+            setActiveGlossary(working as ModifiedGlossary);
 
-          return;
+            return;
+          }
+          workingFallback = working;
         }
       } catch (error) {
         const status = (error as AxiosError)?.response?.status;
@@ -545,7 +552,12 @@ const GlossaryPage = () => {
         setIsTermHistorical(response.entityStatus === EntityStatus.Archived);
         setActiveGlossary(response as ModifiedGlossary);
       } catch {
-        navigate(ROUTES.NOT_FOUND, { replace: true });
+        if (workingFallback) {
+          setIsTermHistorical(false);
+          setActiveGlossary(workingFallback as ModifiedGlossary);
+        } else {
+          navigate(ROUTES.NOT_FOUND, { replace: true });
+        }
       }
     } catch (error) {
       const status = (error as AxiosError)?.response?.status;
@@ -672,7 +684,13 @@ const GlossaryPage = () => {
     } else {
       setIsRightPanelLoading(false);
     }
-  }, [businessVersion, isGlossaryActive, glossaryFqn, glossaryNavigationKey]);
+  }, [
+    businessVersion,
+    isGlossaryActive,
+    glossaryFqn,
+    glossaryNavigationKey,
+    isWorkingDraft,
+  ]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {

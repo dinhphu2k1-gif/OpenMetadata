@@ -1,0 +1,56 @@
+{
+  "createClassification": {
+    "name": "DataSource",
+    "displayName": "Nguồn dữ liệu",
+    "description": "Hệ thống hoặc kênh nguồn phát sinh và lưu trữ dữ liệu",
+    "provider": "system",
+    "mutuallyExclusive": "false"
+  },
+  "createTags": [
+    {
+      "name": "FTP_MIS",
+      "displayName": "FTP MIS",
+      "description": "Dữ liệu được trích xuất và đồng bộ từ hệ thống FTP-MIS"
+    },
+    {
+      "name": "MCC_System",
+      "displayName": "Hệ thống MCC",
+      "description": "Hệ thống Merchant Category Code / Quản lý đơn vị chấp nhận thanh toán"
+    },
+    {
+      "name": "IPCAS",
+      "displayName": "IPCAS",
+      "description": "Hệ thống Core Banking IPCAS"
+    },
+    {
+      "name": "RRTD_DataWarehouse",
+      "displayName": "Kho dữ liệu RRTD",
+      "description": "Kho dữ liệu quản trị Rủi ro Tín dụng"
+    },
+    {
+      "name": "MIS",
+      "displayName": "MIS",
+      "description": "Hệ thống Báo cáo Thông tin Quản trị (MIS)"
+    },
+    {
+      "name": "PaymentHub",
+      "displayName": "Payment Hub",
+      "description": "Hệ thống trục tích hợp thanh toán tập trung"
+    },
+    {
+      "name": "CustomerClassification_MIS",
+      "displayName": "Phân loại khách hàng - MIS",
+      "description": "Phân hệ phân loại khách hàng trên hệ thống MIS"
+    },
+    {
+      "name": "ManualTracking",
+      "displayName": "Theo dõi thủ công",
+      "description": "Dữ liệu được tổng hợp và theo dõi thủ công"
+    },
+    {
+      "name": "Card",
+      "displayName": "Thẻ",
+      "description": "Hệ thống quản lý và phát hành thẻ ngân hàng (Card Center / Way4)"
+    }
+  ]
+}

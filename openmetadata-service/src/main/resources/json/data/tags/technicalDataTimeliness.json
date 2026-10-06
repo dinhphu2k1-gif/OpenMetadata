@@ -4,7 +4,7 @@
     "displayName": "Thời gian",
     "description": "Thời gian cần thiết để dữ liệu sẵn sàng trong hệ thống, dạng T+X với X là số ngày kể từ ngày giao dịch.",
     "provider": "system",
-    "mutuallyExclusive": "true"
+    "mutuallyExclusive": "false"
   },
   "createTags": [
     {
