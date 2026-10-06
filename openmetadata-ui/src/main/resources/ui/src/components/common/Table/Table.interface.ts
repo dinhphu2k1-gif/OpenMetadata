@@ -21,6 +21,8 @@ export interface TableComponentProps<T> extends TableProps<T> {
   /** Filter's in ReactNode that will be aligned with TableColumnFilter. Example: GlossaryTableFilter */
   extraTableFilters?: React.ReactNode;
   extraTableFiltersClassName?: string;
+  /** Replaces the toolbar (search, filters, column picker) while rows are selected. */
+  selectionBar?: React.ReactNode;
   /** Columns that will be visible by default in the Table */
   defaultVisibleColumns?: string[];
   /** Columns that will be statically visible in the Table and will not be Filtered */

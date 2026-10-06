@@ -47,7 +47,8 @@ class TechnicalImportPatchTest {
     assertEquals(1, merged.rank());
     assertEquals("DataTimeliness.T1", merged.timeliness());
     assertEquals("DataElementType.AtomicDataElement", merged.elementType());
-    assertEquals(TEAM, merged.systemOwnerId());
+    assertEquals(
+        List.of(new TechnicalOwnerRef(TEAM, TechnicalOwnerRef.TEAM)), merged.systemOwners());
   }
 
   @Test

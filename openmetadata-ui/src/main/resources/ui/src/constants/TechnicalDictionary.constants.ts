@@ -24,7 +24,7 @@ export const TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS = {
   GENERATION_TYPE: 'generationType',
   CREATION_METHOD: 'creationMethod',
   TIMELINESS: 'timeliness',
-  SYSTEM_OWNER: 'systemOwner',
+  SYSTEM_OWNER: 'systemOwners',
   DESCRIPTION: 'description',
   UPDATED_AT: 'updatedAt',
   UPDATED_BY: 'updatedBy',
@@ -35,17 +35,18 @@ const KEYS = TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS;
 /** Default dictionary fields in display order; update metadata columns remain optional. */
 export const TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS = [
   KEYS.FIELD_NAME,
-  KEYS.STATUS,
   KEYS.SERVICE_NAME,
   KEYS.CDE_CODE,
   KEYS.CDE_NAME,
   KEYS.SURVIVORSHIP_RANK,
   KEYS.DATA_TYPE,
+  KEYS.SYSTEM_OWNER,
   KEYS.ELEMENT_TYPE,
   KEYS.GENERATION_TYPE,
   KEYS.CREATION_METHOD,
   KEYS.TIMELINESS,
   KEYS.DESCRIPTION,
+  KEYS.STATUS,
 ];
 
 export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
@@ -55,7 +56,7 @@ export const TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS = [
 
 // v5 merges the four source columns into one field column, so an older saved layout is not applied again.
 export const TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY =
-  'technicalDictionary.v5';
+  'technicalDictionary.v6';
 
 export const TECHNICAL_CLASSIFICATIONS = {
   ELEMENT_TYPE: 'DataElementType',

@@ -11,8 +11,7 @@
  *  limitations under the License.
  */
 
-import { Button } from '@openmetadata/ui-core-components';
-import { Modal, Progress, Space, Typography } from 'antd';
+import { Progress, Space, Typography } from 'antd';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,6 +20,9 @@ import {
   transitionGlossaryTermWorkflow,
 } from '../../../../rest/glossaryAPI';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
+import ReviewActionConfirmModal, {
+  ReviewConfirmAction,
+} from '../../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
 
 export type BulkActionType = 'submitForReview' | 'approve' | 'reject';
@@ -35,6 +37,12 @@ export interface GlossaryBulkActionModalProps {
 
 const BATCH_CONCURRENCY = 5;
 
+const CONFIRM_ACTIONS: Record<BulkActionType, ReviewConfirmAction> = {
+  submitForReview: 'submit',
+  approve: 'approve',
+  reject: 'reject',
+};
+
 export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
   actionType,
   open,
@@ -47,39 +55,6 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [currentTermName, setCurrentTermName] = useState<string>('');
-
-  const modalTitle = {
-    submitForReview: t(
-      'message.confirm-bulk-submit-title',
-      'Xác nhận gửi phê duyệt hàng loạt'
-    ),
-    approve: t(
-      'message.confirm-bulk-approve-title',
-      'Xác nhận phê duyệt hàng loạt'
-    ),
-    reject: t(
-      'message.confirm-bulk-reject-title',
-      'Xác nhận từ chối hàng loạt'
-    ),
-  }[actionType];
-
-  const modalDescription = {
-    submitForReview: t(
-      'message.confirm-bulk-submit-desc',
-      'Bạn có chắc chắn muốn gửi phê duyệt {{count}} bản ghi đang ở trạng thái Bản nháp sang trạng thái Chờ duyệt?',
-      { count: terms.length }
-    ),
-    approve: t(
-      'message.confirm-bulk-approve-desc',
-      'Bạn có chắc chắn muốn phê duyệt {{count}} bản ghi đang ở trạng thái Chờ duyệt sang trạng thái Đã duyệt?',
-      { count: terms.length }
-    ),
-    reject: t(
-      'message.confirm-bulk-reject-desc',
-      'Bạn có chắc chắn muốn từ chối {{count}} bản ghi đang ở trạng thái Chờ duyệt? Các bản ghi này sẽ được giữ ở trạng thái Từ chối cho đến khi người đề xuất chọn Chỉnh sửa lại.',
-      { count: terms.length }
-    ),
-  }[actionType];
 
   const handleExecute = useCallback(async () => {
     setIsProcessing(true);
@@ -158,33 +133,14 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
   }, [isProcessing, onCancel]);
 
   return (
-    <Modal
-      centered
-      destroyOnClose
-      closable={!isProcessing}
-      data-testid="glossary-bulk-action-modal"
-      footer={
-        isProcessing
-          ? null
-          : [
-              <Button color="secondary" key="cancel" onPress={handleModalClose}>
-                {t('label.cancel', 'Hủy')}
-              </Button>,
-              <Button
-                color={
-                  actionType === 'reject' ? 'primary-destructive' : 'primary'
-                }
-                key="confirm"
-                onPress={handleExecute}>
-                {t('label.confirm', 'Xác nhận')}
-              </Button>,
-            ]
-      }
-      maskClosable={!isProcessing}
+    <ReviewActionConfirmModal
+      action={CONFIRM_ACTIONS[actionType]}
+      count={terms.length}
+      hideActions={isProcessing}
       open={open}
-      title={modalTitle}
-      onCancel={handleModalClose}>
-      {isProcessing ? (
+      onCancel={handleModalClose}
+      onConfirm={handleExecute}>
+      {isProcessing && (
         <Space
           direction="vertical"
           size="middle"
@@ -202,33 +158,8 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
           <Progress percent={progress} status="active" />
           <Typography.Text type="secondary">{currentTermName}</Typography.Text>
         </Space>
-      ) : (
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Typography.Text>{modalDescription}</Typography.Text>
-
-          <div
-            style={{
-              maxHeight: '140px',
-              overflowY: 'auto',
-              backgroundColor: '#fafafa',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: '1px solid #f0f0f0',
-            }}>
-            <ul style={{ paddingLeft: '20px', margin: 0 }}>
-              {terms.map((term) => (
-                <li key={term.id || term.fullyQualifiedName}>
-                  <strong>{term.name}</strong>
-                  {term.displayName && term.displayName !== term.name
-                    ? ` (${term.displayName})`
-                    : ''}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Space>
       )}
-    </Modal>
+    </ReviewActionConfirmModal>
   );
 };
 

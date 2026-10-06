@@ -58,6 +58,7 @@ public final class TechnicalImportPlanner {
   }
 
   private final Map<String, List<TechnicalRecord>> recordsByLocation;
+  private final Map<String, TechnicalRecordChangeRequest> changesByRecordId;
   private final TechnicalImportLookups lookups;
   private final TechnicalRecordValidator validator;
 
@@ -65,7 +66,16 @@ public final class TechnicalImportPlanner {
       Map<String, List<TechnicalRecord>> recordsByLocation,
       TechnicalImportLookups lookups,
       TechnicalRecordValidator validator) {
+    this(recordsByLocation, Map.of(), lookups, validator);
+  }
+
+  public TechnicalImportPlanner(
+      Map<String, List<TechnicalRecord>> recordsByLocation,
+      Map<String, TechnicalRecordChangeRequest> changesByRecordId,
+      TechnicalImportLookups lookups,
+      TechnicalRecordValidator validator) {
     this.recordsByLocation = recordsByLocation;
+    this.changesByRecordId = changesByRecordId;
     this.lookups = lookups;
     this.validator = validator;
   }
@@ -224,6 +234,20 @@ public final class TechnicalImportPlanner {
       Target target,
       RowPatch patch,
       List<ImportError> errors) {
+    final TechnicalRecordChangeRequest pending =
+        target.record() == null ? null : changesByRecordId.get(target.record().id());
+    if (target.record() != null
+        && target.record().isApproved()
+        && pending != null
+        && pending.isInReview()) {
+      errors.add(
+          error(
+              row,
+              COLUMN,
+              TechnicalDictionaryErrors.CHANGE_REQUEST_EXISTS,
+              "Bản ghi đang có đề xuất chờ duyệt; Import không được ghi đè"));
+      return failed(row, location, errors);
+    }
     final TechnicalRecordValues current =
         target.record() == null
             ? TechnicalRecordValues.EMPTY
@@ -242,7 +266,7 @@ public final class TechnicalImportPlanner {
     } else {
       result =
           new Planned(
-              planned(row, location, target, patch, current, merged),
+              planned(row, location, target, patch, current, merged, pending),
               merged,
               target.record() != null && target.record().isApproved());
     }
@@ -255,7 +279,8 @@ public final class TechnicalImportPlanner {
       Target target,
       RowPatch patch,
       TechnicalRecordValues current,
-      TechnicalRecordValues merged) {
+      TechnicalRecordValues merged,
+      TechnicalRecordChangeRequest pending) {
     final boolean unchanged = current.equals(merged);
     final boolean declared = target.record() != null;
     final String action =
@@ -268,6 +293,7 @@ public final class TechnicalImportPlanner {
         action,
         declared ? target.record().id() : null,
         declared ? target.record().revision() : null,
+        pending == null ? null : pending.revision(),
         patch,
         target.column(),
         List.of(),
@@ -402,6 +428,7 @@ public final class TechnicalImportPlanner {
           TechnicalImportPlan.ERROR,
           row.recordId(),
           row.expectedRevision(),
+          row.expectedChangeRevision(),
           null,
           null,
           List.of(

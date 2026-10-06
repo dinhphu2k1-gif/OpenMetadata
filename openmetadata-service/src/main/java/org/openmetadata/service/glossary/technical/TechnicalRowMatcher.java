@@ -37,6 +37,7 @@ public final class TechnicalRowMatcher {
           TechnicalDictionaryProfile.SOURCE_UNAVAILABLE);
   private static final Set<String> STATUS_VALUES =
       Set.of(
+          TechnicalRecord.STATUS_DRAFT,
           TechnicalRecord.STATUS_IN_REVIEW,
           TechnicalRecord.STATUS_APPROVED,
           TechnicalRecord.STATUS_REJECTED);

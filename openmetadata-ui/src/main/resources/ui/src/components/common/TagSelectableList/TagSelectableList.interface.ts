@@ -18,6 +18,8 @@ export interface TagSelectableListProps {
   onCancel: () => void;
   hasPermission: boolean;
   searchPlaceholder?: string;
+  /** Several tags can be ticked unless set to false; a single-select list updates as soon as a tag is picked. */
+  multiSelect?: boolean;
   selectedTags?: TagLabel[];
   onUpdate: (tags: TagLabel[]) => Promise<void>;
   children?: React.ReactNode;

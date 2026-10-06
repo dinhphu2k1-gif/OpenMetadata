@@ -8,6 +8,7 @@ package org.openmetadata.service.glossary.technical;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.PlannedRow;
@@ -24,13 +25,14 @@ public final class TechnicalImportCommitter {
   private static final int FLUSH_BATCHES = 20;
 
   private final TechnicalRecordService service = new TechnicalRecordService();
+  private final TechnicalChangeRequestService changeRequests = new TechnicalChangeRequestService();
 
-  public record CommitResult(int committed, int pendingApproval, int updated) {}
+  public record CommitResult(int committed, int created, int proposed, int updated) {}
 
-  /** Returns written rows split between new records awaiting approval and effective updates. */
+  /** Returns written rows split between new draft records and updates of existing records. */
   public CommitResult commit(String previewVersion, List<PlannedRow> rows, String actor) {
     final List<PlannedRow> mutating = rows.stream().filter(PlannedRow::mutates).toList();
-    CommitResult result = new CommitResult(0, 0, 0);
+    CommitResult result = new CommitResult(0, 0, 0, 0);
     try {
       result =
           Entity.getJdbi()
@@ -58,12 +60,23 @@ public final class TechnicalImportCommitter {
           "The Data Dictionary version changed after the preview; preview the file again");
     }
     final List<TechnicalRecord> touched = new ArrayList<>();
+    final int proposed =
+        (int)
+            rows.stream()
+                .filter(row -> !TechnicalImportPlan.CREATE_RECORD.equals(row.action()))
+                .map(row -> dao.findById(row.recordId()))
+                .filter(record -> record != null && record.isApproved())
+                .count();
     rows.stream()
         .sorted(Comparator.comparing(PlannedRow::rowNumber))
         .forEach(row -> touched.add(write(dao, version, row, actor)));
     service.requireFinalRanks(dao, touched);
-    final int pendingApproval = (int) touched.stream().filter(TechnicalRecord::isInReview).count();
-    return new CommitResult(touched.size(), pendingApproval, touched.size() - pendingApproval);
+    final int created =
+        (int)
+            rows.stream()
+                .filter(row -> TechnicalImportPlan.CREATE_RECORD.equals(row.action()))
+                .count();
+    return new CommitResult(touched.size(), created, proposed, touched.size() - created - proposed);
   }
 
   private TechnicalRecord write(
@@ -91,14 +104,25 @@ public final class TechnicalImportCommitter {
     if (current == null || current.revision() != row.expectedRevision()) {
       throw conflict("Record " + row.location() + " changed after the preview");
     }
+    final TechnicalRecordValues imported =
+        TechnicalImportPatch.merge(TechnicalRecordValues.of(current), row.patch());
+    if (current.isApproved()) {
+      final TechnicalRecordChangeRequest pending = dao.findChangeRequest(current.id());
+      final Long currentChangeRevision = pending == null ? null : pending.revision();
+      if (!Objects.equals(row.expectedChangeRevision(), currentChangeRevision)) {
+        throw conflict("Change request of " + row.location() + " changed after the preview");
+      }
+      if (pending != null && pending.isInReview()) {
+        throw TechnicalDictionaryErrors.conflict(
+            TechnicalDictionaryErrors.CHANGE_REQUEST_EXISTS,
+            "Record " + row.location() + " already has a change request in review");
+      }
+      changeRequests.saveImported(
+          dao, version, current, imported, row.expectedChangeRevision(), actor);
+      return current;
+    }
     return service.change(
-        dao,
-        version,
-        current,
-        TechnicalImportPatch.merge(TechnicalRecordValues.of(current), row.patch()),
-        TechnicalRecordAudit.IMPORT,
-        false,
-        actor);
+        dao, version, current, imported, TechnicalRecordAudit.IMPORT, false, actor);
   }
 
   private static RuntimeException conflict(String message) {

@@ -5,6 +5,7 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import java.util.List;
 import java.util.UUID;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.service.Entity;
@@ -40,8 +41,8 @@ public final class TechnicalRecordValidator {
             requireTag(
                 TechnicalDictionaryProfile.CREATION_METHOD_CLASSIFICATION, values.creationMethod()),
             requireTag(TechnicalDictionaryProfile.TIMELINESS_CLASSIFICATION, values.timeliness()),
-            values.systemOwnerId());
-    requireTeam(values.systemOwnerId());
+            values.systemOwners());
+    requireOwners(values.systemOwners());
     return normalized;
   }
 
@@ -77,9 +78,16 @@ public final class TechnicalRecordValidator {
     return value;
   }
 
-  private void requireTeam(UUID teamId) {
-    if (teamId != null && !lookup.teamExists(teamId)) {
-      throw invalid(TechnicalDictionaryProfile.SYSTEM_OWNER + " must reference an existing team");
+  private void requireOwners(List<TechnicalOwnerRef> owners) {
+    for (TechnicalOwnerRef owner : owners) {
+      final boolean exists =
+          TechnicalOwnerRef.USER.equals(owner.type())
+              ? lookup.userExists(owner.id())
+              : lookup.teamExists(owner.id());
+      if (!exists) {
+        throw invalid(
+            TechnicalDictionaryProfile.SYSTEM_OWNER + " must reference existing teams or users");
+      }
     }
   }
 
@@ -92,6 +100,8 @@ public final class TechnicalRecordValidator {
     boolean tagExists(String tagFqn);
 
     boolean teamExists(UUID teamId);
+
+    boolean userExists(UUID userId);
   }
 
   static final class EntityReferenceLookup implements ReferenceLookup {
@@ -108,9 +118,18 @@ public final class TechnicalRecordValidator {
 
     @Override
     public boolean teamExists(UUID teamId) {
+      return exists(Entity.TEAM, teamId);
+    }
+
+    @Override
+    public boolean userExists(UUID userId) {
+      return exists(Entity.USER, userId);
+    }
+
+    private static boolean exists(String entityType, UUID id) {
       boolean exists = true;
       try {
-        Entity.getEntityReferenceById(Entity.TEAM, teamId, Include.NON_DELETED);
+        Entity.getEntityReferenceById(entityType, id, Include.NON_DELETED);
       } catch (EntityNotFoundException exception) {
         exists = false;
       }

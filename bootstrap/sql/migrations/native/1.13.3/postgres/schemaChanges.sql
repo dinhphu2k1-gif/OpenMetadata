@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS technical_record (
   generationType varchar(256),
   creationMethod varchar(256),
   timeliness varchar(256),
-  systemOwnerId varchar(36),
+  systemOwnerId text,
   revision bigint NOT NULL,
   createdAt bigint NOT NULL,
   createdBy varchar(256) NOT NULL,
@@ -190,6 +190,26 @@ ALTER TABLE technical_record
   ADD COLUMN reviewComment text;
 CREATE INDEX IF NOT EXISTS idx_technical_record_cde_rank
   ON technical_record (cdeTermId, survivorshipRank);
+
+CREATE TABLE IF NOT EXISTS technical_record_change_request (
+  id varchar(36) PRIMARY KEY,
+  recordId varchar(36) NOT NULL,
+  operation varchar(16) NOT NULL,
+  baseRevision bigint NOT NULL,
+  proposedValues text,
+  status varchar(16) NOT NULL,
+  revision bigint NOT NULL,
+  createdAt bigint NOT NULL,
+  createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL,
+  updatedBy varchar(256) NOT NULL,
+  submittedAt bigint,
+  submittedBy varchar(256),
+  reviewedAt bigint,
+  reviewedBy varchar(256),
+  reviewComment text,
+  CONSTRAINT uq_technical_change_record UNIQUE (recordId)
+);
 
 CREATE TABLE IF NOT EXISTS technical_record_audit (
   id varchar(36) PRIMARY KEY,

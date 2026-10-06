@@ -21,6 +21,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -33,7 +34,11 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.glossary.technical.TechnicalBulkReview;
 import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.glossary.technical.TechnicalChangeRequestCreate;
+import org.openmetadata.service.glossary.technical.TechnicalChangeRequestService;
+import org.openmetadata.service.glossary.technical.TechnicalChangeRows;
 import org.openmetadata.service.glossary.technical.TechnicalColumnIndex;
 import org.openmetadata.service.glossary.technical.TechnicalColumnIndex.ColumnDocument;
 import org.openmetadata.service.glossary.technical.TechnicalColumnSource;
@@ -42,11 +47,14 @@ import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
 import org.openmetadata.service.glossary.technical.TechnicalExcelExporter;
 import org.openmetadata.service.glossary.technical.TechnicalHistory;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
+import org.openmetadata.service.glossary.technical.TechnicalOwnerLabels;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
+import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.technical.TechnicalRecordDeclaration;
 import org.openmetadata.service.glossary.technical.TechnicalRecordReview;
 import org.openmetadata.service.glossary.technical.TechnicalRecordService;
 import org.openmetadata.service.glossary.technical.TechnicalRecordUpdate;
+import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 import org.openmetadata.service.glossary.technical.search.TechnicalDocumentBuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchCriteria;
@@ -77,12 +85,20 @@ public class TechnicalDictionaryResource {
   private static final int MAX_COLUMN_LIMIT = 50;
   private static final String DEFAULT_HISTORY_LIMIT = "20";
   private static final int MAX_HISTORY_LIMIT = 100;
+  private static final int MAX_SNAPSHOT_LIMIT = 100;
   private static final String DATA = "data";
+  private static final String BULK_SUCCEEDED = "succeeded";
+  private static final String BULK_FAILED = "failed";
+  private static final String BULK_RESULTS = "results";
+  private static final String OUTCOME_SUCCEEDED = "SUCCEEDED";
+  private static final String OUTCOME_FAILED = "FAILED";
   private static final String EXPORT_FILE_STEM = "TuDienKyThuat_Agribank_TDDLv";
 
   private final TechnicalDictionaryAccess access;
   private final TechnicalSearchService searchService = new TechnicalSearchService();
   private final TechnicalRecordService recordService = new TechnicalRecordService();
+  private final TechnicalChangeRequestService changeRequestService =
+      new TechnicalChangeRequestService();
 
   public TechnicalDictionaryResource(Authorizer authorizer) {
     this.access = new TechnicalDictionaryAccess(authorizer);
@@ -126,7 +142,7 @@ public class TechnicalDictionaryResource {
       @QueryParam("timeliness") String timeliness,
       @DefaultValue(DEFAULT_PAGE_SIZE) @QueryParam("limit") int limit,
       @DefaultValue("0") @QueryParam("offset") int offset) {
-    access.requireView(securityContext);
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final Map<String, String> parameters =
         TechnicalSearchParameters.parameters(
             q,
@@ -142,8 +158,14 @@ public class TechnicalDictionaryResource {
             timeliness);
     final String version = requireVersion();
     TechnicalOutbox.flush();
-    return searchService.search(
-        TechnicalSearchParameters.criteria(version, parameters, limit, offset));
+    final TechnicalSearchCriteria criteria =
+        TechnicalSearchParameters.criteria(version, parameters, limit, offset)
+            .withUnapprovedHidden(!capabilities.canSeeWorkingRecords());
+    final Map<String, Object> result = searchService.search(criteria);
+    if (!capabilities.canSeeWorkingRecords()) {
+      return TechnicalOwnerLabels.refreshPage(withoutChangeMetadata(result));
+    }
+    return TechnicalOwnerLabels.refreshPage(withChangeRows(result, criteria));
   }
 
   @GET
@@ -152,10 +174,12 @@ public class TechnicalDictionaryResource {
       operationId = "getTechnicalDictionaryIndexStats",
       summary = "Declared Columns, tables, sources and mapped Columns")
   public Map<String, Long> stats(@Context SecurityContext securityContext) {
-    access.requireView(securityContext);
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final String version = requireVersion();
     TechnicalOutbox.flush();
-    return searchService.stats(TechnicalSearchCriteria.scopeOnly(version));
+    return searchService.stats(
+        TechnicalSearchCriteria.scopeOnly(version)
+            .withUnapprovedHidden(!capabilities.canSeeWorkingRecords()));
   }
 
   @GET
@@ -178,7 +202,7 @@ public class TechnicalDictionaryResource {
   @Path("/records")
   @Operation(
       operationId = "declareTechnicalDictionaryColumn",
-      summary = "Declare a Column and send the new record for independent approval")
+      summary = "Declare a Column as a draft; it is submitted for approval separately")
   public Response declare(
       @Context SecurityContext securityContext, @NotNull TechnicalRecordDeclaration declaration) {
     access.requireEdit(securityContext);
@@ -192,8 +216,9 @@ public class TechnicalDictionaryResource {
   @Operation(operationId = "getTechnicalDictionaryRecord", summary = "One declared Column")
   public Map<String, Object> get(
       @Context SecurityContext securityContext, @PathParam("id") UUID recordId) {
-    access.requireView(securityContext);
-    return row(requireRecord(recordId));
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
+    final Map<String, Object> result = row(requireVisibleRecord(recordId, capabilities));
+    return capabilities.canSeeWorkingRecords() ? result : withoutChangeMetadataRow(result);
   }
 
   @PATCH
@@ -201,7 +226,7 @@ public class TechnicalDictionaryResource {
   @Operation(
       operationId = "updateTechnicalDictionaryRecord",
       summary =
-          "Replace editable values; rejected records return to review, approved edits are immediate")
+          "Replace editable values of a non-Approved record; Approved records require a change request")
   public Map<String, Object> update(
       @Context SecurityContext securityContext,
       @PathParam("id") UUID recordId,
@@ -220,6 +245,150 @@ public class TechnicalDictionaryResource {
   }
 
   @POST
+  @Path("/records/{id}/change-request")
+  @Operation(
+      operationId = "createTechnicalDictionaryChangeRequest",
+      summary = "Create or replace a Draft update/delete proposal for an Approved record")
+  public Map<String, Object> createChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalChangeRequestCreate input) {
+    access.requireEdit(securityContext);
+    return changeRequest(
+        changeRequestService.save(recordId, input, securityContext.getUserPrincipal().getName()),
+        true);
+  }
+
+  @GET
+  @Path("/records/{id}/change-request")
+  @Operation(
+      operationId = "getTechnicalDictionaryChangeRequest",
+      summary = "Read the pending proposal; consumers cannot read proposed values")
+  public Map<String, Object> getChangeRequest(
+      @Context SecurityContext securityContext, @PathParam("id") UUID recordId) {
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
+    if (!capabilities.canSeeWorkingRecords()) {
+      throw TechnicalDictionaryErrors.forbidden(
+          TechnicalDictionaryErrors.CHANGE_REQUEST_NOT_FOUND,
+          "Not authorized to view Technical Dictionary change requests");
+    }
+    return changeRequest(changeRequestService.get(recordId), true);
+  }
+
+  @PATCH
+  @Path("/records/{id}/change-request")
+  @Operation(
+      operationId = "updateTechnicalDictionaryChangeRequest",
+      summary = "Replace the editable values of a Draft or Rejected proposal")
+  public Map<String, Object> updateChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalChangeRequestCreate input) {
+    access.requireEdit(securityContext);
+    return changeRequest(
+        changeRequestService.save(recordId, input, securityContext.getUserPrincipal().getName()),
+        true);
+  }
+
+  @POST
+  @Path("/records/{id}/change-request/submit")
+  @Operation(
+      operationId = "submitTechnicalDictionaryChangeRequest",
+      summary = "Submit a Draft or Rejected proposal for independent review")
+  public Map<String, Object> submitChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireEdit(securityContext);
+    requireExpectedRevision(review);
+    return changeRequest(
+        changeRequestService.submit(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()),
+        true);
+  }
+
+  @POST
+  @Path("/records/{id}/change-request/approve")
+  @Operation(
+      operationId = "approveTechnicalDictionaryChangeRequest",
+      summary = "Atomically apply an update or delete proposal")
+  public Map<String, Object> approveChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireApprove(securityContext);
+    requireExpectedRevision(review);
+    final TechnicalRecord approved =
+        changeRequestService.approve(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName());
+    return approved == null ? Map.of("termId", recordId, "deleted", true) : row(approved);
+  }
+
+  @POST
+  @Path("/records/{id}/change-request/reject")
+  @Operation(
+      operationId = "rejectTechnicalDictionaryChangeRequest",
+      summary = "Reject a proposal without changing the Approved record")
+  public Map<String, Object> rejectChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireApprove(securityContext);
+    requireExpectedRevision(review);
+    return changeRequest(
+        changeRequestService.reject(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()),
+        true);
+  }
+
+  @DELETE
+  @Path("/records/{id}/change-request")
+  @Operation(
+      operationId = "cancelTechnicalDictionaryChangeRequest",
+      summary = "Cancel a Draft or Rejected proposal")
+  public Map<String, Object> cancelChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull @QueryParam("expectedRevision") Long expectedRevision) {
+    access.requireEdit(securityContext);
+    if (expectedRevision == null) {
+      throw TechnicalDictionaryErrors.badRequest(
+          TechnicalDictionaryErrors.INVALID_FIELD, "expectedRevision is required");
+    }
+    changeRequestService.cancel(
+        recordId, expectedRevision, securityContext.getUserPrincipal().getName());
+    return Map.of("termId", recordId, "cancelled", true);
+  }
+
+  @POST
+  @Path("/records/{id}/submit")
+  @Operation(
+      operationId = "submitTechnicalDictionaryRecord",
+      summary = "Send a draft for independent approval")
+  public Map<String, Object> submit(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireEdit(securityContext);
+    requireExpectedRevision(review);
+    return row(
+        recordService.submit(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/records/bulk/submit")
+  @Operation(
+      operationId = "bulkSubmitTechnicalDictionaryRecords",
+      summary = "Send up to 100 drafts for approval; each one succeeds or fails on its own")
+  public Map<String, Object> bulkSubmit(
+      @Context SecurityContext securityContext, @NotNull TechnicalBulkReview.Request request) {
+    access.requireEdit(securityContext);
+    final List<TechnicalBulkReview.Item> items = TechnicalBulkReview.validate(request);
+    return bulkResult(recordService.submitAll(items, securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
   @Path("/records/{id}/approve")
   @Operation(operationId = "approveTechnicalDictionaryRecord", summary = "Approve a new record")
   public Map<String, Object> approve(
@@ -235,7 +404,9 @@ public class TechnicalDictionaryResource {
 
   @POST
   @Path("/records/{id}/reject")
-  @Operation(operationId = "rejectTechnicalDictionaryRecord", summary = "Reject a new record")
+  @Operation(
+      operationId = "rejectTechnicalDictionaryRecord",
+      summary = "Reject a new record; no reason is needed")
   public Map<String, Object> reject(
       @Context SecurityContext securityContext,
       @PathParam("id") UUID recordId,
@@ -244,10 +415,32 @@ public class TechnicalDictionaryResource {
     requireExpectedRevision(review);
     return row(
         recordService.reject(
-            recordId,
-            review.expectedRevision(),
-            review.comment(),
-            securityContext.getUserPrincipal().getName()));
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/records/bulk/approve")
+  @Operation(
+      operationId = "bulkApproveTechnicalDictionaryRecords",
+      summary = "Approve up to 100 new records; each one succeeds or fails on its own")
+  public Map<String, Object> bulkApprove(
+      @Context SecurityContext securityContext, @NotNull TechnicalBulkReview.Request request) {
+    access.requireApprove(securityContext);
+    final List<TechnicalBulkReview.Item> items = TechnicalBulkReview.validate(request);
+    return bulkResult(
+        recordService.approveAll(items, securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/records/bulk/reject")
+  @Operation(
+      operationId = "bulkRejectTechnicalDictionaryRecords",
+      summary = "Reject up to 100 new records; each one succeeds or fails on its own")
+  public Map<String, Object> bulkReject(
+      @Context SecurityContext securityContext, @NotNull TechnicalBulkReview.Request request) {
+    access.requireApprove(securityContext);
+    final List<TechnicalBulkReview.Item> items = TechnicalBulkReview.validate(request);
+    return bulkResult(recordService.rejectAll(items, securityContext.getUserPrincipal().getName()));
   }
 
   @DELETE
@@ -282,8 +475,9 @@ public class TechnicalDictionaryResource {
       @DefaultValue(DEFAULT_HISTORY_LIMIT) @Min(1) @Max(MAX_HISTORY_LIMIT) @QueryParam("limit")
           int limit,
       @DefaultValue("0") @Min(0) @QueryParam("offset") int offset) {
-    access.requireView(securityContext);
-    return new TechnicalHistory().page(recordId.toString(), limit, offset);
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
+    hideDraftFrom(dao().findById(recordId.toString()), capabilities);
+    return new TechnicalHistory().page(recordId.toString(), limit, offset, false);
   }
 
   @GET
@@ -293,10 +487,12 @@ public class TechnicalDictionaryResource {
       operationId = "exportTechnicalDictionary",
       summary = "Export every declared Column of the Technical Dictionary as Excel")
   public Response export(@Context SecurityContext securityContext) {
-    access.requireView(securityContext);
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final String version = requireVersion();
     TechnicalOutbox.flush();
-    final TechnicalSearchCriteria criteria = TechnicalSearchCriteria.scopeOnly(version);
+    final TechnicalSearchCriteria criteria =
+        TechnicalSearchCriteria.scopeOnly(version)
+            .withUnapprovedHidden(!capabilities.canSeeWorkingRecords());
     return TechnicalWorkbookResponses.download(
         securityContext.getUserPrincipal().getName(),
         EXPORT_FILE_STEM + version,
@@ -320,6 +516,73 @@ public class TechnicalDictionaryResource {
             .map(TechnicalDictionaryResource::summary)
             .toList();
     return Map.of(DATA, summaries);
+  }
+
+  @GET
+  @Path("/snapshots/{dataDictionaryVersion}/records")
+  @Operation(
+      operationId = "listTechnicalDictionarySnapshotRecords",
+      summary = "The frozen records of one replaced Data Dictionary version, read only")
+  public Map<String, Object> snapshotRecords(
+      @Context SecurityContext securityContext,
+      @PathParam("dataDictionaryVersion") String version,
+      @QueryParam("q") String q,
+      @DefaultValue(DEFAULT_PAGE_SIZE) @Min(1) @Max(MAX_SNAPSHOT_LIMIT) @QueryParam("limit")
+          int limit,
+      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset) {
+    access.requireView(securityContext);
+    final String pattern = "%" + (q == null ? "" : q.trim().toLowerCase()) + "%";
+    final List<Map<String, Object>> rows =
+        dao().searchSnapshots(version, pattern, limit, offset).stream()
+            .map(
+                snapshot ->
+                    withoutChangeMetadataRow(
+                        JsonUtils.<Map<String, Object>>readValue(
+                            snapshot.payload(), new TypeReference<>() {})))
+            .toList();
+    final Map<String, Object> paging = new LinkedHashMap<>();
+    paging.put("total", dao().countSearchedSnapshots(version, pattern));
+    paging.put("limit", limit);
+    paging.put("offset", offset);
+    return Map.of(DATA, rows, "paging", paging);
+  }
+
+  @GET
+  @Path("/snapshots/{dataDictionaryVersion}/records/{id}")
+  @Operation(
+      operationId = "getTechnicalDictionarySnapshotRecord",
+      summary = "One frozen record of a replaced Data Dictionary version, read only")
+  public Map<String, Object> snapshotRecord(
+      @Context SecurityContext securityContext,
+      @PathParam("dataDictionaryVersion") String version,
+      @PathParam("id") UUID recordId) {
+    access.requireView(securityContext);
+    final SnapshotRow snapshot = requireSnapshot(version, recordId);
+    return withoutChangeMetadataRow(
+        JsonUtils.<Map<String, Object>>readValue(snapshot.payload(), new TypeReference<>() {}));
+  }
+
+  @GET
+  @Path("/records/{id}/versions")
+  @Operation(
+      operationId = "getTechnicalDictionaryRecordVersions",
+      summary =
+          "The replaced Data Dictionary versions that hold this Column, and its current record")
+  public Map<String, Object> recordVersions(
+      @Context SecurityContext securityContext, @PathParam("id") UUID recordId) {
+    access.requireView(securityContext);
+    final String columnKey = columnKeyOf(recordId.toString());
+    final List<String> versions =
+        columnKey == null
+            ? List.of()
+            : dao().listSnapshotVersionsOfColumn(columnKey).stream()
+                .sorted(GlossaryBusinessVersion::compare)
+                .toList()
+                .reversed();
+    final Map<String, Object> result = new LinkedHashMap<>();
+    result.put(DATA, versions);
+    result.put("currentRecordId", currentRecordIdOf(columnKey));
+    return result;
   }
 
   @GET
@@ -348,6 +611,33 @@ public class TechnicalDictionaryResource {
     return TechnicalIndexRebuilder.rebuild();
   }
 
+  /** The frozen record, found by its id or, for a record made after a reset, by its Column. */
+  private static SnapshotRow requireSnapshot(String version, UUID recordId) {
+    SnapshotRow snapshot = dao().findSnapshot(version, recordId.toString());
+    final String columnKey = columnKeyOf(recordId.toString());
+    if (snapshot == null && columnKey != null) {
+      snapshot = dao().findSnapshotByColumnKey(version, columnKey);
+    }
+    if (snapshot == null) {
+      throw TechnicalDictionaryErrors.notFound(
+          TechnicalDictionaryErrors.RECORD_NOT_FOUND,
+          String.format("Record '%s' is not in Data Dictionary version '%s'", recordId, version));
+    }
+    return snapshot;
+  }
+
+  private static String columnKeyOf(String recordId) {
+    final TechnicalRecord current = dao().findById(recordId);
+    final SnapshotRow frozen = current == null ? dao().findLatestSnapshotOfRecord(recordId) : null;
+    return current != null ? current.columnKey() : frozen == null ? null : frozen.columnKey();
+  }
+
+  private static String currentRecordIdOf(String columnKey) {
+    final List<TechnicalRecord> current =
+        columnKey == null ? List.of() : dao().findByColumnKeys(List.of(columnKey));
+    return current.isEmpty() ? null : current.getFirst().id();
+  }
+
   private static String requireVersion() {
     return TechnicalDictionaryState.activeVersion()
         .orElseThrow(
@@ -364,19 +654,136 @@ public class TechnicalDictionaryResource {
     }
   }
 
-  private static TechnicalRecord requireRecord(UUID recordId) {
+  private static TechnicalRecord requireVisibleRecord(
+      UUID recordId, TechnicalDictionaryAccess.Capabilities capabilities) {
     final TechnicalRecord record = dao().findById(recordId.toString());
     if (record == null) {
-      throw TechnicalDictionaryErrors.notFound(
-          TechnicalDictionaryErrors.RECORD_NOT_FOUND,
-          String.format("Technical Dictionary record %s was not found", recordId));
+      throw recordNotFound(recordId.toString());
     }
+    hideDraftFrom(record, capabilities);
     return record;
+  }
+
+  /** A working record is visible only to people who can edit or approve. */
+  private static void hideDraftFrom(
+      TechnicalRecord record, TechnicalDictionaryAccess.Capabilities capabilities) {
+    if (record != null
+        && !TechnicalRecord.STATUS_APPROVED.equals(record.status())
+        && !capabilities.canSeeWorkingRecords()) {
+      throw recordNotFound(record.id());
+    }
+  }
+
+  private static WebApplicationException recordNotFound(String recordId) {
+    return TechnicalDictionaryErrors.notFound(
+        TechnicalDictionaryErrors.RECORD_NOT_FOUND,
+        String.format("Technical Dictionary record %s was not found", recordId));
+  }
+
+  private static Map<String, Object> bulkResult(List<TechnicalBulkReview.Outcome> outcomes) {
+    final long succeeded = outcomes.stream().filter(TechnicalBulkReview.Outcome::succeeded).count();
+    final Map<String, Object> result = new LinkedHashMap<>();
+    result.put(BULK_SUCCEEDED, succeeded);
+    result.put(BULK_FAILED, outcomes.size() - succeeded);
+    result.put(
+        BULK_RESULTS, outcomes.stream().map(TechnicalDictionaryResource::bulkOutcome).toList());
+    return result;
+  }
+
+  private static Map<String, Object> bulkOutcome(TechnicalBulkReview.Outcome outcome) {
+    final Map<String, Object> view = new LinkedHashMap<>();
+    view.put("termId", outcome.recordId());
+    view.put("outcome", outcome.succeeded() ? OUTCOME_SUCCEEDED : OUTCOME_FAILED);
+    if (outcome.succeeded()) {
+      view.put("record", row(outcome.record()));
+    } else {
+      view.put("code", outcome.code());
+      view.put("message", outcome.message());
+    }
+    return view;
   }
 
   private static Map<String, Object> row(TechnicalRecord record) {
     return new TechnicalDocumentBuilder()
         .row(record, TechnicalDictionaryState.row().dataDictionaryVersion());
+  }
+
+  /** Lists each pending update right under its approved record and counts it in the total. */
+  private Map<String, Object> withChangeRows(
+      Map<String, Object> page, TechnicalSearchCriteria criteria) {
+    final List<Map<String, Object>> rows =
+        ((List<?>) page.get(DATA)).stream().map(TechnicalDictionaryResource::stringKeyMap).toList();
+    final Map<String, Object> paging = stringKeyMap(page.get("paging"));
+    paging.put(
+        "total",
+        ((Number) paging.get("total")).longValue() + searchService.countPendingUpdates(criteria));
+    return Map.of(
+        DATA,
+        new TechnicalChangeRows(changeRequestService, dao(), TechnicalDictionaryResource::row)
+            .expand(rows, criteria.filters().getOrDefault(TechnicalRowMatcher.STATUSES, List.of())),
+        "paging",
+        paging);
+  }
+
+  private static Map<String, Object> withoutChangeMetadata(Map<String, Object> page) {
+    final Map<String, Object> sanitized = new LinkedHashMap<>(page);
+    if (page.get(DATA) instanceof List<?> rows) {
+      sanitized.put(
+          DATA,
+          rows.stream()
+              .filter(Map.class::isInstance)
+              .map(TechnicalDictionaryResource::stringKeyMap)
+              .map(TechnicalDictionaryResource::withoutChangeMetadataRow)
+              .toList());
+    }
+    return sanitized;
+  }
+
+  private static Map<String, Object> withoutChangeMetadataRow(Map<String, Object> row) {
+    final Map<String, Object> sanitized = new LinkedHashMap<>(row);
+    sanitized.remove("hasPendingChange");
+    sanitized.remove("changeRequestId");
+    sanitized.remove("changeRequestStatus");
+    sanitized.remove("changeOperation");
+    sanitized.remove("changeCreatedBy");
+    return sanitized;
+  }
+
+  private static Map<String, Object> stringKeyMap(Object value) {
+    final Map<String, Object> result = new LinkedHashMap<>();
+    ((Map<?, ?>) value).forEach((key, item) -> result.put(String.valueOf(key), item));
+    return result;
+  }
+
+  private Map<String, Object> changeRequest(
+      TechnicalRecordChangeRequest request, boolean includeProposal) {
+    final Map<String, Object> result = new LinkedHashMap<>();
+    result.put("id", request.id());
+    result.put("recordId", request.recordId());
+    result.put("operation", request.operation());
+    result.put("baseRevision", request.baseRevision());
+    result.put("status", request.status());
+    result.put("revision", request.revision());
+    result.put("createdAt", request.createdAt());
+    result.put("createdBy", request.createdBy());
+    result.put("updatedAt", request.updatedAt());
+    result.put("updatedBy", request.updatedBy());
+    result.put("submittedAt", request.submittedAt());
+    result.put("submittedBy", request.submittedBy());
+    result.put("reviewedAt", request.reviewedAt());
+    result.put("reviewedBy", request.reviewedBy());
+    result.put(
+        "proposedValues",
+        request.proposedValues() == null
+            ? null
+            : JsonUtils.readValue(
+                request.proposedValues(), new TypeReference<Map<String, Object>>() {}));
+    if (includeProposal) {
+      final TechnicalRecord proposed = changeRequestService.proposedRecord(request);
+      result.put("approvedRecord", row(dao().findById(request.recordId())));
+      result.put("proposedRecord", proposed == null ? null : row(proposed));
+    }
+    return result;
   }
 
   private static List<Map<String, Object>> snapshotRows(String version) {

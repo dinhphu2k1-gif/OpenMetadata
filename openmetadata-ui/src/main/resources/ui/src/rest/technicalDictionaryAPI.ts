@@ -14,8 +14,17 @@ import { AxiosResponse } from 'axios';
 import APIClient from './index';
 
 export type TechnicalSourceStatus = 'Available' | 'Unavailable';
-export type TechnicalRecordStatus = 'In Review' | 'Approved' | 'Rejected';
+export type TechnicalRecordStatus =
+  | 'Draft'
+  | 'In Review'
+  | 'Approved'
+  | 'Rejected'
+  /** Only on rows of a replaced Data Dictionary version; never stored on a record. */
+  | 'Archived';
 export type TechnicalAssetSource = 'CURRENT' | 'SNAPSHOT' | 'NONE';
+export type TechnicalChangeStatus = 'Draft' | 'InReview' | 'Rejected';
+export type TechnicalRowRole = 'APPROVED' | 'CHANGE';
+export type TechnicalChangeOperation = 'UPDATE' | 'DELETE';
 
 export interface TechnicalTagValue {
   fqn: string;
@@ -25,6 +34,17 @@ export interface TechnicalTagValue {
 export interface TechnicalNamedReference {
   id: string;
   name: string;
+}
+
+/** A data steward of a record: a team or a user. */
+export interface TechnicalOwnerReference extends TechnicalNamedReference {
+  type: 'team' | 'user';
+}
+
+/** What is sent to store a steward. */
+export interface TechnicalOwnerInput {
+  id: string;
+  type: 'team' | 'user';
 }
 
 export interface TechnicalCdeValue {
@@ -64,11 +84,18 @@ export interface TechnicalRecordApiRow {
   generationType?: TechnicalTagValue;
   creationMethod?: TechnicalTagValue;
   timeliness?: TechnicalTagValue;
-  systemOwner?: TechnicalNamedReference;
+  systemOwners?: TechnicalOwnerReference[];
   createdAt?: number;
   createdBy?: string;
   updatedAt?: number;
   updatedBy?: string;
+  hasPendingChange?: boolean;
+  changeRequestId?: string;
+  changeRequestStatus?: TechnicalChangeStatus;
+  changeOperation?: TechnicalChangeOperation;
+  changeCreatedBy?: string;
+  /** Set when a pending update lists as two rows: the approved values, then the proposal. */
+  rowRole?: TechnicalRowRole;
 }
 
 export interface TechnicalCapabilities {
@@ -141,7 +168,7 @@ export interface TechnicalRecordValues {
   generationType?: string;
   creationMethod?: string;
   timeliness?: string;
-  systemOwnerId?: string;
+  systemOwners?: TechnicalOwnerInput[];
 }
 
 /** Initial values sent when declaring a Column; every value but the Column is optional. */
@@ -151,6 +178,27 @@ export interface TechnicalDeclarationRequest extends TechnicalRecordValues {
 
 export interface TechnicalRecordUpdateRequest extends TechnicalRecordValues {
   expectedRevision: number;
+}
+
+export interface TechnicalChangeRequest {
+  id: string;
+  recordId: string;
+  operation: TechnicalChangeOperation;
+  baseRevision: number;
+  status: TechnicalChangeStatus;
+  revision: number;
+  createdAt: number;
+  createdBy: string;
+  updatedAt: number;
+  updatedBy: string;
+  proposedValues?: TechnicalRecordValues;
+  approvedRecord: TechnicalRecordApiRow;
+  proposedRecord?: TechnicalRecordApiRow | null;
+}
+
+export interface TechnicalChangeRequestInput extends TechnicalRecordValues {
+  expectedRevision: number;
+  operation: TechnicalChangeOperation;
 }
 
 export interface TechnicalSnapshotSummary {
@@ -242,6 +290,17 @@ export const searchTechnicalRecords = async (
   return response.data;
 };
 
+/** One declared Column, shaped like a row of the search list. */
+export const getTechnicalRecord = async (
+  termId: string
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.get<TechnicalRecordApiRow>(
+    `/glossaryTerms/technical/records/${termId}`
+  );
+
+  return response.data;
+};
+
 export const getTechnicalStats = async (): Promise<TechnicalStats> => {
   const response = await APIClient.get<TechnicalStats>(
     '/glossaryTerms/technical/stats'
@@ -289,6 +348,90 @@ export const updateTechnicalRecord = async (
   return response.data;
 };
 
+export const saveTechnicalChangeRequest = async (
+  termId: string,
+  request: TechnicalChangeRequestInput,
+  exists = false
+): Promise<TechnicalChangeRequest> => {
+  const url = `/glossaryTerms/technical/records/${termId}/change-request`;
+  const config = { headers: { 'Content-Type': 'application/json' } };
+  const response = exists
+    ? await APIClient.patch<
+        TechnicalChangeRequestInput,
+        AxiosResponse<TechnicalChangeRequest>
+      >(url, request, config)
+    : await APIClient.post<
+        TechnicalChangeRequestInput,
+        AxiosResponse<TechnicalChangeRequest>
+      >(url, request, config);
+
+  return response.data;
+};
+
+export const getTechnicalChangeRequest = async (
+  termId: string
+): Promise<TechnicalChangeRequest> => {
+  const response = await APIClient.get<TechnicalChangeRequest>(
+    `/glossaryTerms/technical/records/${termId}/change-request`
+  );
+
+  return response.data;
+};
+
+const reviewTechnicalChangeRequest = async (
+  termId: string,
+  action: 'submit' | 'approve' | 'reject',
+  expectedRevision: number
+) => {
+  const response = await APIClient.post<
+    { expectedRevision: number },
+    AxiosResponse<TechnicalChangeRequest | TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}/change-request/${action}`, {
+    expectedRevision,
+  });
+
+  return response.data;
+};
+
+export const submitTechnicalChangeRequest = (
+  termId: string,
+  expectedRevision: number
+) => reviewTechnicalChangeRequest(termId, 'submit', expectedRevision);
+
+export const approveTechnicalChangeRequest = (
+  termId: string,
+  expectedRevision: number
+) => reviewTechnicalChangeRequest(termId, 'approve', expectedRevision);
+
+export const rejectTechnicalChangeRequest = (
+  termId: string,
+  expectedRevision: number
+) => reviewTechnicalChangeRequest(termId, 'reject', expectedRevision);
+
+export const cancelTechnicalChangeRequest = async (
+  termId: string,
+  expectedRevision: number
+): Promise<void> => {
+  await APIClient.delete(
+    `/glossaryTerms/technical/records/${termId}/change-request`,
+    { params: { expectedRevision } }
+  );
+};
+
+export const submitTechnicalRecord = async (
+  termId: string,
+  expectedRevision: number
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.post<
+    { expectedRevision: number },
+    AxiosResponse<TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}/submit`, {
+    expectedRevision,
+  });
+
+  return response.data;
+};
+
 export const approveTechnicalRecord = async (
   termId: string,
   expectedRevision: number
@@ -305,19 +448,60 @@ export const approveTechnicalRecord = async (
 
 export const rejectTechnicalRecord = async (
   termId: string,
-  expectedRevision: number,
-  comment: string
+  expectedRevision: number
 ): Promise<TechnicalRecordApiRow> => {
   const response = await APIClient.post<
-    { expectedRevision: number; comment: string },
+    { expectedRevision: number },
     AxiosResponse<TechnicalRecordApiRow>
   >(`/glossaryTerms/technical/records/${termId}/reject`, {
     expectedRevision,
-    comment,
   });
 
   return response.data;
 };
+
+/** One record of a bulk submit, approve or reject request, with the revision that was displayed. */
+export interface TechnicalBulkReviewItem {
+  id: string;
+  expectedRevision: number;
+}
+
+/** What happened to one record of a bulk request; `record` is set on success, `code` on failure. */
+export interface TechnicalBulkReviewOutcome {
+  termId: string;
+  outcome: 'SUCCEEDED' | 'FAILED';
+  record?: TechnicalRecordApiRow;
+  code?: string;
+  message?: string;
+}
+
+export interface TechnicalBulkReviewResult {
+  succeeded: number;
+  failed: number;
+  /** In the order of the request. */
+  results: TechnicalBulkReviewOutcome[];
+}
+
+const bulkReview = async (
+  action: 'submit' | 'approve' | 'reject',
+  items: TechnicalBulkReviewItem[]
+): Promise<TechnicalBulkReviewResult> => {
+  const response = await APIClient.post<
+    { items: TechnicalBulkReviewItem[] },
+    AxiosResponse<TechnicalBulkReviewResult>
+  >(`/glossaryTerms/technical/records/bulk/${action}`, { items });
+
+  return response.data;
+};
+
+export const bulkSubmitTechnicalRecords = (items: TechnicalBulkReviewItem[]) =>
+  bulkReview('submit', items);
+
+export const bulkApproveTechnicalRecords = (items: TechnicalBulkReviewItem[]) =>
+  bulkReview('approve', items);
+
+export const bulkRejectTechnicalRecords = (items: TechnicalBulkReviewItem[]) =>
+  bulkReview('reject', items);
 
 export const deleteTechnicalRecord = async (
   termId: string,
@@ -352,6 +536,60 @@ export const listTechnicalSnapshots = async (): Promise<
   );
 
   return response.data.data;
+};
+
+/** The frozen records of a replaced Data Dictionary version, read only. */
+export const searchTechnicalSnapshotRecords = async (
+  dataDictionaryVersion: string,
+  query: Pick<TechnicalRecordQuery, 'q' | 'limit' | 'offset'>,
+  signal?: AbortSignal
+): Promise<TechnicalRecordPage> => {
+  const response = await APIClient.get<TechnicalRecordPage>(
+    `/glossaryTerms/technical/snapshots/${encodeURIComponent(
+      dataDictionaryVersion
+    )}/records`,
+    {
+      params: {
+        q: query.q || undefined,
+        limit: query.limit,
+        offset: query.offset,
+      },
+      signal,
+    }
+  );
+
+  return response.data;
+};
+
+export interface TechnicalRecordVersions {
+  /** Replaced versions that hold this Column, newest first. */
+  data: string[];
+  /** The record of this Column now, when there is one. */
+  currentRecordId?: string | null;
+}
+
+export const getTechnicalRecordVersions = async (
+  termId: string
+): Promise<TechnicalRecordVersions> => {
+  const response = await APIClient.get<TechnicalRecordVersions>(
+    `/glossaryTerms/technical/records/${termId}/versions`
+  );
+
+  return response.data;
+};
+
+/** One frozen record of a replaced Data Dictionary version, read only. */
+export const getTechnicalSnapshotRecord = async (
+  dataDictionaryVersion: string,
+  termId: string
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.get<TechnicalRecordApiRow>(
+    `/glossaryTerms/technical/snapshots/${encodeURIComponent(
+      dataDictionaryVersion
+    )}/records/${termId}`
+  );
+
+  return response.data;
 };
 
 export const exportTechnicalSnapshot = async (
@@ -404,11 +642,10 @@ export const previewTechnicalImport = async (
 export const commitTechnicalImport = async (importSessionId: string) => {
   const response = await APIClient.post<{
     committed: number;
-    pendingApproval: number;
+    created: number;
+    proposed: number;
     updated: number;
-  }>(
-    `/glossaryTerms/import/technical/${importSessionId}/commit`
-  );
+  }>(`/glossaryTerms/import/technical/${importSessionId}/commit`);
 
   return response.data;
 };
@@ -421,6 +658,41 @@ export const getCdeTechnicalAssets = async (
 ): Promise<TechnicalAssetsPage> => {
   const response = await APIClient.get<TechnicalAssetsPage>(
     `/glossaryTerms/${cdeId}/technicalAssets`,
+    { params: { limit, offset } }
+  );
+
+  return response.data;
+};
+
+export interface TechnicalHistoryChange {
+  field: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+}
+
+export interface TechnicalHistoryEntry {
+  id: string;
+  /** CREATE, SUBMIT, APPROVE_CHANGE and so on. */
+  action: string;
+  actor: string;
+  at: number;
+  dataDictionaryVersion?: string | null;
+  changes: TechnicalHistoryChange[];
+}
+
+export interface TechnicalHistoryPage {
+  data: TechnicalHistoryEntry[];
+  paging: { total: number; limit: number; offset: number };
+}
+
+/** Who changed a record and when, newest first. */
+export const getTechnicalRecordHistory = async (
+  termId: string,
+  limit: number,
+  offset: number
+): Promise<TechnicalHistoryPage> => {
+  const response = await APIClient.get<TechnicalHistoryPage>(
+    `/glossaryTerms/technical/records/${termId}/history`,
     { params: { limit, offset } }
   );
 

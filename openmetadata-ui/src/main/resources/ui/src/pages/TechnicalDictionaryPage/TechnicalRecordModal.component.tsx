@@ -15,25 +15,28 @@ import { Form, Input, InputNumber, Modal, Select, Tag as AntTag } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import GlossaryTermFormSection from '../../components/Glossary/AddGlossaryTermForm/GlossaryTermFormSection.component';
-import CDESelector from '../../components/Glossary/CDESelector/CDESelector.component';
+import CDESelectableField from '../../components/Glossary/CDESelectableList/CDESelectableField.component';
 import { TECHNICAL_MAX_RANK } from '../../constants/TechnicalDictionary.constants';
-import { GlossaryTerm } from '../../generated/entity/data/glossaryTerm';
+import { EntityReference } from '../../generated/entity/type';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
-import { TechnicalColumnCandidate } from '../../rest/technicalDictionaryAPI';
-import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
+import {
+  TechnicalColumnCandidate,
+  TechnicalOwnerInput,
+} from '../../rest/technicalDictionaryAPI';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import TechnicalStatusBadge from './TechnicalStatusBadge.component';
 import TechnicalTagSelect from './TechnicalTagSelect.component';
 
 /** Editable values collected from the modal. `cde` is undefined when unchanged, null when cleared. */
 export interface TechnicalRecordFormValues {
-  cde?: GlossaryTerm | null;
+  cde?: EntityReference | null;
   rank?: number | null;
   elementType?: string;
   generationType?: string;
   creationMethod?: string;
   timeliness?: string;
-  systemOwnerId?: string;
+  systemOwners?: TechnicalOwnerInput[];
 }
 
 export type TechnicalRecordModalMode = 'view' | 'edit' | 'create' | 'review';
@@ -51,6 +54,7 @@ interface TechnicalRecordModalProps {
   open: boolean;
   mode: TechnicalRecordModalMode;
   row?: TechnicalDictionaryRow;
+  /** Current effective values while `row` contains the pending proposal. */
   options: TechnicalDictionaryOptions;
   isSaving: boolean;
   /** Data Dictionary version the CDEs are chosen from. */
@@ -64,6 +68,10 @@ interface TechnicalRecordModalProps {
   onEdit?: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  /** Present when the caller may send this draft for approval. */
+  onSubmit?: () => void;
+  /** Present when the caller may read the change history of this record. */
+  onOpenHistory?: () => void;
 }
 
 const columnOptionLabel = (candidate: TechnicalColumnCandidate) =>
@@ -88,10 +96,12 @@ const TechnicalRecordModal = ({
   onEdit,
   onApprove,
   onReject,
+  onSubmit,
+  onOpenHistory,
 }: TechnicalRecordModalProps) => {
   const { t } = useTranslation();
   const [form] = Form.useForm<TechnicalRecordFormValues>();
-  const [pendingCde, setPendingCde] = useState<GlossaryTerm | null>();
+  const [pendingCde, setPendingCde] = useState<EntityReference | null>();
   const isReadOnly = mode === 'view' || mode === 'review';
   const isCreate = mode === 'create';
   const isSaveDisabled = isSaving || (isCreate && !row);
@@ -118,14 +128,14 @@ const TechnicalRecordModal = ({
   const selectedCde = useMemo(
     () =>
       row?.cdeTermId
-        ? ({
+        ? {
             id: row.cdeTermId,
             name: row.cdeCode,
             displayName: row.cdeName,
-            parentBusinessVersion: dataDictionaryVersion,
-          } as GlossaryTerm)
+            type: 'glossaryTerm',
+          }
         : undefined,
-    [row, dataDictionaryVersion]
+    [row]
   );
 
   const shownName =
@@ -148,81 +158,123 @@ const TechnicalRecordModal = ({
     onSave({ ...values, cde: pendingCde });
   };
 
+  const isReview = mode === 'review';
+  const closeButton = (
+    <Button color="secondary" key="cancel-btn" onPress={onCancel}>
+      {t(isReadOnly ? 'label.close' : 'label.cancel')}
+    </Button>
+  );
+  const deleteButton =
+    onDelete && mode === 'edit' ? (
+      <Button
+        color="tertiary-destructive"
+        data-testid="technical-record-delete"
+        isDisabled={isSaving}
+        key="delete-btn"
+        onPress={onDelete}>
+        {t('label.delete-declaration')}
+      </Button>
+    ) : null;
+  const editButton =
+    onEdit && isReadOnly ? (
+      <Button
+        color="secondary"
+        data-testid="technical-record-edit"
+        key="edit-btn"
+        onPress={onEdit}>
+        {t('label.edit')}
+      </Button>
+    ) : null;
+  const submitButton =
+    onSubmit && mode === 'view' ? (
+      <Button
+        color="primary"
+        data-testid="technical-record-submit"
+        key="submit-btn"
+        onPress={onSubmit}>
+        {t(
+          row?.status === 'Rejected'
+            ? 'label.technical-resubmit'
+            : 'label.technical-send-for-approval'
+        )}
+      </Button>
+    ) : null;
+  const saveButton = isReadOnly ? null : (
+    <Button
+      color="primary"
+      data-testid="technical-record-save"
+      isDisabled={isSaveDisabled}
+      isLoading={isSaving}
+      key="save-btn"
+      onPress={handleOk}>
+      {t(
+        isCreate
+          ? 'label.technical-save-draft'
+          : row?.status === 'Rejected'
+          ? 'label.technical-resubmit'
+          : row?.status === 'Approved' || row?.hasPendingChange
+          ? 'label.technical-save-change-draft'
+          : 'label.save'
+      )}
+    </Button>
+  );
+  const reviewButtons = [
+    <Button
+      color="secondary-destructive"
+      data-testid="technical-record-reject"
+      key="reject-btn"
+      onPress={onReject}>
+      {t('label.reject')}
+    </Button>,
+    <Button
+      color="primary"
+      data-testid="technical-record-approve"
+      key="approve-btn"
+      onPress={onApprove}>
+      {t('label.approve')}
+    </Button>,
+  ];
+  const historyButton = onOpenHistory ? (
+    <Button
+      color="tertiary"
+      data-testid="technical-record-history"
+      key="history-btn"
+      onPress={onOpenHistory}>
+      {t('label.technical-history')}
+    </Button>
+  ) : null;
+  const leftActions = isReview
+    ? [closeButton, editButton, historyButton]
+    : [deleteButton, historyButton];
+  const rightActions = isReview
+    ? reviewButtons
+    : [closeButton, editButton, submitButton, saveButton];
+
   return (
     <Modal
       centered
       destroyOnClose
       className="edit-glossary-modal cde-glossary-term-modal cde-glossary-term-modal--cde cde-glossary-term-modal--add"
       data-testid="technical-record-modal"
-      footer={[
-        ...(onDelete && mode === 'edit'
-          ? [
-              <Button
-                color="primary-destructive"
-                data-testid="technical-record-delete"
-                isDisabled={isSaving}
-                key="delete-btn"
-                onPress={onDelete}>
-                {t('label.delete-declaration')}
-              </Button>,
-            ]
-          : []),
-        <Button color="secondary" key="cancel-btn" onPress={onCancel}>
-          {t(isReadOnly ? 'label.close' : 'label.cancel')}
-        </Button>,
-        ...(onEdit && isReadOnly
-          ? [
-              <Button
-                color="secondary"
-                data-testid="technical-record-edit"
-                key="edit-btn"
-                onPress={onEdit}>
-                {t('label.edit')}
-              </Button>,
-            ]
-          : []),
-        ...(mode === 'review'
-          ? [
-              <Button
-                color="primary-destructive"
-                data-testid="technical-record-reject"
-                key="reject-btn"
-                onPress={onReject}>
-                {t('label.reject')}
-              </Button>,
-              <Button
-                color="primary"
-                data-testid="technical-record-approve"
-                key="approve-btn"
-                onPress={onApprove}>
-                {t('label.approve')}
-              </Button>,
-            ]
-          : isReadOnly
-          ? []
-          : [
-              <Button
-                color="primary"
-                data-testid="technical-record-save"
-                isDisabled={isSaveDisabled}
-                isLoading={isSaving}
-                key="save-btn"
-                onPress={handleOk}>
-                {t(
-                  isCreate
-                    ? 'label.technical-send-for-approval'
-                    : row?.status === 'Rejected'
-                    ? 'label.technical-resubmit'
-                    : 'label.save'
-                )}
-              </Button>,
-            ]),
-      ]}
+      footer={
+        <div className="tech-record-footer">
+          {leftActions}
+          <div className="tech-record-footer-actions">{rightActions}</div>
+        </div>
+      }
       maskClosable={false}
       open={open}
       title={
         <div className="cde-glossary-modal-title">
-          <div>{t(titleKey)}</div>
+          <div className="tech-record-modal-heading">
+            {t(titleKey)}
+            {row?.status && !isCreate && (
+              <TechnicalStatusBadge
+                dataTestId="technical-record-status"
+                status={row.status}
+              />
+            )}
+          </div>
           <div className="cde-glossary-modal-subtitle" title={row?.columnFqn}>
             {row
               ? [
@@ -239,6 +291,11 @@ const TechnicalRecordModal = ({
       }
       width={1080}
       onCancel={onCancel}>
+      {isReview && row?.changeOperation === 'DELETE' && (
+        <p data-testid="technical-change-comparison">
+          {t('message.technical-delete-change-review')}
+        </p>
+      )}
       <Form
         className="cde-glossary-term-form cde-glossary-term-form--add technical-dictionary-edit-form"
         disabled={isReadOnly}
@@ -317,47 +374,6 @@ const TechnicalRecordModal = ({
             label={t('label.description')}>
             <Input.TextArea autoSize disabled value={row?.description} />
           </Form.Item>
-          {row?.status && (
-            <Form.Item label={t('label.status')}>
-              <Input
-                disabled
-                value={t(
-                  row.status === 'Approved'
-                    ? 'label.approved'
-                    : row.status === 'Rejected'
-                    ? 'label.rejected'
-                    : 'label.technical-in-review'
-                )}
-              />
-            </Form.Item>
-          )}
-          {row?.submittedBy && (
-            <Form.Item label={t('label.submitted-by')}>
-              <Input disabled value={row.submittedBy} />
-            </Form.Item>
-          )}
-          {row?.submittedAt && (
-            <Form.Item label={t('label.submitted-on')}>
-              <Input disabled value={formatDateTime(row.submittedAt)} />
-            </Form.Item>
-          )}
-          {row?.reviewedBy && (
-            <Form.Item label={t('label.technical-reviewed-by')}>
-              <Input disabled value={row.reviewedBy} />
-            </Form.Item>
-          )}
-          {row?.reviewedAt && (
-            <Form.Item label={t('label.technical-reviewed-on')}>
-              <Input disabled value={formatDateTime(row.reviewedAt)} />
-            </Form.Item>
-          )}
-          {row?.reviewComment && (
-            <Form.Item
-              className="cde-form-field-full"
-              label={t('label.technical-rejection-reason')}>
-              <Input.TextArea autoSize disabled value={row.reviewComment} />
-            </Form.Item>
-          )}
         </GlossaryTermFormSection>
 
         <GlossaryTermFormSection
@@ -366,16 +382,13 @@ const TechnicalRecordModal = ({
           )}
           title={t('label.technical-specification-and-reference')}>
           <Form.Item label={t('label.cde-code-ref')}>
-            <CDESelector
-              requireActive
-              className="cde-form-enum-select"
+            <CDESelectableField
+              dataDictionaryVersion={dataDictionaryVersion}
               disabled={isReadOnly}
-              parentBusinessVersion={dataDictionaryVersion}
-              popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
-              selectedCde={selectedCde}
-              onChange={(value, cde) =>
-                setPendingCde(value && cde ? cde : null)
+              selectedCde={
+                pendingCde === undefined ? selectedCde : pendingCde ?? undefined
               }
+              onChange={(cde) => setPendingCde(cde ?? null)}
             />
           </Form.Item>
           <Form.Item label={t('label.cde-name')}>

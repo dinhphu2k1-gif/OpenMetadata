@@ -25,7 +25,10 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.technical.TechnicalCdeInfo;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
+import org.openmetadata.service.glossary.technical.TechnicalOwnerRef;
+import org.openmetadata.service.glossary.technical.TechnicalOwners;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
+import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex.IndexAction;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 
@@ -90,12 +93,24 @@ public final class TechnicalDocumentBuilder {
     putTag(row, TechnicalIndexFields.GENERATION_TYPE, record.generationType());
     putTag(row, TechnicalIndexFields.CREATION_METHOD, record.creationMethod());
     putTag(row, TechnicalIndexFields.TIMELINESS, record.timeliness());
-    putSystemOwner(row, record.systemOwnerId());
+    putSystemOwners(row, record.systemOwnerId());
     row.put(TechnicalIndexFields.CREATED_AT, record.createdAt());
     row.put(TechnicalIndexFields.CREATED_BY, record.createdBy());
     row.put(TechnicalIndexFields.UPDATED_AT, record.updatedAt());
     row.put(TechnicalIndexFields.UPDATED_BY, record.updatedBy());
+    putChangeRequest(row, record.id());
     return row;
+  }
+
+  private static void putChangeRequest(Map<String, Object> row, String recordId) {
+    final TechnicalRecordChangeRequest request = dao().findChangeRequest(recordId);
+    row.put(TechnicalIndexFields.HAS_PENDING_CHANGE, request != null);
+    if (request != null) {
+      row.put(TechnicalIndexFields.CHANGE_REQUEST_ID, request.id());
+      row.put(TechnicalIndexFields.CHANGE_REQUEST_STATUS, request.status());
+      row.put(TechnicalIndexFields.CHANGE_OPERATION, request.operation());
+      row.put(TechnicalIndexFields.CHANGE_CREATED_BY, request.createdBy());
+    }
   }
 
   private static void putLocation(Map<String, Object> row, TechnicalRecord record) {
@@ -152,14 +167,20 @@ public final class TechnicalDocumentBuilder {
     }
   }
 
-  private void putSystemOwner(Map<String, Object> row, String teamId) {
-    if (teamId != null) {
-      final Map<String, Object> owner = new LinkedHashMap<>();
-      owner.put(TechnicalIndexFields.ID, teamId);
-      owner.put(
-          TechnicalIndexFields.NAME,
-          team(teamId).map(TechnicalDocumentBuilder::label).orElse(teamId));
-      row.put(TechnicalIndexFields.SYSTEM_OWNER, owner);
+  private void putSystemOwners(Map<String, Object> row, String stored) {
+    final List<Map<String, Object>> owners = new ArrayList<>();
+    for (TechnicalOwnerRef ref : TechnicalOwners.parse(stored)) {
+      final Optional<EntityReference> found = owner(ref);
+      if (found.isPresent()) {
+        final Map<String, Object> owner = new LinkedHashMap<>();
+        owner.put(TechnicalIndexFields.ID, ref.id().toString());
+        owner.put(TechnicalIndexFields.NAME, label(found.get()));
+        owner.put(TechnicalIndexFields.TYPE, ref.entityType());
+        owners.add(owner);
+      }
+    }
+    if (!owners.isEmpty()) {
+      row.put(TechnicalIndexFields.SYSTEM_OWNERS, owners);
     }
   }
 
@@ -174,8 +195,8 @@ public final class TechnicalDocumentBuilder {
         .orElse(lastSegment(tagFqn));
   }
 
-  private Optional<EntityReference> team(String teamId) {
-    return teams.get(teamId, key -> lookupTeam(teamId));
+  private Optional<EntityReference> owner(TechnicalOwnerRef ref) {
+    return teams.get(ref.entityType() + ":" + ref.id(), key -> lookupOwner(ref));
   }
 
   private static Optional<EntityReference> lookupTag(String tagFqn) {
@@ -188,17 +209,16 @@ public final class TechnicalDocumentBuilder {
     return tag;
   }
 
-  private static Optional<EntityReference> lookupTeam(String teamId) {
-    Optional<EntityReference> team = Optional.empty();
+  private static Optional<EntityReference> lookupOwner(TechnicalOwnerRef ref) {
+    Optional<EntityReference> owner = Optional.empty();
     try {
-      team =
+      owner =
           Optional.of(
-              Entity.getEntityReferenceById(
-                  Entity.TEAM, UUID.fromString(teamId), Include.NON_DELETED));
+              Entity.getEntityReferenceById(ref.entityType(), ref.id(), Include.NON_DELETED));
     } catch (EntityNotFoundException exception) {
-      team = Optional.empty();
+      owner = Optional.empty();
     }
-    return team;
+    return owner;
   }
 
   static String tableKey(TechnicalRecord record) {

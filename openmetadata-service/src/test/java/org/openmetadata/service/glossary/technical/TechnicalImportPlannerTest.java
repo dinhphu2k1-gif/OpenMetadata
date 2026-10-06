@@ -53,6 +53,19 @@ class TechnicalImportPlannerTest {
     return plan(records, TechnicalImportTestSupport.lookups(), headers, rows);
   }
 
+  private static List<PlannedRow> plan(
+      List<TechnicalRecord> records,
+      Map<String, TechnicalRecordChangeRequest> changes,
+      List<String> headers,
+      List<List<String>> rows) {
+    return new TechnicalImportPlanner(
+            TechnicalImportPlanner.indexRecords(records),
+            changes,
+            TechnicalImportTestSupport.lookups(),
+            TechnicalImportTestSupport.validator())
+        .plan(TechnicalImportSheet.parse(TechnicalImportTestSupport.workbook(headers, rows)));
+  }
+
   @Test
   void updatesDeclaredColumnsAndDeclaresColumnsWithoutARecord() {
     TechnicalRecord declared = TechnicalImportTestSupport.record("T", "NAME");
@@ -73,6 +86,32 @@ class TechnicalImportPlannerTest {
     assertEquals(TechnicalImportPlan.CREATE_RECORD, planned.get(1).action());
     assertEquals("NEW", planned.get(1).column().columnName());
     assertTrue(planned.stream().allMatch(PlannedRow::mutates));
+  }
+
+  @Test
+  void approvedImportPinsDraftProposalRevisionAndRejectsInReviewProposal() {
+    final TechnicalRecord approved = TechnicalImportTestSupport.record("T", "NAME");
+    final TechnicalRecordChangeRequest draft =
+        TechnicalRecordChangeRequest.builder()
+            .recordId(approved.id())
+            .status(TechnicalRecordChangeRequest.STATUS_DRAFT)
+            .revision(7)
+            .build();
+    final List<String> importHeaders = headers("Mã CDE quy chiếu", "Thứ hạng");
+    final List<List<String>> importRows = List.of(cells("T", "NAME", "CDE1", "1"));
+
+    final PlannedRow planned =
+        plan(List.of(approved), Map.of(approved.id(), draft), importHeaders, importRows).getFirst();
+    assertEquals(7L, planned.expectedChangeRevision());
+
+    final TechnicalRecordChangeRequest inReview =
+        draft.toBuilder().status(TechnicalRecordChangeRequest.STATUS_IN_REVIEW).build();
+    final PlannedRow rejected =
+        plan(List.of(approved), Map.of(approved.id(), inReview), importHeaders, importRows)
+            .getFirst();
+    assertEquals(TechnicalImportPlan.ERROR, rejected.action());
+    assertEquals(
+        TechnicalDictionaryErrors.CHANGE_REQUEST_EXISTS, rejected.errors().getFirst().code());
   }
 
   @Test

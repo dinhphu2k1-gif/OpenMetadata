@@ -46,10 +46,34 @@ public final class TechnicalImportPlan {
       String action,
       String recordId,
       Long expectedRevision,
+      Long expectedChangeRevision,
       @JsonIgnore RowPatch patch,
       @JsonIgnore TechnicalColumnSource column,
       List<ImportError> errors,
       List<String> warnings) {
+
+    public PlannedRow(
+        int rowNumber,
+        String location,
+        String action,
+        String recordId,
+        Long expectedRevision,
+        RowPatch patch,
+        TechnicalColumnSource column,
+        List<ImportError> errors,
+        List<String> warnings) {
+      this(
+          rowNumber,
+          location,
+          action,
+          recordId,
+          expectedRevision,
+          null,
+          patch,
+          column,
+          errors,
+          warnings);
+    }
 
     public boolean hasErrors() {
       return !errors.isEmpty();

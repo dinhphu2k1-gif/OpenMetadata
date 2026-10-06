@@ -17,9 +17,10 @@ import org.openmetadata.service.security.DefaultAuthorizer;
 import org.openmetadata.service.security.policyevaluator.SubjectContext;
 
 /**
- * Capabilities on the unversioned Technical Dictionary. Everybody who may view sees the same data;
- * the {@code Technical Dictionary} glossary is only the policy target. New records require a
- * maker-checker review; edits to an approved record take effect immediately.
+ * Capabilities on the unversioned Technical Dictionary. Everybody who may view sees the same data,
+ * except working states, which only people who can edit or approve see; the {@code Technical
+ * Dictionary} glossary is only the policy target. New records start as drafts and require a maker-checker
+ * review once submitted; edits and deletions of an approved record use a separate change request.
  */
 public final class TechnicalDictionaryAccess {
   private static final String DATA_STEWARD_ROLE = "DATA_STEWARD";
@@ -32,6 +33,11 @@ public final class TechnicalDictionaryAccess {
 
   public record Capabilities(
       boolean canView, boolean canEdit, boolean canApprove, boolean canImport, boolean canExport) {
+    /** Draft, In Review and Rejected records are hidden from consumers. */
+    public boolean canSeeWorkingRecords() {
+      return canEdit || canApprove;
+    }
+
     public Map<String, Boolean> asMap() {
       final Map<String, Boolean> result = new LinkedHashMap<>();
       result.put("canView", canView);

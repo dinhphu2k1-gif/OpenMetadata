@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
@@ -36,6 +38,7 @@ import org.openmetadata.service.glossary.technical.TechnicalImportSheet;
 import org.openmetadata.service.glossary.technical.TechnicalImportTables;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
+import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.versioning.CdeImportService;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.resources.Collection;
@@ -95,6 +98,7 @@ public class TechnicalDictionaryImportResource {
         fileBytes,
         new PreviewScope(version, securityContext.getUserPrincipal().getName()),
         TechnicalDictionaryImportResource::declaredRecordsOfTables,
+        TechnicalDictionaryImportResource::pendingChanges,
         new TechnicalImportLookupsImpl(version));
   }
 
@@ -124,7 +128,8 @@ public class TechnicalDictionaryImportResource {
           return Map.of(
               "importSessionId", importSessionId,
               "committed", result.committed(),
-              "pendingApproval", result.pendingApproval(),
+              "created", result.created(),
+              "proposed", result.proposed(),
               "updated", result.updated(),
               "dataDictionaryVersion", session.dataDictionaryVersion());
         });
@@ -151,6 +156,18 @@ public class TechnicalDictionaryImportResource {
                         lower(table.database()), lower(table.schema()), lower(table.table()))
                     .stream())
         .toList();
+  }
+
+  private static Map<String, TechnicalRecordChangeRequest> pendingChanges(
+      List<TechnicalRecord> records) {
+    if (records.isEmpty()) {
+      return Map.of();
+    }
+    return Entity.getJdbi()
+        .onDemand(TechnicalDictionaryDAO.class)
+        .findChangeRequestsByRecordIds(records.stream().map(TechnicalRecord::id).toList())
+        .stream()
+        .collect(Collectors.toMap(TechnicalRecordChangeRequest::recordId, Function.identity()));
   }
 
   private static String lower(String value) {

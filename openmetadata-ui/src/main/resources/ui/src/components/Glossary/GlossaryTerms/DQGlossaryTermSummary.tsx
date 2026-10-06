@@ -21,11 +21,12 @@ import {
   GlossaryTerm,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
+import { EntityReference } from '../../../generated/entity/type';
 import { getLatestPublishedGlossaryTerm } from '../../../rest/glossaryAPI';
 import { TagSource } from '../../../generated/type/tagLabel';
 import { createTagObject } from '../../../utils/TagsUtils';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
-import CDESelector from '../CDESelector/CDESelector.component';
+import CDESelectableList from '../CDESelectableList/CDESelectableList.component';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
 import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
@@ -80,7 +81,7 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
       .catch(() => setResolvedCde(undefined));
   }, [selectedCde?.id]);
 
-  const handleSelect = async (_id?: string, selected?: GlossaryTerm) => {
+  const handleSelect = async (selected?: EntityReference) => {
     if (isSavingCde) {
       return;
     }
@@ -114,7 +115,6 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
         ...data,
         relatedTerms: [...nonCdeRelations, ...updatedRelation],
       });
-      setResolvedCde(selected);
       setIsEditorOpen(false);
     } finally {
       setIsSavingCde(false);
@@ -129,25 +129,27 @@ const DQCdeRelationFields = ({ glossaryTerm }: SummaryProps) => {
       <GovernedGlossaryField
         action={
           canEdit ? (
-            <Popover
-              content={
-                <CDESelector
-                  disabled={isSavingCde}
-                  parentBusinessVersion={currentTerm.parentBusinessVersion}
-                  selectedCde={resolvedCde ?? selectedCde}
-                  width={520}
-                  onChange={handleSelect}
-                />
+            <CDESelectableList
+              dataDictionaryVersion={currentTerm.parentBusinessVersion}
+              isOpen={isEditorOpen}
+              selectedCde={
+                resolvedCde
+                  ? {
+                      id: resolvedCde.id,
+                      name: resolvedCde.name,
+                      displayName: resolvedCde.displayName,
+                      fullyQualifiedName: resolvedCde.fullyQualifiedName,
+                      type: 'glossaryTerm',
+                    }
+                  : selectedCde
               }
-              open={isEditorOpen}
-              placement="bottomLeft"
-              trigger="click"
-              onOpenChange={setIsEditorOpen}>
+              onOpenChange={setIsEditorOpen}
+              onSelect={handleSelect}>
               <EditIconButton
                 size="small"
                 title={t('label.edit-entity', { entity: t('dq.cde-code') })}
               />
-            </Popover>
+            </CDESelectableList>
           ) : undefined
         }
         label={t('dq.cde-code')}>

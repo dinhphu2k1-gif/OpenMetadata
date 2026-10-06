@@ -4,7 +4,7 @@
  */
 
 import { Popover, PopoverProps, Select, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
 
@@ -18,6 +18,8 @@ interface CDEEnumFieldProps {
   className?: string;
   editorTestId?: string;
   fieldTestId?: string;
+  /** Shown under the value, for a note that belongs to this field only. */
+  footer?: ReactNode;
   label: string;
   options: CDEEnumOption[];
   placeholder: string;
@@ -33,6 +35,7 @@ const CDEEnumField = ({
   className,
   editorTestId,
   fieldTestId,
+  footer,
   label,
   onChange,
   options,
@@ -82,8 +85,8 @@ const CDEEnumField = ({
                 getPopupContainer={() => document.body}
                 loading={isSaving}
                 options={options}
-                placement={selectPlacement}
                 placeholder={placeholder}
+                placement={selectPlacement}
                 value={value}
                 onChange={handleChange}
               />
@@ -116,6 +119,7 @@ const CDEEnumField = ({
           </Typography.Text>
         )}
       </div>
+      {footer}
     </div>
   );
 };

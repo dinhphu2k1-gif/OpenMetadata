@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
+import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
 
 /**
@@ -58,13 +59,12 @@ public final class TechnicalSearchQueryBuilder {
     final Map<String, String> fields = new LinkedHashMap<>();
     fields.put(TechnicalRowMatcher.SOURCE_SERVICES, TechnicalIndexFields.SERVICE);
     fields.put(TechnicalRowMatcher.SOURCE_STATUSES, TechnicalIndexFields.SOURCE_STATUS);
-    fields.put(TechnicalRowMatcher.STATUSES, TechnicalIndexFields.STATUS);
     fields.put(
         TechnicalRowMatcher.CDE_TERM_IDS,
         TechnicalIndexFields.path(TechnicalIndexFields.CDE, TechnicalIndexFields.ID));
     fields.put(
         TechnicalRowMatcher.SYSTEM_OWNER_IDS,
-        TechnicalIndexFields.path(TechnicalIndexFields.SYSTEM_OWNER, TechnicalIndexFields.ID));
+        TechnicalIndexFields.path(TechnicalIndexFields.SYSTEM_OWNERS, TechnicalIndexFields.ID));
     fields.put(
         TechnicalRowMatcher.ELEMENT_TYPES,
         TechnicalIndexFields.path(TechnicalIndexFields.ELEMENT_TYPE, TechnicalIndexFields.FQN));
@@ -115,7 +115,11 @@ public final class TechnicalSearchQueryBuilder {
         term(TechnicalIndexFields.DATA_DICTIONARY_VERSION, criteria.dataDictionaryVersion()));
     FILTER_FIELDS.forEach(
         (parameter, field) -> addTerms(filter, field, criteria.filters().get(parameter)));
+    addStatuses(filter, criteria);
     addCdeMapping(filter, mustNot, criteria);
+    if (criteria.hideUnapproved()) {
+      filter.add(term(TechnicalIndexFields.STATUS, TechnicalRecord.STATUS_APPROVED));
+    }
     final Map<String, Object> bool = new LinkedHashMap<>();
     bool.put(FILTER, filter);
     if (!nullOrEmpty(criteria.q())) {
@@ -125,6 +129,58 @@ public final class TechnicalSearchQueryBuilder {
       bool.put(MUST_NOT, mustNot);
     }
     return Map.of(BOOL, bool);
+  }
+
+  /**
+   * A pending update lists as a second row carrying the status of its change, so a status filter
+   * matches the record's own status or, for editors and reviewers, the status of its pending update.
+   */
+  private static void addStatuses(List<Object> filter, TechnicalSearchCriteria criteria) {
+    final List<String> statuses = statusFilter(criteria);
+    final List<String> changeStatuses = changeStatuses(criteria);
+    if (changeStatuses.isEmpty()) {
+      addTerms(filter, TechnicalIndexFields.STATUS, statuses);
+    } else {
+      final List<Object> alternatives =
+          List.of(
+              terms(TechnicalIndexFields.STATUS, statuses),
+              pendingUpdateWithStatus(changeStatuses));
+      filter.add(Map.of(BOOL, Map.of(SHOULD, alternatives, MINIMUM_SHOULD_MATCH, 1)));
+    }
+  }
+
+  private static List<String> statusFilter(TechnicalSearchCriteria criteria) {
+    return criteria.filters().getOrDefault(TechnicalRowMatcher.STATUSES, List.of());
+  }
+
+  /** The change request statuses whose row shows under the requested record statuses. */
+  private static List<String> changeStatuses(TechnicalSearchCriteria criteria) {
+    final List<String> result = new ArrayList<>();
+    if (!criteria.hideUnapproved()) {
+      statusFilter(criteria).forEach(status -> addChangeStatus(result, status));
+    }
+    return result;
+  }
+
+  private static void addChangeStatus(List<String> result, String recordStatus) {
+    if (TechnicalRecord.STATUS_DRAFT.equals(recordStatus)) {
+      result.add(TechnicalRecordChangeRequest.STATUS_DRAFT);
+    } else if (TechnicalRecord.STATUS_IN_REVIEW.equals(recordStatus)) {
+      result.add(TechnicalRecordChangeRequest.STATUS_IN_REVIEW);
+    } else if (TechnicalRecord.STATUS_REJECTED.equals(recordStatus)) {
+      result.add(TechnicalRecordChangeRequest.STATUS_REJECTED);
+    }
+  }
+
+  private static Map<String, Object> pendingUpdateWithStatus(List<String> changeStatuses) {
+    return Map.of(
+        BOOL,
+        Map.of(
+            FILTER,
+            List.of(
+                term(TechnicalIndexFields.HAS_PENDING_CHANGE, true),
+                term(TechnicalIndexFields.CHANGE_OPERATION, "UPDATE"),
+                terms(TechnicalIndexFields.CHANGE_REQUEST_STATUS, changeStatuses))));
   }
 
   private static void addTerms(List<Object> filter, String field, List<String> values) {
@@ -186,6 +242,26 @@ public final class TechnicalSearchQueryBuilder {
 
   static String escapeWildcard(String value) {
     return value.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?");
+  }
+
+  /**
+   * Counts the records that list as two rows: those with a pending update that also match the
+   * criteria through their own status, which a status filter makes a subset of the matches.
+   */
+  public static Map<String, Object> pendingUpdateCountBody(TechnicalSearchCriteria criteria) {
+    final List<Object> filter = new ArrayList<>();
+    filter.add(query(criteria));
+    filter.add(term(TechnicalIndexFields.HAS_PENDING_CHANGE, true));
+    filter.add(term(TechnicalIndexFields.CHANGE_OPERATION, "UPDATE"));
+    if (!statusFilter(criteria).isEmpty()) {
+      filter.add(terms(TechnicalIndexFields.STATUS, statusFilter(criteria)));
+      filter.add(terms(TechnicalIndexFields.CHANGE_REQUEST_STATUS, changeStatuses(criteria)));
+    }
+    final Map<String, Object> body = new LinkedHashMap<>();
+    body.put("size", 0);
+    body.put("track_total_hits", true);
+    body.put("query", Map.of(BOOL, Map.of(FILTER, filter)));
+    return body;
   }
 
   /** Header statistics over the same bound version as the list. */

@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { CheckOutlined, PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Space, Tooltip } from 'antd';
 import { MenuProps } from 'antd/lib/menu';
 import { useState } from 'react';
@@ -25,12 +25,17 @@ import { CopyToClipboardButton } from '../../components/common/CopyToClipboardBu
 import { ManageButtonItemLabel } from '../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
 import { TECHNICAL_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import { TechnicalDictionaryCapabilities } from './technicalDictionary.interface';
+import TechnicalVersionBadges from './TechnicalVersionBadges.component';
 
 interface TechnicalDictionaryHeaderProps {
   /** Data Dictionary version the dictionary follows; undefined while none is approved. */
   dataDictionaryVersion?: string;
   capabilities: TechnicalDictionaryCapabilities;
   isAdmin: boolean;
+  /** Version of the replaced Data Dictionary on screen; undefined for the live list. */
+  snapshotVersion?: string;
+  /** Picks a version to view; called with no version for the live list. */
+  onSelectVersion: (version?: string) => void;
   onAddColumn: () => void;
   onExport: () => void;
   onImport: () => void;
@@ -42,6 +47,8 @@ const TechnicalDictionaryHeader = ({
   dataDictionaryVersion,
   capabilities,
   isAdmin,
+  snapshotVersion,
+  onSelectVersion,
   onAddColumn,
   onExport,
   onImport,
@@ -51,6 +58,7 @@ const TechnicalDictionaryHeader = ({
   const { t } = useTranslation();
 
   const [showActions, setShowActions] = useState(false);
+  const isSnapshot = Boolean(snapshotVersion);
 
   const menuItem = (
     key: string,
@@ -131,13 +139,12 @@ const TechnicalDictionaryHeader = ({
                 {t('label.technical-dictionary')}
               </h1>
               {dataDictionaryVersion && (
-                <span
-                  className="tech-dict-version-badge"
-                  data-testid="technical-dictionary-version-badge">
-                  <CheckOutlined />
-                  {t('label.technical-follows-data-dictionary', {
-                    version: dataDictionaryVersion,
-                  })}
+                <span data-testid="technical-dictionary-version-badge">
+                  <TechnicalVersionBadges
+                    dataDictionaryVersion={dataDictionaryVersion}
+                    snapshotVersion={snapshotVersion}
+                    onSelectVersion={onSelectVersion}
+                  />
                 </span>
               )}
             </div>
@@ -152,7 +159,7 @@ const TechnicalDictionaryHeader = ({
           </div>
         </div>
         <Space>
-          {capabilities.canEdit && dataDictionaryVersion && (
+          {capabilities.canEdit && dataDictionaryVersion && !isSnapshot && (
             <Button
               data-testid="technical-dictionary-add-column"
               icon={<PlusOutlined />}

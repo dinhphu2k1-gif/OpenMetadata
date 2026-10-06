@@ -44,6 +44,7 @@ import { ManageButtonItemLabel } from '../../../components/common/ManageButtonCo
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
 import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
+import ReviewActionConfirmModal from '../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
@@ -2086,66 +2087,44 @@ const GlossaryHeader = ({
         </div>
       </Modal>
 
-      <ConfirmationModal
-        bodyText={t('message.confirm-submit-for-review-message')}
-        cancelText={t('label.cancel')}
-        confirmText={t('label.submit-for-review')}
-        header={t('message.confirm-submit-for-review-title')}
+      <ReviewActionConfirmModal
+        action="submit"
         isLoading={isSubmittingForReview}
-        visible={isSubmitForReviewModalOpen}
+        message={t('message.confirm-submit-for-review-message')}
+        open={isSubmitForReviewModalOpen}
         onCancel={() => setIsSubmitForReviewModalOpen(false)}
         onConfirm={handleSubmitForReview}
       />
 
-      <ConfirmationModal
-        bodyText={
-          isGlossary ? (
-            t('message.confirm-approve-entity-message', {
-              entity: t('label.glossary'),
-            })
-          ) : (
-            <>
-              {t('message.confirm-approve-glossary-term-message')}
-              {isDQGlossaryTerm && isApproveModalOpen && (
-                <DQApprovePreview rule={selectedData as GlossaryTerm} />
-              )}
-            </>
-          )
-        }
-        cancelText={t('label.cancel')}
-        confirmText={t('label.approve')}
-        header={
+      <ReviewActionConfirmModal
+        action="approve"
+        isLoading={isApproving}
+        message={
           isGlossary
-            ? t('message.confirm-approve-entity-title', {
+            ? t('message.confirm-approve-entity-message', {
                 entity: t('label.glossary'),
               })
-            : t('message.confirm-approve-glossary-term-title')
+            : t('message.confirm-approve-glossary-term-message')
         }
-        isLoading={isApproving}
-        visible={isApproveModalOpen}
+        open={isApproveModalOpen}
         onCancel={() => setIsApproveModalOpen(false)}
-        onConfirm={handleApproveTerm}
-      />
+        onConfirm={handleApproveTerm}>
+        {!isGlossary && isDQGlossaryTerm && isApproveModalOpen && (
+          <DQApprovePreview rule={selectedData as GlossaryTerm} />
+        )}
+      </ReviewActionConfirmModal>
 
-      <ConfirmationModal
-        bodyText={
+      <ReviewActionConfirmModal
+        action="reject"
+        isLoading={isRejecting}
+        message={
           isGlossary
             ? t('message.confirm-reject-entity-message', {
                 entity: t('label.glossary'),
               })
             : t('message.confirm-reject-glossary-term-message')
         }
-        cancelText={t('label.cancel')}
-        confirmText={t('label.reject')}
-        header={
-          isGlossary
-            ? t('message.confirm-reject-entity-title', {
-                entity: t('label.glossary'),
-              })
-            : t('message.confirm-reject-glossary-term-title')
-        }
-        isLoading={isRejecting}
-        visible={isRejectModalOpen}
+        open={isRejectModalOpen}
         onCancel={() => setIsRejectModalOpen(false)}
         onConfirm={handleRejectTerm}
       />

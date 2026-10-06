@@ -67,7 +67,7 @@ class TechnicalSearchQueryBuilderTest {
         Map.of(
             TechnicalRowMatcher.SOURCE_SERVICES, List.of("ipcas"),
             TechnicalRowMatcher.SOURCE_STATUSES, List.of("Unavailable"),
-            TechnicalRowMatcher.STATUSES, List.of(TechnicalRecord.STATUS_IN_REVIEW),
+            TechnicalRowMatcher.STATUSES, List.of(TechnicalRecord.STATUS_APPROVED),
             TechnicalRowMatcher.CDE_TERM_IDS, List.of("cde-1"),
             TechnicalRowMatcher.SYSTEM_OWNER_IDS, List.of("team-1"),
             TechnicalRowMatcher.ELEMENT_TYPES, List.of("DataElementType.AtomicDataElement"),
@@ -80,9 +80,9 @@ class TechnicalSearchQueryBuilderTest {
 
     assertTrue(hasTerm(filter, "terms", "service", "ipcas"));
     assertTrue(hasTerm(filter, "terms", "sourceStatus", "Unavailable"));
-    assertTrue(hasTerm(filter, "terms", "status", TechnicalRecord.STATUS_IN_REVIEW));
+    assertTrue(hasTerm(filter, "terms", "status", TechnicalRecord.STATUS_APPROVED));
     assertTrue(hasTerm(filter, "terms", "cde.id", "cde-1"));
-    assertTrue(hasTerm(filter, "terms", "systemOwner.id", "team-1"));
+    assertTrue(hasTerm(filter, "terms", "systemOwners.id", "team-1"));
     assertTrue(hasTerm(filter, "terms", "elementType.fqn", "DataElementType.AtomicDataElement"));
     assertTrue(hasTerm(filter, "terms", "generationType.fqn", "FieldGenerationType.ManualInput"));
     assertTrue(hasTerm(filter, "terms", "creationMethod.fqn", "DataCreationMethod.Hardcoded"));
@@ -214,5 +214,94 @@ class TechnicalSearchQueryBuilderTest {
     assertTrue(hasTerm(filter, "term", "schema", "dbo"));
     assertTrue(hasTerm(filter, "term", "table", "customer"));
     assertFalse(hasTerm(filter, "term", "table", "Customer"));
+  }
+
+  @Test
+  void workingStatesAreShownUnlessTheCriteriaHideThem() {
+    final TechnicalSearchCriteria shown = criteria(null, Map.of());
+    final JsonNode all = json(TechnicalSearchQueryBuilder.query(shown));
+    final JsonNode approvedOnly =
+        json(TechnicalSearchQueryBuilder.query(shown.withUnapprovedHidden(true)));
+
+    assertFalse(hasTerm(clauses(all, "filter"), "term", "status", TechnicalRecord.STATUS_APPROVED));
+    assertTrue(
+        hasTerm(
+            clauses(approvedOnly, "filter"), "term", "status", TechnicalRecord.STATUS_APPROVED));
+  }
+
+  @Test
+  void hidingUnapprovedSurvivesDroppingThePageAndCombinesWithOtherFilters() {
+    final TechnicalSearchCriteria hidden =
+        criteria("name", Map.of(TechnicalRowMatcher.STATUSES, List.of("Approved")))
+            .withUnapprovedHidden(true)
+            .withoutPaging();
+    final JsonNode query = json(TechnicalSearchQueryBuilder.query(hidden));
+
+    assertTrue(hidden.hideUnapproved());
+    assertTrue(hasTerm(clauses(query, "filter"), "terms", "status", "Approved"));
+    assertTrue(hasTerm(clauses(query, "filter"), "term", "status", "Approved"));
+  }
+
+  @Test
+  void statisticsOfAConsumerIncludeApprovedRecordsOnly() {
+    final JsonNode body =
+        json(
+            TechnicalSearchQueryBuilder.statsBody(
+                TechnicalSearchCriteria.scopeOnly(VERSION).withUnapprovedHidden(true)));
+
+    assertTrue(hasTerm(clauses(body.path("query"), "filter"), "term", "status", "Approved"));
+  }
+
+  @Test
+  void aDraftCanBeFilteredByStatus() {
+    assertEquals(
+        List.of("Draft"),
+        TechnicalRowMatcher.validate(Map.of(TechnicalRowMatcher.STATUSES, "Draft"))
+            .get(TechnicalRowMatcher.STATUSES));
+  }
+
+  @Test
+  void aDraftStatusAlsoMatchesRecordsWhoseUpdateIsADraft() {
+    final TechnicalSearchCriteria drafts =
+        criteria(null, Map.of(TechnicalRowMatcher.STATUSES, List.of("Draft", "In Review")));
+    final JsonNode query = json(TechnicalSearchQueryBuilder.query(drafts));
+    final JsonNode alternatives = clauses(query, "filter").get(1).path("bool").path("should");
+
+    assertEquals(2, alternatives.size());
+    assertTrue(hasTerm(List.of(alternatives.get(0)), "terms", "status", "Draft"));
+    final List<JsonNode> pending = clauses(alternatives.get(1), "filter");
+    assertTrue(hasTerm(pending, "term", "hasPendingChange", "true"));
+    assertTrue(hasTerm(pending, "term", "changeOperation", "UPDATE"));
+    assertTrue(hasTerm(pending, "terms", "changeRequestStatus", "Draft"));
+    assertTrue(hasTerm(pending, "terms", "changeRequestStatus", "InReview"));
+  }
+
+  @Test
+  void anApprovedOrConsumerStatusFilterIgnoresPendingUpdates() {
+    final JsonNode approved =
+        json(
+            TechnicalSearchQueryBuilder.query(
+                criteria(null, Map.of(TechnicalRowMatcher.STATUSES, List.of("Approved")))));
+    final JsonNode consumer =
+        json(
+            TechnicalSearchQueryBuilder.query(
+                criteria(null, Map.of(TechnicalRowMatcher.STATUSES, List.of("Draft")))
+                    .withUnapprovedHidden(true)));
+
+    assertTrue(hasTerm(clauses(approved, "filter"), "terms", "status", "Approved"));
+    assertTrue(hasTerm(clauses(consumer, "filter"), "terms", "status", "Draft"));
+  }
+
+  @Test
+  void pendingUpdateCountsOnlyRecordsListedAsTwoRows() {
+    final JsonNode body =
+        json(
+            TechnicalSearchQueryBuilder.pendingUpdateCountBody(
+                criteria(
+                    null, Map.of(TechnicalRowMatcher.STATUSES, List.of("Approved", "Draft")))));
+    final List<JsonNode> filter = clauses(body.path("query"), "filter");
+
+    assertTrue(hasTerm(filter, "terms", "status", "Approved"));
+    assertTrue(hasTerm(filter, "terms", "changeRequestStatus", "Draft"));
   }
 }

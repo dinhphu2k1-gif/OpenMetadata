@@ -19,12 +19,21 @@ import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.AuditRow;
 public final class TechnicalRecordAudit {
   public static final String CREATE = "CREATE";
   public static final String UPDATE = "UPDATE";
+  public static final String SUBMIT = "SUBMIT";
   public static final String APPROVE = "APPROVE";
   public static final String REJECT = "REJECT";
   public static final String RESUBMIT = "RESUBMIT";
   public static final String DELETE = "DELETE";
   public static final String IMPORT = "IMPORT";
   public static final String RESET = "RESET";
+  public static final String CREATE_CHANGE = "CREATE_CHANGE";
+  public static final String UPDATE_CHANGE = "UPDATE_CHANGE";
+  public static final String SUBMIT_CHANGE = "SUBMIT_CHANGE";
+  public static final String RESUBMIT_CHANGE = "RESUBMIT_CHANGE";
+  public static final String APPROVE_CHANGE = "APPROVE_CHANGE";
+  public static final String REJECT_CHANGE = "REJECT_CHANGE";
+  public static final String CANCEL_CHANGE = "CANCEL_CHANGE";
+  public static final String RESET_CHANGE = "RESET_CHANGE";
 
   private static final String FIELD = "field";
   private static final String OLD_VALUE = "oldValue";
@@ -49,6 +58,33 @@ public final class TechnicalRecordAudit {
             dataDictionaryVersion,
             action,
             JsonUtils.pojoToJson(changes(before, after)),
+            actor,
+            System.currentTimeMillis()));
+  }
+
+  /** Writes proposal lifecycle history with its operation and optimistic-lock base revision. */
+  public static void recordChange(
+      TechnicalDictionaryDAO dao,
+      String action,
+      TechnicalRecordChangeRequest request,
+      TechnicalRecord before,
+      TechnicalRecord after,
+      String dataDictionaryVersion,
+      String actor) {
+    final List<Map<String, Object>> values = new ArrayList<>();
+    values.add(change("operation", null, request.operation()));
+    values.add(change("baseRevision", null, String.valueOf(request.baseRevision())));
+    values.add(change("changeRevision", null, String.valueOf(request.revision())));
+    values.addAll(changes(before, after));
+    final TechnicalRecord subject = before == null ? after : before;
+    dao.insertAudit(
+        new AuditRow(
+            UUID.randomUUID().toString(),
+            request.recordId(),
+            subject.columnFqn(),
+            dataDictionaryVersion,
+            action,
+            JsonUtils.pojoToJson(values),
             actor,
             System.currentTimeMillis()));
   }

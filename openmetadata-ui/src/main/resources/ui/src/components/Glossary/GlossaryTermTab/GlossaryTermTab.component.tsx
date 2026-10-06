@@ -3360,17 +3360,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           style={{
             position: 'relative',
           }}>
-          {canSelectRows && selectedRowKeys.length > 0 && (
-            <GlossaryBulkActionBar
-              canApproveOrReject={canApproveOrReject}
-              canSubmitForReview={canSubmitForReview}
-              selectedTerms={selectedTerms}
-              onApprove={handleBulkApprove}
-              onClearSelection={handleClearSelection}
-              onReject={handleBulkReject}
-              onSubmitForReview={handleBulkSubmitForReview}
-            />
-          )}
           <Table
             resizableColumns
             className={classNames(
@@ -3433,6 +3422,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             rowClassName={getRowClassName}
             rowKey={getVersionRowKey}
             rowSelection={rowSelection}
+            selectionBar={
+              canSelectRows && selectedRowKeys.length > 0 ? (
+                <GlossaryBulkActionBar
+                  canApproveOrReject={canApproveOrReject}
+                  canSubmitForReview={canSubmitForReview}
+                  selectedTerms={selectedTerms}
+                  onApprove={handleBulkApprove}
+                  onClearSelection={handleClearSelection}
+                  onReject={handleBulkReject}
+                  onSubmitForReview={handleBulkSubmitForReview}
+                />
+              ) : undefined
+            }
             size="small"
             staticVisibleColumns={
               isDQGlossary

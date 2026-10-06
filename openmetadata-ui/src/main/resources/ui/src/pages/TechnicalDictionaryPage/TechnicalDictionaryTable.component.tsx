@@ -11,26 +11,24 @@
  *  limitations under the License.
  */
 import { Button, Tag } from 'antd';
-import { AxiosError } from 'axios';
 import { ColumnsType } from 'antd/lib/table';
+import { AxiosError } from 'axios';
 import React, {
   Fragment,
   useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
-import StatusBadge from '../../components/common/StatusBadge/StatusBadge.component';
 import Table from '../../components/common/Table/Table';
+import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import {
   renderDictionaryMarkdown,
   renderDictionaryPastelTag,
 } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
-import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import { NO_DATA_PLACEHOLDER } from '../../constants/constants';
 import {
   TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY,
@@ -40,11 +38,8 @@ import {
   TECHNICAL_PAGE_SIZE_OPTIONS,
 } from '../../constants/TechnicalDictionary.constants';
 import { EntityTabs, EntityType } from '../../enums/entity.enum';
-import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
-import { TechnicalRecordStatus } from '../../rest/technicalDictionaryAPI';
-import { getEntityStatusClass } from '../../utils/EntityStatusUtils';
-import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { getGlossaryTermsById } from '../../rest/glossaryAPI';
+import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import {
   getEntityDetailsPath,
   getGlossaryTermDetailsPath,
@@ -52,6 +47,7 @@ import {
 import { showErrorToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import { getTagLabel } from './TechnicalDictionaryRows';
+import TechnicalStatusBadge from './TechnicalStatusBadge.component';
 
 export interface TechnicalDictionaryTableProps {
   rows: TechnicalDictionaryRow[];
@@ -61,6 +57,13 @@ export interface TechnicalDictionaryTableProps {
   pageSize: number;
   extraTableFilters?: React.ReactNode;
   emptyContent?: React.ReactNode;
+  /** Keys of the ticked rows; the page owns them so it can act on and clear them. */
+  selectedRowKeys: React.Key[];
+  /** Replaces the toolbar while rows are ticked; leave undefined to keep the toolbar. */
+  bulkActionBar?: React.ReactNode;
+  /** Hides the row checkboxes, for the frozen snapshot that cannot be acted on. */
+  isReadOnly?: boolean;
+  onSelectionChange: (keys: React.Key[]) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onView: (row: TechnicalDictionaryRow) => void;
@@ -69,15 +72,6 @@ export interface TechnicalDictionaryTableProps {
 const Placeholder = () => (
   <span className="text-grey-muted">{NO_DATA_PLACEHOLDER}</span>
 );
-
-const TECHNICAL_STATUS_TO_ENTITY_STATUS: Record<
-  TechnicalRecordStatus,
-  EntityStatus
-> = {
-  Approved: EntityStatus.Approved,
-  Rejected: EntityStatus.Rejected,
-  'In Review': EntityStatus.InReview,
-};
 
 const TAG_VARIANTS = {
   elementType: 'method',
@@ -96,6 +90,10 @@ const TechnicalDictionaryTable = ({
   pageSize,
   extraTableFilters,
   emptyContent,
+  selectedRowKeys,
+  bulkActionBar,
+  isReadOnly = false,
+  onSelectionChange,
   onPageChange,
   onPageSizeChange,
   onView,
@@ -103,7 +101,6 @@ const TechnicalDictionaryTable = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const handleCdeClick = useCallback(
     async (termId: string) => {
@@ -217,28 +214,6 @@ const TechnicalDictionaryTable = ({
         ),
       },
       {
-        title: t('label.status'),
-        dataIndex: KEYS.STATUS,
-        key: KEYS.STATUS,
-        width: 140,
-        render: (_, row) => {
-          const status = TECHNICAL_STATUS_TO_ENTITY_STATUS[row.status];
-
-          return (
-            <StatusBadge
-              dataTestId={`status-${row.columnName}`}
-              displayLabel={
-                row.status === 'In Review'
-                  ? t('label.technical-in-review')
-                  : undefined
-              }
-              label={status}
-              status={getEntityStatusClass(status)}
-            />
-          );
-        },
-      },
-      {
         title: t('label.source'),
         dataIndex: KEYS.SERVICE_NAME,
         key: KEYS.SERVICE_NAME,
@@ -318,6 +293,18 @@ const TechnicalDictionaryTable = ({
           ),
       },
       {
+        title: t('label.technical-data-steward'),
+        dataIndex: KEYS.SYSTEM_OWNER,
+        key: KEYS.SYSTEM_OWNER,
+        width: 170,
+        render: (_, row) =>
+          row.systemOwners.length ? (
+            row.systemOwners.map((owner) => owner.name).join(', ')
+          ) : (
+            <Placeholder />
+          ),
+      },
+      {
         title: t('label.data-element-type'),
         dataIndex: KEYS.ELEMENT_TYPE,
         key: KEYS.ELEMENT_TYPE,
@@ -354,6 +341,33 @@ const TechnicalDictionaryTable = ({
         key: KEYS.DESCRIPTION,
         width: 240,
         render: (_, row) => renderDictionaryMarkdown(row.description),
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        width: 140,
+        render: (_, row) => (
+          <div className="d-flex flex-column items-start gap-1">
+            <TechnicalStatusBadge
+              dataTestId={`status-${row.columnName}`}
+              status={row.status}
+            />
+            {row.hasPendingChange && row.rowRole !== 'CHANGE' && (
+              <Tag color={row.changeOperation === 'DELETE' ? 'red' : 'gold'}>
+                {t(
+                  row.changeOperation === 'DELETE'
+                    ? 'label.technical-change-delete-pending'
+                    : row.changeRequestStatus === 'InReview'
+                    ? 'label.technical-change-in-review'
+                    : row.changeRequestStatus === 'Rejected'
+                    ? 'label.technical-change-rejected'
+                    : 'label.technical-change-draft'
+                )}
+              </Tag>
+            )}
+          </div>
+        ),
       },
       {
         title: t('label.updated-at'),
@@ -427,13 +441,18 @@ const TechnicalDictionaryTable = ({
         pagination={false}
         rowClassName="tech-dict-row"
         rowKey="key"
-        rowSelection={{
-          type: 'checkbox',
-          fixed: true,
-          columnWidth: 32,
-          selectedRowKeys,
-          onChange: setSelectedRowKeys,
-        }}
+        rowSelection={
+          isReadOnly
+            ? undefined
+            : {
+                type: 'checkbox',
+                fixed: true,
+                columnWidth: 32,
+                selectedRowKeys,
+                onChange: onSelectionChange,
+              }
+        }
+        selectionBar={bulkActionBar}
         size="small"
         staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
         sticky={{

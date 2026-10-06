@@ -18,13 +18,17 @@ import {
   TECHNICAL_PAGE_SIZE_OPTIONS,
   TECHNICAL_SEARCH_DEBOUNCE_MS,
 } from '../constants/TechnicalDictionary.constants';
+import { CDE_ROUTE_QUERY } from '../utils/routing/cdeRoutingHelper';
 import {
   EMPTY_TECHNICAL_FILTERS,
   TechnicalDictionaryFilters,
   TechnicalDictionaryRow,
 } from '../pages/TechnicalDictionaryPage/technicalDictionary.interface';
 import { toTechnicalDictionaryRow } from '../pages/TechnicalDictionaryPage/TechnicalDictionaryRows';
-import { searchTechnicalRecords } from '../rest/technicalDictionaryAPI';
+import {
+  searchTechnicalRecords,
+  searchTechnicalSnapshotRecords,
+} from '../rest/technicalDictionaryAPI';
 
 const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
   'statuses',
@@ -38,6 +42,8 @@ const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
 const PAGE_PARAM = 'page';
 const PAGE_SIZE_PARAM = 'pageSize';
 const QUERY_PARAM = 'q';
+// Same query name the Data Dictionary uses to pick a version.
+const VERSION_PARAM = CDE_ROUTE_QUERY.businessVersion;
 
 const splitList = (value: string | null): string[] =>
   value ? value.split(',').filter(Boolean) : [];
@@ -101,6 +107,10 @@ export const useTechnicalDictionaryRecords = ({
     ? requestedPageSize
     : TECHNICAL_DEFAULT_PAGE_SIZE;
   const page = parsePositive(searchParams.get(PAGE_PARAM), 1);
+  /** Version of a replaced Data Dictionary being viewed read only; undefined for the live list. */
+  const requestedVersion = searchParams.get(VERSION_PARAM) || undefined;
+  const snapshotVersion =
+    requestedVersion === dataDictionaryVersion ? undefined : requestedVersion;
   const [rows, setRows] = useState<TechnicalDictionaryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -154,6 +164,19 @@ export const useTechnicalDictionaryRecords = ({
     [updateParams]
   );
 
+  const viewSnapshot = useCallback(
+    (version?: string) => {
+      setSearchParams(() => {
+        const next = new URLSearchParams();
+        version && next.set(VERSION_PARAM, version);
+
+        return next;
+      });
+      setSearchText('');
+    },
+    [setSearchParams]
+  );
+
   const commitSearch = useMemo(
     () =>
       debounce(
@@ -181,24 +204,37 @@ export const useTechnicalDictionaryRecords = ({
     const controller = new AbortController();
     setIsLoading(true);
     setFailed(false);
-    searchTechnicalRecords(
-      {
-        q: filters.q,
-        sourceServices: filters.sourceServices,
-        statuses: filters.statuses,
-        cdeTermIds: filters.cdeTermIds,
-        elementTypes: filters.elementType,
-        generationTypes: filters.generationType,
-        creationMethods: filters.creationMethod,
-        timeliness: filters.timeliness,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      },
-      controller.signal
+    const paging = { limit: pageSize, offset: (page - 1) * pageSize };
+    (snapshotVersion
+      ? searchTechnicalSnapshotRecords(
+          snapshotVersion,
+          { q: filters.q, ...paging },
+          controller.signal
+        )
+      : searchTechnicalRecords(
+          {
+            q: filters.q,
+            sourceServices: filters.sourceServices,
+            statuses: filters.statuses,
+            cdeTermIds: filters.cdeTermIds,
+            elementTypes: filters.elementType,
+            generationTypes: filters.generationType,
+            creationMethods: filters.creationMethod,
+            timeliness: filters.timeliness,
+            ...paging,
+          },
+          controller.signal
+        )
     )
       .then((response) => {
         if (current === generation.current) {
-          setRows(response.data.map(toTechnicalDictionaryRow));
+          setRows(
+            response.data.map((row) => ({
+              ...toTechnicalDictionaryRow(row),
+              // A replaced version is history, whatever the record was then.
+              ...(snapshotVersion && { status: 'Archived' as const }),
+            }))
+          );
           setTotal(response.paging.total);
         }
       })
@@ -216,7 +252,15 @@ export const useTechnicalDictionaryRecords = ({
       });
 
     return () => controller.abort();
-  }, [enabled, dataDictionaryVersion, filters, page, pageSize, reloadKey]);
+  }, [
+    enabled,
+    dataDictionaryVersion,
+    snapshotVersion,
+    filters,
+    page,
+    pageSize,
+    reloadKey,
+  ]);
 
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
@@ -229,6 +273,8 @@ export const useTechnicalDictionaryRecords = ({
     page,
     pageSize,
     searchText,
+    snapshotVersion,
+    viewSnapshot,
     setSearchText: changeSearchText,
     setFilters,
     setPage,

@@ -1,0 +1,106 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+.bulk-selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  /* Same height as the toolbar controls it replaces, inside the same padded row. */
+  min-height: 36px;
+
+  .bulk-selection-bar-count {
+    color: #101828;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .bulk-selection-bar-clear {
+    padding: 4px 2px;
+    border: none;
+    background: transparent;
+    color: #475467;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+
+    &:hover {
+      color: #101828;
+    }
+  }
+
+  .bulk-selection-bar-spacer {
+    flex: 1;
+  }
+
+  .bulk-selection-bar-empty {
+    color: #667085;
+  }
+
+  .bulk-selection-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 20px;
+    white-space: nowrap;
+
+    .bulk-selection-chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    &.bulk-selection-chip--draft {
+      background: #fef6ee;
+      color: #b93815;
+
+      .bulk-selection-chip-dot {
+        background: #ef6820;
+      }
+    }
+
+    &.bulk-selection-chip--in-review {
+      background: #f4f3ff;
+      color: #5925dc;
+
+      .bulk-selection-chip-dot {
+        background: #7a5af8;
+      }
+    }
+
+    &.bulk-selection-chip--rejected {
+      background: #fef3f2;
+      color: #b42318;
+
+      .bulk-selection-chip-dot {
+        background: #f04438;
+      }
+    }
+
+    &.bulk-selection-chip--approved {
+      background: #ecfdf3;
+      color: #067647;
+
+      .bulk-selection-chip-dot {
+        background: #17b26a;
+      }
+    }
+  }
+}

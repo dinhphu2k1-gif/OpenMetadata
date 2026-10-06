@@ -90,6 +90,11 @@ final class TechnicalImportTestSupport {
           public boolean teamExists(UUID teamId) {
             return true;
           }
+
+          @Override
+          public boolean userExists(UUID userId) {
+            return true;
+          }
         });
   }
 

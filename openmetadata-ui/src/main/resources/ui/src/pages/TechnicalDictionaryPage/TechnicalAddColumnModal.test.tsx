@@ -136,7 +136,7 @@ describe('TechnicalAddColumnModal', () => {
       generationType: undefined,
       creationMethod: undefined,
       timeliness: 'DataTimeliness.T0',
-      systemOwnerId: undefined,
+      systemOwners: undefined,
     });
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());

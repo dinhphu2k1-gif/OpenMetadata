@@ -5,6 +5,7 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -20,10 +21,10 @@ public record TechnicalRecordDeclaration(
     String generationType,
     String creationMethod,
     String timeliness,
-    UUID systemOwnerId) {
+    List<TechnicalOwnerRef> systemOwners) {
 
   public TechnicalRecordValues values() {
     return new TechnicalRecordValues(
-        cde, rank, elementType, generationType, creationMethod, timeliness, systemOwnerId);
+        cde, rank, elementType, generationType, creationMethod, timeliness, systemOwners);
   }
 }

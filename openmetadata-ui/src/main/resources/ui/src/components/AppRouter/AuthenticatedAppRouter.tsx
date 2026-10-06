@@ -90,6 +90,15 @@ const TechnicalImportPage = withSuspenseFallback(
   )
 );
 
+const TechnicalRecordDetailPage = withSuspenseFallback(
+  React.lazy(
+    () =>
+      import(
+        '../../pages/TechnicalDictionaryPage/TechnicalRecordDetailPage.component'
+      )
+  )
+);
+
 const TechnicalDictionaryPage = withSuspenseFallback(
   React.lazy(
     () =>
@@ -793,6 +802,10 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
       <Route
         element={<TechnicalImportPage />}
         path={ROUTES.TECHNICAL_DICTIONARY_IMPORT}
+      />
+      <Route
+        element={<TechnicalRecordDetailPage />}
+        path={ROUTES.TECHNICAL_DICTIONARY_DETAILS}
       />
       <Route
         element={<TechnicalDictionaryPage />}

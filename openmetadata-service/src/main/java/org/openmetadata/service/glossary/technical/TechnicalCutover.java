@@ -57,6 +57,7 @@ public final class TechnicalCutover {
       page.forEach(record -> freeze(dao, rows, record, previousVersion, now, actor));
       page = page.size() < PAGE_SIZE ? List.of() : dao.listAfter(page.getLast().id(), PAGE_SIZE);
     }
+    dao.deleteAllChangeRequests();
     dao.deleteAllRecords();
     dao.recordReset(newVersion, previousVersion, now, actor);
     TechnicalOutbox.enqueueReset(dao, previousVersion);
@@ -74,6 +75,31 @@ public final class TechnicalCutover {
     }
     TechnicalRecordAudit.record(
         dao, TechnicalRecordAudit.RESET, record, null, previousVersion, actor);
+    final TechnicalRecordChangeRequest request = dao.findChangeRequest(record.id());
+    if (request != null) {
+      TechnicalRecordAudit.recordChange(
+          dao,
+          TechnicalRecordAudit.RESET_CHANGE,
+          request,
+          record,
+          request.isDelete()
+              ? null
+              : proposed(record, TechnicalChangeRequestService.values(request)),
+          previousVersion,
+          actor);
+    }
+  }
+
+  private static TechnicalRecord proposed(TechnicalRecord record, TechnicalRecordValues values) {
+    return record.toBuilder()
+        .cdeTermId(values.cde() == null ? null : values.cde().toString())
+        .rank(values.rank())
+        .elementType(values.elementType())
+        .generationType(values.generationType())
+        .creationMethod(values.creationMethod())
+        .timeliness(values.timeliness())
+        .systemOwnerId(TechnicalOwners.serialize(values.systemOwners()))
+        .build();
   }
 
   private static SnapshotRow snapshot(

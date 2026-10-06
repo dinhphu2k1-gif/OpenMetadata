@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS `technical_record` (
   `generationType` varchar(256) DEFAULT NULL,
   `creationMethod` varchar(256) DEFAULT NULL,
   `timeliness` varchar(256) DEFAULT NULL,
-  `systemOwnerId` varchar(36) DEFAULT NULL,
+  `systemOwnerId` mediumtext,
   `revision` bigint unsigned NOT NULL,
   `createdAt` bigint unsigned NOT NULL,
   `createdBy` varchar(256) NOT NULL,
@@ -182,6 +182,27 @@ ALTER TABLE `technical_record`
   ADD COLUMN `reviewedAt` bigint unsigned DEFAULT NULL AFTER `submittedBy`,
   ADD COLUMN `reviewedBy` varchar(256) DEFAULT NULL AFTER `reviewedAt`,
   ADD COLUMN `reviewComment` mediumtext AFTER `reviewedBy`;
+
+CREATE TABLE IF NOT EXISTS `technical_record_change_request` (
+  `id` varchar(36) NOT NULL,
+  `recordId` varchar(36) NOT NULL,
+  `operation` varchar(16) NOT NULL,
+  `baseRevision` bigint unsigned NOT NULL,
+  `proposedValues` mediumtext,
+  `status` varchar(16) NOT NULL,
+  `revision` bigint unsigned NOT NULL,
+  `createdAt` bigint unsigned NOT NULL,
+  `createdBy` varchar(256) NOT NULL,
+  `updatedAt` bigint unsigned NOT NULL,
+  `updatedBy` varchar(256) NOT NULL,
+  `submittedAt` bigint unsigned DEFAULT NULL,
+  `submittedBy` varchar(256) DEFAULT NULL,
+  `reviewedAt` bigint unsigned DEFAULT NULL,
+  `reviewedBy` varchar(256) DEFAULT NULL,
+  `reviewComment` mediumtext,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_technical_change_record` (`recordId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `technical_record_audit` (
   `id` varchar(36) NOT NULL,

@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -47,6 +48,7 @@ public class TechnicalDictionaryIT {
   private static final String DRAFT = "Draft";
   private static final String IN_REVIEW = "In Review";
   private static final String APPROVED = "Approved";
+  private static final int BULK_REVIEW_LIMIT = 100;
 
   @Test
   void declareSearchEditApproveConsumerReadAndDeleteDraft(TestNamespace ns) throws Exception {
@@ -91,6 +93,80 @@ public class TechnicalDictionaryIT {
     assertEquals(409, cannotDeleteApproved.getStatusCode());
     delete(admin, other.path("termId").asText(), scope);
     assertTrue(searchRows(admin, glossaryId, scope, draftColumn).isEmpty());
+  }
+
+  @Test
+  void bulkReviewRejectsAnUnusableBody() {
+    OpenMetadataClient admin = SdkClients.adminClient();
+    String recordId = UUID.randomUUID().toString();
+    List<Map<String, Object>> overTheLimit =
+        IntStream.range(0, BULK_REVIEW_LIMIT + 1)
+            .mapToObj(index -> bulkItem(UUID.randomUUID().toString(), 1))
+            .toList();
+    List<List<Map<String, Object>>> unusable =
+        List.of(
+            List.of(),
+            List.of(Map.of("id", recordId)),
+            List.of(Map.of("id", "not-a-uuid", "expectedRevision", 1)),
+            List.of(bulkItem(recordId, 1), bulkItem(recordId, 2)),
+            overTheLimit);
+
+    for (String action : List.of("submit", "approve", "reject")) {
+      for (List<Map<String, Object>> items : unusable) {
+        ApiException invalid =
+            assertThrows(ApiException.class, () -> bulkReview(admin, action, items));
+        assertEquals(400, invalid.getStatusCode());
+        assertTrue(String.valueOf(invalid.getResponseBody()).contains("TD_INVALID_FIELD"));
+      }
+    }
+  }
+
+  @Test
+  void bulkReviewReportsAnUnknownRecordAndStillAnswers() throws Exception {
+    OpenMetadataClient admin = SdkClients.adminClient();
+    String unknown = UUID.randomUUID().toString();
+
+    for (String action : List.of("submit", "approve", "reject")) {
+      JsonNode result = bulkReview(admin, action, List.of(bulkItem(unknown, 1)));
+
+      assertEquals(0, result.path("succeeded").asInt());
+      assertEquals(1, result.path("failed").asInt());
+      JsonNode outcome = result.path("results").get(0);
+      assertEquals(unknown, outcome.path("termId").asText());
+      assertEquals("FAILED", outcome.path("outcome").asText());
+      assertTrue(outcome.path("code").asText().startsWith("TD_"));
+      assertFalse(outcome.path("message").asText().isBlank());
+    }
+  }
+
+  @Test
+  void bulkReviewIsForEditorsAndApproversOnly() {
+    OpenMetadataClient consumer = SdkClients.dataConsumerClient();
+
+    for (String action : List.of("submit", "approve", "reject")) {
+      ApiException forbidden =
+          assertThrows(
+              ApiException.class,
+              () ->
+                  bulkReview(consumer, action, List.of(bulkItem(UUID.randomUUID().toString(), 1))));
+      assertEquals(403, forbidden.getStatusCode());
+    }
+  }
+
+  private static Map<String, Object> bulkItem(String id, long expectedRevision) {
+    return Map.of("id", id, "expectedRevision", expectedRevision);
+  }
+
+  private static JsonNode bulkReview(
+      OpenMetadataClient client, String action, List<Map<String, Object>> items)
+      throws Exception {
+    return client
+        .getHttpClient()
+        .execute(
+            HttpMethod.POST,
+            BASE + "/records/bulk/" + action,
+            Map.of("items", items),
+            JsonNode.class);
   }
 
   private static Table createTable(TestNamespace ns, String... columnNames) {

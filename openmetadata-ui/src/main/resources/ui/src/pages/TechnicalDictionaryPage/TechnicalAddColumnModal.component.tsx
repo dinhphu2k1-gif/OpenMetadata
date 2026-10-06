@@ -110,7 +110,7 @@ const TechnicalAddColumnModal = ({
         generationType: values.generationType,
         creationMethod: values.creationMethod,
         timeliness: values.timeliness,
-        systemOwnerId: values.systemOwnerId,
+        systemOwners: values.systemOwners,
       });
       showSuccessToast(t('message.technical-column-declared'));
       onDone();

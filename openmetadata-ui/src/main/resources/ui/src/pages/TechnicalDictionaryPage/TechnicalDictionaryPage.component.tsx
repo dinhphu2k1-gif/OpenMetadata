@@ -10,14 +10,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Alert, Button, Input, Modal as AntModal, Result } from 'antd';
+import { Alert, Button, Result, Space } from 'antd';
 import { AxiosError } from 'axios';
-import { useCallback, useEffect, useState } from 'react';
+import { Key, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../../components/common/Loader/Loader';
+import ReviewActionConfirmModal from '../../components/common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
-import ConfirmationModal from '../../components/Modals/ConfirmationModal/ConfirmationModal';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import { ROUTES } from '../../constants/constants';
 import { TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME } from '../../constants/Glossary.contant';
@@ -27,27 +27,38 @@ import { useTechnicalDictionaryContext } from '../../hooks/useTechnicalDictionar
 import { useTechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { useTechnicalDictionaryRecords } from '../../hooks/useTechnicalDictionaryRecords';
 import {
-  deleteTechnicalRecord,
-  approveTechnicalRecord,
+  bulkApproveTechnicalRecords,
+  bulkRejectTechnicalRecords,
+  bulkSubmitTechnicalRecords,
+  TechnicalBulkReviewOutcome,
+  TechnicalBulkReviewResult,
   exportTechnicalDictionary,
   exportTechnicalSnapshot,
   rebuildTechnicalIndex,
-  rejectTechnicalRecord,
-  updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
 import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
+import TechnicalBulkActionBar from './TechnicalBulkActionBar.component';
+import TechnicalBulkResultModal from './TechnicalBulkResultModal.component';
+import {
+  TechnicalBulkResultItem,
+  TechnicalDictionaryRow,
+} from './technicalDictionary.interface';
 import TechnicalDictionaryHeader from './TechnicalDictionaryHeader.component';
+import {
+  getReviewableTechnicalRecords,
+  getSubmittableTechnicalRecords,
+  toBulkResultItems,
+} from './TechnicalDictionaryRows';
 import TechnicalDictionaryTable from './TechnicalDictionaryTable.component';
 import TechnicalDictionaryToolbar from './TechnicalDictionaryToolbar.component';
-import TechnicalRecordModal, {
-  TechnicalRecordFormValues,
-  TechnicalRecordModalMode,
-} from './TechnicalRecordModal.component';
+import {
+  CHANGE_ACTIONS,
+  TECHNICAL_REVIEW_ACTIONS,
+  TechnicalReviewAction,
+} from './technicalReviewActions';
 import TechnicalSnapshotsModal from './TechnicalSnapshotsModal.component';
-import { TechnicalDictionaryRow } from './technicalDictionary.interface';
-import { canReviewTechnicalRecord } from './TechnicalDictionaryRows';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
 
@@ -55,17 +66,24 @@ interface TechnicalDictionaryPageProps {
   isEmbedded?: boolean;
 }
 
-interface PendingConfirmation {
-  header: string;
-  body: string;
-  confirmText: string;
-  onConfirm: () => Promise<void> | void;
+interface PendingReview {
+  action: TechnicalReviewAction;
+  rows: TechnicalDictionaryRow[];
 }
 
+interface BulkResultView {
+  action: TechnicalReviewAction;
+  items: TechnicalBulkResultItem[];
+}
+
+const BULK_ACTIONS = {
+  submit: bulkSubmitTechnicalRecords,
+  approve: bulkApproveTechnicalRecords,
+  reject: bulkRejectTechnicalRecords,
+};
 const RESET_BANNER_DAYS = 30;
 const RESET_BANNER_STORAGE_PREFIX = 'technicalDictionary.resetBanner.';
 const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
-const REVISION_CONFLICT = 'TD_RECORD_REVISION_CONFLICT';
 const RECORD_NOT_FOUND = 'TD_RECORD_NOT_FOUND';
 
 const saveBlob = (blob: Blob, fileName: string) => {
@@ -79,6 +97,50 @@ const saveBlob = (blob: Blob, fileName: string) => {
 
 const errorCodeOf = (error: unknown): string | undefined =>
   (error as AxiosError<{ code?: string }>)?.response?.data?.code;
+
+/**
+ * Runs one review action on many rows. Rows that carry a pending change go through the change
+ * request API one by one, since there is no bulk endpoint for them; the rest use the bulk one.
+ */
+const runBulk = async (
+  action: keyof typeof BULK_ACTIONS,
+  rows: TechnicalDictionaryRow[]
+): Promise<TechnicalBulkReviewResult> => {
+  const outcomes = new Map<string, TechnicalBulkReviewOutcome>();
+  const records = rows.filter((row) => !row.hasPendingChange);
+  if (records.length > 0) {
+    const response = await BULK_ACTIONS[action](
+      records.map((row) => ({ id: row.termId, expectedRevision: row.revision }))
+    );
+    records.forEach((row, index) =>
+      outcomes.set(row.key, response.results[index])
+    );
+  }
+  await Promise.all(
+    rows
+      .filter((row) => row.hasPendingChange)
+      .map(async (row) => {
+        try {
+          await CHANGE_ACTIONS[action](row.termId, row.revision);
+          outcomes.set(row.key, { termId: row.termId, outcome: 'SUCCEEDED' });
+        } catch (failure) {
+          outcomes.set(row.key, {
+            termId: row.termId,
+            outcome: 'FAILED',
+            code: errorCodeOf(failure),
+            message: (failure as AxiosError<{ message?: string }>)?.response
+              ?.data?.message,
+          });
+        }
+      })
+  );
+  const results = rows.map(
+    (row) => outcomes.get(row.key) as TechnicalBulkReviewOutcome
+  );
+  const failed = results.filter((item) => item.outcome === 'FAILED').length;
+
+  return { succeeded: results.length - failed, failed, results };
+};
 
 /** The banner is shown for a month after a reset unless the user closed it. */
 export const isResetBannerVisible = (
@@ -129,18 +191,44 @@ const TechnicalDictionaryPage = ({
     enabled: Boolean(dataDictionaryVersion) && capabilities.canView,
     dataDictionaryVersion,
   });
-  const [modal, setModal] = useState<{
-    mode: TechnicalRecordModalMode;
-    row: TechnicalDictionaryRow;
-  }>();
-  const [isSaving, setIsSaving] = useState(false);
+  const snapshotVersion = records.snapshotVersion;
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
-  const [confirmation, setConfirmation] = useState<PendingConfirmation>();
   const [isConfirming, setIsConfirming] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [rejecting, setRejecting] = useState<TechnicalDictionaryRow>();
-  const [rejectComment, setRejectComment] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<Key[]>([]);
+  const [review, setReview] = useState<PendingReview>();
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkResultView>();
+  const [isBulkResultOpen, setIsBulkResultOpen] = useState(false);
+
+  const selectionScope = JSON.stringify([
+    records.filters,
+    records.page,
+    records.pageSize,
+  ]);
+
+  useEffect(() => {
+    setSelectedKeys((keys) => (keys.length > 0 ? [] : keys));
+  }, [selectionScope]);
+
+  const selectedRows = useMemo(
+    () => records.rows.filter((row) => selectedKeys.includes(row.key)),
+    [records.rows, selectedKeys]
+  );
+  const submittableRows = useMemo(
+    () => getSubmittableTechnicalRecords(selectedRows, capabilities.canEdit),
+    [capabilities.canEdit, selectedRows]
+  );
+  const reviewableRows = useMemo(
+    () =>
+      getReviewableTechnicalRecords(
+        selectedRows,
+        capabilities.canApprove,
+        currentUser?.name
+      ),
+    [capabilities.canApprove, currentUser?.name, selectedRows]
+  );
 
   useEffect(() => {
     setBannerDismissed(readDismissed(context?.resetAt));
@@ -155,148 +243,69 @@ const TechnicalDictionaryPage = ({
   }, []);
 
   /** A record that vanished or changed means the list on screen is stale. */
-  const failRecordAction = useCallback(
-    async (failure: unknown) => {
-      const code = errorCodeOf(failure);
-      if (code === REVISION_CONFLICT) {
-        showErrorToast(t('message.technical-record-changed-by-someone'));
-        setModal(undefined);
+  const startReview = useCallback((pending: PendingReview) => {
+    setReview(pending);
+    setIsReviewOpen(true);
+  }, []);
+
+  const reviewMany = useCallback(
+    async ({ action, rows }: PendingReview) => {
+      try {
+        const result = await runBulk(action, rows);
+        setSelectedKeys([]);
         refreshData();
-      } else if (code === RECORD_NOT_FOUND) {
-        showErrorToast(
-          t('message.technical-dictionary-was-reset', {
-            version: dataDictionaryVersion,
-          })
-        );
-        setModal(undefined);
-        await reloadContext();
-        refreshData();
-      } else {
+        if (result.failed === 0) {
+          showSuccessToast(
+            t(TECHNICAL_REVIEW_ACTIONS[action].bulkToastKey, {
+              count: result.succeeded,
+            })
+          );
+        } else {
+          setBulkResult({
+            action,
+            items: toBulkResultItems(rows, result.results),
+          });
+          setIsBulkResultOpen(true);
+          if (result.results.some((item) => item.code === RECORD_NOT_FOUND)) {
+            await reloadContext();
+          }
+        }
+      } catch (failure) {
         fail(failure);
       }
     },
-    [dataDictionaryVersion, fail, refreshData, reloadContext, t]
+    [fail, refreshData, reloadContext, t]
   );
 
-  const handleConfirm = useCallback(async () => {
-    if (!confirmation) {
+  const handleReviewConfirm = useCallback(async () => {
+    if (!review) {
       return;
     }
     setIsConfirming(true);
     try {
-      await confirmation.onConfirm();
+      await reviewMany(review);
     } finally {
       setIsConfirming(false);
-      setConfirmation(undefined);
+      setIsReviewOpen(false);
     }
-  }, [confirmation]);
+  }, [review, reviewMany]);
 
-  const handleDelete = useCallback(
+  /** Every record opens on its own page; a pending change opens as its working view. */
+  const handleOpenDetail = useCallback(
     (row: TechnicalDictionaryRow) => {
-      setConfirmation({
-        header: t('label.delete-declaration'),
-        body: t('message.technical-declaration-delete-confirm'),
-        confirmText: t('label.delete'),
-        onConfirm: async () => {
-          try {
-            await deleteTechnicalRecord(row.termId, row.revision);
-            showSuccessToast(t('message.technical-declaration-deleted'));
-            setModal(undefined);
-            refreshData();
-          } catch (failure) {
-            await failRecordAction(failure);
-          }
-        },
-      });
-    },
-    [failRecordAction, refreshData, t]
-  );
-
-  const handleSave = useCallback(
-    async (values: TechnicalRecordFormValues) => {
-      if (!modal) {
-        return;
-      }
-      const { row } = modal;
-      setIsSaving(true);
-      try {
-        await updateTechnicalRecord(row.termId, {
-          expectedRevision: row.revision,
-          cde: values.cde === undefined ? row.cdeTermId : values.cde?.id,
-          rank: values.rank ?? undefined,
-          elementType: values.elementType,
-          generationType: values.generationType,
-          creationMethod: values.creationMethod,
-          timeliness: values.timeliness,
-          // The form has no system-owner field; keep the one already set.
-          systemOwnerId: values.systemOwnerId ?? row.systemOwner?.id,
-        });
-        showSuccessToast(t('message.technical-record-updated'));
-        setModal(undefined);
-        refreshData();
-      } catch (failure) {
-        await failRecordAction(failure);
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [failRecordAction, modal, refreshData, t]
-  );
-
-  const handleApprove = useCallback(
-    (row: TechnicalDictionaryRow) => {
-      setConfirmation({
-        header: t('label.approve'),
-        body: t('message.technical-approve-confirm'),
-        confirmText: t('label.approve'),
-        onConfirm: async () => {
-          try {
-            await approveTechnicalRecord(row.termId, row.revision);
-            showSuccessToast(t('message.technical-record-approved'));
-            setModal(undefined);
-            refreshData();
-          } catch (failure) {
-            await failRecordAction(failure);
-          }
-        },
-      });
-    },
-    [failRecordAction, refreshData, t]
-  );
-
-  const handleReject = useCallback(async () => {
-    if (!rejecting || !rejectComment.trim()) {
-      return;
-    }
-    setIsConfirming(true);
-    try {
-      await rejectTechnicalRecord(
-        rejecting.termId,
-        rejecting.revision,
-        rejectComment.trim()
+      const version = snapshotVersion ?? dataDictionaryVersion ?? '';
+      const working =
+        !snapshotVersion && (row.rowRole === 'CHANGE' || row.hasPendingChange);
+      navigate(
+        `${ROUTES.TECHNICAL_DICTIONARY_DETAILS.replace(
+          ':termId',
+          row.termId
+        )}?businessVersion=${encodeURIComponent(version)}${
+          working ? '&view=working' : ''
+        }`
       );
-      showSuccessToast(t('message.technical-record-rejected'));
-      setRejecting(undefined);
-      setRejectComment('');
-      setModal(undefined);
-      refreshData();
-    } catch (failure) {
-      await failRecordAction(failure);
-    } finally {
-      setIsConfirming(false);
-    }
-  }, [failRecordAction, refreshData, rejectComment, rejecting, t]);
-
-  const handleOpenRecord = useCallback(
-    (row: TechnicalDictionaryRow) => {
-      const canReview = canReviewTechnicalRecord(
-        row,
-        capabilities.canApprove,
-        currentUser?.name
-      );
-      setModal({ mode: canReview ? 'review' : 'view', row });
     },
-    [capabilities.canApprove, currentUser?.name]
+    [dataDictionaryVersion, navigate, snapshotVersion]
   );
 
   const handleExport = useCallback(async () => {
@@ -387,15 +396,30 @@ const TechnicalDictionaryPage = ({
           showIcon
           action={
             context.previousDataDictionaryVersion ? (
-              <Button
-                data-testid="technical-reset-banner-download"
-                size="small"
-                type="link"
-                onClick={handleDownloadPreviousSnapshot}>
-                {t('label.technical-download-snapshot', {
-                  version: context.previousDataDictionaryVersion,
-                })}
-              </Button>
+              <Space size={0}>
+                <Button
+                  data-testid="technical-reset-banner-view"
+                  size="small"
+                  type="link"
+                  onClick={() =>
+                    records.viewSnapshot(
+                      context.previousDataDictionaryVersion ?? undefined
+                    )
+                  }>
+                  {t('label.technical-view-snapshot', {
+                    version: context.previousDataDictionaryVersion,
+                  })}
+                </Button>
+                <Button
+                  data-testid="technical-reset-banner-download"
+                  size="small"
+                  type="link"
+                  onClick={handleDownloadPreviousSnapshot}>
+                  {t('label.technical-download-snapshot', {
+                    version: context.previousDataDictionaryVersion,
+                  })}
+                </Button>
+              </Space>
             ) : undefined
           }
           className="m-b-md"
@@ -422,6 +446,38 @@ const TechnicalDictionaryPage = ({
             />
           )}
           <TechnicalDictionaryTable
+            bulkActionBar={
+              !snapshotVersion &&
+              (capabilities.canEdit || capabilities.canApprove) &&
+              selectedRows.length > 0 ? (
+                <TechnicalBulkActionBar
+                  canReview={capabilities.canApprove}
+                  canSubmit={capabilities.canEdit}
+                  reviewableCount={reviewableRows.length}
+                  selectedRows={selectedRows}
+                  submittableCount={submittableRows.length}
+                  onApprove={() =>
+                    startReview({
+                      action: 'approve',
+                      rows: reviewableRows,
+                    })
+                  }
+                  onClear={() => setSelectedKeys([])}
+                  onReject={() =>
+                    startReview({
+                      action: 'reject',
+                      rows: reviewableRows,
+                    })
+                  }
+                  onSubmit={() =>
+                    startReview({
+                      action: 'submit',
+                      rows: submittableRows,
+                    })
+                  }
+                />
+              ) : undefined
+            }
             emptyContent={
               hasActiveFilters ? undefined : (
                 <div data-testid="technical-dictionary-empty">
@@ -431,9 +487,13 @@ const TechnicalDictionaryPage = ({
             }
             extraTableFilters={
               <TechnicalDictionaryToolbar
-                canAddColumn={isEmbedded && capabilities.canEdit}
+                canAddColumn={
+                  isEmbedded && capabilities.canEdit && !snapshotVersion
+                }
+                canSeeDrafts={capabilities.canEdit || capabilities.canApprove}
                 filters={records.filters}
                 options={options}
+                searchOnly={Boolean(snapshotVersion)}
                 searchText={records.searchText}
                 onAddColumn={() => setAddColumnOpen(true)}
                 onFilters={records.setFilters}
@@ -441,46 +501,16 @@ const TechnicalDictionaryPage = ({
               />
             }
             isLoading={records.isLoading}
+            isReadOnly={Boolean(snapshotVersion)}
             page={records.page}
             pageSize={records.pageSize}
             rows={records.rows}
+            selectedRowKeys={selectedKeys}
             total={records.total}
             onPageChange={records.setPage}
             onPageSizeChange={records.setPageSize}
-            onView={handleOpenRecord}
-          />
-          <TechnicalRecordModal
-            dataDictionaryVersion={dataDictionaryVersion}
-            isSaving={isSaving}
-            mode={modal?.mode ?? 'view'}
-            open={Boolean(modal)}
-            options={options}
-            row={modal?.row}
-            onApprove={
-              modal?.mode === 'review' && modal
-                ? () => handleApprove(modal.row)
-                : undefined
-            }
-            onCancel={() => setModal(undefined)}
-            onDelete={
-              capabilities.canEdit && modal
-                ? () => handleDelete(modal.row)
-                : undefined
-            }
-            onEdit={
-              capabilities.canEdit && modal && modal.mode !== 'edit'
-                ? () => setModal({ mode: 'edit', row: modal.row })
-                : undefined
-            }
-            onReject={
-              modal?.mode === 'review' && modal
-                ? () => {
-                    setRejectComment('');
-                    setRejecting(modal.row);
-                  }
-                : undefined
-            }
-            onSave={handleSave}
+            onSelectionChange={setSelectedKeys}
+            onView={handleOpenDetail}
           />
           <TechnicalAddColumnModal
             dataDictionaryVersion={dataDictionaryVersion}
@@ -491,37 +521,27 @@ const TechnicalDictionaryPage = ({
           />
         </>
       )}
-      <ConfirmationModal
-        bodyText={confirmation?.body ?? ''}
-        cancelText={t('label.cancel')}
-        confirmText={confirmation?.confirmText ?? ''}
-        header={confirmation?.header ?? ''}
+      <ReviewActionConfirmModal
+        action={review?.action ?? 'approve'}
+        count={review?.rows.length ?? 0}
         isLoading={isConfirming}
-        visible={Boolean(confirmation)}
-        onCancel={() => setConfirmation(undefined)}
-        onConfirm={handleConfirm}
+        open={isReviewOpen}
+        onCancel={() => setIsReviewOpen(false)}
+        onConfirm={handleReviewConfirm}
       />
-      <AntModal
-        confirmLoading={isConfirming}
-        okButtonProps={{ disabled: !rejectComment.trim() }}
-        okText={t('label.reject')}
-        open={Boolean(rejecting)}
-        title={t('label.technical-rejection-reason')}
-        onCancel={() => {
-          setRejecting(undefined);
-          setRejectComment('');
-        }}
-        onOk={handleReject}>
-        <Input.TextArea
-          data-testid="technical-rejection-comment"
-          placeholder={t('label.technical-rejection-reason')}
-          value={rejectComment}
-          onChange={(event) => setRejectComment(event.target.value)}
-        />
-      </AntModal>
+      <TechnicalBulkResultModal
+        action={bulkResult?.action ?? 'approve'}
+        items={bulkResult?.items ?? []}
+        open={isBulkResultOpen}
+        onClose={() => setIsBulkResultOpen(false)}
+      />
       <TechnicalSnapshotsModal
         open={snapshotsOpen}
         onClose={() => setSnapshotsOpen(false)}
+        onView={(version) => {
+          setSnapshotsOpen(false);
+          records.viewSnapshot(version);
+        }}
       />
     </div>
   );
@@ -550,11 +570,13 @@ const TechnicalDictionaryPage = ({
           capabilities={capabilities}
           dataDictionaryVersion={dataDictionaryVersion}
           isAdmin={isAdminUser}
+          snapshotVersion={snapshotVersion}
           onAddColumn={() => setAddColumnOpen(true)}
           onExport={handleExport}
           onImport={() => navigate(ROUTES.TECHNICAL_DICTIONARY_IMPORT)}
           onOpenSnapshots={() => setSnapshotsOpen(true)}
           onRebuildIndex={handleRebuildIndex}
+          onSelectVersion={records.viewSnapshot}
         />
         <div className="tech-dict-tab-card">
           <div className="tech-dict-tab-list" role="tablist">

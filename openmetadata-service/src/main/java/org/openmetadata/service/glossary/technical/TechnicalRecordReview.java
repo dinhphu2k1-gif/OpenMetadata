@@ -5,5 +5,11 @@
 
 package org.openmetadata.service.glossary.technical;
 
-/** Optimistic-lock input for approving or rejecting a newly declared Technical Dictionary record. */
-public record TechnicalRecordReview(Long expectedRevision, String comment) {}
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * Optimistic-lock input for approving or rejecting a newly declared Technical Dictionary record. A
+ * rejection carries no reason; a {@code comment} sent by an older client is ignored.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record TechnicalRecordReview(Long expectedRevision) {}

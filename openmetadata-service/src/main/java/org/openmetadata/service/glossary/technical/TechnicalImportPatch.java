@@ -5,6 +5,7 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import java.util.List;
 import java.util.UUID;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.Field;
 import org.openmetadata.service.glossary.technical.TechnicalImportPlan.RowPatch;
@@ -29,7 +30,10 @@ public final class TechnicalImportPatch {
             current.creationMethod()),
         pick(
             tag(patch, TechnicalDictionaryProfile.TIMELINESS_CLASSIFICATION), current.timeliness()),
-        pick(patch.systemOwner(), current.systemOwnerId(), owner -> owner));
+        pick(
+            patch.systemOwner(),
+            current.systemOwners(),
+            owner -> List.of(new TechnicalOwnerRef(owner, TechnicalOwnerRef.TEAM))));
   }
 
   private static Field<String> tag(RowPatch patch, String classification) {

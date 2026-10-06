@@ -156,6 +156,24 @@ describe('TagSelectableList', () => {
     });
   });
 
+  it('should allow several tags unless multiSelect is turned off', async () => {
+    const { unmount } = render(<TagSelectableList {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('trigger-button'));
+
+    await waitFor(() => {
+      expect(mockSelectableList.mock.calls[0][0].multiSelect).toBe(true);
+    });
+
+    unmount();
+    mockSelectableList.mockClear();
+    render(<TagSelectableList {...defaultProps} multiSelect={false} />);
+    fireEvent.click(screen.getByTestId('trigger-button'));
+
+    await waitFor(() => {
+      expect(mockSelectableList.mock.calls[0][0].multiSelect).toBe(false);
+    });
+  });
+
   it('should call onUpdate with converted tags when update is clicked', async () => {
     render(<TagSelectableList {...defaultProps} />);
 

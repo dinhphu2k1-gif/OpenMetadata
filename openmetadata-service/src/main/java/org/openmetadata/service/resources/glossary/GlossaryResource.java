@@ -176,7 +176,9 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     try {
       if (TechnicalDictionaryState.dataDictionary().getId().equals(glossaryId)) {
         final TechnicalDictionaryDAO dao = Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
-        impact = new TechnicalDictionaryImpact(dao.countRecords(), dao.countMappedRecords());
+        impact =
+            new TechnicalDictionaryImpact(
+                dao.countRecords(), dao.countMappedRecords(), dao.countChangeRequests());
       }
     } catch (EntityNotFoundException exception) {
       impact = null;
@@ -539,7 +541,8 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       TechnicalDictionaryImpact technicalDictionary) {}
 
   /** What approving this Data Dictionary version does to the Technical Dictionary. */
-  public record TechnicalDictionaryImpact(long declaredColumns, long mappedColumns) {}
+  public record TechnicalDictionaryImpact(
+      long declaredColumns, long mappedColumns, long pendingChangeRequests) {}
 
   public record PublishPreviewPaging(String after) {}
 

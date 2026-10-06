@@ -132,7 +132,8 @@ const TechnicalImportPage = () => {
   const [validatedRows, setValidatedRows] = useState<GridRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [committed, setCommitted] = useState(0);
-  const [pendingApproval, setPendingApproval] = useState(0);
+  const [created, setCreated] = useState(0);
+  const [proposed, setProposed] = useState(0);
   const [updated, setUpdated] = useState(0);
   const [isBusy, setIsBusy] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -206,7 +207,8 @@ const TechnicalImportPage = () => {
     setValidatedRows([]);
     setStatusFilter('all');
     setCommitted(0);
-    setPendingApproval(0);
+    setCreated(0);
+    setProposed(0);
     setUpdated(0);
     setIsCompleted(false);
   };
@@ -284,7 +286,8 @@ const TechnicalImportPage = () => {
     try {
       const result = await commitTechnicalImport(preview.importSessionId);
       setCommitted(result.committed);
-      setPendingApproval(result.pendingApproval);
+      setCreated(result.created);
+      setProposed(result.proposed);
       setUpdated(result.updated);
       setIsCompleted(true);
     } catch (error) {
@@ -591,7 +594,8 @@ const TechnicalImportPage = () => {
                 ]}
                 status="success"
                 subTitle={t('message.technical-import-result-detail', {
-                  pending: pendingApproval,
+                  created,
+                  proposed,
                   updated,
                 })}
                 title={t('message.technical-import-committed', {

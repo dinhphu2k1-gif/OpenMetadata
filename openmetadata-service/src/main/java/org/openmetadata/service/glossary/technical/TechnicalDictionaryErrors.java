@@ -29,7 +29,12 @@ public final class TechnicalDictionaryErrors {
   public static final String COLUMN_ALREADY_DECLARED = "TD_COLUMN_ALREADY_DECLARED";
   public static final String INVALID_STATUS_TRANSITION = "TD_INVALID_STATUS_TRANSITION";
   public static final String SELF_APPROVAL_FORBIDDEN = "TD_SELF_APPROVAL_FORBIDDEN";
-  public static final String REJECTION_COMMENT_REQUIRED = "TD_REJECTION_COMMENT_REQUIRED";
+  public static final String APPROVED_EDIT_REQUIRES_CHANGE_REQUEST =
+      "TD_APPROVED_EDIT_REQUIRES_CHANGE_REQUEST";
+  public static final String CHANGE_REQUEST_NOT_FOUND = "TD_CHANGE_REQUEST_NOT_FOUND";
+  public static final String CHANGE_REQUEST_STALE = "TD_CHANGE_REQUEST_STALE";
+  public static final String CHANGE_REQUEST_EXISTS = "TD_CHANGE_REQUEST_EXISTS";
+  public static final String INTERNAL_ERROR = "TD_INTERNAL_ERROR";
 
   private TechnicalDictionaryErrors() {}
 

@@ -397,7 +397,14 @@ public final class DqResultService {
     if (result != null && result.getTestResultValue() != null) {
       result
           .getTestResultValue()
-          .forEach(value -> values.add(Map.of("name", String.valueOf(value.getName()), "value", String.valueOf(value.getValue()))));
+          .forEach(
+              value ->
+                  values.add(
+                      Map.of(
+                          "name",
+                          String.valueOf(value.getName()),
+                          "value",
+                          String.valueOf(value.getValue()))));
     }
     return values;
   }

@@ -31,6 +31,10 @@ interface TechnicalDictionaryToolbarProps {
   options: TechnicalDictionaryOptions;
   searchText: string;
   canAddColumn: boolean;
+  /** Drafts are hidden from users who can neither edit nor approve. */
+  canSeeDrafts: boolean;
+  /** A frozen snapshot only supports search; the other filters do not apply. */
+  searchOnly?: boolean;
   onAddColumn: () => void;
   onSearchText: (value: string) => void;
   onFilters: (patch: Partial<TechnicalDictionaryFilters>) => void;
@@ -51,6 +55,8 @@ const TechnicalDictionaryToolbar = ({
   options,
   searchText,
   canAddColumn,
+  canSeeDrafts,
+  searchOnly = false,
   onAddColumn,
   onSearchText,
   onFilters,
@@ -102,45 +108,56 @@ const TechnicalDictionaryToolbar = ({
         value={searchText}
         onChange={(event) => onSearchText(event.target.value)}
       />
-      <CDEFilterDropdown
-        dataTestId="technical-dictionary-filter-status"
-        label={t('label.status')}
-        options={[
-          { value: 'In Review', label: t('label.technical-in-review') },
-          { value: 'Approved', label: t('label.approved') },
-          { value: 'Rejected', label: t('label.rejected') },
-        ]}
-        selectedValues={filters.statuses}
-        onChange={(values) =>
-          onFilters({
-            statuses: withoutAll(values) as TechnicalDictionaryFilters['statuses'],
-          })
-        }
-      />
-      <CDEFilterDropdown
-        dataTestId="technical-dictionary-filter-source"
-        label={t('label.source')}
-        options={options.services.map((service) => ({
-          value: service,
-          label: service,
-        }))}
-        selectedValues={filters.sourceServices}
-        onChange={(values) => onFilters({ sourceServices: withoutAll(values) })}
-      />
-      {columnFilters.map((filter) => (
-        <CDEFilterDropdown
-          dataTestId={filter.testId}
-          key={filter.key}
-          label={filter.label}
-          options={filter.options}
-          selectedValues={filters[filter.key]}
-          onChange={(values) =>
-            onFilters({
-              [filter.key]: withoutAll(values),
-            } as Partial<TechnicalDictionaryFilters>)
-          }
-        />
-      ))}
+      {!searchOnly && (
+        <>
+          <CDEFilterDropdown
+            dataTestId="technical-dictionary-filter-status"
+            label={t('label.status')}
+            options={[
+              ...(canSeeDrafts
+                ? [{ value: 'Draft', label: t('label.technical-draft') }]
+                : []),
+              { value: 'In Review', label: t('label.technical-in-review') },
+              { value: 'Approved', label: t('label.approved') },
+              { value: 'Rejected', label: t('label.rejected') },
+            ]}
+            selectedValues={filters.statuses}
+            onChange={(values) =>
+              onFilters({
+                statuses: withoutAll(
+                  values
+                ) as TechnicalDictionaryFilters['statuses'],
+              })
+            }
+          />
+          <CDEFilterDropdown
+            dataTestId="technical-dictionary-filter-source"
+            label={t('label.source')}
+            options={options.services.map((service) => ({
+              value: service,
+              label: service,
+            }))}
+            selectedValues={filters.sourceServices}
+            onChange={(values) =>
+              onFilters({ sourceServices: withoutAll(values) })
+            }
+          />
+          {columnFilters.map((filter) => (
+            <CDEFilterDropdown
+              dataTestId={filter.testId}
+              key={filter.key}
+              label={filter.label}
+              options={filter.options}
+              selectedValues={filters[filter.key]}
+              onChange={(values) =>
+                onFilters({
+                  [filter.key]: withoutAll(values),
+                } as Partial<TechnicalDictionaryFilters>)
+              }
+            />
+          ))}
+        </>
+      )}
       <div className="tech-dict-toolbar-actions">
         {canAddColumn && (
           <Button

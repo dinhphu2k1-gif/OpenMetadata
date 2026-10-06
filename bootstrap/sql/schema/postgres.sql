@@ -2086,7 +2086,7 @@ CREATE TABLE IF NOT EXISTS public.technical_record (
   generationType varchar(256),
   creationMethod varchar(256),
   timeliness varchar(256),
-  systemOwnerId varchar(36),
+  systemOwnerId text,
   status varchar(16) NOT NULL DEFAULT 'Approved',
   submittedAt bigint,
   submittedBy varchar(256),
@@ -2102,6 +2102,26 @@ CREATE TABLE IF NOT EXISTS public.technical_record (
 );
 CREATE INDEX IF NOT EXISTS idx_technical_record_cde_rank
   ON public.technical_record (cdeTermId, survivorshipRank);
+
+CREATE TABLE IF NOT EXISTS public.technical_record_change_request (
+  id varchar(36) PRIMARY KEY,
+  recordId varchar(36) NOT NULL,
+  operation varchar(16) NOT NULL,
+  baseRevision bigint NOT NULL,
+  proposedValues text,
+  status varchar(16) NOT NULL,
+  revision bigint NOT NULL,
+  createdAt bigint NOT NULL,
+  createdBy varchar(256) NOT NULL,
+  updatedAt bigint NOT NULL,
+  updatedBy varchar(256) NOT NULL,
+  submittedAt bigint,
+  submittedBy varchar(256),
+  reviewedAt bigint,
+  reviewedBy varchar(256),
+  reviewComment text,
+  CONSTRAINT uq_technical_change_record UNIQUE (recordId)
+);
 
 CREATE TABLE IF NOT EXISTS public.technical_record_audit (
   id varchar(36) PRIMARY KEY,
@@ -2151,6 +2171,7 @@ ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
 ALTER TABLE public.technical_dictionary_state OWNER TO openmetadata_user;
 ALTER TABLE public.technical_record OWNER TO openmetadata_user;
+ALTER TABLE public.technical_record_change_request OWNER TO openmetadata_user;
 ALTER TABLE public.technical_record_audit OWNER TO openmetadata_user;
 ALTER TABLE public.technical_binding_snapshot OWNER TO openmetadata_user;
 ALTER TABLE public.technical_outbox OWNER TO openmetadata_user;

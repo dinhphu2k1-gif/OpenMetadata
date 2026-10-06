@@ -10,14 +10,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DATA_DICTIONARY_GLOSSARY_NAME } from '../../../constants/Glossary.contant';
 import {
-  GlossaryTerm,
   TagLabel,
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
 import SingleClassificationSelect from '../../common/ClassificationSelect/SingleClassificationSelect.component';
 import RichTextEditor from '../../common/RichTextEditor/RichTextEditor';
 import DatePicker from '../../common/DatePicker/DatePicker';
-import CDESelector from '../CDESelector/CDESelector.component';
+import { EntityReference } from '../../../generated/entity/type';
+import CDESelectableField from '../CDESelectableList/CDESelectableField.component';
 import { CDE_RELEASE_LEVEL_OPTIONS } from '../../../constants/CDEReleaseLevel.constants';
 import { validateCDEDates } from '../../../utils/CDEDateUtils';
 import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
@@ -68,8 +68,8 @@ const DQGlossaryTermForm = ({
   const existingCdeRelation = glossaryTerm?.relatedTerms?.find((relation) =>
     relation.term?.fullyQualifiedName?.includes(DATA_DICTIONARY_GLOSSARY_NAME)
   );
-  const [selectedCde, setSelectedCde] = useState<GlossaryTerm | undefined>(
-    existingCdeRelation?.term as GlossaryTerm | undefined
+  const [selectedCde, setSelectedCde] = useState<EntityReference | undefined>(
+    existingCdeRelation?.term
   );
 
   useEffect(() => {
@@ -82,7 +82,7 @@ const DQGlossaryTermForm = ({
         )
       )?.term;
 
-      setSelectedCde(relatedCde as GlossaryTerm | undefined);
+      setSelectedCde(relatedCde);
 
       form.setFieldsValue({
         name: glossaryTerm.name,
@@ -128,9 +128,9 @@ const DQGlossaryTermForm = ({
     }
   }, [editMode, form, glossaryTerm]);
 
-  const onCdeSelectChange = (value?: string, cde?: GlossaryTerm) => {
+  const onCdeSelectChange = (cde?: EntityReference) => {
     setSelectedCde(cde);
-    if (!value || !cde) {
+    if (!cde) {
       form.setFieldsValue({ cdeCode: undefined, cdeName: undefined });
 
       return;
@@ -328,8 +328,8 @@ const DQGlossaryTermForm = ({
         className="cde-form-section-management"
         title={t('cde.management-information', 'Thông tin quản lý')}>
         <Form.Item label={t('dq.cde-code', 'Mã CDE liên kết')}>
-          <CDESelector
-            parentBusinessVersion={
+          <CDESelectableField
+            dataDictionaryVersion={
               glossaryTerm?.parentBusinessVersion ?? parentBusinessVersion
             }
             selectedCde={selectedCde}

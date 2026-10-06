@@ -29,11 +29,21 @@ public final class TechnicalHistory {
   private final Map<String, String> labels = new HashMap<>();
 
   public Map<String, Object> page(String recordId, int limit, int offset) {
+    return page(recordId, limit, offset, true);
+  }
+
+  public Map<String, Object> page(
+      String recordId, int limit, int offset, boolean includeProposalLifecycle) {
     final TechnicalDictionaryDAO dao = dao();
     final List<Map<String, Object>> entries =
-        dao.listAudit(recordId, limit, offset).stream().map(this::entry).toList();
+        (includeProposalLifecycle
+                ? dao.listAudit(recordId, limit, offset)
+                : dao.listEffectiveAudit(recordId, limit, offset))
+            .stream().map(this::entry).toList();
     final Map<String, Object> paging = new LinkedHashMap<>();
-    paging.put("total", dao.countAudit(recordId));
+    paging.put(
+        "total",
+        includeProposalLifecycle ? dao.countAudit(recordId) : dao.countEffectiveAudit(recordId));
     paging.put("limit", limit);
     paging.put("offset", offset);
     return Map.of("data", entries, "paging", paging);
@@ -74,7 +84,7 @@ public final class TechnicalHistory {
   private String labelOf(String field, String value, String version) {
     return switch (field) {
       case "cde" -> labels.computeIfAbsent("cde:" + value, key -> cdeCode(value, version));
-      case "systemOwner" -> labels.computeIfAbsent("team:" + value, key -> teamName(value));
+      case "systemOwner" -> labels.computeIfAbsent("owners:" + value, key -> ownerNames(value));
       case "elementType", "generationType", "creationMethod", "timeliness" -> labels
           .computeIfAbsent("tag:" + value, key -> tagLabel(value));
       default -> value;
@@ -89,14 +99,21 @@ public final class TechnicalHistory {
     return info.isPresent() ? info.code() : cdeId;
   }
 
-  private static String teamName(String teamId) {
-    String name = teamId;
+  private static String ownerNames(String stored) {
+    return TechnicalOwners.parse(stored).stream()
+        .map(TechnicalHistory::ownerName)
+        .collect(java.util.stream.Collectors.joining(", "));
+  }
+
+  private static String ownerName(TechnicalOwnerRef ref) {
+    final String id = ref.id().toString();
+    String name = id;
     try {
-      final EntityReference team =
-          Entity.getEntityReferenceById(Entity.TEAM, UUID.fromString(teamId), Include.ALL);
-      name = team.getDisplayName() == null ? team.getName() : team.getDisplayName();
+      final EntityReference owner =
+          Entity.getEntityReferenceById(ref.entityType(), ref.id(), Include.ALL);
+      name = owner.getDisplayName() == null ? owner.getName() : owner.getDisplayName();
     } catch (EntityNotFoundException exception) {
-      name = teamId;
+      name = id;
     }
     return name;
   }

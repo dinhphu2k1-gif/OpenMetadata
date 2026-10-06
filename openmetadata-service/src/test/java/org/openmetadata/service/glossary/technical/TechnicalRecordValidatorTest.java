@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.ws.rs.WebApplicationException;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -29,11 +30,22 @@ class TechnicalRecordValidatorTest {
             public boolean teamExists(UUID teamId) {
               return TEAM_ID.equals(teamId);
             }
+
+            @Override
+            public boolean userExists(UUID userId) {
+              return false;
+            }
           });
 
   private static TechnicalRecordValues values(UUID cde, Integer rank, String timeliness) {
     return new TechnicalRecordValues(
-        cde, rank, "DataElementType.AtomicDataElement", null, null, timeliness, TEAM_ID);
+        cde,
+        rank,
+        "DataElementType.AtomicDataElement",
+        null,
+        null,
+        timeliness,
+        List.of(new TechnicalOwnerRef(TEAM_ID, TechnicalOwnerRef.TEAM)));
   }
 
   private static String code(WebApplicationException exception) {
@@ -47,7 +59,8 @@ class TechnicalRecordValidatorTest {
     assertEquals(CDE_ID, validated.cde());
     assertEquals(3, validated.rank());
     assertEquals("DataTimeliness.T1", validated.timeliness());
-    assertEquals(TEAM_ID, validated.systemOwnerId());
+    assertEquals(
+        List.of(new TechnicalOwnerRef(TEAM_ID, TechnicalOwnerRef.TEAM)), validated.systemOwners());
   }
 
   @Test
@@ -93,9 +106,16 @@ class TechnicalRecordValidatorTest {
   }
 
   @Test
-  void theSystemOwnerMustBeAnExistingTeam() {
+  void everySystemOwnerMustBeAnExistingTeamOrUser() {
     TechnicalRecordValues values =
-        new TechnicalRecordValues(null, null, null, null, null, null, UUID.randomUUID());
+        new TechnicalRecordValues(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(new TechnicalOwnerRef(UUID.randomUUID(), TechnicalOwnerRef.TEAM)));
 
     assertEquals(
         TechnicalDictionaryErrors.INVALID_FIELD,

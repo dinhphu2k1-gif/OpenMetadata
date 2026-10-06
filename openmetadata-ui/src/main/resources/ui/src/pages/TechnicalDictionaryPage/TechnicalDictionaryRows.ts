@@ -11,12 +11,17 @@
  *  limitations under the License.
  */
 import {
+  TechnicalBulkReviewOutcome,
+  TechnicalChangeRequest,
   TechnicalColumnCandidate,
   TechnicalRecordApiRow,
   TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
 import Fqn from '../../utils/Fqn';
-import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import {
+  TechnicalBulkResultItem,
+  TechnicalDictionaryRow,
+} from './technicalDictionary.interface';
 
 const text = (value: unknown): string =>
   value === undefined || value === null ? '' : String(value);
@@ -41,7 +46,9 @@ export const toTechnicalDictionaryRow = (
   const columnFqn = text(row.columnFqn);
 
   return {
-    key: row.termId,
+    // The two rows of a pending update share the record id.
+    key: row.rowRole === 'CHANGE' ? `${row.termId}:change` : row.termId,
+    rowRole: row.rowRole,
     termId: row.termId,
     revision: row.revision,
     status: row.status ?? 'Approved',
@@ -71,10 +78,15 @@ export const toTechnicalDictionaryRow = (
     generationType: row.generationType,
     creationMethod: row.creationMethod,
     timeliness: row.timeliness,
-    systemOwner: row.systemOwner,
+    systemOwners: row.systemOwners ?? [],
     sourceStatus: row.sourceStatus ?? 'Available',
     updatedAt: row.updatedAt,
     updatedBy: row.updatedBy,
+    hasPendingChange: row.hasPendingChange,
+    changeRequestId: row.changeRequestId,
+    changeRequestStatus: row.changeRequestStatus,
+    changeOperation: row.changeOperation,
+    changeCreatedBy: row.changeCreatedBy,
   };
 };
 
@@ -91,9 +103,46 @@ export const canReviewTechnicalRecord = (
   currentUserName?: string
 ): boolean =>
   canApprove &&
-  row.status === 'In Review' &&
+  (row.status === 'In Review' || row.changeRequestStatus === 'InReview') &&
   Boolean(currentUserName) &&
-  row.createdBy !== currentUserName;
+  (row.hasPendingChange
+    ? row.changeCreatedBy !== currentUserName
+    : row.createdBy !== currentUserName);
+
+/** `database / schema / table` of the Column of a record. */
+export const getTechnicalRecordPath = (row: TechnicalDictionaryRow): string =>
+  [row.databaseName, row.schemaName, row.tableName].filter(Boolean).join(' / ');
+
+/** The records of a selection that the current user may approve or reject. */
+export const getReviewableTechnicalRecords = (
+  rows: TechnicalDictionaryRow[],
+  canApprove: boolean,
+  currentUserName?: string
+): TechnicalDictionaryRow[] =>
+  rows.filter((row) =>
+    canReviewTechnicalRecord(row, canApprove, currentUserName)
+  );
+
+/** The drafts of a selection that the current user may send for approval. */
+export const getSubmittableTechnicalRecords = (
+  rows: TechnicalDictionaryRow[],
+  canEdit: boolean
+): TechnicalDictionaryRow[] =>
+  canEdit ? rows.filter((row) => row.status === 'Draft') : [];
+
+/** Pairs each outcome of a bulk review with the row it was for, in the order of the request. */
+export const toBulkResultItems = (
+  rows: TechnicalDictionaryRow[],
+  outcomes: TechnicalBulkReviewOutcome[]
+): TechnicalBulkResultItem[] => {
+  const rowsById = new Map(rows.map((row) => [row.termId, row]));
+
+  return outcomes.flatMap((outcome) => {
+    const row = rowsById.get(outcome.termId);
+
+    return row ? [{ row, outcome }] : [];
+  });
+};
 
 /** A not-yet-declared Column as the empty row the declaration form starts from. */
 export const candidateToRow = (
@@ -102,7 +151,7 @@ export const candidateToRow = (
   key: candidate.columnKey,
   termId: '',
   revision: 0,
-  status: 'In Review',
+  status: 'Draft',
   databaseName: text(candidate.sourceDatabase),
   databaseFqn: parentFqn(candidate.columnFqn, 2),
   schemaName: text(candidate.sourceSchema),
@@ -117,5 +166,30 @@ export const candidateToRow = (
   cdeCode: '',
   cdeName: '',
   dataOwners: [],
+  systemOwners: [],
   sourceStatus: 'Available',
 });
+
+const CHANGE_STATUS = {
+  InReview: 'In Review',
+  Rejected: 'Rejected',
+  Draft: 'Draft',
+} as const;
+
+/** The proposal of a pending change as a row of its own, next to the approved row it changes. */
+export const toWorkingRow = (change: TechnicalChangeRequest) => {
+  const approved = toTechnicalDictionaryRow(change.approvedRecord);
+  const working: TechnicalDictionaryRow = {
+    ...toTechnicalDictionaryRow(change.proposedRecord ?? change.approvedRecord),
+    revision: change.revision,
+    status: CHANGE_STATUS[change.status],
+    createdBy: change.createdBy,
+    hasPendingChange: true,
+    changeRequestId: change.id,
+    changeRequestStatus: change.status,
+    changeOperation: change.operation,
+    changeCreatedBy: change.createdBy,
+  };
+
+  return { approved, working };
+};

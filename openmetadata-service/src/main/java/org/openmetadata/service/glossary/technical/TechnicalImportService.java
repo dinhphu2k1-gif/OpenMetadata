@@ -85,15 +85,26 @@ public final class TechnicalImportService {
       PreviewScope scope,
       Function<TechnicalImportSheet, List<TechnicalRecord>> declaredRecords,
       TechnicalImportLookups lookups) {
+    return preview(fileBytes, scope, declaredRecords, records -> Map.of(), lookups);
+  }
+
+  public Map<String, Object> preview(
+      byte[] fileBytes,
+      PreviewScope scope,
+      Function<TechnicalImportSheet, List<TechnicalRecord>> declaredRecords,
+      Function<List<TechnicalRecord>, Map<String, TechnicalRecordChangeRequest>> pendingChanges,
+      TechnicalImportLookups lookups) {
     expireSessions();
     if (sessions.size() >= MAX_ACTIVE_SESSIONS) {
       throw new ClientErrorException(
           "Too many active import sessions", Response.Status.SERVICE_UNAVAILABLE);
     }
     final TechnicalImportSheet sheet = TechnicalImportSheet.parse(fileBytes);
+    final List<TechnicalRecord> records = declaredRecords.apply(sheet);
     final List<PlannedRow> planned =
         new TechnicalImportPlanner(
-                TechnicalImportPlanner.indexRecords(declaredRecords.apply(sheet)),
+                TechnicalImportPlanner.indexRecords(records),
+                pendingChanges.apply(records),
                 lookups,
                 new TechnicalRecordValidator())
             .plan(sheet);

@@ -78,6 +78,7 @@ export const TagSelectableList = ({
   selectedTags = [],
   onUpdate,
   children,
+  multiSelect = true,
   popoverProps,
   searchPlaceholder,
   listHeight = ADD_USER_CONTAINER_HEIGHT,
@@ -106,6 +107,7 @@ export const TagSelectableList = ({
     <EntitySelectableList
       config={config}
       listHeight={listHeight}
+      multiSelect={multiSelect}
       popoverProps={popoverProps}
       selectedItems={selectedTags}
       onCancel={onCancel}

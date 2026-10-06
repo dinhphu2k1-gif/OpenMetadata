@@ -20,6 +20,7 @@ import org.jdbi.v3.sqlobject.customizer.BindMethods;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
+import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.jdbi3.locator.ConnectionAwareSqlUpdate;
 
 /** Persistence of the unversioned Technical Dictionary: records, state, audit and snapshots. */
@@ -107,6 +108,10 @@ public interface TechnicalDictionaryDAO {
   @RegisterRowMapper(RecordMapper.class)
   TechnicalRecord findById(@Bind("id") String id);
 
+  @SqlQuery("SELECT " + RECORD_COLUMNS + " FROM technical_record WHERE id = :id FOR UPDATE")
+  @RegisterRowMapper(RecordMapper.class)
+  TechnicalRecord findByIdForUpdate(@Bind("id") String id);
+
   @SqlQuery("SELECT " + RECORD_COLUMNS + " FROM technical_record WHERE id IN (<ids>)")
   @RegisterRowMapper(RecordMapper.class)
   List<TechnicalRecord> findByIds(@BindList("ids") List<String> ids);
@@ -132,6 +137,53 @@ public interface TechnicalDictionaryDAO {
 
   @SqlQuery("SELECT COUNT(*) FROM technical_record")
   long countRecords();
+
+  // ---- approved-record change requests ----------------------------------------------------
+
+  @SqlUpdate(
+      "INSERT INTO technical_record_change_request (id, recordId, operation, baseRevision, "
+          + "proposedValues, status, revision, createdAt, createdBy, updatedAt, updatedBy, "
+          + "submittedAt, submittedBy, reviewedAt, reviewedBy, reviewComment) VALUES (:id, "
+          + ":recordId, :operation, :baseRevision, :proposedValues, :status, :revision, "
+          + ":createdAt, :createdBy, :updatedAt, :updatedBy, :submittedAt, :submittedBy, "
+          + ":reviewedAt, :reviewedBy, :reviewComment)")
+  void insertChangeRequest(@BindMethods TechnicalRecordChangeRequest request);
+
+  @SqlUpdate(
+      "UPDATE technical_record_change_request SET operation = :operation, "
+          + "baseRevision = :baseRevision, proposedValues = :proposedValues, status = :status, "
+          + "revision = :revision, updatedAt = :updatedAt, updatedBy = :updatedBy, "
+          + "submittedAt = :submittedAt, submittedBy = :submittedBy, reviewedAt = :reviewedAt, "
+          + "reviewedBy = :reviewedBy, reviewComment = :reviewComment WHERE recordId = :recordId "
+          + "AND revision = :expectedRevision")
+  int updateChangeRequest(
+      @BindMethods TechnicalRecordChangeRequest request,
+      @Bind("expectedRevision") long expectedRevision);
+
+  @SqlQuery("SELECT * FROM technical_record_change_request WHERE recordId = :recordId")
+  @RegisterRowMapper(ChangeRequestMapper.class)
+  TechnicalRecordChangeRequest findChangeRequest(@Bind("recordId") String recordId);
+
+  @SqlQuery("SELECT * FROM technical_record_change_request WHERE recordId = :recordId FOR UPDATE")
+  @RegisterRowMapper(ChangeRequestMapper.class)
+  TechnicalRecordChangeRequest findChangeRequestForUpdate(@Bind("recordId") String recordId);
+
+  @SqlQuery("SELECT * FROM technical_record_change_request WHERE recordId IN (<recordIds>)")
+  @RegisterRowMapper(ChangeRequestMapper.class)
+  List<TechnicalRecordChangeRequest> findChangeRequestsByRecordIds(
+      @BindList("recordIds") List<String> recordIds);
+
+  @SqlUpdate(
+      "DELETE FROM technical_record_change_request WHERE recordId = :recordId "
+          + "AND revision = :expectedRevision")
+  int deleteChangeRequest(
+      @Bind("recordId") String recordId, @Bind("expectedRevision") long expectedRevision);
+
+  @SqlUpdate("DELETE FROM technical_record_change_request")
+  int deleteAllChangeRequests();
+
+  @SqlQuery("SELECT COUNT(*) FROM technical_record_change_request")
+  long countChangeRequests();
 
   @SqlQuery(
       "SELECT COUNT(*) FROM technical_record WHERE cdeTermId IS NOT NULL AND status = 'Approved'")
@@ -175,8 +227,22 @@ public interface TechnicalDictionaryDAO {
   List<AuditRow> listAudit(
       @Bind("recordId") String recordId, @Bind("limit") int limit, @Bind("offset") int offset);
 
+  /** Effective history: only the approvals, the moments a value became the approved one. */
+  @SqlQuery(
+      "SELECT * FROM technical_record_audit WHERE recordId = :recordId "
+          + "AND action IN ('APPROVE', 'APPROVE_CHANGE') "
+          + "ORDER BY changedAt DESC, id DESC LIMIT :limit OFFSET :offset")
+  @RegisterRowMapper(AuditMapper.class)
+  List<AuditRow> listEffectiveAudit(
+      @Bind("recordId") String recordId, @Bind("limit") int limit, @Bind("offset") int offset);
+
   @SqlQuery("SELECT COUNT(*) FROM technical_record_audit WHERE recordId = :recordId")
   long countAudit(@Bind("recordId") String recordId);
+
+  @SqlQuery(
+      "SELECT COUNT(*) FROM technical_record_audit WHERE recordId = :recordId "
+          + "AND action IN ('APPROVE', 'APPROVE_CHANGE')")
+  long countEffectiveAudit(@Bind("recordId") String recordId);
 
   /** Keyset page of the records removed by the reset that replaced one Data Dictionary version. */
   @SqlQuery(
@@ -217,6 +283,48 @@ public interface TechnicalDictionaryDAO {
   @RegisterRowMapper(SnapshotMapper.class)
   List<SnapshotRow> listSnapshotsAfter(
       @Bind("version") String version, @Bind("after") String afterId, @Bind("limit") int limit);
+
+  @SqlQuery(
+      "SELECT * FROM technical_binding_snapshot WHERE dataDictionaryVersion = :version "
+          + "AND (LOWER(columnFqn) LIKE :pattern OR LOWER(COALESCE(cdeCode, '')) LIKE :pattern "
+          + "OR LOWER(COALESCE(cdeName, '')) LIKE :pattern) "
+          + "ORDER BY columnFqn, recordId LIMIT :limit OFFSET :offset")
+  @RegisterRowMapper(SnapshotMapper.class)
+  List<SnapshotRow> searchSnapshots(
+      @Bind("version") String version,
+      @Bind("pattern") String pattern,
+      @Bind("limit") int limit,
+      @Bind("offset") int offset);
+
+  @SqlQuery(
+      "SELECT COUNT(*) FROM technical_binding_snapshot WHERE dataDictionaryVersion = :version "
+          + "AND (LOWER(columnFqn) LIKE :pattern OR LOWER(COALESCE(cdeCode, '')) LIKE :pattern "
+          + "OR LOWER(COALESCE(cdeName, '')) LIKE :pattern)")
+  long countSearchedSnapshots(@Bind("version") String version, @Bind("pattern") String pattern);
+
+  @SqlQuery(
+      "SELECT * FROM technical_binding_snapshot WHERE dataDictionaryVersion = :version "
+          + "AND recordId = :recordId")
+  @RegisterRowMapper(SnapshotMapper.class)
+  SnapshotRow findSnapshot(@Bind("version") String version, @Bind("recordId") String recordId);
+
+  @SqlQuery(
+      "SELECT * FROM technical_binding_snapshot WHERE dataDictionaryVersion = :version "
+          + "AND columnKey = :columnKey")
+  @RegisterRowMapper(SnapshotMapper.class)
+  SnapshotRow findSnapshotByColumnKey(
+      @Bind("version") String version, @Bind("columnKey") String columnKey);
+
+  @SqlQuery(
+      "SELECT * FROM technical_binding_snapshot WHERE recordId = :recordId "
+          + "ORDER BY frozenAt DESC LIMIT 1")
+  @RegisterRowMapper(SnapshotMapper.class)
+  SnapshotRow findLatestSnapshotOfRecord(@Bind("recordId") String recordId);
+
+  @SqlQuery(
+      "SELECT DISTINCT dataDictionaryVersion FROM technical_binding_snapshot "
+          + "WHERE columnKey = :columnKey")
+  List<String> listSnapshotVersionsOfColumn(@Bind("columnKey") String columnKey);
 
   @SqlQuery(
       "SELECT dataDictionaryVersion, COUNT(*) AS bindings, MAX(frozenAt) AS frozenAt "
@@ -309,6 +417,31 @@ public interface TechnicalDictionaryDAO {
       long enqueuedAt,
       int attempts,
       String lastError) {}
+
+  class ChangeRequestMapper implements RowMapper<TechnicalRecordChangeRequest> {
+    @Override
+    public TechnicalRecordChangeRequest map(ResultSet rs, StatementContext ctx)
+        throws SQLException {
+      return TechnicalRecordChangeRequest.builder()
+          .id(rs.getString("id"))
+          .recordId(rs.getString("recordId"))
+          .operation(rs.getString("operation"))
+          .baseRevision(rs.getLong("baseRevision"))
+          .proposedValues(rs.getString("proposedValues"))
+          .status(rs.getString("status"))
+          .revision(rs.getLong("revision"))
+          .createdAt(rs.getLong("createdAt"))
+          .createdBy(rs.getString("createdBy"))
+          .updatedAt(rs.getLong("updatedAt"))
+          .updatedBy(rs.getString("updatedBy"))
+          .submittedAt(nullableLong(rs, "submittedAt"))
+          .submittedBy(rs.getString("submittedBy"))
+          .reviewedAt(nullableLong(rs, "reviewedAt"))
+          .reviewedBy(rs.getString("reviewedBy"))
+          .reviewComment(rs.getString("reviewComment"))
+          .build();
+    }
+  }
 
   class StateMapper implements RowMapper<StateRow> {
     @Override

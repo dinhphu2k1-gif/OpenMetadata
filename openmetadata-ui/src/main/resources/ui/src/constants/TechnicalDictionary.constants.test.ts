@@ -20,19 +20,21 @@ import {
 describe('TechnicalDictionary constants', () => {
   it('uses a preference key that drops the layout of the versioned dictionary', () => {
     expect(TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY).toBe(
-      'technicalDictionary.v5'
+      'technicalDictionary.v6'
     );
   });
 
-  it('lists the field and its status first, then the dictionary fields in the documented order', () => {
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(12);
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(0, 2)).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_NAME,
+  it('lists the field first and its status last, with the dictionary fields in between', () => {
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toHaveLength(13);
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS[0]).toBe(
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.FIELD_NAME
+    );
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-1)).toEqual([
       TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.STATUS,
     ]);
-    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS.slice(-1)).toEqual([
-      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.DESCRIPTION,
-    ]);
+    expect(TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS).toContain(
+      TECHNICAL_DICTIONARY_TABLE_COLUMNS_KEYS.SYSTEM_OWNER
+    );
   });
 
   it('keeps the update columns optional and hidden by default', () => {

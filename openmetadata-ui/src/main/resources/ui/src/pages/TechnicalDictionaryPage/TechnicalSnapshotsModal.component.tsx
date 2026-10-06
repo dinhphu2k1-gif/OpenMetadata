@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { DownloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { Button } from '@openmetadata/ui-core-components';
 import { Empty, Modal, Spin, Table } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
@@ -28,6 +28,7 @@ import { showErrorToast } from '../../utils/ToastUtils';
 interface TechnicalSnapshotsModalProps {
   open: boolean;
   onClose: () => void;
+  onView: (version: string) => void;
 }
 
 const saveBlob = (blob: Blob, fileName: string) => {
@@ -43,6 +44,7 @@ const saveBlob = (blob: Blob, fileName: string) => {
 const TechnicalSnapshotsModal = ({
   open,
   onClose,
+  onView,
 }: TechnicalSnapshotsModalProps) => {
   const { t } = useTranslation();
   const [snapshots, setSnapshots] = useState<TechnicalSnapshotSummary[]>([]);
@@ -100,17 +102,27 @@ const TechnicalSnapshotsModal = ({
     {
       title: t('label.action-plural'),
       key: 'actions',
-      width: 150,
+      width: 220,
       render: (_, snapshot) => (
-        <Button
-          color="secondary"
-          data-testid={`technical-snapshot-download-${snapshot.dataDictionaryVersion}`}
-          iconLeading={<DownloadOutlined />}
-          isLoading={downloading === snapshot.dataDictionaryVersion}
-          size="sm"
-          onPress={() => handleDownload(snapshot.dataDictionaryVersion)}>
-          {t('label.download')}
-        </Button>
+        <div className="d-flex gap-2">
+          <Button
+            color="secondary"
+            data-testid={`technical-snapshot-view-${snapshot.dataDictionaryVersion}`}
+            iconLeading={<EyeOutlined />}
+            size="sm"
+            onPress={() => onView(snapshot.dataDictionaryVersion)}>
+            {t('label.view')}
+          </Button>
+          <Button
+            color="secondary"
+            data-testid={`technical-snapshot-download-${snapshot.dataDictionaryVersion}`}
+            iconLeading={<DownloadOutlined />}
+            isLoading={downloading === snapshot.dataDictionaryVersion}
+            size="sm"
+            onPress={() => handleDownload(snapshot.dataDictionaryVersion)}>
+            {t('label.download')}
+          </Button>
+        </div>
       ),
     },
   ];

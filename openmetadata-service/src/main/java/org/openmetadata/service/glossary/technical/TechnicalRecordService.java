@@ -40,7 +40,7 @@ public class TechnicalRecordService {
     this.validator = validator;
   }
 
-  /** Declares a Column in review; it becomes effective only after independent approval. */
+  /** Declares a Column as a draft; it is reviewed only after it is submitted. */
   public TechnicalRecord declare(TechnicalRecordDeclaration declaration, String actor) {
     final TechnicalColumnSource column = requireColumn(declaration.columnFqn());
     final TechnicalRecordValues values = validator.validate(declaration.values());
@@ -53,12 +53,11 @@ public class TechnicalRecordService {
   /** Replaces the editable values of a record after checking the expected revision. */
   public TechnicalRecord update(
       UUID recordId, long expectedRevision, TechnicalRecordValues requested, String actor) {
-    final TechnicalRecordValues values = validator.validate(requested);
     final TechnicalRecord updated =
         write(
             true,
             (handle, version) ->
-                replaceValues(handle, version, recordId, expectedRevision, values, actor));
+                replaceValues(handle, version, recordId, expectedRevision, requested, actor));
     TechnicalOutbox.flush();
     return updated;
   }
@@ -69,6 +68,11 @@ public class TechnicalRecordService {
         (handle, version) -> {
           final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
           final TechnicalRecord existing = requireRecord(dao, recordId);
+          if (existing.isApproved()) {
+            throw TechnicalDictionaryErrors.conflict(
+                TechnicalDictionaryErrors.APPROVED_EDIT_REQUIRES_CHANGE_REQUEST,
+                "An Approved record must be deleted through a change request");
+          }
           if (dao.deleteRecord(existing.id(), expectedRevision) != 1) {
             throw revisionConflict();
           }
@@ -80,29 +84,68 @@ public class TechnicalRecordService {
     TechnicalOutbox.flush();
   }
 
+  /** Sends a draft for independent approval. */
+  public TechnicalRecord submit(UUID recordId, long expectedRevision, String actor) {
+    final TechnicalRecord submitted = submitWithoutFlush(recordId, expectedRevision, actor);
+    TechnicalOutbox.flush();
+    return submitted;
+  }
+
   public TechnicalRecord approve(UUID recordId, long expectedRevision, String actor) {
-    final TechnicalRecord approved =
-        write(
-            true,
-            (handle, version) ->
-                review(handle, version, recordId, expectedRevision, actor, true, null));
+    final TechnicalRecord approved = approveWithoutFlush(recordId, expectedRevision, actor);
     TechnicalOutbox.flush();
     return approved;
   }
 
-  public TechnicalRecord reject(
-      UUID recordId, long expectedRevision, String comment, String actor) {
-    if (nullOrEmpty(comment) || comment.isBlank()) {
-      throw TechnicalDictionaryErrors.badRequest(
-          TechnicalDictionaryErrors.REJECTION_COMMENT_REQUIRED, "A rejection comment is required");
-    }
-    final TechnicalRecord rejected =
-        write(
-            false,
-            (handle, version) ->
-                review(handle, version, recordId, expectedRevision, actor, false, comment.trim()));
+  public TechnicalRecord reject(UUID recordId, long expectedRevision, String actor) {
+    final TechnicalRecord rejected = rejectWithoutFlush(recordId, expectedRevision, actor);
     TechnicalOutbox.flush();
     return rejected;
+  }
+
+  /** Submits each item in its own transaction; the outbox is flushed once after the last one. */
+  public List<TechnicalBulkReview.Outcome> submitAll(
+      List<TechnicalBulkReview.Item> items, String actor) {
+    return TechnicalBulkReview.run(
+        items,
+        (recordId, expectedRevision) -> submitWithoutFlush(recordId, expectedRevision, actor),
+        TechnicalOutbox::flush);
+  }
+
+  /** Approves each item in its own transaction; the outbox is flushed once after the last one. */
+  public List<TechnicalBulkReview.Outcome> approveAll(
+      List<TechnicalBulkReview.Item> items, String actor) {
+    return TechnicalBulkReview.run(
+        items,
+        (recordId, expectedRevision) -> approveWithoutFlush(recordId, expectedRevision, actor),
+        TechnicalOutbox::flush);
+  }
+
+  /** Rejects each item in its own transaction; the outbox is flushed once after the last one. */
+  public List<TechnicalBulkReview.Outcome> rejectAll(
+      List<TechnicalBulkReview.Item> items, String actor) {
+    return TechnicalBulkReview.run(
+        items,
+        (recordId, expectedRevision) -> rejectWithoutFlush(recordId, expectedRevision, actor),
+        TechnicalOutbox::flush);
+  }
+
+  private TechnicalRecord submitWithoutFlush(UUID recordId, long expectedRevision, String actor) {
+    return write(
+        false,
+        (handle, version) -> submitDraft(handle, version, recordId, expectedRevision, actor));
+  }
+
+  private TechnicalRecord approveWithoutFlush(UUID recordId, long expectedRevision, String actor) {
+    return write(
+        true,
+        (handle, version) -> review(handle, version, recordId, expectedRevision, actor, true));
+  }
+
+  private TechnicalRecord rejectWithoutFlush(UUID recordId, long expectedRevision, String actor) {
+    return write(
+        false,
+        (handle, version) -> review(handle, version, recordId, expectedRevision, actor, false));
   }
 
   /**
@@ -190,7 +233,19 @@ public class TechnicalRecordService {
     if (existing.revision() != expectedRevision) {
       throw revisionConflict();
     }
-    return change(dao, version, existing, values, TechnicalRecordAudit.UPDATE, true, actor);
+    if (existing.isApproved()) {
+      throw TechnicalDictionaryErrors.conflict(
+          TechnicalDictionaryErrors.APPROVED_EDIT_REQUIRES_CHANGE_REQUEST,
+          "An Approved record must be changed through a change request");
+    }
+    return change(
+        dao,
+        version,
+        existing,
+        validator.validate(values),
+        TechnicalRecordAudit.UPDATE,
+        true,
+        actor);
   }
 
   /** Applies new editable values to a record; returns the record unchanged when nothing differs. */
@@ -225,13 +280,15 @@ public class TechnicalRecordService {
       if (dao.updateEditable(record, existing.revision()) != 1) {
         throw revisionConflict();
       }
-      TechnicalRecordAudit.record(
-          dao,
-          resubmitted ? TechnicalRecordAudit.RESUBMIT : action,
-          existing,
-          record,
-          version,
-          actor);
+      if (action != null) {
+        TechnicalRecordAudit.record(
+            dao,
+            resubmitted ? TechnicalRecordAudit.RESUBMIT : action,
+            existing,
+            record,
+            version,
+            actor);
+      }
       TechnicalOutbox.enqueueRecord(dao, record);
     }
     return changed ? record : existing;
@@ -262,7 +319,7 @@ public class TechnicalRecordService {
         .generationType(values.generationType())
         .creationMethod(values.creationMethod())
         .timeliness(values.timeliness())
-        .systemOwnerId(values.systemOwnerId() == null ? null : values.systemOwnerId().toString())
+        .systemOwnerId(TechnicalOwners.serialize(values.systemOwners()))
         .revision(previous == null ? 1L : previous.revision() + 1)
         .updatedAt(now)
         .updatedBy(actor)
@@ -273,13 +330,13 @@ public class TechnicalRecordService {
     return TechnicalRecordValues.of(left).equals(TechnicalRecordValues.of(right));
   }
 
-  private void requireAssignableCde(TechnicalRecord record, String version) {
+  void requireAssignableCde(TechnicalRecord record, String version) {
     if (record.hasCde()) {
       cdeResolver.requireAssignable(UUID.fromString(record.cdeTermId()), version);
     }
   }
 
-  private static void requireUniqueRank(TechnicalDictionaryDAO dao, TechnicalRecord record) {
+  static void requireUniqueRank(TechnicalDictionaryDAO dao, TechnicalRecord record) {
     if (record.isApproved() && record.hasCde() && record.rank() != null && record.isAvailable()) {
       final String holder = dao.findRankHolder(record.cdeTermId(), record.rank(), record.id());
       if (holder != null) {
@@ -306,12 +363,42 @@ public class TechnicalRecordService {
         .into(TechnicalRecord.builder())
         .id(UUID.randomUUID().toString())
         .sourceStatus(TechnicalDictionaryProfile.SOURCE_AVAILABLE)
-        .status(TechnicalRecord.STATUS_IN_REVIEW)
-        .submittedAt(now)
-        .submittedBy(actor)
+        .status(TechnicalRecord.STATUS_DRAFT)
         .createdAt(now)
         .createdBy(actor)
         .build();
+  }
+
+  private TechnicalRecord submitDraft(
+      Handle handle, String version, UUID recordId, long expectedRevision, String actor) {
+    final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
+    final TechnicalRecord existing = requireRecord(dao, recordId);
+    if (existing.revision() != expectedRevision) {
+      throw revisionConflict();
+    }
+    if (!existing.isDraft()) {
+      throw TechnicalDictionaryErrors.conflict(
+          TechnicalDictionaryErrors.INVALID_STATUS_TRANSITION,
+          "Only a draft can be submitted for review");
+    }
+    final long now = System.currentTimeMillis();
+    final TechnicalRecord submitted =
+        existing.toBuilder()
+            .status(TechnicalRecord.STATUS_IN_REVIEW)
+            .submittedAt(now)
+            .submittedBy(actor)
+            .revision(existing.revision() + 1)
+            .updatedAt(now)
+            .updatedBy(actor)
+            .build();
+    requireAssignableCde(submitted, version);
+    if (dao.updateEditable(submitted, expectedRevision) != 1) {
+      throw revisionConflict();
+    }
+    TechnicalRecordAudit.record(
+        dao, TechnicalRecordAudit.SUBMIT, existing, submitted, version, actor);
+    TechnicalOutbox.enqueueRecord(dao, submitted);
+    return submitted;
   }
 
   private TechnicalRecord review(
@@ -320,8 +407,7 @@ public class TechnicalRecordService {
       UUID recordId,
       long expectedRevision,
       String actor,
-      boolean approve,
-      String comment) {
+      boolean approve) {
     final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
     final TechnicalRecord existing = requireRecord(dao, recordId);
     if (existing.revision() != expectedRevision) {
@@ -343,7 +429,7 @@ public class TechnicalRecordService {
             .status(approve ? TechnicalRecord.STATUS_APPROVED : TechnicalRecord.STATUS_REJECTED)
             .reviewedAt(now)
             .reviewedBy(actor)
-            .reviewComment(comment)
+            .reviewComment(null)
             .revision(existing.revision() + 1)
             .updatedAt(now)
             .updatedBy(actor)
@@ -404,11 +490,30 @@ public class TechnicalRecordService {
   }
 
   private static RuntimeException translate(UnableToExecuteStatementException exception) {
+    if (isChangeRequestConstraint(exception)) {
+      return TechnicalDictionaryErrors.conflict(
+          TechnicalDictionaryErrors.CHANGE_REQUEST_EXISTS,
+          "The record already has an open change request");
+    }
     return isConstraintViolation(exception)
         ? TechnicalDictionaryErrors.conflict(
             TechnicalDictionaryErrors.COLUMN_ALREADY_DECLARED,
             "The Column was declared by another user at the same time")
         : exception;
+  }
+
+  private static boolean isChangeRequestConstraint(Throwable exception) {
+    Throwable current = exception;
+    boolean match = false;
+    while (current != null && !match) {
+      final String message = current.getMessage();
+      match =
+          message != null
+              && (message.contains("uq_technical_change_record")
+                  || message.contains("technical_record_change_request.recordId"));
+      current = current.getCause();
+    }
+    return match;
   }
 
   static boolean isConstraintViolation(Throwable exception) {

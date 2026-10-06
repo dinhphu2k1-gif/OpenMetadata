@@ -43,6 +43,17 @@ public final class TechnicalSearchService {
     return page(rows, hits.path(TOTAL).path(VALUE).asLong(), criteria.limit(), criteria.offset());
   }
 
+  /** How many records matching the criteria have a pending update. */
+  public long countPendingUpdates(TechnicalSearchCriteria criteria) {
+    return read(() ->
+            TechnicalSearchIndex.search(
+                TechnicalSearchQueryBuilder.pendingUpdateCountBody(criteria)))
+        .path(HITS)
+        .path(TOTAL)
+        .path(VALUE)
+        .asLong();
+  }
+
   /** One page of the records referencing a CDE in the bound version, in rank order. */
   public Map<String, Object> rowsOfCde(String version, UUID cdeId, int limit, int offset) {
     TechnicalSearchQueryBuilder.requireWithinWindow(offset, limit);

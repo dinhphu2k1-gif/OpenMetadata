@@ -234,12 +234,15 @@
           }
         }
       },
-      "systemOwner": {
+      "systemOwners": {
         "properties": {
           "id": {
             "type": "keyword"
           },
           "name": {
+            "type": "keyword"
+          },
+          "type": {
             "type": "keyword"
           }
         }
@@ -256,6 +259,21 @@
         "format": "epoch_millis"
       },
       "updatedBy": {
+        "type": "keyword"
+      },
+      "hasPendingChange": {
+        "type": "boolean"
+      },
+      "changeRequestId": {
+        "type": "keyword"
+      },
+      "changeRequestStatus": {
+        "type": "keyword"
+      },
+      "changeOperation": {
+        "type": "keyword"
+      },
+      "changeCreatedBy": {
         "type": "keyword"
       }
     }

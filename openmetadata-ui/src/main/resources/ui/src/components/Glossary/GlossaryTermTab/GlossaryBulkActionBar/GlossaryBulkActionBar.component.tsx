@@ -11,17 +11,14 @@
  *  limitations under the License.
  */
 
-import Icon, { CloseOutlined } from '@ant-design/icons';
-import { Button, Typography } from '@openmetadata/ui-core-components';
 import { FC, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ReactComponent as CheckIcon } from '../../../../assets/svg/ic-check-circle.svg';
-import { ReactComponent as PaperPlaneIcon } from '../../../../assets/svg/paper-plane.svg';
-import StatusBadge from '../../../common/StatusBadge/StatusBadge.component';
 import { EntityStatus } from '../../../../generated/entity/data/glossaryTerm';
-import { EntityStatusClass } from '../../../../utils/EntityStatusUtils';
+import BulkSelectionBar from '../../../common/BulkSelectionBar/BulkSelectionBar.component';
+import {
+  BulkSelectionAction,
+  BulkSelectionChip,
+} from '../../../common/BulkSelectionBar/BulkSelectionBar.interface';
 import { ModifiedGlossaryTerm } from '../GlossaryTermTab.interface';
-import './glossary-bulk-action-bar.less';
 
 export interface GlossaryBulkActionBarProps {
   selectedTerms: ModifiedGlossaryTerm[];
@@ -42,143 +39,78 @@ export const GlossaryBulkActionBar: FC<GlossaryBulkActionBarProps> = ({
   canSubmitForReview,
   canApproveOrReject,
 }) => {
-  const { t } = useTranslation();
-
   const { draftTerms, inReviewTerms, approvedTerms } = useMemo(() => {
-    const drafts: ModifiedGlossaryTerm[] = [];
-    const inReviews: ModifiedGlossaryTerm[] = [];
-    const approveds: ModifiedGlossaryTerm[] = [];
-
-    selectedTerms.forEach((term) => {
-      const status = term.entityStatus ?? EntityStatus.Approved;
-      if (status === EntityStatus.Draft) {
-        drafts.push(term);
-      } else if (status === EntityStatus.InReview) {
-        inReviews.push(term);
-      } else if (status === EntityStatus.Approved) {
-        approveds.push(term);
-      }
-    });
+    const statusOf = (term: ModifiedGlossaryTerm) =>
+      term.entityStatus ?? EntityStatus.Approved;
 
     return {
-      draftTerms: drafts,
-      inReviewTerms: inReviews,
-      approvedTerms: approveds,
+      draftTerms: selectedTerms.filter(
+        (term) => statusOf(term) === EntityStatus.Draft
+      ),
+      inReviewTerms: selectedTerms.filter(
+        (term) => statusOf(term) === EntityStatus.InReview
+      ),
+      approvedTerms: selectedTerms.filter(
+        (term) => statusOf(term) === EntityStatus.Approved
+      ),
     };
   }, [selectedTerms]);
 
-  if (selectedTerms.length === 0) {
-    return null;
-  }
+  const chips = (
+    [
+      { tone: 'draft', count: draftTerms.length, testId: 'draft-count-tag' },
+      {
+        tone: 'in-review',
+        count: inReviewTerms.length,
+        testId: 'in-review-count-tag',
+      },
+      {
+        tone: 'approved',
+        count: approvedTerms.length,
+        testId: 'approved-count-tag',
+      },
+    ] as BulkSelectionChip[]
+  ).filter((chip) => chip.count > 0);
 
-  return (
-    <div
-      className="glossary-bulk-action-bar-container"
-      data-testid="glossary-bulk-action-bar">
-      <div className="bulk-bar-left">
-        <Typography
-          className="selected-count-text"
-          data-testid="selected-count-tag"
-          size="text-sm">
-          {t('label.selected-records-count', 'Đã chọn {{count}} bản ghi', {
-            count: selectedTerms.length,
-          })}
-        </Typography>
+  const actions: BulkSelectionAction[] = [
+    ...(canSubmitForReview && draftTerms.length > 0
+      ? [
+          {
+            type: 'submit' as const,
+            count: draftTerms.length,
+            testId: 'bulk-submit-for-review-btn',
+            onPress: () => onSubmitForReview(draftTerms),
+          },
+        ]
+      : []),
+    ...(canApproveOrReject && inReviewTerms.length > 0
+      ? [
+          {
+            type: 'reject' as const,
+            count: inReviewTerms.length,
+            testId: 'bulk-reject-btn',
+            onPress: () => onReject(inReviewTerms),
+          },
+          {
+            type: 'approve' as const,
+            count: inReviewTerms.length,
+            testId: 'bulk-approve-btn',
+            onPress: () => onApprove(inReviewTerms),
+          },
+        ]
+      : []),
+  ];
 
-        {draftTerms.length > 0 && (
-          <StatusBadge
-            dataTestId="draft-count-tag"
-            displayLabel={t('label.draft-count', '{{count}} bản nháp', {
-              count: draftTerms.length,
-            })}
-            label={EntityStatus.Draft}
-            status={EntityStatusClass[EntityStatus.Draft]}
-          />
-        )}
-
-        {inReviewTerms.length > 0 && (
-          <StatusBadge
-            dataTestId="in-review-count-tag"
-            displayLabel={t('label.in-review-count', '{{count}} chờ duyệt', {
-              count: inReviewTerms.length,
-            })}
-            label={EntityStatus.InReview}
-            status={EntityStatusClass[EntityStatus.InReview]}
-          />
-        )}
-
-        {approvedTerms.length > 0 && (
-          <StatusBadge
-            dataTestId="approved-count-tag"
-            displayLabel={t('label.approved-count', '{{count}} đã duyệt', {
-              count: approvedTerms.length,
-            })}
-            label={EntityStatus.Approved}
-            status={EntityStatusClass[EntityStatus.Approved]}
-          />
-        )}
-
-        <Typography
-          as="a"
-          className="btn-clear tw:cursor-pointer tw:text-primary hover:tw:underline"
-          data-testid="clear-selection-btn"
-          size="text-sm"
-          onClick={onClearSelection}>
-          {t('label.clear-selection', 'Bỏ chọn')}
-        </Typography>
-      </div>
-
-      <div className="bulk-bar-right">
-        <div className="bulk-bar-actions">
-          {canSubmitForReview && draftTerms.length > 0 && (
-            <Button
-              color="primary"
-              data-testid="bulk-submit-for-review-btn"
-              iconLeading={
-                <Icon
-                  component={PaperPlaneIcon}
-                  style={{ fontSize: '14px' }}
-                />
-              }
-              onPress={() => onSubmitForReview(draftTerms)}>
-              {t('label.bulk-submit-for-review-count', 'Gửi phê duyệt ({{count}})', {
-                count: draftTerms.length,
-              })}
-            </Button>
-          )}
-
-          {canApproveOrReject && inReviewTerms.length > 0 && (
-            <>
-              <Button
-                className="btn-bulk-approve"
-                color="primary"
-                data-testid="bulk-approve-btn"
-                iconLeading={
-                  <Icon
-                    component={CheckIcon}
-                    style={{ fontSize: '14px' }}
-                  />
-                }
-                onPress={() => onApprove(inReviewTerms)}>
-                {t('label.bulk-approve-count', 'Phê duyệt tất cả ({{count}})', {
-                  count: inReviewTerms.length,
-                })}
-              </Button>
-
-              <Button
-                color="primary-destructive"
-                data-testid="bulk-reject-btn"
-                iconLeading={<CloseOutlined />}
-                onPress={() => onReject(inReviewTerms)}>
-                {t('label.bulk-reject-count', 'Từ chối tất cả ({{count}})', {
-                  count: inReviewTerms.length,
-                })}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+  return selectedTerms.length === 0 ? null : (
+    <BulkSelectionBar
+      actions={actions}
+      chips={chips}
+      clearTestId="clear-selection-btn"
+      countTestId="selected-count-tag"
+      selectedCount={selectedTerms.length}
+      testId="glossary-bulk-action-bar"
+      onClear={onClearSelection}
+    />
   );
 };
 

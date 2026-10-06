@@ -1866,3 +1866,27 @@
     }
   }
 }
+
+.cde-code-select-popover {
+  width: 480px !important;
+  min-width: 480px !important;
+  z-index: 1101 !important;
+
+  .cde-select-code {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+.cde-selectable-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  text-align: left;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}

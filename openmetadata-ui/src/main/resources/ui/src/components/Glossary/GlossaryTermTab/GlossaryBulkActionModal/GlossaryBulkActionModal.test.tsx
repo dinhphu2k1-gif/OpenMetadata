@@ -96,13 +96,12 @@ describe('GlossaryBulkActionModal', () => {
       />
     );
 
-    expect(
-      screen.getByText('Xác nhận gửi phê duyệt hàng loạt')
-    ).toBeInTheDocument();
-    expect(screen.getByText('CDE001')).toBeInTheDocument();
-    expect(screen.getByText('CDE002')).toBeInTheDocument();
+    expect(screen.getByTestId('modal-header')).toHaveTextContent(
+      'label.review-confirm-submit'
+    );
+    expect(screen.queryByText('CDE001')).not.toBeInTheDocument();
 
-    const confirmBtn = screen.getByText('Xác nhận');
+    const confirmBtn = screen.getByTestId('save-button');
     await act(async () => {
       fireEvent.click(confirmBtn);
     });
@@ -140,11 +139,11 @@ describe('GlossaryBulkActionModal', () => {
       />
     );
 
-    expect(
-      screen.getByText('Xác nhận phê duyệt hàng loạt')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('modal-header')).toHaveTextContent(
+      'label.review-confirm-approve'
+    );
 
-    const confirmBtn = screen.getByText('Xác nhận');
+    const confirmBtn = screen.getByTestId('save-button');
     await act(async () => {
       fireEvent.click(confirmBtn);
     });
@@ -172,9 +171,11 @@ describe('GlossaryBulkActionModal', () => {
       />
     );
 
-    expect(screen.getByText('Xác nhận từ chối hàng loạt')).toBeInTheDocument();
+    expect(screen.getByTestId('modal-header')).toHaveTextContent(
+      'label.review-confirm-reject'
+    );
 
-    const confirmBtn = screen.getByText('Xác nhận');
+    const confirmBtn = screen.getByTestId('save-button');
     await act(async () => {
       fireEvent.click(confirmBtn);
     });

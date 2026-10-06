@@ -11,9 +11,12 @@
  *  limitations under the License.
  */
 import {
+  TechnicalBulkReviewOutcome,
   TechnicalCapabilities,
   TechnicalNamedReference,
+  TechnicalOwnerReference,
   TechnicalRecordStatus,
+  TechnicalRowRole,
   TechnicalSourceStatus,
   TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
@@ -50,10 +53,17 @@ export interface TechnicalDictionaryRow {
   generationType?: TechnicalTagValue;
   creationMethod?: TechnicalTagValue;
   timeliness?: TechnicalTagValue;
-  systemOwner?: TechnicalNamedReference;
+  systemOwners: TechnicalOwnerReference[];
   sourceStatus: TechnicalSourceStatus;
   updatedAt?: number;
   updatedBy?: string;
+  /** Approved values, or the proposal, of a record with a pending update; absent otherwise. */
+  rowRole?: TechnicalRowRole;
+  hasPendingChange?: boolean;
+  changeRequestId?: string;
+  changeRequestStatus?: 'Draft' | 'InReview' | 'Rejected';
+  changeOperation?: 'UPDATE' | 'DELETE';
+  changeCreatedBy?: string;
 }
 
 /** Filters that are reflected in the URL and sent to the server. */
@@ -89,3 +99,9 @@ export const NO_TECHNICAL_CAPABILITIES: TechnicalDictionaryCapabilities = {
   canImport: false,
   canExport: false,
 };
+
+/** What a bulk review did to one record that was on screen. */
+export interface TechnicalBulkResultItem {
+  row: TechnicalDictionaryRow;
+  outcome: TechnicalBulkReviewOutcome;
+}

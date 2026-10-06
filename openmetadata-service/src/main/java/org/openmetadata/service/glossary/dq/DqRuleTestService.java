@@ -189,7 +189,8 @@ public final class DqRuleTestService {
 
   private static Map<String, Object> pipelineRun(
       IngestionPipeline pipeline, PipelineStatus status, Map<String, String> specNames) {
-    final String specKey = pipeline.getName().substring(DqPipelineGateway.PIPELINE_NAME.length() + 1);
+    final String specKey =
+        pipeline.getName().substring(DqPipelineGateway.PIPELINE_NAME.length() + 1);
     final Map<String, Object> entry = new LinkedHashMap<>();
     entry.put("specKey", specKey);
     entry.put("specName", specNames.getOrDefault(specKey, specKey));
