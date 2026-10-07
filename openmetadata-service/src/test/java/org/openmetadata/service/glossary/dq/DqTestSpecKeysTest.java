@@ -32,6 +32,15 @@ class DqTestSpecKeysTest {
   }
 
   @Test
+  void aNewDeclarationKeepsItsSchedule() {
+    final DqTestSpec scheduled =
+        spec(null, "a").withScheduleCron("*/5 * * * *").withScheduleTimezone("Asia/Ho_Chi_Minh");
+    final DqTestSpec assigned = DqTestSpecKeys.assign(specs(scheduled), 1).getItems().get(0);
+    assertEquals("*/5 * * * *", assigned.getScheduleCron());
+    assertEquals("Asia/Ho_Chi_Minh", assigned.getScheduleTimezone());
+  }
+
+  @Test
   void keysAreNeverReusedAfterTheHighestWasIssued() {
     final DqTestSpecs assigned =
         DqTestSpecKeys.assign(specs(spec("t1", "a"), spec(null, "new")), 3);

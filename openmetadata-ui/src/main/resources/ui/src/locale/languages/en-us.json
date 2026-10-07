@@ -235,7 +235,17 @@
       "managed-by": "Managed by rule {{code}}",
       "managed-hint": "Edit the test declaration in Data Quality; this test case cannot be edited or deleted here.",
       "messages": {
-        "regex-match": "Found {{matched}} value(s) matching the regex pattern out of {{total}} value(s) in the column."
+        "and": "and",
+        "column": "column",
+        "diff-rows": "Found {{count}} different rows.",
+        "diff-rows-over": "Found {{count}} different rows, which is more than the threshold of {{threshold}}.",
+        "dimension": "Dimension {{name}}={{value}}: {{message}}",
+        "expected": "Found {{found}} vs. the expected {{expected}}.",
+        "forbidden-regex": "Found {{count}} value(s) matching the forbidden regex pattern.",
+        "query-rows": "Found {{count}} row(s). The test query is expected to return {{operator}} {{threshold}} row(s).",
+        "regex-match": "Found {{matched}} value(s) matching the regex pattern out of {{total}} value(s) in the column.",
+        "should-be-zero": "Found {{metric}}={{value}}. It should be 0.",
+        "unique": "Found {{found}} vs. {{other}}. Both counts should be equal for the column values to be unique."
       },
       "name": "Test name",
       "name-duplicate": "A test with this name already exists in the rule.",

@@ -49,7 +49,6 @@ const DQManagedBadge = ({
     <Alert
       showIcon
       data-testid="dq-managed-badge"
-      description={t('dq.test.managed-hint')}
       message={
         <>
           {t('dq.test.managed-by', { code: managed.ruleCode })} ·{' '}

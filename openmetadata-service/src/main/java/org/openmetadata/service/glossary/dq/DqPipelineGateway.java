@@ -85,7 +85,7 @@ public final class DqPipelineGateway {
     if (pipeline == null) {
       pipeline = createPipeline(suite, specKey, testCaseNames, cron);
     } else if (!sameSchedule(pipeline, cron) || !sameTestCases(pipeline, testCaseNames)) {
-      pipeline = updatePipeline(pipeline, testCaseNames, cron);
+      pipeline = updatePipeline(pipeline, suite, testCaseNames, cron);
     }
     return pipeline;
   }
@@ -256,7 +256,9 @@ public final class DqPipelineGateway {
   }
 
   private static IngestionPipeline updatePipeline(
-      IngestionPipeline pipeline, List<String> testCaseNames, String cron) {
+      IngestionPipeline pipeline, TestSuite suite, List<String> testCaseNames, String cron) {
+    // The service is a relationship, so a pipeline read without fields has none to validate
+    pipeline.setService(suite.getEntityReference());
     final TestSuitePipeline config = testSuiteConfig(pipeline);
     config.setTestCases(testCaseNames);
     pipeline.getSourceConfig().setConfig(config);

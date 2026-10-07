@@ -235,7 +235,17 @@
       "managed-by": "Quản lý bởi quy tắc {{code}}",
       "managed-hint": "Hãy sửa khai báo kiểm thử trong Chất lượng dữ liệu; không sửa hoặc xóa được testcase này tại đây.",
       "messages": {
-        "regex-match": "Có {{matched}} giá trị khớp biểu thức chính quy trên tổng {{total}} giá trị của cột."
+        "and": "và",
+        "column": "cột",
+        "diff-rows": "Có {{count}} dòng khác biệt.",
+        "diff-rows-over": "Có {{count}} dòng khác biệt, vượt ngưỡng {{threshold}}.",
+        "dimension": "Chiều {{name}}={{value}}: {{message}}",
+        "expected": "Ghi nhận {{found}}, kỳ vọng {{expected}}.",
+        "forbidden-regex": "Có {{count}} giá trị khớp biểu thức chính quy bị cấm.",
+        "query-rows": "Truy vấn trả về {{count}} dòng, kỳ vọng {{operator}} {{threshold}} dòng.",
+        "regex-match": "Có {{matched}} giá trị khớp biểu thức chính quy trên tổng {{total}} giá trị của cột.",
+        "should-be-zero": "Ghi nhận {{metric}}={{value}}, kỳ vọng bằng 0.",
+        "unique": "Ghi nhận {{found}} so với {{other}}; hai số này phải bằng nhau để các giá trị trong cột là duy nhất."
       },
       "name": "Tên kiểm thử",
       "name-duplicate": "Tên kiểm thử đã tồn tại trong quy tắc.",

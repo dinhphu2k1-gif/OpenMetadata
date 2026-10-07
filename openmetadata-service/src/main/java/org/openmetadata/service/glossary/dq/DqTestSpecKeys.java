@@ -99,7 +99,9 @@ public final class DqTestSpecKeys {
         .withSqlExpression(spec.getSqlExpression())
         .withParameterValues(spec.getParameterValues())
         .withComputePassedFailedRowCount(spec.getComputePassedFailedRowCount())
-        .withThreshold(spec.getThreshold());
+        .withThreshold(spec.getThreshold())
+        .withScheduleCron(spec.getScheduleCron())
+        .withScheduleTimezone(spec.getScheduleTimezone());
   }
 
   static int numberOf(String key) {
