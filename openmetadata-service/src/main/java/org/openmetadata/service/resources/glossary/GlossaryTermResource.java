@@ -444,7 +444,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Path("/bulk/{action}")
   @Operation(
       operationId = "bulkGovernedWorkflow",
-      summary = "Submit, approve or reject working records selected by ids or filters")
+      summary = "Submit, approve, reject or withdraw working records selected by ids or filters")
   public Map<String, Object> bulkWorkflow(
       @Context SecurityContext securityContext,
       @PathParam("action") String action,
@@ -534,14 +534,32 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           working ->
               GlossaryAuthorizationResolver.requireReject(
                   capabilitiesForWorking(securityContext, working)));
-      case APPROVE -> versioningService.publish(
-          GlossaryVersioningService.GLOSSARY_TERM,
-          termId,
-          scope,
-          revision,
-          actor,
-          working -> authorizeAndValidateApprove(securityContext, working),
-          null);
+      case WITHDRAW -> versioningService.withdraw(
+          GlossaryVersioningService.GLOSSARY_TERM, termId, scope, revision, actor);
+      case APPROVE -> {
+        if (EntityStatus.DRAFT.value().equals(row.get("entityStatus"))
+            && Boolean.parseBoolean(String.valueOf(row.get("pendingDeletion")))) {
+          WorkingVersionRecord submitted =
+              versioningService.transition(
+                  GlossaryVersioningService.GLOSSARY_TERM,
+                  termId,
+                  scope,
+                  revision,
+                  EntityStatus.DRAFT,
+                  EntityStatus.IN_REVIEW,
+                  actor,
+                  working -> authorizeAndValidateApprove(securityContext, working));
+          revision = submitted.revision();
+        }
+        versioningService.publish(
+            GlossaryVersioningService.GLOSSARY_TERM,
+            termId,
+            scope,
+            revision,
+            actor,
+            working -> authorizeAndValidateApprove(securityContext, working),
+            null);
+      }
     }
   }
 
@@ -730,6 +748,33 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   }
 
   @POST
+  @Path("/{id}/working/withdraw")
+  @Operation(
+      operationId = "withdrawGlossaryTermWorkingVersion",
+      summary = "Withdraw an In Review glossary term request",
+      description =
+          "Only the submitter can withdraw. A deletion request is discarded; any other request"
+              + " returns to Draft.")
+  public Map<String, Object> withdrawWorkingVersion(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
+      @NotNull @Valid CdeWorkflowTransitionRequest request) {
+    versionEntity(uriInfo, securityContext, id);
+    WorkingVersionRecord withdrawn =
+        versioningService.withdraw(
+            GlossaryVersioningService.GLOSSARY_TERM,
+            id,
+            parentBusinessVersion,
+            request.getExpectedRevision(),
+            securityContext.getUserPrincipal().getName());
+    return withdrawn == null
+        ? Map.of("withdrawn", true, "discarded", true)
+        : GlossaryVersionResponses.working(withdrawn);
+  }
+
+  @POST
   @Path("/{id}/working/reopen")
   @Operation(
       operationId = "reopenGlossaryTermWorkingVersion",
@@ -873,10 +918,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Path("/{id}/working/deletion")
   @Operation(
       operationId = "requestGlossaryTermDeletion",
-      summary = "Open a Draft that proposes deleting an Approved CDE",
+      summary = "Submit a request to delete an Approved CDE",
       description =
-          "The Approved CDE stays effective until the Draft is submitted and approved. Approving it"
-              + " archives the CDE in its Data Dictionary scope; the Approved history is kept.")
+          "The Approved CDE stays effective until the request is approved. Approving it archives"
+              + " the CDE in its Data Dictionary scope; the Approved history is kept.")
   public Map<String, Object> requestDeletion(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
@@ -892,8 +937,10 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             securityContext.getUserPrincipal().getName(),
             snapshot -> {
               final GlossaryTerm published = publishedTerm(snapshot);
-              GlossaryAuthorizationResolver.requireCreateVersion(
-                  capabilitiesForAuthorizationTerm(securityContext, published));
+              final GlossaryAuthorizationResolver.Capabilities capabilities =
+                  capabilitiesForAuthorizationTerm(securityContext, published);
+              GlossaryAuthorizationResolver.requireCreateVersion(capabilities);
+              GlossaryAuthorizationResolver.requireSubmit(capabilities);
               CdeDeletionGuard.requireNoDependents(published, parentBusinessVersion);
             });
     final Map<String, Object> response = GlossaryVersionResponses.working(working);
@@ -1532,6 +1579,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           sortOrder,
           limitParam,
           offsetParam,
+          include,
           includeDeleted);
     }
 
@@ -1624,10 +1672,23 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String sortOrder,
       int limit,
       int offset,
+      Include include,
       boolean includeDeleted) {
+    boolean shouldLoadDeleted =
+        includeDeleted || include == Include.DELETED || include == Include.ALL;
     AuthorizedFlatRows authorized =
         loadAuthorizedGlossaryFlatRows(
-            securityContext, glossaryId.toString(), parentBusinessVersion, null, includeDeleted);
+            securityContext, glossaryId.toString(), parentBusinessVersion, null, shouldLoadDeleted);
+    List<Map<String, Object>> rows = authorized.rows();
+    if (!includeDeleted && include != Include.ALL) {
+      boolean deletedOnly = include == Include.DELETED;
+      rows =
+          rows.stream()
+              .filter(
+                  row ->
+                      deletedOnly == RECORD_DELETED.equals(String.valueOf(row.get("recordType"))))
+              .toList();
+    }
     Criteria criteria =
         new Criteria(
             glossaryId,
@@ -1649,10 +1710,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       throw new BadRequestException("Archived status is only valid for an archived scope");
     }
     return glossarySearchService.search(
-        validated,
-        authorized.rows(),
-        authorized.consumerOnly(),
-        authorized.scopeType() == ScopeType.ARCHIVED);
+        validated, rows, authorized.consumerOnly(), authorized.scopeType() == ScopeType.ARCHIVED);
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
@@ -2400,8 +2458,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         parentBusinessVersion, scope.type(), consumerOnly, profile, visibleRows);
   }
 
-  private static boolean isDataDictionaryProfile(
-      GovernedGlossaryProfileRegistry.Profile profile) {
+  private static boolean isDataDictionaryProfile(GovernedGlossaryProfileRegistry.Profile profile) {
     return profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY;
   }
 

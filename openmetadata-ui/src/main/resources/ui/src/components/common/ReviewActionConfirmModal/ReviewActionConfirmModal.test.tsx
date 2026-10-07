@@ -63,6 +63,11 @@ describe('ReviewActionConfirmModal', () => {
       'message.review-confirm-approve',
     ],
     ['reject', 'label.review-confirm-reject', 'message.review-confirm-reject'],
+    [
+      'withdraw',
+      'label.review-confirm-withdraw',
+      'message.review-confirm-withdraw',
+    ],
   ] as const)('titles and asks for %s', (action, title, question) => {
     renderModal({ action });
 

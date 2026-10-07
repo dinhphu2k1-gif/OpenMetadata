@@ -13,13 +13,16 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { AxiosError } from 'axios';
 import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useParams } from 'react-router-dom';
 import { CustomizeEntityType } from '../../../constants/Customize.constants';
 import { EntityTabs, EntityType } from '../../../enums/entity.enum';
 import { ThreadType } from '../../../generated/entity/feed/thread';
 import { PageType } from '../../../generated/system/ui/page';
 import { postThread } from '../../../rest/feedsAPI';
-import { updateWidgetHeightRecursively } from '../../../utils/CustomizePage/CustomizePageWidgetUtils';
+import {
+  getLayoutFromCustomizedPage,
+  updateWidgetHeightRecursively,
+} from '../../../utils/CustomizePage/CustomizePageWidgetUtils';
 import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import ActivityThreadPanel from '../../ActivityFeed/ActivityThreadPanel/ActivityThreadPanel';
 import { GenericProvider, useGenericContext } from './GenericProvider';
@@ -286,6 +289,29 @@ describe('GenericProvider', () => {
 
     expect(screen.getByTestId('context-data')).toHaveTextContent(
       JSON.stringify(updatedData)
+    );
+  });
+
+  it('keeps the terms layout while the glossary pending requests tab is active', () => {
+    (useParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.PENDING_REQUESTS,
+    });
+
+    render(
+      <MemoryRouter>
+        <GenericProvider
+          {...defaultProps}
+          type={EntityType.GLOSSARY as CustomizeEntityType}>
+          <TestComponent />
+        </GenericProvider>
+      </MemoryRouter>
+    );
+
+    expect(getLayoutFromCustomizedPage).toHaveBeenCalledWith(
+      PageType.Glossary,
+      EntityTabs.TERMS,
+      undefined,
+      undefined
     );
   });
 });

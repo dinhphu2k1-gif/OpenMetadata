@@ -32,6 +32,11 @@ jest.mock('@openmetadata/ui-core-components', () => ({
 }));
 
 jest.mock('../../../../rest/glossaryAPI', () => ({
+  getGlossaryTermWorkingVersion: jest.fn().mockImplementation((id: string) =>
+    Promise.resolve({
+      workingRevision: id === 'term-1' ? 1.1 : 1.2,
+    })
+  ),
   transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
 }));
 
@@ -68,6 +73,7 @@ describe('GlossaryBulkActionModal', () => {
       name: 'CDE001',
       displayName: 'Mã khách hàng',
       fullyQualifiedName: 'Glossary.CDE001',
+      parentBusinessVersion: '2.0',
       entityStatus: EntityStatus.Draft,
       version: 1.1,
     } as ModifiedGlossaryTerm,
@@ -76,6 +82,7 @@ describe('GlossaryBulkActionModal', () => {
       name: 'CDE002',
       displayName: 'Số tài khoản',
       fullyQualifiedName: 'Glossary.CDE002',
+      parentBusinessVersion: '2.0',
       entityStatus: EntityStatus.Draft,
       version: 1.2,
     } as ModifiedGlossaryTerm,
@@ -115,16 +122,18 @@ describe('GlossaryBulkActionModal', () => {
         'submit',
         {
           expectedRevision: 1.1,
-        }
+        },
+        '2.0'
       );
       expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
         'term-2',
         'submit',
         {
           expectedRevision: 1.2,
-        }
+        },
+        '2.0'
       );
-      expect(mockOnSuccess).toHaveBeenCalled();
+      expect(mockOnSuccess).toHaveBeenCalledWith(2);
     });
   });
 
@@ -154,7 +163,8 @@ describe('GlossaryBulkActionModal', () => {
         'approve',
         {
           expectedRevision: 1.1,
-        }
+        },
+        '2.0'
       );
       expect(mockOnSuccess).toHaveBeenCalled();
     });
@@ -186,7 +196,8 @@ describe('GlossaryBulkActionModal', () => {
         'reject',
         {
           expectedRevision: 1.1,
-        }
+        },
+        '2.0'
       );
       expect(mockOnSuccess).toHaveBeenCalled();
     });

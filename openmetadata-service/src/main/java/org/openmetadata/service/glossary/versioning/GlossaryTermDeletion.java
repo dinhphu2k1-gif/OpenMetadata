@@ -22,11 +22,10 @@ import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
  * Deletes an Approved Data Dictionary CDE through the approval workflow.
  *
  * <p>A deletion working row is marked {@code pendingDeletion}, carries the businessVersion of the
- * newest Approved snapshot of the CDE in its scope and travels the normal Draft, In Review and
- * Approved workflow. Until it is approved the Approved CDE stays effective. Approving it archives
- * every Approved snapshot of the CDE in the scope and drops its published head, the same state a
- * Data Dictionary cutover leaves behind: the CDE leaves the active list while its Approved history
- * is kept.
+ * newest Approved snapshot of the CDE in its scope and is submitted for review immediately. Until
+ * it is approved the Approved CDE stays effective. Approving it archives every Approved snapshot
+ * of the CDE in the scope and drops its published head, the same state a Data Dictionary cutover
+ * leaves behind: the CDE leaves the active list while its Approved history is kept.
  */
 final class GlossaryTermDeletion {
   static final String PENDING_DELETION = "pendingDeletion";
@@ -53,6 +52,7 @@ final class GlossaryTermDeletion {
     if (dao.lockWorking(GLOSSARY_TERM, request.entityId(), scope) != null) {
       throw GlossaryVersioningService.conflict("A working version already exists");
     }
+    final long now = System.currentTimeMillis();
     dao.insertWorking(
         UUID.randomUUID(),
         GLOSSARY_TERM,
@@ -63,8 +63,20 @@ final class GlossaryTermDeletion {
         EntityStatus.DRAFT.value(),
         latest.nativeVersion(),
         JsonUtils.pojoToJson(deletionDraftPayload(latest, scope)),
-        System.currentTimeMillis(),
+        now,
         request.actor());
+    GlossaryVersioningService.requireUpdated(
+        dao.transitionWorking(
+            GLOSSARY_TERM,
+            request.entityId(),
+            scope,
+            1,
+            EntityStatus.DRAFT.value(),
+            EntityStatus.IN_REVIEW.value(),
+            EntityStatus.IN_REVIEW.value(),
+            EntityStatus.REJECTED.value(),
+            now,
+            request.actor()));
     return dao.findWorking(GLOSSARY_TERM, request.entityId(), scope);
   }
 

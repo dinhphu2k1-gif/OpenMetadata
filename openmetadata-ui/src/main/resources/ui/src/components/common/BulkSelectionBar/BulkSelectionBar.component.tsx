@@ -10,7 +10,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { CheckOutlined, CloseOutlined, SendOutlined } from '@ant-design/icons';
+import {
+  CheckOutlined,
+  CloseOutlined,
+  SendOutlined,
+  UndoOutlined,
+} from '@ant-design/icons';
 import { Button } from '@openmetadata/ui-core-components';
 import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,21 +32,31 @@ const CHIP_LABEL_KEYS: Record<BulkSelectionTone, string> = {
   'in-review': 'label.bulk-chip-in-review',
   rejected: 'label.bulk-chip-rejected',
   approved: 'label.bulk-chip-approved',
+  create: 'label.request-type-create',
+  update: 'label.request-type-update',
+  delete: 'label.request-type-delete',
 };
 
 const ACTION_LABEL_KEYS: Record<BulkSelectionActionType, string> = {
   submit: 'label.bulk-action-submit',
   approve: 'label.bulk-action-approve',
   reject: 'label.bulk-action-reject',
+  withdraw: 'label.bulk-action-withdraw',
 };
 
 const ACTION_ICONS: Record<BulkSelectionActionType, ReactNode> = {
   submit: <SendOutlined />,
   approve: <CheckOutlined />,
   reject: <CloseOutlined />,
+  withdraw: <UndoOutlined />,
 };
 
-const ACTION_ORDER: BulkSelectionActionType[] = ['submit', 'reject', 'approve'];
+const ACTION_ORDER: BulkSelectionActionType[] = [
+  'submit',
+  'withdraw',
+  'reject',
+  'approve',
+];
 
 /** Approve is the main action; submit takes over only when nothing can be approved. */
 const buttonColor = (
@@ -51,7 +66,7 @@ const buttonColor = (
   let color: 'primary' | 'secondary' | 'secondary-destructive' = 'primary';
   if (type === 'reject') {
     color = 'secondary-destructive';
-  } else if (type === 'submit' && hasApprove) {
+  } else if (type === 'withdraw' || (type === 'submit' && hasApprove)) {
     color = 'secondary';
   }
 
@@ -93,7 +108,7 @@ const BulkSelectionBar = ({
           data-testid={chip.testId}
           key={chip.tone}>
           <span className="bulk-selection-chip-dot" />
-          {t(CHIP_LABEL_KEYS[chip.tone], { count: chip.count })}
+          {chip.label ?? t(CHIP_LABEL_KEYS[chip.tone], { count: chip.count })}
         </span>
       ))}
       <button

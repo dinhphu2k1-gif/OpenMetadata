@@ -34,6 +34,7 @@ import { GlossaryTerm } from '../generated/entity/data/glossaryTerm';
 import { BulkOperationResult } from '../generated/type/bulkOperationResult';
 import { ChangeEvent } from '../generated/type/changeEvent';
 import { EntityHistory } from '../generated/type/entityHistory';
+import { Include } from '../generated/type/include';
 import { ListParams, ListParamsWithOffset } from '../interface/API.interface';
 import { getEncodedFqn } from '../utils/StringUtils';
 import {
@@ -62,6 +63,7 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
   ownerIds?: string;
   dataSourceTags?: string;
   classificationTags?: string;
+  include?: Include;
   includeDeleted?: boolean;
   sortField?: 'name' | 'displayName' | 'businessVersion' | 'entityStatus';
   sortOrder?: 'asc' | 'desc';
@@ -93,7 +95,8 @@ export type GlossaryWorkflowAction =
   | 'submit'
   | 'approve'
   | 'reject'
-  | 'reopen';
+  | 'reopen'
+  | 'withdraw';
 
 export interface GlossaryDraftPayload {
   description: string;
@@ -530,6 +533,71 @@ export const requestGlossaryTermDeletion = async (
   return response.data;
 };
 
+/** Working records of one glossary version, filtered by status, with offset pagination. */
+export const getGlossaryWorkingRecords = async (params: {
+  glossaryId: string;
+  parentBusinessVersion: string;
+  statuses: string[];
+  q?: string;
+  limit: 10 | 15 | 25 | 50;
+  offset: number;
+}) => {
+  const { parentBusinessVersion, statuses, ...rest } = params;
+  const response = await APIClient.get<{
+    data: Array<GlossaryTerm & { termId?: string; recordType?: string }>;
+    paging: { total: number; limit: number; offset: number };
+  }>('/glossaryTerms/search', {
+    params: {
+      ...rest,
+      glossary: params.glossaryId,
+      glossaryId: undefined,
+      statuses: statuses.join(','),
+      parentBusinessVersion:
+        normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+        parentBusinessVersion,
+    },
+  });
+
+  return response.data;
+};
+
+export interface GlossaryBulkWorkflowFailure {
+  termId?: string;
+  code?: string;
+  message?: string;
+}
+
+export interface GlossaryBulkWorkflowResult {
+  eligible: number;
+  succeeded: number;
+  failedCount: number;
+  failures: GlossaryBulkWorkflowFailure[];
+  remaining: number;
+}
+
+/** Applies one workflow action to the working records of the given terms, one chunk per call. */
+export const bulkGlossaryTermWorkflow = async (
+  action: Exclude<GlossaryWorkflowAction, 'createDraft' | 'reopen'>,
+  request: {
+    glossaryId: string;
+    parentBusinessVersion: string;
+    termIds: string[];
+    offset?: number;
+  }
+) => {
+  const response = await APIClient.post<
+    typeof request,
+    AxiosResponse<GlossaryBulkWorkflowResult>
+  >(`/glossaryTerms/bulk/${action}`, {
+    ...request,
+    parentBusinessVersion:
+      normalizeCdeParentBusinessVersion(request.parentBusinessVersion) ??
+      request.parentBusinessVersion,
+  });
+
+  return response.data;
+};
+
 export interface GlossaryTermCorrectionHistoryEntry extends GlossaryTerm {
   historyId: string;
   snapshotId: string;
@@ -612,13 +680,16 @@ export const getGlossaryTermVersionPermissions = async (id: string) => {
 
 export async function transitionGlossaryTermWorkflow(
   id: string,
-  action: 'submit' | 'reject' | 'reopen',
+  action: 'submit' | 'reject' | 'reopen' | 'withdraw',
   request: CdeWorkflowTransitionRequest,
   parentBusinessVersion?: string
 ): Promise<GlossaryTerm>;
 export async function transitionGlossaryTermWorkflow(
   id: string,
-  action: Exclude<GlossaryWorkflowAction, 'submit' | 'reject' | 'reopen'>,
+  action: Exclude<
+    GlossaryWorkflowAction,
+    'submit' | 'reject' | 'reopen' | 'withdraw'
+  >,
   request: GlossaryWorkflowRequest,
   parentBusinessVersion?: string
 ): Promise<GlossaryTerm>;
@@ -784,6 +855,28 @@ export const getGlossaryTermsVersionsList = async (
   const versions = snapshots.map((snapshot) => JSON.stringify(snapshot));
 
   return { entityType: 'glossaryTerm', versions } as EntityHistory;
+};
+
+/** Current published snapshot of a term in one governed glossary version. */
+export const getCurrentPublishedGlossaryTerm = async (
+  id: string,
+  parentBusinessVersion: string
+): Promise<GlossaryTerm | undefined> => {
+  const response = await APIClient.get<
+    GlossaryTerm | GlossaryTerm[] | { data?: GlossaryTerm[] }
+  >(`/glossaryTerms/${id}/published`, { params: { parentBusinessVersion } });
+  const body = response.data;
+  const envelope = body as { data?: GlossaryTerm[] };
+  if (!Array.isArray(body) && !Array.isArray(envelope.data)) {
+    return body as GlossaryTerm;
+  }
+  const snapshots = Array.isArray(body) ? body : envelope.data ?? [];
+
+  return [...snapshots].sort(
+    (left, right) =>
+      (right.publicationSequence ?? right.publishedAt ?? 0) -
+      (left.publicationSequence ?? left.publishedAt ?? 0)
+  )[0];
 };
 
 export const getGlossaryTermsVersion = async (

@@ -1,0 +1,370 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+@import (reference) '../../../styles/variables.less';
+
+@pending-create-color: #17b26a;
+@pending-update-color: #2e90fa;
+@pending-delete-color: #f04438;
+
+.pending-requests-tab {
+  .dictionary-table-toolbar {
+    .custom-column-dropdown-menu {
+      margin-left: auto;
+    }
+  }
+
+  .dictionary-table-container .ant-table-content {
+    overflow-x: auto;
+  }
+
+  .dictionary-table-container .ant-table-tbody > tr.ant-table-row > td {
+    vertical-align: middle;
+  }
+
+  .dictionary-table-container .ant-table-tbody > tr.pending-requests-expanded-row {
+    > td.ant-table-cell {
+      padding: 12px 24px 16px 40px;
+      border-left: 3px solid @grey-300;
+      background: #f9fafb;
+    }
+
+    // Overrides the pink row hover of the glossary table, which also reaches the detail row.
+    &:hover > td.ant-table-cell {
+      background: #f9fafb !important;
+    }
+
+    &--create > td.ant-table-cell {
+      border-left-color: @pending-create-color;
+    }
+
+    &--update > td.ant-table-cell {
+      border-left-color: @pending-update-color;
+    }
+
+    &--delete > td.ant-table-cell {
+      border-left-color: @pending-delete-color;
+    }
+  }
+
+  .dictionary-table-container .ant-table-tbody > tr.pending-requests-row--expanded {
+    > td {
+      border-bottom: 0;
+      background: #f9fafb;
+    }
+
+    // The glossary table paints hovered rows pink with !important.
+    &:hover > td {
+      background: #f9fafb !important;
+    }
+
+    > td:first-child {
+      border-left: 3px solid @grey-300;
+    }
+
+    &.pending-requests-row--create > td:first-child {
+      border-left-color: @pending-create-color;
+    }
+
+    &.pending-requests-row--update > td:first-child {
+      border-left-color: @pending-update-color;
+    }
+
+    &.pending-requests-row--delete > td:first-child {
+      border-left-color: @pending-delete-color;
+    }
+  }
+
+  .pending-requests-expand-icon {
+    cursor: pointer;
+  }
+
+  .pending-requests-readonly-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid #fedf89;
+    border-radius: 8px;
+    background: #fffaeb;
+    color: #93370d;
+
+    .anticon {
+      color: #dc6803;
+      font-size: 16px;
+    }
+  }
+
+  .pending-requests-row-expandable {
+    cursor: pointer;
+  }
+
+  .pending-requests-code {
+    color: #101828;
+    font-weight: 600;
+  }
+
+  a.pending-requests-code:hover {
+    color: @primary-color;
+  }
+
+  .pending-requests-segmented {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 8px;
+    background: #f2f4f7;
+    flex-shrink: 0;
+  }
+
+  .pending-requests-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 4px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #475467;
+    cursor: pointer;
+
+    &.active {
+      background: @white;
+      color: #101828;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
+
+      .pending-requests-type-count {
+        color: @primary-color;
+      }
+    }
+  }
+
+  .pending-requests-type-count {
+    font-weight: 600;
+
+    &.is-zero {
+      color: #98a2b3;
+      font-weight: 400;
+    }
+  }
+
+  .pending-requests-type-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+
+    &--create {
+      background: @pending-create-color;
+    }
+
+    &--update {
+      background: @pending-update-color;
+    }
+
+    &--delete {
+      background: @pending-delete-color;
+    }
+  }
+
+  .pending-requests-badges,
+  .pending-requests-change-chips,
+  .pending-requests-confirm-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .pending-requests-change-chip {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f2f4f7;
+    color: #475467;
+    font-size: 12px;
+    line-height: 20px;
+  }
+
+  // rc-table only wraps the detail row in a sticky box when a column is fixed.
+  .pending-requests-detail {
+    position: sticky;
+    left: 0;
+    max-width: 960px;
+  }
+
+  .pending-requests-detail__summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: @text-color;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .pending-requests-detail__warning-icon {
+    color: @pending-delete-color;
+  }
+
+  .pending-requests-detail-loading {
+    padding: 18px;
+    text-align: center;
+  }
+
+  .pending-requests-diffs {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pending-requests-diff {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eaecf0;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &--two-columns {
+      grid-template-columns: 200px minmax(0, 1fr);
+    }
+
+    &--head {
+      padding-top: 0;
+      padding-bottom: 6px;
+      color: #667085;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+  }
+
+  .pending-requests-detail-label {
+    color: #667085;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pending-requests-field-value {
+    color: #101828;
+    line-height: 20px;
+  }
+
+  .pending-requests-old-value {
+    color: @text-color-tertiary;
+    text-decoration: line-through;
+  }
+
+  .pending-requests-new-value {
+    padding-left: 10px;
+    border-left: 2px solid @green-17;
+    color: @text-color;
+  }
+
+  .pending-requests-detail__empty {
+    color: #98a2b3;
+    font-style: italic;
+    text-decoration: none;
+  }
+
+  .pending-requests-detail__empty-summary {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+}
+
+.pending-requests-confirm-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #fecdca;
+  border-radius: 6px;
+  background: #fef3f2;
+  color: #b42318;
+
+  ul {
+    margin: 8px 0 0;
+    padding-left: 20px;
+  }
+}
+
+.pending-requests-confirm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  .bulk-selection-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+
+    .bulk-selection-chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    &--create {
+      background: #ecfdf3;
+      color: #067647;
+
+      .bulk-selection-chip-dot {
+        background: #17b26a;
+      }
+    }
+
+    &--update {
+      background: #eff8ff;
+      color: #175cd3;
+
+      .bulk-selection-chip-dot {
+        background: #2e90fa;
+      }
+    }
+
+    &--delete {
+      background: #fef3f2;
+      color: #b42318;
+
+      .bulk-selection-chip-dot {
+        background: #f04438;
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .pending-requests-tab {
+    .pending-requests-diff {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .pending-requests-diff--head {
+      display: none;
+    }
+
+    .pending-requests-old-value::before,
+    .pending-requests-new-value::before {
+      content: attr(data-label) ': ';
+      color: #667085;
+      font-style: normal;
+      text-decoration: none;
+    }
+  }
+}

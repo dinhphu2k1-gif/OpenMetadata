@@ -21,10 +21,13 @@ import {
 } from '../../../mocks/Glossary.mock';
 import { getGlossaryTermDetailsPath } from '../../../utils/RouterUtils';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import { getGlossaryVersionPermissions } from '../../../rest/glossaryAPI';
+import type { GlossaryPendingRequestsProps } from '../GlossaryPendingRequests/GlossaryPendingRequests.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import GlossaryDetails from './GlossaryDetails.component';
 
 const mockNavigate = jest.fn();
+const mockGlossaryPendingRequests = jest.fn();
 
 jest.mock('../GlossaryTermTab/GlossaryTermTab.component', () => {
   return jest.fn().mockReturnValue(<p>GlossaryTermTab.component</p>);
@@ -43,6 +46,23 @@ jest.mock('react-router-dom', () => ({
     tab: 'terms',
   })),
   useNavigate: jest.fn().mockImplementation(() => mockNavigate),
+  useLocation: jest.fn().mockImplementation(() => ({ pathname: '/', search: '' })),
+}));
+
+jest.mock(
+  '../GlossaryPendingRequests/GlossaryPendingRequests.component',
+  () => ({
+    __esModule: true,
+    default: (props: GlossaryPendingRequestsProps) => {
+      mockGlossaryPendingRequests(props);
+
+      return <p>testPendingRequests</p>;
+    },
+  })
+);
+
+jest.mock('../../../rest/glossaryAPI', () => ({
+  getGlossaryVersionPermissions: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../../../utils/useRequiredParams', () => ({
@@ -88,6 +108,9 @@ const mockProps = {
 
 jest.mock('../../Customization/GenericProvider/GenericProvider', () => {
   return {
+    GenericProvider: ({ children }: { children: React.ReactNode }) => (
+      <div>{children}</div>
+    ),
     useGenericContext: jest.fn().mockImplementation(() => ({
       permissions: MOCK_PERMISSIONS,
     })),
@@ -108,7 +131,12 @@ jest.mock('../../../utils/CustomizePage/CustomizePageEntityTabUtils', () => ({
 describe('Test Glossary-details component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    useGlossaryStore.setState({ activeGlossary: mockedGlossaries[0] });
+    useGlossaryStore.setState({
+      activeGlossary: mockedGlossaries[0],
+      termsRefreshVersion: 0,
+      pendingRequestsRefreshVersion: 0,
+      visibleGlossaryTermsCount: undefined,
+    });
     (useRequiredParams as jest.Mock).mockReturnValue({
       tab: EntityTabs.TERMS,
     });
@@ -143,6 +171,95 @@ describe('Test Glossary-details component', () => {
         { replace: true }
       )
     );
+  });
+
+  it('refreshes terms only after a successful approval', async () => {
+    (getGlossaryVersionPermissions as jest.Mock).mockResolvedValueOnce({
+      canApprove: true,
+      canViewWorking: true,
+      isConsumer: false,
+    });
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.PENDING_REQUESTS,
+    });
+    useGlossaryStore.setState({
+      activeGlossary: {
+        ...mockedGlossaries[0],
+        name: 'Data Dictionary',
+        displayName: 'Data Dictionary',
+        fullyQualifiedName: 'Data Dictionary',
+        businessVersion: '2.0',
+      },
+    });
+
+    render(<GlossaryDetails {...mockProps} />);
+
+    await waitFor(() => expect(mockGlossaryPendingRequests).toHaveBeenCalled());
+
+    expect(screen.getByText('GenericTab')).toBeInTheDocument();
+    expect(screen.getByTestId('loading-skeleton')).toBeInTheDocument();
+
+    const getOnDecided = () =>
+      mockGlossaryPendingRequests.mock.calls.at(-1)?.[0]
+        .onDecided as GlossaryPendingRequestsProps['onDecided'];
+
+    act(() => {
+      getOnDecided()?.({ succeeded: 1, failures: [] }, 'reject');
+    });
+
+    expect(useGlossaryStore.getState().termsRefreshVersion).toBe(0);
+
+    act(() => {
+      getOnDecided()?.({ succeeded: 0, failures: [] }, 'approve');
+    });
+
+    expect(useGlossaryStore.getState().termsRefreshVersion).toBe(0);
+
+    act(() => {
+      getOnDecided()?.({ succeeded: 1, failures: [] }, 'approve');
+    });
+
+    expect(useGlossaryStore.getState().termsRefreshVersion).toBe(1);
+  });
+
+  it('propagates a request-creation refresh without refreshing terms', async () => {
+    (getGlossaryVersionPermissions as jest.Mock).mockResolvedValueOnce({
+      canApprove: true,
+      canViewWorking: true,
+      isConsumer: false,
+    });
+    (useRequiredParams as jest.Mock).mockReturnValue({
+      tab: EntityTabs.PENDING_REQUESTS,
+    });
+    useGlossaryStore.setState({
+      activeGlossary: {
+        ...mockedGlossaries[0],
+        name: 'Data Dictionary',
+        displayName: 'Data Dictionary',
+        fullyQualifiedName: 'Data Dictionary',
+        businessVersion: '2.0',
+      },
+    });
+
+    render(<GlossaryDetails {...mockProps} />);
+
+    await waitFor(() => expect(mockGlossaryPendingRequests).toHaveBeenCalled());
+
+    expect(mockGlossaryPendingRequests.mock.calls.at(-1)?.[0].refreshKey).toBe(
+      0
+    );
+
+    act(() => {
+      useGlossaryStore.getState().requestPendingRequestsRefresh();
+    });
+
+    await waitFor(() =>
+      expect(
+        mockGlossaryPendingRequests.mock.calls.at(-1)?.[0].refreshKey
+      ).toBe(1)
+    );
+
+    expect(useGlossaryStore.getState().termsRefreshVersion).toBe(0);
   });
 
   it('should show the action opposite to the glossary information state', async () => {

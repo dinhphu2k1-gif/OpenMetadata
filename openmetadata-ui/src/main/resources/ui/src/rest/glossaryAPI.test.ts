@@ -3,6 +3,7 @@
  *  Licensed under the Apache License, Version 2.0 (the "License");
  */
 import APIClient from './index';
+import { Include } from '../generated/type/include';
 import {
   addGlossaryTerm,
   commitCdeImport,
@@ -150,6 +151,7 @@ describe('F14 CDE import API', () => {
   it('downloads the dedicated XLSX template as a blob', async () => {
     client.get.mockResolvedValue({ data: new Blob(['xlsx']) });
     await downloadCdeImportTemplate();
+
     expect(client.get).toHaveBeenCalledWith('/glossaryTerms/import/template', {
       responseType: 'blob',
     });
@@ -159,6 +161,7 @@ describe('F14 CDE import API', () => {
     client.post.mockResolvedValue({ data: { importSessionId: 'session-id' } });
     const file = new File(['xlsx'], 'cde.xlsx');
     await previewCdeImport('glossary-id', '2', 'SKIP_EXISTING', file);
+
     expect(client.post).toHaveBeenCalledWith(
       '/glossaryTerms/import/preview',
       expect.any(FormData),
@@ -175,6 +178,7 @@ describe('F14 CDE import API', () => {
   it('commits only the opaque import session id', async () => {
     client.post.mockResolvedValue({ data: { committed: 2 } });
     await commitCdeImport('session-id');
+
     expect(client.post).toHaveBeenCalledWith('/glossaryTerms/import/session-id/commit');
   });
 });
@@ -278,6 +282,24 @@ describe('F12 CDE business-version search API', () => {
         limit: 15,
         offset: 30,
       }),
+    });
+  });
+
+  it('serializes the deleted-only include mode', async () => {
+    client.get.mockResolvedValue({
+      data: { data: [], paging: { total: 0, limit: 15, offset: 0 } },
+    });
+
+    await searchGlossaryTermsPaginated({
+      glossary: 'dictionary-id',
+      parentBusinessVersion: '2',
+      include: Include.Deleted,
+      limit: 15,
+      offset: 0,
+    });
+
+    expect(client.get).toHaveBeenCalledWith('/glossaryTerms/search', {
+      params: expect.objectContaining({ include: Include.Deleted }),
     });
   });
 });

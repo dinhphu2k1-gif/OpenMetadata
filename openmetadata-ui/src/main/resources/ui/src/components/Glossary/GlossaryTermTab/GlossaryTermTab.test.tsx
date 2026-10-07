@@ -288,6 +288,7 @@ const mockUseGlossaryStore = {
   activeGlossary: mockedGlossaryTerms[0],
   glossaryChildTerms: [] as ModifiedGlossaryTerm[],
   termsRefreshVersion: 0,
+  requestPendingRequestsRefresh: jest.fn(),
   updateActiveGlossary: jest.fn(),
   onAddGlossaryTerm: mockOnAddGlossaryTerm,
   onEditGlossaryTerm: mockOnEditGlossaryTerm,
@@ -417,6 +418,7 @@ describe('Test GlossaryTermTab component', () => {
       activeGlossary: mockedGlossaryTerms[0],
       glossaryChildTerms: [] as ModifiedGlossaryTerm[],
       termsRefreshVersion: 0,
+      requestPendingRequestsRefresh: jest.fn(),
       updateActiveGlossary: jest.fn(),
       onAddGlossaryTerm: mockOnAddGlossaryTerm,
       onEditGlossaryTerm: mockOnEditGlossaryTerm,
@@ -1023,6 +1025,7 @@ describe('Test GlossaryTermTab component', () => {
           }),
         ]);
       });
+
       expect(mockGetPublishedGlossaryTerms).toHaveBeenCalledWith(
         glossarySnapshot.id,
         '1.0'
@@ -1077,6 +1080,7 @@ describe('Test GlossaryTermTab component', () => {
             }),
           ]);
         });
+
         expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledWith(
           'Data Dictionary',
           API_RES_MAX_SIZE,

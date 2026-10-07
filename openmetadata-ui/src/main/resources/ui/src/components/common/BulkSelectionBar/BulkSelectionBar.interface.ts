@@ -11,14 +11,23 @@
  *  limitations under the License.
  */
 
-export type BulkSelectionTone = 'draft' | 'in-review' | 'rejected' | 'approved';
+export type BulkSelectionTone =
+  | 'draft'
+  | 'in-review'
+  | 'rejected'
+  | 'approved'
+  | 'create'
+  | 'update'
+  | 'delete';
 
-export type BulkSelectionActionType = 'submit' | 'approve' | 'reject';
+export type BulkSelectionActionType = 'submit' | 'approve' | 'reject' | 'withdraw';
 
 /** How many of the selected records are in one status. */
 export interface BulkSelectionChip {
   tone: BulkSelectionTone;
   count: number;
+  /** Optional module-specific label; the status labels remain the default. */
+  label?: string;
   testId?: string;
 }
 

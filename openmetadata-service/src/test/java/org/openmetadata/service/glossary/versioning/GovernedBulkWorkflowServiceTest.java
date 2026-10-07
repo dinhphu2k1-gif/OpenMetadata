@@ -32,6 +32,12 @@ class GovernedBulkWorkflowServiceTest {
     return row;
   }
 
+  private static Map<String, Object> deletionRow(UUID id, String status) {
+    Map<String, Object> row = row(id, "working", status);
+    row.put("pendingDeletion", true);
+    return row;
+  }
+
   private static Request request(boolean dryRun, Integer offset, Integer limit) {
     return new Request(UUID.randomUUID(), "1", null, null, dryRun, offset, limit);
   }
@@ -63,6 +69,29 @@ class GovernedBulkWorkflowServiceTest {
   }
 
   @Test
+  void withdrawOnlyAppliesToInReviewRows() {
+    UUID inReview = UUID.randomUUID();
+    List<Map<String, Object>> rows =
+        List.of(
+            row(inReview, "working", "In Review"),
+            row(UUID.randomUUID(), "working", "Draft"),
+            row(UUID.randomUUID(), "published", "Approved"));
+    List<UUID> applied = new ArrayList<>();
+
+    Map<String, Object> result =
+        service.run(
+            Action.WITHDRAW,
+            request(false, null, null),
+            rows,
+            (r, ids) -> applied.add(GovernedBulkWorkflowService.termId(r)),
+            null);
+
+    assertEquals(List.of(inReview), applied);
+    assertEquals(1, result.get("eligible"));
+    assertEquals(1, result.get("succeeded"));
+  }
+
+  @Test
   void dryRunReportsWithoutApplying() {
     List<Map<String, Object>> rows = List.of(row(UUID.randomUUID(), "working", "In Review"));
     List<UUID> applied = new ArrayList<>();
@@ -80,6 +109,25 @@ class GovernedBulkWorkflowServiceTest {
     assertEquals(0, result.get("attempted"));
     assertEquals(1, result.get("eligible"));
     assertEquals(0, result.get("succeeded"));
+  }
+
+  @Test
+  void approveIncludesLegacyDraftDeletionRequests() {
+    UUID legacyDeletion = UUID.randomUUID();
+    UUID normalDraft = UUID.randomUUID();
+    List<UUID> applied = new ArrayList<>();
+
+    Map<String, Object> result =
+        service.run(
+            Action.APPROVE,
+            request(false, null, null),
+            List.of(deletionRow(legacyDeletion, "Draft"), row(normalDraft, "working", "Draft")),
+            (row, ids) -> applied.add(GovernedBulkWorkflowService.termId(row)),
+            null);
+
+    assertEquals(List.of(legacyDeletion), applied);
+    assertEquals(1, result.get("eligible"));
+    assertEquals(1, result.get("ineligible"));
   }
 
   @Test
@@ -165,6 +213,7 @@ class GovernedBulkWorkflowServiceTest {
         GovernedBulkWorkflowService.MAX_LIMIT, request(false, null, 100_000).effectiveLimit());
     assertEquals(0, request(false, -5, null).effectiveOffset());
     assertEquals(Action.APPROVE, Action.from("approve"));
+    assertEquals(Action.WITHDRAW, Action.from("withdraw"));
     assertThrows(BadRequestException.class, () -> Action.from("delete"));
   }
 }

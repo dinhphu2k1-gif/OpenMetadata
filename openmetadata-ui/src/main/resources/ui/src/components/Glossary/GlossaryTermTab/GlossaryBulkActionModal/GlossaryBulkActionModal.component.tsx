@@ -32,7 +32,7 @@ export interface GlossaryBulkActionModalProps {
   open: boolean;
   terms: ModifiedGlossaryTerm[];
   onCancel: () => void;
-  onSuccess: () => void;
+  onSuccess: (successCount: number) => void;
 }
 
 const BATCH_CONCURRENCY = 5;
@@ -121,7 +121,7 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
     setIsProcessing(false);
     setProgress(0);
     setCurrentTermName('');
-    onSuccess();
+    onSuccess(successCount);
   }, [actionType, terms, onSuccess, t]);
 
   const handleModalClose = useCallback(() => {

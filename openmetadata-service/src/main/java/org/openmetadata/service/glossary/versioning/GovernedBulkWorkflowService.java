@@ -51,7 +51,8 @@ public class GovernedBulkWorkflowService {
   public enum Action {
     SUBMIT(EntityStatus.DRAFT),
     APPROVE(EntityStatus.IN_REVIEW),
-    REJECT(EntityStatus.IN_REVIEW);
+    REJECT(EntityStatus.IN_REVIEW),
+    WITHDRAW(EntityStatus.IN_REVIEW);
 
     private final EntityStatus requiredStatus;
 
@@ -130,8 +131,19 @@ public class GovernedBulkWorkflowService {
       Action action, List<Map<String, Object>> matchedRows) {
     return matchedRows.stream()
         .filter(row -> WORKING_RECORD.equals(row.get("recordType")))
-        .filter(row -> action.requiredStatus().value().equals(row.get("entityStatus")))
+        .filter(row -> hasRequiredStatus(action, row))
         .toList();
+  }
+
+  private static boolean hasRequiredStatus(Action action, Map<String, Object> row) {
+    if (action.requiredStatus().value().equals(row.get("entityStatus"))) {
+      return true;
+    }
+    // Deletion requests created before they were submitted immediately remain Draft. Let an
+    // approver migrate these legacy rows in the normal approve flow instead of stranding them.
+    return action == Action.APPROVE
+        && EntityStatus.DRAFT.value().equals(row.get("entityStatus"))
+        && Boolean.parseBoolean(String.valueOf(row.get("pendingDeletion")));
   }
 
   private void execute(

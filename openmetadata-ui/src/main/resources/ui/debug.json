@@ -2,13 +2,13 @@
   "numFailedTestSuites": 0,
   "numFailedTests": 0,
   "numPassedTestSuites": 1,
-  "numPassedTests": 7,
+  "numPassedTests": 1,
   "numPendingTestSuites": 0,
-  "numPendingTests": 0,
+  "numPendingTests": 16,
   "numRuntimeErrorTestSuites": 0,
   "numTodoTests": 0,
   "numTotalTestSuites": 1,
-  "numTotalTests": 7,
+  "numTotalTests": 17,
   "openHandles": [],
   "snapshot": {
     "added": 0,
@@ -26,21 +26,21 @@
     "unmatched": 0,
     "updated": 0
   },
-  "startTime": 1790753931415,
+  "startTime": 1791409486194,
   "success": true,
   "testResults": [
     {
       "leaks": false,
       "numFailingTests": 0,
-      "numPassingTests": 7,
-      "numPendingTests": 0,
+      "numPassingTests": 1,
+      "numPendingTests": 16,
       "numTodoTests": 0,
       "openHandles": [],
       "perfStats": {
-        "end": 1790753938901,
-        "runtime": 5742,
-        "slow": true,
-        "start": 1790753933159
+        "end": 1791409487034,
+        "runtime": 499,
+        "slow": false,
+        "start": 1791409486535
       },
       "skipped": false,
       "snapshot": {
@@ -52,112 +52,262 @@
         "unmatched": 0,
         "updated": 0
       },
-      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/pages/TechnicalDictionaryPage/TechnicalDictionaryPage.test.tsx",
+      "testFilePath": "/home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.test.ts",
       "testResults": [
         {
           "ancestorTitles": [
-            "TechnicalDictionaryPage"
+            "F03 CDE draft API"
           ],
-          "duration": 116,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage shows a not-found result instead of a table when the catalog cannot be resolved",
+          "fullName": "F03 CDE draft API creates the identity and initial Draft with one POST",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "shows a not-found result instead of a table when the catalog cannot be resolved"
+          "status": "pending",
+          "title": "creates the identity and initial Draft with one POST"
         },
         {
           "ancestorTitles": [
-            "TechnicalDictionaryPage"
+            "F03 CDE draft API"
           ],
-          "duration": 37,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage runs record workflow actions against the record scope with its working revision",
+          "fullName": "F03 CDE draft API loads a working CDE from the explicitly selected Dictionary scope",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 4,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "runs record workflow actions against the record scope with its working revision"
+          "status": "pending",
+          "title": "loads a working CDE from the explicitly selected Dictionary scope"
         },
         {
           "ancestorTitles": [
-            "TechnicalDictionaryPage"
+            "F03 CDE draft API"
           ],
-          "duration": 16,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage asks for confirmation before submitting the catalog for review",
+          "fullName": "F03 CDE draft API submits a CDE using the row scope instead of the current route fallback",
           "invocations": 1,
           "location": null,
-          "numPassingAsserts": 2,
+          "numPassingAsserts": 0,
           "retryReasons": [],
-          "status": "passed",
-          "title": "asks for confirmation before submitting the catalog for review"
+          "status": "pending",
+          "title": "submits a CDE using the row scope instead of the current route fallback"
         },
         {
           "ancestorTitles": [
-            "TechnicalDictionaryPage"
+            "F03 CDE draft API"
           ],
-          "duration": 10,
+          "duration": null,
           "failureDetails": [],
           "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage creates the next minor version of a record inside the same catalog version",
+          "fullName": "F03 CDE draft API sends only the complete mutable allowlist when saving",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only the complete mutable allowlist when saving"
+        },
+        {
+          "ancestorTitles": [
+            "F03 CDE draft API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F03 CDE draft API loads authoring rows by glossary so unpinned Drafts survive reload",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "loads authoring rows by glossary so unpinned Drafts survive reload"
+        },
+        {
+          "ancestorTitles": [
+            "F14 CDE import API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F14 CDE import API downloads the dedicated XLSX template as a blob",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "downloads the dedicated XLSX template as a blob"
+        },
+        {
+          "ancestorTitles": [
+            "F14 CDE import API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F14 CDE import API uploads only the workbook and immutable scope for preview",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "uploads only the workbook and immutable scope for preview"
+        },
+        {
+          "ancestorTitles": [
+            "F14 CDE import API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F14 CDE import API commits only the opaque import session id",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "commits only the opaque import session id"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API requests a server-paginated dynamic publish preview",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "requests a server-paginated dynamic publish preview"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for submit",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only expectedRevision for submit"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for reject",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only expectedRevision for reject"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for reopen",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only expectedRevision for reopen"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API sends only expectedRevision for approve",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only expectedRevision for approve"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API sends only businessVersion when creating the exact next Dictionary",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "sends only businessVersion when creating the exact next Dictionary"
+        },
+        {
+          "ancestorTitles": [
+            "F09 Data Dictionary publication API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F09 Data Dictionary publication API does not retain the removed F08 working terms route",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "does not retain the removed F08 working terms route"
+        },
+        {
+          "ancestorTitles": [
+            "F12 CDE business-version search API"
+          ],
+          "duration": null,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F12 CDE business-version search API serializes the immutable scope and stable filter identifiers",
+          "invocations": 1,
+          "location": null,
+          "numPassingAsserts": 0,
+          "retryReasons": [],
+          "status": "pending",
+          "title": "serializes the immutable scope and stable filter identifiers"
+        },
+        {
+          "ancestorTitles": [
+            "F12 CDE business-version search API"
+          ],
+          "duration": 2,
+          "failureDetails": [],
+          "failureMessages": [],
+          "fullName": "F12 CDE business-version search API serializes the deleted-only include mode",
           "invocations": 1,
           "location": null,
           "numPassingAsserts": 1,
           "retryReasons": [],
           "status": "passed",
-          "title": "creates the next minor version of a record inside the same catalog version"
-        },
-        {
-          "ancestorTitles": [
-            "TechnicalDictionaryPage"
-          ],
-          "duration": 19,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage saves only editable fields and never sends server-owned extension keys",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 9,
-          "retryReasons": [],
-          "status": "passed",
-          "title": "saves only editable fields and never sends server-owned extension keys"
-        },
-        {
-          "ancestorTitles": [
-            "TechnicalDictionaryPage"
-          ],
-          "duration": 8,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage deletes a Draft declaration in the record scope after confirmation",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 2,
-          "retryReasons": [],
-          "status": "passed",
-          "title": "deletes a Draft declaration in the record scope after confirmation"
-        },
-        {
-          "ancestorTitles": [
-            "TechnicalDictionaryPage"
-          ],
-          "duration": 12,
-          "failureDetails": [],
-          "failureMessages": [],
-          "fullName": "TechnicalDictionaryPage clears the CDE relation when the user clears the selector",
-          "invocations": 1,
-          "location": null,
-          "numPassingAsserts": 2,
-          "retryReasons": [],
-          "status": "passed",
-          "title": "clears the CDE relation when the user clears the selector"
+          "title": "serializes the deleted-only include mode"
         }
       ],
       "displayName": {

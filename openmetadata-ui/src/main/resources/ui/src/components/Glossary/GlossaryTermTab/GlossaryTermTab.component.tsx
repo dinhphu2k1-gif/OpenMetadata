@@ -97,6 +97,7 @@ import {
   ThreadType,
 } from '../../../generated/entity/feed/thread';
 import { User } from '../../../generated/entity/teams/user';
+import { Include } from '../../../generated/type/include';
 import { Paging } from '../../../generated/type/paging';
 import { usePaging } from '../../../hooks/paging/usePaging';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
@@ -391,6 +392,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     setGlossaryChildTerms,
     setVisibleGlossaryTermsCount,
     termsRefreshVersion,
+    requestPendingRequestsRefresh,
     onAddGlossaryTerm,
     onEditGlossaryTerm,
     refreshGlossaryTerms,
@@ -1279,7 +1281,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     // authoritative membership for the newly-selected business version loads.
     setGlossaryChildTerms([]);
     setTotalTermsCount(0);
-    setVisibleGlossaryTermsCount(0);
     handlePagingChange({ total: 0 });
     setIsTableLoading(true);
     try {
@@ -1328,7 +1329,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   ? withoutAll(selectedCdeClassifications)
                   : dqClassificationTags
                 ).join(',') || undefined,
-              includeDeleted: includeDeleted || undefined,
+              include: includeDeleted ? Include.Deleted : Include.NonDeleted,
               limit: pageSize,
               offset: (currentPage - 1) * pageSize,
             })
@@ -1364,11 +1365,19 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             ].join('|'),
           } as ModifiedGlossary;
         });
-        const total = response.paging?.total ?? flatRows.length;
+        // A deletion request is decided in the pending requests tab; it is not a term row.
+        const listedRows = flatRows.filter(
+          (row) => !(row as ModifiedGlossaryTerm).pendingDeletion
+        );
+        const total = Math.max(
+          0,
+          (response.paging?.total ?? flatRows.length) -
+            (flatRows.length - listedRows.length)
+        );
         setTotalTermsCount(total);
         setVisibleGlossaryTermsCount(total);
         handlePagingChange({ total });
-        setGlossaryChildTerms(flatRows);
+        setGlossaryChildTerms(listedRows);
         setExpandedRowKeys([]);
 
         return;
@@ -1856,11 +1865,26 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     }
   };
 
-  const handleBulkActionSuccess = useCallback(() => {
-    handleCloseBulkModal();
-    handleClearSelection();
-    fetchAllTerms();
-  }, [handleCloseBulkModal, handleClearSelection, fetchAllTerms]);
+  const handleBulkActionSuccess = useCallback(
+    (successCount: number) => {
+      if (
+        bulkModalConfig.actionType === 'submitForReview' &&
+        successCount > 0
+      ) {
+        requestPendingRequestsRefresh();
+      }
+      handleCloseBulkModal();
+      handleClearSelection();
+      fetchAllTerms();
+    },
+    [
+      bulkModalConfig.actionType,
+      requestPendingRequestsRefresh,
+      handleCloseBulkModal,
+      handleClearSelection,
+      fetchAllTerms,
+    ]
+  );
 
   const fetchExpadedTree = async () => {
     setIsTableLoading(true);
@@ -2534,6 +2558,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               align: 'center' as const,
             };
           }
+
           return column;
         });
 
@@ -3289,7 +3314,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       termsWorkflowKeyRef.current = cdeScopeKey;
       setGlossaryChildTerms([]);
       setTotalTermsCount(0);
-      setVisibleGlossaryTermsCount(0);
       handlePagingChange({ total: 0 });
       if (currentPage !== INITIAL_PAGING_VALUE) {
         handlePageChange(INITIAL_PAGING_VALUE, {

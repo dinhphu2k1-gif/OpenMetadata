@@ -62,6 +62,7 @@ import {
 } from '../../../generated/entity/data/glossaryTerm';
 import { Operation } from '../../../generated/entity/policies/policy';
 import { Style } from '../../../generated/type/tagLabel';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   isDataDictionaryGlossary,
@@ -138,6 +139,10 @@ export { getCreatedDraftSearch } from '../../../utils/routing/cdeRoutingHelper';
 
 const CORRECTION_DRAFT_KEY_SUFFIX = '#correction';
 
+/** Withdrawing a deletion request removes the working version, so no term comes back. */
+const wasWorkingVersionDiscarded = (response: unknown) =>
+  Boolean((response as { discarded?: boolean } | undefined)?.discarded);
+
 export const suggestNextVersion = (ver: string, isGlossary = false): string => {
   const trimmed = ver.trim();
   if (isGlossary) {
@@ -187,10 +192,15 @@ const GlossaryHeader = ({
   onWorkflowTransition,
 }: GlossaryHeaderProps) => {
   const { t } = useTranslation();
+  const { currentUser } = useApplicationStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { fqn } = useFqn();
-  const { activeGlossary, createDraftRequest } = useGlossaryStore();
+  const {
+    activeGlossary,
+    createDraftRequest,
+    requestPendingRequestsRefresh,
+  } = useGlossaryStore();
   const cdeRoute = useMemo(
     () =>
       parseCdeRoute({
@@ -246,6 +256,7 @@ const GlossaryHeader = ({
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
   const [isReopening, setIsReopening] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [hasWorkflowConflict, setHasWorkflowConflict] = useState(false);
   const [isReloadingWorking, setIsReloadingWorking] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] =
@@ -1020,7 +1031,10 @@ const GlossaryHeader = ({
             selectedData.parentBusinessVersion ??
             getBusinessVersion(activeGlossary?.businessVersion, '')
         )
-      : action === 'submit' || action === 'reject' || action === 'reopen'
+      : action === 'submit' ||
+        action === 'reject' ||
+        action === 'reopen' ||
+        action === 'withdraw'
       ? await transitionGlossaryTermWorkflow(
           selectedData.id,
           action,
@@ -1041,8 +1055,11 @@ const GlossaryHeader = ({
         )
       );
     }
-    await onWorkflowTransition?.(updated, action);
     setHasWorkflowConflict(false);
+    if (action === 'withdraw' && wasWorkingVersionDiscarded(updated)) {
+      return updated;
+    }
+    await onWorkflowTransition?.(updated, action);
 
     return updated;
   };
@@ -1183,6 +1200,7 @@ const GlossaryHeader = ({
         selectedData.id,
         getParentBusinessVersion()
       );
+      // The deletion endpoint creates and submits the request atomically.
       navigateToWorkingDraft(
         getBusinessVersion(
           created.businessVersion,
@@ -1190,6 +1208,7 @@ const GlossaryHeader = ({
         )
       );
       await onWorkflowTransition?.(created, 'createDraft');
+      requestPendingRequestsRefresh();
       showSuccessToast(t('cde.deletion-request-created'));
       setIsDeletionRequestModalOpen(false);
     } catch (error) {
@@ -1228,6 +1247,9 @@ const GlossaryHeader = ({
     try {
       setIsSubmittingForReview(true);
       await runWorkflowAction('submit');
+      if (!isGlossary) {
+        requestPendingRequestsRefresh();
+      }
       showSuccessToast(t('message.submit-for-review-success'));
       setIsSubmitForReviewModalOpen(false);
     } catch (error) {
@@ -1302,6 +1324,29 @@ const GlossaryHeader = ({
     !isVersionView &&
     glossaryTermStatus === EntityStatus.Rejected &&
     Boolean(workflowPermissions?.canEditWorking);
+
+  const canWithdraw =
+    !isVersionView &&
+    !isGlossary &&
+    glossaryTermStatus === EntityStatus.InReview &&
+    selectedData.workingRevision != null &&
+    Boolean(currentUser?.name) &&
+    selectedData.submittedBy === currentUser?.name;
+
+  const handleWithdraw = async () => {
+    try {
+      setIsWithdrawing(true);
+      const updated = await runWorkflowAction('withdraw');
+      showSuccessToast(t('message.request-withdrawn-success'));
+      if (wasWorkingVersionDiscarded(updated)) {
+        navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
+      }
+    } catch (error) {
+      handleWorkflowError(error);
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
 
   const handleReopen = async () => {
     try {
@@ -1748,6 +1793,16 @@ const GlossaryHeader = ({
           </Button>
         )}
 
+        {canWithdraw && (
+          <Button
+            className="m-l-xs"
+            data-testid="withdraw-request-button"
+            loading={isWithdrawing}
+            onClick={handleWithdraw}>
+            {t('label.withdraw-request')}
+          </Button>
+        )}
+
         {canCreateDraft && glossaryTermStatus === EntityStatus.Approved && (
           <Button className="m-l-xs" onClick={openCreateDraftModal}>
             {t('label.create-draft')}
@@ -1796,6 +1851,8 @@ const GlossaryHeader = ({
     isSubmittingForReview,
     canReopen,
     isReopening,
+    canWithdraw,
+    isWithdrawing,
     canCreateDraft,
     canCreateCorrection,
     glossaryTermStatus,

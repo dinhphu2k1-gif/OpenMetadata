@@ -16,7 +16,7 @@ import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import './review-action-confirm-modal.less';
 
-export type ReviewConfirmAction = 'submit' | 'approve' | 'reject';
+export type ReviewConfirmAction = 'submit' | 'approve' | 'reject' | 'withdraw';
 
 export interface ReviewActionConfirmModalProps {
   open: boolean;
@@ -38,12 +38,14 @@ const TITLE_KEYS: Record<ReviewConfirmAction, string> = {
   submit: 'label.review-confirm-submit',
   approve: 'label.review-confirm-approve',
   reject: 'label.review-confirm-reject',
+  withdraw: 'label.review-confirm-withdraw',
 };
 
 const MESSAGE_KEYS: Record<ReviewConfirmAction, string> = {
   submit: 'message.review-confirm-submit',
   approve: 'message.review-confirm-approve',
   reject: 'message.review-confirm-reject',
+  withdraw: 'message.review-confirm-withdraw',
 };
 
 /**

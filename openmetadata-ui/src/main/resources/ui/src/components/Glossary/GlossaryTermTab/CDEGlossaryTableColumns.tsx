@@ -166,7 +166,7 @@ export const getCDEGlossaryTableColumns = ({
     dataIndex: 'name',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.NAME,
     fixed: 'left',
-    width: 150,
+    width: 120,
     render: (name: string, record) => {
       if (record.isLoadMoreButton) {
         const parentRecord = record.parentRecord;
@@ -231,7 +231,7 @@ export const getCDEGlossaryTableColumns = ({
     dataIndex: 'displayName',
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DISPLAY_NAME,
     fixed: 'left',
-    width: 260,
+    width: 200,
     render: (displayName: string, record) =>
       record.isLoadMoreButton
         ? null

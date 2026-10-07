@@ -11,17 +11,20 @@
 | Tên tài liệu | Đặc tả kỹ thuật API Hệ thống Quản trị Metadata Ngân hàng |
 | Đơn vị chủ trì | Trung tâm Quản lý Dữ liệu (TT QLDL) |
 | Phân loại | Nội bộ Agribank |
-| Phiên bản tài liệu | 0.9 |
+| Phiên bản tài liệu | 0.11 |
 | Trạng thái | Dự thảo kỹ thuật phục vụ rà soát và nghiệm thu |
 | Phiên bản nền tảng | OpenMetadata Core 1.13.3, có tùy biến của dự án |
-| Ngày đối chiếu mã nguồn | 06/10/2026 |
+| Revision đối chiếu | `dd61210ed5bef553e7c5667d75529506f17b8641` |
+| Ngày đối chiếu mã nguồn và Swagger runtime | 07/10/2026 |
 | Phạm vi | Từ điển dữ liệu dùng chung, Quy tắc chất lượng dữ liệu, Từ điển kỹ thuật và xác thực OIDC qua IAM Backend |
 
 ### Lịch sử sửa đổi
 
 | Phiên bản | Ngày | Nội dung | Trạng thái |
 | :---: | :---: | :--- | :--- |
-| 0.9 | 06/10/2026 | Chuẩn hóa danh mục API as-built; bổ sung OIDC/IAM; đồng bộ ma trận phân quyền theo Phương án triển khai; ghi nhận sai khác cần đóng; chuẩn hóa nguồn Markdown để xuất DOCX. | Dự thảo |
+| 0.9 | 06/10/2026 | Chuẩn hóa danh mục API as-built; bổ sung OIDC/IAM; đồng bộ ma trận phân quyền nghiệp vụ; ghi nhận sai khác cần đóng; chuẩn hóa nguồn Markdown để xuất DOCX. | Dự thảo |
+| 0.10 | 07/10/2026 | Đối chiếu lại với Swagger runtime, backend và frontend; bổ sung API thực thi kiểm thử DQ, workflow Từ điển kỹ thuật, hủy/đề xuất xóa CDE; loại bỏ route archive đã gỡ và sửa contract payload/response kỹ thuật. | Dự thảo |
+| 0.11 | 07/10/2026 | Chuyển tài liệu thành đặc tả độc lập: loại bỏ tham chiếu bắt buộc tới tài liệu ngoài và phát biểu trực tiếp phạm vi, ma trận quyền, contract IAM/API cùng các điều kiện nghiệm thu. | Dự thảo |
 
 ### Thẩm định và phê duyệt
 
@@ -61,19 +64,18 @@ Tài liệu này đặc tả chi tiết toàn bộ giao diện lập trình ứn
 
 Tài liệu được biên soạn theo tiêu chuẩn kỹ thuật ngân hàng, đóng vai trò là dự thảo hợp đồng giao tiếp (API Contract) giữa Backend (OpenMetadata Core Server - JAX-RS / Dropwizard), Frontend (React Single Page Application), và các hệ sinh thái tích hợp bên ngoài (Data Pipeline, Ingestion Bots, DWH/Data Lakehouse). Tài liệu trở thành baseline chính thức sau khi các sai khác được phân loại, các điều kiện nghiệm thu được đóng và bảng phê duyệt được hoàn tất.
 
-**Trạng thái tài liệu:** Dự thảo kỹ thuật phiên bản `0.9`, kết hợp contract nghiệp vụ mục tiêu và hành vi as-built được đối chiếu ngày `2026-10-06`.
+**Trạng thái tài liệu:** Dự thảo kỹ thuật phiên bản `0.11`, kết hợp contract nghiệp vụ mục tiêu và hành vi as-built được đối chiếu ngày `2026-10-07` tại revision `dd61210ed5bef553e7c5667d75529506f17b8641`.
 
-**Nguồn sự thật theo từng loại nội dung:**
+**Nguyên tắc áp dụng độc lập:**
 
-1. **Phạm vi nghiệp vụ và phân quyền mục tiêu:** *Phương án triển khai phần mềm quản lý siêu dữ liệu_20260910* và các phê duyệt nghiệp vụ bổ sung.
-2. **Contract xác thực phía IAM:** tài liệu `tai-lieu-dac-ta-api.docx` và discovery document thực tế của IAM Backend.
-3. **API as-built của OpenMetadata:** JAX-RS resource, Authentication Servlet trong `openmetadata-service`, JSON Schema trong `openmetadata-spec` và Swagger build từ cùng revision.
-4. **Cách Frontend gọi API:** REST wrapper trong `openmetadata-ui`; đây không phải nguồn để mở rộng quyền hoặc route backend.
-5. **Tài liệu thiết kế trong `docs/design`:** mô tả ý định kiến trúc và sai khác mục tiêu; không thay thế contract runtime đã kiểm chứng.
+1. Phạm vi nghiệp vụ và ma trận phân quyền chính thức được quy định trực tiếp tại mục 1 và mục 2.1.5 của tài liệu này.
+2. Contract OIDC/IAM cần dùng để tích hợp được quy định đầy đủ tại mục 2.1.1-2.1.4.
+3. Method, path, request, response và ràng buộc của các API nghiệp vụ được quy định tại mục 3-5.
+4. Mọi sai khác giữa yêu cầu nghiệp vụ và hành vi đang triển khai được công bố tại mục 7 cùng điều kiện đóng sai khác.
 
-Khi các nguồn mâu thuẫn, tài liệu phải trình bày tách biệt **Yêu cầu nghiệp vụ**, **Hành vi as-built** và **Điều kiện cần đạt trước nghiệm thu**. Không được mô tả yêu cầu chưa triển khai như hành vi đang hoạt động, và không được dùng hành vi runtime rộng hơn để thay đổi ma trận quyền đã được phê duyệt.
+Người đọc không cần truy cập tài liệu thiết kế, tài liệu phương án, mã nguồn hoặc file đặc tả khác để sử dụng API contract này. Khi **Yêu cầu nghiệp vụ** và **Hành vi as-built** khác nhau, điều kiện nghiệm thu tại mục 7 được áp dụng; hành vi runtime rộng hơn không tự động làm thay đổi ma trận quyền chính thức.
 
-Tài liệu này đặc tả **danh mục quy tắc Chất lượng dữ liệu** dưới dạng Governed Glossary. Các API vận hành kiểm thử dữ liệu gốc của OpenMetadata như `/dataQuality/testCases`, `/testSuites` và `/testCaseResults` nằm ngoài phạm vi tài liệu này.
+Tài liệu này đặc tả **danh mục quy tắc Chất lượng dữ liệu** dưới dạng Governed Glossary và lớp API `/glossaryTerms/dataQuality` dùng để khai báo, chạy, xem kết quả và xu hướng kiểm thử gắn với DQ Rule/CDE. Các API nền tảng OpenMetadata được quản lý trực tiếp như `/dataQuality/testCases`, `/testSuites` và `/testCaseResults` nằm ngoài contract tích hợp công khai của tài liệu này; chúng chỉ là hạ tầng nội bộ phía sau lớp API DQ Rule.
 
 ### 1.2. Đối tượng sử dụng
 - **Kỹ sư phát triển Backend & Frontend:** Căn cứ lập trình đúng endpoint, tham số, kiểu dữ liệu, ràng buộc khóa lạc quan và mã phản hồi.
@@ -129,18 +131,12 @@ Luồng định tuyến thống nhất: **UI Route → Frontend API Client → `
 | **Sai khác cần xử lý** | Khoảng cách đã xác định giữa runtime và yêu cầu nghiệp vụ; không được hiểu là chức năng đã hoàn thành. |
 | **Ngoài phạm vi** | Route hoặc chức năng không thuộc contract của tài liệu này. |
 
-### 1.6. Quy ước ví dụ và tài liệu tham chiếu
+### 1.6. Quy ước ví dụ và tính độc lập của tài liệu
 
 - Các giá trị đặt trong dấu `<...>`, `{...}`, UUID, tên người dùng, hostname và token trong ví dụ chỉ là placeholder hoặc dữ liệu minh họa; không được sao chép sang production như thông tin thật.
 - URL `http://localhost:8585` chỉ dùng cho môi trường phát triển. UAT và production bắt buộc dùng hostname đã được phê duyệt qua HTTPS.
-- Khi tài liệu tham chiếu và runtime khác nhau, áp dụng nguyên tắc phân loại tại mục 1.1 và ghi sai khác tại mục 7; không tự chọn một hành vi làm contract chính thức.
-
-| Mã | Tài liệu / Nguồn tham chiếu | Mục đích sử dụng |
-| :--- | :--- | :--- |
-| `TL-01` | *Phương án triển khai phần mềm quản lý siêu dữ liệu_20260910* | Phạm vi nghiệp vụ và ma trận phân quyền mục tiêu. |
-| `TL-02` | *tai-lieu-dac-ta-api.docx* của IAM Backend | Contract OIDC phía IAM được cung cấp để đối chiếu. |
-| `TL-03` | *technical-dictionary-design.md* | Thiết kế và vòng đời Từ điển kỹ thuật. |
-| `TL-04` | JAX-RS resources, JSON Schema, Authentication Servlet, Swagger/OpenAPI và frontend REST wrappers tại revision đối chiếu | Kiểm chứng danh mục API và hành vi as-built. |
+- Mọi thuật ngữ, ma trận quyền, endpoint, schema cần thiết và sai khác đã biết đều được định nghĩa trong tài liệu này. Tên hệ thống, revision và ngày đối chiếu chỉ dùng để xác định baseline kỹ thuật, không phải liên kết bắt buộc tới tài liệu ngoài.
+- Nếu môi trường triển khai có hành vi khác contract này, phải ghi nhận thành sai khác và xử lý theo mục 7; không tự chọn hành vi runtime làm contract mới.
 
 ---
 
@@ -253,10 +249,10 @@ Base URL logic của IAM Backend là `https://<iam-backend-host>/api/v1`. Các e
 
 ##### IAM-OIDC-01: Xác thực người dùng và phát hành authorization code
 
-- **Method & Endpoint theo tài liệu IAM:** `POST /api/v1/oidc/login`
+- **Method & Endpoint:** `POST /api/v1/oidc/login`
 - **Xác thực endpoint:** Public.
 - **Content-Type:** `application/json`.
-- **Request Body tham chiếu:**
+- **Request Body:**
   ```json
   {
     "username": "nguyenvana",
@@ -272,7 +268,7 @@ Base URL logic của IAM Backend là `https://<iam-backend-host>/api/v1`. Các e
 - `password` không phải plaintext; client IAM mã hóa RSA và IAM giải mã bằng private key cấu hình.
 - `isLdap = 1` yêu cầu IAM xác thực người dùng qua LDAP; nếu không, IAM dùng kho tài khoản nội bộ theo cấu hình.
 - `state`/`nonce` trống thì IAM tự sinh UUID. Đối với OpenMetadata, IAM phải bảo toàn chính xác `state` và `nonce` do OpenMetadata gửi để callback validation thành công.
-- **Response theo tài liệu IAM:** chứa `redirectUrl` dạng `<redirectUri>?code=...&state=...`.
+- **Response:** chứa `redirectUrl` dạng `<redirectUri>?code=...&state=...`.
 - Authorization code được IAM lưu một lần, TTL 120 giây; client phải đổi code trước khi hết hạn.
 
 ##### IAM-OIDC-02: Đổi authorization code lấy token
@@ -299,7 +295,7 @@ Base URL logic của IAM Backend là `https://<iam-backend-host>/api/v1`. Các e
     "scope": "openid profile email"
   }
   ```
-- Tài liệu IAM hiện không mô tả `refresh_token`.
+- Token response hiện tại chưa công bố `refresh_token`.
 
 ##### IAM-OIDC-03: Lấy thông tin người dùng
 
@@ -329,7 +325,7 @@ Base URL logic của IAM Backend là `https://<iam-backend-host>/api/v1`. Các e
 Token IAM OIDC dùng RS256:
 
 - Access token: `tokenType="OIDC_ACCESS"`, có `iss`, `aud`, `sub` (username), `app`, `auth`.
-- ID Token: `tokenType="ID"`, có `sub` (user ID), `preferred_username`, `name`, `email`, `nonce`; tài liệu IAM chưa thể hiện claim `roles` trong ID Token.
+- ID Token: `tokenType="ID"`, có `sub` (user ID), `preferred_username`, `name`, `email`, `nonce`; contract hiện tại chưa công bố claim `roles` trong ID Token.
 
 #### 2.1.4. Cấu hình và điều kiện tương thích IAM–OpenMetadata
 
@@ -347,7 +343,7 @@ Token IAM OIDC dùng RS256:
 | `AUTHENTICATION_AUTHORITY` | Phải bằng `issuer` mà IAM Backend công bố trong discovery document. |
 | `OIDC_SCOPE` | Dùng giá trị cấu hình `openid email profile`; thư viện OIDC chịu trách nhiệm URL-encode thành wire format IAM chấp nhận. Không cấu hình dấu `+` như một ký tự literal nếu chưa kiểm thử discovery/client library. |
 | `OIDC_USE_NONCE=true` | Bật kiểm tra nonce chống replay. |
-| `OIDC_DISABLE_PKCE` | Chỉ đặt `false` khi discovery IAM công bố hỗ trợ PKCE S256; tên biến có ngữ nghĩa phủ định. Default source OpenMetadata hiện là `true`. |
+| `OIDC_DISABLE_PKCE` | Chỉ đặt `false` khi discovery IAM công bố hỗ trợ PKCE S256; tên biến có ngữ nghĩa phủ định. Giá trị mặc định của bản triển khai hiện tại là `true`. |
 | `OIDC_CLIENT_AUTH_METHOD=client_secret_post` | Phù hợp contract IAM `/oidc/token` hiện mô tả `client_id`/`client_secret` trong form body. |
 | `OIDC_SESSION_EXPIRY` | Thời gian sống/inactive timeout của `JSESSIONID`, đơn vị giây, tối thiểu 3.600; mặc định 604.800 (7 ngày). |
 | `FORCE_SECURE_SESSION_COOKIE=true` | Bắt buộc khi TLS kết thúc tại reverse proxy/load balancer nhưng OpenMetadata nhận kết nối HTTP nội bộ. |
@@ -362,24 +358,24 @@ Backend kiểm tra chữ ký và hạn JWT bằng JWKS của IAM Backend, ánh x
 
 | Hạng mục | Contract IAM được cung cấp | OpenMetadata as-built | Kết luận / Điều kiện tích hợp |
 | :--- | :--- | :--- | :--- |
-| Authorization endpoint | `POST /api/v1/oidc/login`, nhận JSON username/password và trả `redirectUrl` | Redirect browser bằng `GET authorization_endpoint?...` | **Chưa tương thích trực tiếp theo tài liệu.** IAM phải cung cấp authorization endpoint chuẩn GET có UI đăng nhập/redirect, hoặc phải phát triển adapter/custom authenticator cho OpenMetadata. |
-| Client registration | Tài liệu chỉ nêu cấu hình `oidc.client.superset.*` | Gửi `client_id=openmetadata` và callback `/callback` | IAM phải đăng ký client `openmetadata`, client secret và từng callback của OM/Portal; không dùng cấu hình Superset. |
+| Authorization endpoint | `POST /api/v1/oidc/login`, nhận JSON username/password và trả `redirectUrl` | Redirect browser bằng `GET authorization_endpoint?...` | **Chưa tương thích trực tiếp.** IAM phải cung cấp authorization endpoint chuẩn GET có UI đăng nhập/redirect, hoặc phải phát triển adapter/custom authenticator cho OpenMetadata. |
+| Client registration | Contract IAM đầu vào mới có cấu hình cho client `superset` | Gửi `client_id=openmetadata` và callback `/callback` | IAM phải đăng ký client `openmetadata`, client secret và từng callback của OM/Portal; không dùng cấu hình Superset. |
 | Token response | Có `access_token`, `id_token`; chưa có `refresh_token` | Session refresh yêu cầu refresh token | IAM bổ sung refresh-token grant hoặc OpenMetadata phải đổi cơ chế refresh/re-login. |
 | Bearer gọi API OM | OpenMetadata UI đang gửi ID Token | `JwtFilter` chấp nhận JWT ký bởi JWKS | IAM ID Token phải có `kid`, `exp`, principal claim hợp lệ; cần cưỡng chế thêm `iss`/`aud` như cảnh báo dưới đây. |
 | Đồng bộ role | `auth` nằm trong access token; `roles` chỉ được mô tả ở `/userinfo` | Đọc claim `roles` từ bearer ID Token khi `AUTHORIZER_USE_ROLES_FROM_PROVIDER=true` | IAM phải phát hành claim `roles` trong ID Token với tên role OM, hoặc OM phải ánh xạ `auth`/userinfo sang role local. Nếu chưa có, tắt đồng bộ role từ provider và cấp role trong OM. |
 | Logout | Chưa mô tả OIDC logout/end-session | Redirect `${OIDC_SERVER_URL}/logout` | IAM/gateway phải cung cấp route này hoặc OpenMetadata phải dùng `end_session_endpoint` thực tế. |
 
-Do discovery IAM tại môi trường nội bộ không truy cập được trong lần đối chiếu tài liệu này, các trường `authorization_endpoint`, `issuer`, `grant_types_supported`, `code_challenge_methods_supported` và `token_endpoint_auth_methods_supported` phải được kiểm tra lại trực tiếp trên UAT; không suy diễn chỉ từ đường dẫn cấu hình.
+Tại baseline này, discovery IAM trong môi trường nội bộ chưa được xác minh trực tiếp. Các trường `authorization_endpoint`, `issuer`, `grant_types_supported`, `code_challenge_methods_supported` và `token_endpoint_auth_methods_supported` phải được kiểm tra lại trên UAT; không suy diễn chỉ từ đường dẫn cấu hình.
 
 > **Rủi ro cần xử lý trước go-live:** `JwtFilter` as-built kiểm tra `exp`, chữ ký và khóa `kid` từ JWKS nhưng chưa kiểm tra tường minh claim `iss` và `aud` cho từng request API. Trước go-live phải bổ sung/kiểm chứng kiểm tra `iss = issuer` và `aud`/`azp = OIDC_CLIENT_ID`; chỉ cấu hình `AUTHENTICATION_AUTHORITY` không đồng nghĩa hai claim này đã được cưỡng chế. Tương tự, code hiện chỉ kiểm tra `redirectUri` khác rỗng, chưa tự allowlist origin — yêu cầu giới hạn tại gateway ở OIDC-01 là bắt buộc cho đến khi backend được harden.
 
 #### 2.1.5. Vai trò và ma trận quyền
 
-Ma trận dưới đây lấy nguyên tắc quyền từ mục **“4. Phân quyền truy cập, truy xuất dữ liệu”** của tài liệu *Phương án triển khai phần mềm quản lý siêu dữ liệu_20260910*. Tên role kỹ thuật trong OpenMetadata chỉ là ánh xạ triển khai; tên vai trò nghiệp vụ và phạm vi quyền trong tài liệu nguồn là chuẩn ưu tiên.
+Ma trận dưới đây là **ma trận phân quyền nghiệp vụ chính thức của API contract này**. Tên role kỹ thuật trong OpenMetadata chỉ là ánh xạ triển khai; tên vai trò nghiệp vụ và phạm vi quyền ghi trong bảng là chuẩn ưu tiên.
 
 Đối với kiểm thử nghiệm thu API, ma trận này là contract bắt buộc: thao tác có ký hiệu `-` phải trả `403 Forbidden` (hoặc `404 Not Found` khi cần che giấu sự tồn tại của tài nguyên). Nếu runtime hiện trả thành công do quyền superuser, Owner/Reviewer hoặc policy kế thừa thì đó là sai khác triển khai, không làm thay đổi ma trận chuẩn.
 
-| Vai trò nghiệp vụ trong tài liệu nguồn | Role triển khai OpenMetadata | Đơn vị đầu mối | Phạm vi mặc định |
+| Vai trò nghiệp vụ | Role triển khai OpenMetadata | Đơn vị đầu mối | Phạm vi mặc định |
 | :--- | :--- | :--- | :--- |
 | Quản trị viên hệ thống (Admin System) | `Admin` | TT QLDL | Quản trị tài khoản/phân quyền (`C`) và tra cứu (`R`) theo ma trận; không có quyền đề xuất hoặc phê duyệt chỉ vì là Admin. |
 | Người phê duyệt (Lãnh đạo) | `DataSteward` | TT QLDL | Đọc và phê duyệt (`R`, `A`) theo từng phân hệ được giao. |
@@ -464,7 +460,7 @@ Các lỗi nền tảng/validation kế thừa OpenMetadata có thể dùng enve
 
 ### 2.5. Phạm vi danh mục API as-built
 
-Danh mục tại các mục 3-5 đã được đối chiếu với JAX-RS resource hiện tại (`GlossaryResource`, `GlossaryTermResource`, `TechnicalDictionaryResource`, `TechnicalDictionaryImportResource`) và Swagger được build từ source. Đây là contract tích hợp cho ba phân hệ governed, không phải bản sao toàn bộ API glossary upstream của OpenMetadata.
+Danh mục tại các mục 3-5 đã được đối chiếu với backend runtime, các lời gọi hiện hành của frontend và Swagger tại revision ghi trong phần kiểm soát tài liệu. Toàn bộ contract cần thiết đã được ghi trực tiếp ở các mục này; người tích hợp không phải tra cứu implementation để suy ra endpoint. Đây là contract tích hợp cho ba phân hệ governed, không phải bản sao toàn bộ API glossary upstream của OpenMetadata.
 
 Một số route upstream vẫn xuất hiện trong Swagger nhưng không thuộc contract này. Đặc biệt, direct `PATCH /api/v1/glossaries/{id}`, direct `PATCH /api/v1/glossaryTerms/{id}`, `PUT` upsert và native bulk create bị backend từ chối đối với luồng governed; client phải dùng `/working`, workflow hoặc import nguyên tử được mô tả trong tài liệu. Các API native history, vote, relation, move, delete/restore và CSV upstream chỉ được dùng khi có đặc tả nghiệp vụ riêng, không được suy ra là API của ba phân hệ này chỉ vì route xuất hiện trong Swagger.
 
@@ -711,15 +707,14 @@ Quyền hiệu lực không nằm trong response này. Client lấy riêng qua `
 
 ---
 
-#### API 3.1.10: Danh sách term trong snapshot và thu hồi bản phát hành
+#### API 3.1.10: Danh sách term trong snapshot
 
 ```http
 GET  /api/v1/glossaries/{id}/published/{businessVersion}/terms
-POST /api/v1/glossaries/{id}/published/latest/archive
 ```
 
 - `GET .../terms` trả trực tiếp JSON array các revision term thuộc manifest của snapshot glossary. Với snapshot mới nhất chưa archive và actor không phải consumer-only, backend còn ghép các working term cùng scope vào kết quả.
-- `POST .../archive` không có request body. Endpoint yêu cầu `canArchive=true`, archive bản published mới nhất và tạo lại một working record trạng thái `Rejected` để sửa đổi. Ma trận nghiệp vụ nguồn không mặc nhiên cấp thao tác này; chỉ sử dụng khi quyền thu hồi được phê duyệt riêng.
+- Backend hiện không công bố endpoint archive trực tiếp cho glossary đã phát hành. Việc chuyển scope chỉ xảy ra trong workflow/cutover được phê duyệt; client không được gọi route `/published/latest/archive` cũ.
 
 ---
 
@@ -1016,7 +1011,29 @@ Không dùng scoped FQN trong response để lookup identity. Deep link cần ve
   ]
   ```
 
-> Không còn endpoint hủy duyệt: `POST /api/v1/glossaries/{id}/published/latest/archive` và `POST /api/v1/glossaryTerms/{id}/published/latest/archive` đã bị gỡ.
+#### API 3.2.10c: Tạo đề xuất xóa CDE đã phát hành
+
+- **Method & Endpoint:** `POST /api/v1/glossaryTerms/{id}/working/deletion?parentBusinessVersion={N}`
+- **Quyền:** `canCreateVersion=true` theo quyền `W`; chỉ áp dụng cho CDE đã có bản `Approved` trong scope yêu cầu.
+- **Request body:** Không có.
+- **Hành vi:** Tạo working version loại deletion và gửi duyệt ngay ở trạng thái `In Review`. CDE Approved vẫn có hiệu lực và tiếp tục xuất hiện với Consumer cho đến khi yêu cầu xóa được approve. Backend từ chối nếu CDE còn dependency không cho phép xóa. Bulk approve vẫn nhận các deletion request `Draft` được tạo bởi phiên bản cũ và nâng chúng sang `In Review` trong cùng luồng trước khi publish.
+- **Response:** Working representation có `workingRevision`, `entityStatus="Draft"`, dấu hiệu deletion do server quản lý và `capabilities` hiệu lực.
+
+#### API 3.2.10d: Hủy working version
+
+- **Method & Endpoint:** `DELETE /api/v1/glossaryTerms/{id}/working?parentBusinessVersion={N}&expectedRevision={revision}`
+- **Quyền:** `canEditWorking=true`; chỉ hủy được working version trạng thái `Draft` hoặc `Rejected`.
+- **Hành vi:** Chỉ xóa working version. Nếu term chưa từng được phát hành, identity term cũng bị xóa; nếu đã có bản Approved thì bản đang có hiệu lực không bị ảnh hưởng.
+- **Mẫu Phản hồi (200 OK):**
+
+  ```json
+  {
+    "discarded": true,
+    "termDeleted": false
+  }
+  ```
+
+> Không còn endpoint archive trực tiếp: các route cũ `/api/v1/glossaries/{id}/published/latest/archive` và `/api/v1/glossaryTerms/{id}/published/latest/archive` đã bị gỡ. Xóa CDE đã phát hành phải đi qua `working/deletion`; hủy đề xuất dùng `DELETE .../working`.
 
 ---
 
@@ -1065,16 +1082,14 @@ Không dùng scoped FQN trong response để lookup identity. Deep link cần ve
 
 ---
 
-#### API 3.2.13: Latest published, thu hồi và workflow hàng loạt
+#### API 3.2.13: Latest published và workflow hàng loạt
 
 ```http
 GET  /api/v1/glossaryTerms/{id}/published/latest
-POST /api/v1/glossaryTerms/{id}/published/latest/archive
 POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}
 ```
 
 - `GET .../published/latest` chỉ áp dụng cho CDE thuộc `Data Dictionary` và trả representation Approved mới nhất.
-- `POST .../archive` không có body, yêu cầu `canArchive=true`; endpoint dùng chung cho governed CDE/DQ Rule và trả working representation trạng thái `Rejected`. Quyền này không được suy ra từ `A` nếu chưa được nghiệp vụ phê duyệt riêng.
 - Bulk workflow dùng cho cả CDE và DQ Rule. Body chọn record bằng `termIds`, `criteria` hoặc kết hợp cả hai:
 
   ```json
@@ -1186,6 +1201,7 @@ Trừ khi một API ghi rõ khác đi, toàn bộ endpoint ở mục này kế t
 | `extension.releaseLevel` | `string[]` | Một cấp phát hành theo cấu hình nghiệp vụ. |
 | `extension.effectiveDate`, `extension.expirationDate` | `yyyy-MM-dd` | Khoảng hiệu lực; ngày hết hiệu lực không trước ngày hiệu lực. |
 | `extension.releaseVersionType` | `string[]` | Server-owned, suy từ `businessVersion`; client không gửi giá trị này. |
+| `dataQualityTestSpecs` | `DqTestSpecs/null` | Khai báo kiểm thử của DQ Rule. Đây là trường cấp cao nhất của GlossaryTerm, không nằm trong `extension`; chỉ được gửi khi lưu working Draft bằng `PATCH /working`. |
 
 Một DQ Rule phải là con trực tiếp của Data Quality Glossary, phải có `name`, và phải tham chiếu đúng một CDE chuẩn. Backend kiểm tra lại CDE và scope; không tin `cdeCode`/`cdeName` lưu trong extension cũ.
 
@@ -1298,11 +1314,27 @@ PATCH /api/v1/glossaryTerms/{id}/working?parentBusinessVersion=2
   "extension": {
     "qualityThreshold": "100%",
     "otherConstraints": "Áp dụng từ quý IV/2026"
+  },
+  "dataQualityTestSpecs": {
+    "schemaVersion": 1,
+    "items": [
+      {
+        "key": "t1",
+        "name": "Giá trị không rỗng",
+        "kind": "LIBRARY",
+        "testDefinitionFqn": "columnValuesToBeNotNull",
+        "parameterValues": [],
+        "computePassedFailedRowCount": true,
+        "threshold": ">= 99.9%",
+        "scheduleCron": "0 2 * * *",
+        "scheduleTimezone": "Asia/Ho_Chi_Minh"
+      }
+    ]
   }
 }
 ```
 
-Đây là **full mutable payload**, không có wrapper `payload`. `description`, `owners`, `domains`, `tags` và `expectedRevision` là bắt buộc theo JSON Schema. Backend tăng `workingRevision`; revision cũ trả `409 Conflict`.
+Đây là **full mutable payload**, không có wrapper `payload`. `description`, `owners`, `domains`, `tags` và `expectedRevision` là bắt buộc theo JSON Schema. Backend tăng `workingRevision`; revision cũ trả `409 Conflict`. `dataQualityTestSpecs` bị từ chối đối với CDE thuộc Data Dictionary. Khi tạo DQ Rule lần đầu bằng `POST /glossaryTerms`, schema create chưa nhận trường này; client tạo Draft trước rồi lưu test specs bằng `PATCH /working`.
 
 ### 4.4. Workflow
 
@@ -1317,7 +1349,152 @@ Body chỉ cho phép `expectedRevision >= 1`; `comment` và mọi field khác b�
 
 Workflow hàng loạt dùng endpoint `POST /api/v1/glossaryTerms/bulk/{submit|approve|reject}` và request/response tại API 3.2.13. Runtime hiện có cả `reject` và `reopen`; ma trận nghiệp vụ nguồn chỉ mặc nhiên quy định `W` và `A`, vì vậy quyền từ chối/thu hồi phải được nghiệp vụ phê duyệt riêng trước khi cấp policy.
 
-### 4.5. Trạng thái import/export DQ hiện tại
+### 4.5. API khai báo, thực thi và xem kết quả kiểm thử DQ Rule
+
+Các API trong mục này là lớp contract theo DQ Rule/CDE mà UI đang sử dụng. Chúng quản lý các TestCase và Ingestion Pipeline nền tảng ở phía server; client không tự ghi trực tiếp vào `/dataQuality/testCases`, `/testSuites` hoặc `/testCaseResults`.
+
+#### 4.5.1. Schema `DqTestSpecs`
+
+```json
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "key": "t1",
+      "name": "Giá trị không rỗng",
+      "kind": "LIBRARY",
+      "testDefinitionFqn": "columnValuesToBeNotNull",
+      "parameterValues": [],
+      "computePassedFailedRowCount": true,
+      "threshold": ">= 99.9%",
+      "scheduleCron": "0 2 * * *",
+      "scheduleTimezone": "Asia/Ho_Chi_Minh"
+    },
+    {
+      "key": "t2",
+      "name": "Kiểm tra bằng SQL",
+      "kind": "SQL",
+      "sqlExpression": "SELECT * FROM {{ table_name }} WHERE {{ column_name }} IS NULL",
+      "parameterValues": [],
+      "computePassedFailedRowCount": false
+    }
+  ]
+}
+```
+
+| Trường | Quy tắc |
+| :--- | :--- |
+| `schemaVersion` | Phiên bản schema, hiện dùng `1`. |
+| `items[].key` | Định danh ổn định do server cấp theo mẫu `t1`, `t2`...; khai báo mới có thể chưa gửi key. Key đã phát hành không được tái sử dụng tùy ý. |
+| `items[].name` | Bắt buộc, dài 1-128 ký tự, duy nhất không phân biệt hoa/thường trong cùng DQ Rule. |
+| `items[].kind` | `LIBRARY` hoặc `SQL`. |
+| `testDefinitionFqn` | Bắt buộc với `LIBRARY`; phải là column-level TestDefinition được API `/testDefinitions` công bố. |
+| `sqlExpression` | Bắt buộc với `SQL`; là Jinja2 SELECT template, hỗ trợ `{{ table_name }}` và `{{ column_name }}`. |
+| `parameterValues` | Tham số của TestDefinition hoặc biến bổ sung của SQL template. |
+| `computePassedFailedRowCount` | Cho phép tính số dòng đạt/không đạt để đánh giá threshold phần trăm. |
+| `threshold` | Ngưỡng riêng của test; nếu trống thì dùng `extension.qualityThreshold` của DQ Rule. |
+| `scheduleCron` | Cron năm trường; trống nghĩa là chỉ chạy theo yêu cầu. |
+| `scheduleTimezone` | IANA timezone; mặc định `Asia/Ho_Chi_Minh`. |
+
+#### 4.5.2. Phân quyền runtime của API kiểm thử
+
+`GET /config` trả capability hiệu lực:
+
+```json
+{
+  "defaultTimezone": "Asia/Ho_Chi_Minh",
+  "capabilities": {
+    "canView": true,
+    "canEdit": true,
+    "canRun": true,
+    "isAdmin": false
+  }
+}
+```
+
+- `canView`: Có `ViewBasic` trên Data Quality Glossary hoặc có quyền sửa; dùng để xem trạng thái, kết quả và xu hướng.
+- `canEdit` và `canRun`: Admin hoặc có `EditWorking`; dùng để chọn TestDefinition, preview, cấu hình lịch và chạy ngay.
+- `isAdmin`: Chỉ Admin runtime; dùng cho reconcile. Đây là capability vận hành, không mở rộng ma trận nghiệp vụ mục 2.1.5.
+- Khi trả TestCase result, server kiểm tra thêm `ViewTests`/`ViewAll` trên Table nguồn. Dòng không được phép xem bị loại khỏi `testCases` và được đếm trong `hiddenTestCases`.
+
+#### 4.5.3. Danh mục endpoint đang sử dụng
+
+| Chức năng | Method và endpoint | Quyền / Tham số chính |
+| :--- | :--- | :--- |
+| Cấu hình và capability | `GET /api/v1/glossaryTerms/dataQuality/config` | Người dùng đã xác thực; trả timezone và capability. |
+| TestDefinition được phép chọn | `GET /api/v1/glossaryTerms/dataQuality/testDefinitions` | `canEdit`; trả danh sách column-level definition và parameter definition. |
+| Xem trước mapping test–column | `POST /api/v1/glossaryTerms/dataQuality/preview` | `canEdit`; body gồm `cdeTermId`, `dataQualityTestSpecs`. |
+| Trạng thái của mọi DQ Rule hiệu lực | `GET /api/v1/glossaryTerms/dataQuality/rules/status` | `canView`; trả map `{ruleId: status}` để lọc danh sách. |
+| Kết quả một DQ Rule | `GET /api/v1/glossaryTerms/dataQuality/rules/{ruleId}/results` | `canView`; query `specKey`, `offset` mặc định `0`, `limit` mặc định `25`, tối đa hiệu lực `200`. |
+| Xu hướng một DQ Rule | `GET /api/v1/glossaryTerms/dataQuality/rules/{ruleId}/trend` | `canView`; query `days`, `specKey`; kỳ hiệu lực được chuẩn hóa thành 30 hoặc 90 ngày. |
+| Kiểm tra lịch chạy | `POST /api/v1/glossaryTerms/dataQuality/schedule/preview` | `canEdit`; body `{cron, timezone}`. |
+| Chạy ngay một DQ Rule | `POST /api/v1/glossaryTerms/dataQuality/rules/{ruleId}/run` | `canRun`; không có body. |
+| Trạng thái lần chạy mới nhất | `GET /api/v1/glossaryTerms/dataQuality/rules/{ruleId}/run/latest` | `canView`. |
+| Tổng hợp kết quả theo CDE | `GET /api/v1/glossaryTerms/dataQuality/cdes/{cdeId}/results` | `canView`; query `ruleId`, `result`, `offset`, `limit`. |
+| Xu hướng theo CDE | `GET /api/v1/glossaryTerms/dataQuality/cdes/{cdeId}/trend` | `canView`; query `days`, chuẩn hóa 30 hoặc 90. |
+| Kiểm tra TestCase do DQ Rule quản lý | `GET /api/v1/glossaryTerms/dataQuality/testCases/{testCaseId}/managedBy` | Người dùng đã xác thực; trả `managed` và định danh Rule/spec nếu có. |
+| Đồng bộ lại toàn bộ binding | `POST /api/v1/glossaryTerms/dataQuality/reconcile` | Chỉ Admin runtime; trả `{"queued":true}`. |
+| Trạng thái reconcile/outbox | `GET /api/v1/glossaryTerms/dataQuality/reconcile/status` | Chỉ Admin runtime. |
+
+#### 4.5.4. Request/response chính
+
+**Preview test–column:**
+
+```http
+POST /api/v1/glossaryTerms/dataQuality/preview
+Content-Type: application/json
+```
+
+```json
+{
+  "cdeTermId": "a9812e11-1244-4902-8812-78129aa123bb",
+  "dataQualityTestSpecs": {
+    "schemaVersion": 1,
+    "items": [
+      {
+        "name": "Giá trị không rỗng",
+        "kind": "LIBRARY",
+        "testDefinitionFqn": "columnValuesToBeNotNull"
+      }
+    ]
+  }
+}
+```
+
+Response gồm `cdeTermId`, `columns[]` và `totals`. Mỗi column có `columnKey`, `columnFqn`, `service`, `table`, `dataType`; mỗi verdict trong `tests[]` có `specKey`, `index`, `name`, `applicable`, `reason`.
+
+**Kết quả DQ Rule:** `GET .../rules/{ruleId}/results` trả:
+
+- `rule`: id, code, FQN, display name, threshold, dimension, trạng thái hiệu lực và business version.
+- `status`: `PASSED`, `FAILED`, `ABORTED`, `NO_RESULT` hoặc `NOT_DECLARED`.
+- `summary`: số spec/binding và các bộ đếm passed, failed, aborted, no-result, stale, `lastRunAt`.
+- `specs[]`: kết quả theo từng khai báo test.
+- `testCases[]`: kết quả theo từng Column mà người gọi có quyền xem.
+- `hiddenTestCases` và `paging:{offset,limit,total}`.
+
+**Kết quả theo CDE:** `GET .../cdes/{cdeId}/results` trả `summary`, thống kê theo `dimensions[]`, danh sách `rules[]`, `testCases[]`, `hiddenTestCases` và `paging`.
+
+**Xu hướng:** các endpoint `/trend` trả `{days, points, versions}`; mỗi point có `date`, `passed`, `total`, `passRate`, còn `versions` ghi `ruleCode`, `businessVersion`, `publishedAt` trong kỳ.
+
+**Chạy ngay:** `POST .../rules/{ruleId}/run` trả `{triggered, message}`. Nếu đã có lần chạy đang hoạt động trả `409 DQ_TEST_RUN_IN_PROGRESS`; nếu chưa có pipeline/test có thể chạy trả lỗi miền `DQ_TEST_RUN_NOT_AVAILABLE`.
+
+#### 4.5.5. Mã lỗi miền kiểm thử DQ Rule
+
+| Mã lỗi | Ý nghĩa |
+| :--- | :--- |
+| `DQ_TEST_SPEC_NAME_DUPLICATE` | Trùng tên khai báo test trong cùng Rule. |
+| `DQ_TEST_SPEC_KEY_UNKNOWN` | Key không thuộc lịch sử khai báo của Rule. |
+| `DQ_TEST_SPEC_SQL_INVALID` | SQL template không hợp lệ. |
+| `DQ_TEST_SPEC_PARAM_INVALID` | Tham số TestDefinition/SQL không hợp lệ. |
+| `DQ_TEST_SPEC_DEFINITION_IMMUTABLE` | Thay đổi TestDefinition của key đã phát hành không được phép. |
+| `DQ_THRESHOLD_UNSUPPORTED` | Threshold không thể áp dụng cho kết quả test. |
+| `DQ_SCHEDULE_INVALID` | Cron hoặc timezone không hợp lệ. |
+| `DQ_TEST_RUN_IN_PROGRESS` | Rule đang chạy, không được kích hoạt lần khác. |
+| `DQ_TEST_RUN_NOT_AVAILABLE` | Không có test/pipeline hợp lệ để chạy. |
+| `DQ_MANAGED_TEST_CASE` | Client cố sửa/xóa TestCase do DQ Rule quản lý qua API nền tảng. |
+| `DQ_TEST_SPEC_NOT_A_RULE` | Gửi test specs cho term không phải DQ Rule. |
+
+### 4.6. Trạng thái import/export DQ hiện tại
 
 As-built chưa có server API chuyên biệt cho DQ import/export. Cụ thể:
 
@@ -1333,13 +1510,13 @@ Từ điển kỹ thuật **không có business version** nhưng có workflow ma
 `Draft → In Review → Approved/Rejected`; sửa hoặc xóa record Approved dùng change request riêng để bản đang
 có hiệu lực tiếp tục phục vụ Consumer. Chỉ approve mới thay đổi `technical_record`, search values và Column projection.
 
-PostgreSQL (`technical_record`) là nguồn sự thật cho ghi; `technical_dictionary_search_index` là read model cho danh sách, lọc, thống kê và export. Mọi endpoint bên dưới **không có** tham số `glossary`, `parentBusinessVersion`, `versionView` hay `statuses`. Các endpoint `/api/v1/glossaries/{id}/working*`, `/api/v1/glossaries/{id}/published*`, `/api/v1/glossaryTerms/{id}/working*`, `/api/v1/glossaryTerms/{id}/published*`, `/api/v1/glossaryTerms/{id}/permissions` và `/api/v1/glossaryTerms/bulk/*` không còn áp dụng cho Từ điển kỹ thuật; `POST`/`DELETE /api/v1/glossaryTerms` trên glossary này không tạo/xóa record.
+PostgreSQL (`technical_record`) là nguồn sự thật cho ghi; `technical_dictionary_search_index` là read model cho danh sách, lọc, thống kê và export. Mọi endpoint bên dưới **không có** tham số `glossary`, `parentBusinessVersion` hoặc `versionView`; riêng `/technical/search` có filter `statuses`. Các endpoint `/api/v1/glossaries/{id}/working*`, `/api/v1/glossaries/{id}/published*`, `/api/v1/glossaryTerms/{id}/working*`, `/api/v1/glossaryTerms/{id}/published*`, `/api/v1/glossaryTerms/{id}/permissions` và `/api/v1/glossaryTerms/bulk/*` không còn áp dụng cho Từ điển kỹ thuật; các API tạo/xóa GlossaryTerm thông thường cũng không tạo/xóa record kỹ thuật.
 
-Toàn bộ endpoint mục 5 yêu cầu bearer JWT và trả lỗi theo mục 2.3-2.4. Quyền runtime `canView/canEdit/canImport/canExport` chỉ được dùng để mô tả và kiểm thử hành vi as-built; yêu cầu nghiệm thu vẫn là ma trận `R/W/A` tại mục 2.1.5 và các sai khác tại mục 5.1, mục 7.
+Toàn bộ endpoint mục 5 yêu cầu bearer JWT và trả lỗi theo mục 2.3-2.4. Quyền runtime `canView/canEdit/canApprove/canImport/canExport` chỉ được dùng để mô tả và kiểm thử hành vi as-built; yêu cầu nghiệm thu vẫn là ma trận `R/W/A` tại mục 2.1.5 và các sai khác tại mục 5.1, mục 7.
 
 ### 5.1. Phân quyền
 
-#### 5.1.1. Yêu cầu nghiệp vụ theo ma trận nguồn
+#### 5.1.1. Yêu cầu nghiệp vụ theo ma trận phân quyền chính thức
 
 Phân hệ này áp dụng nguyên ma trận phân quyền chuẩn tại mục 2.1.5: Admin System, Người phê duyệt, Người đề xuất và Người dùng TT QLDL có `R`; Người dùng các ban TSC/Chi nhánh không có quyền truy cập. Chỉ Người đề xuất có `W` và chỉ Người phê duyệt có `A`; Admin System không có `W` hoặc `A`. Dữ liệu do Người đề xuất tạo mới hoặc sửa đổi phải chờ Người phê duyệt phê duyệt trước khi có hiệu lực.
 
@@ -1382,7 +1559,13 @@ GET /api/v1/glossaryTerms/technical/context
   "previousDataDictionaryVersion": "1",
   "resetAt": 1790640000000,
   "resetBy": "admin",
-  "capabilities": { "canView": true, "canEdit": true, "canImport": true, "canExport": true }
+  "capabilities": {
+    "canView": true,
+    "canEdit": true,
+    "canApprove": false,
+    "canImport": true,
+    "canExport": true
+  }
 }
 ```
 
@@ -1398,6 +1581,7 @@ GET /api/v1/glossaryTerms/technical/search
   &cdeTermIds={uuid},{uuid}
   &systemOwnerIds={uuid}
   &sourceStatuses=Available,Unavailable
+  &statuses=Draft,In%20Review,Approved,Rejected
   &elementTypes=DataElementType.AtomicDataElement
   &generationTypes=FieldGenerationType.SystemGenerated
   &creationMethods=DataCreationMethod.Parameterised
@@ -1419,6 +1603,12 @@ Mỗi phần tử `data` là một dòng phẳng, cũng là hình dạng của `
   "sourceStatus": "Available",
   "dataDictionaryVersion": "2",
   "revision": 3,
+  "status": "Approved",
+  "submittedAt": 1790630000000,
+  "submittedBy": "maker@example.com",
+  "reviewedAt": 1790640000000,
+  "reviewedBy": "checker@example.com",
+  "reviewComment": null,
   "cde": { "id": "a9812e11-…", "code": "CDE_CUSTOMER_ID", "name": "Mã khách hàng", "businessVersion": "2.1",
            "assignedAt": 1790640000000, "assignedBy": "steward" },
   "dataOwners": [{ "id": "…", "name": "Ban KHCL" }],
@@ -1427,12 +1617,16 @@ Mỗi phần tử `data` là một dòng phẳng, cũng là hình dạng của `
   "generationType": { "fqn": "…", "label": "…" },
   "creationMethod": { "fqn": "…", "label": "…" },
   "timeliness": { "fqn": "DataTimeliness.T1", "label": "T+1" },
-  "systemOwner": { "id": "…", "name": "Ban CNTT" },
-  "createdAt": 1790640000000, "createdBy": "steward", "updatedAt": 1790640000000, "updatedBy": "steward"
+  "systemOwners": [{ "id": "…", "name": "Ban CNTT", "type": "team" }],
+  "createdAt": 1790640000000,
+  "createdBy": "maker@example.com",
+  "updatedAt": 1790640000000,
+  "updatedBy": "checker@example.com",
+  "hasPendingChange": false
 }
 ```
 
-`sourceStatus` là `Available` hoặc `Unavailable` (Column nguồn bị xóa hoặc đổi tên). Khối `cde` và `dataOwners` chỉ có khi đã gán CDE.
+`sourceStatus` là `Available` hoặc `Unavailable` (Column nguồn bị xóa hoặc đổi tên). `status` nhận `Draft`, `In Review`, `Approved`, `Rejected`; `Archived` chỉ là trạng thái hiển thị của dòng bản chụp đã bị thay thế, không lưu trên current record. Khối `cde` và `dataOwners` chỉ có khi đã gán CDE. Khi Approved record có proposal, response của người có quyền xem working có thể thêm `hasPendingChange`, `changeRequestId`, `changeRequestStatus`, `changeOperation`, `changeCreatedBy` và `rowRole=APPROVED|CHANGE`; Consumer không nhận nội dung/metadata proposal.
 
 ```http
 GET /api/v1/glossaryTerms/technical/stats
@@ -1471,7 +1665,16 @@ POST   /api/v1/glossaryTerms/technical/records/{id}/change-request/reject
   "generationType": "FieldGenerationType.SystemGenerated",
   "creationMethod": "DataCreationMethod.Parameterised",
   "timeliness": "DataTimeliness.T1",
-  "systemOwnerId": "2d242416-65bb-4aa7-9252-87da77ec23f8"
+  "systemOwners": [
+    {
+      "id": "2d242416-65bb-4aa7-9252-87da77ec23f8",
+      "type": "team"
+    },
+    {
+      "id": "151e6a87-2364-40c7-a178-2ae88ca7f9d0",
+      "type": "user"
+    }
+  ]
 }
 ```
 
@@ -1480,7 +1683,78 @@ Approved trả `409 TD_APPROVED_EDIT_REQUIRES_CHANGE_REQUEST`. Với Approved, P
 payload riêng; search và Column projection tiếp tục dùng bản Approved. Chỉ `/change-request/approve` mới áp
 dụng UPDATE hoặc DELETE trong transaction, sau khi kiểm tra `baseRevision`, maker-checker, CDE và Thứ hạng.
 
-Quy tắc kiểm tra: `rank` từ `1` đến `999`; có `cde` thì bắt buộc có `rank`, không có `cde` thì `rank` phải trống; `cde` phải là CDE `Approved` của DD đang gắn; `rank` duy nhất trong cùng CDE trên các record `Available`; tag phải thuộc đúng classification (`DataElementType`, `FieldGenerationType`, `DataCreationMethod`, `DataTimeliness`); `systemOwnerId` là một Team tồn tại.
+Quy tắc kiểm tra: `rank` từ `1` đến `999`; có `cde` thì bắt buộc có `rank`, không có `cde` thì `rank` phải trống; `cde` phải là CDE `Approved` của DD đang gắn; `rank` duy nhất trong cùng CDE trên các record `Available`; tag phải thuộc đúng classification (`DataElementType`, `FieldGenerationType`, `DataCreationMethod`, `DataTimeliness`); mỗi phần tử `systemOwners` phải có UUID tồn tại và `type` là `team` hoặc `user`. Trường lưu trữ nội bộ `systemOwnerId` không phải contract request công khai.
+
+#### 5.4.1. Workflow record mới
+
+```http
+POST /api/v1/glossaryTerms/technical/records/{id}/submit
+POST /api/v1/glossaryTerms/technical/records/{id}/approve
+POST /api/v1/glossaryTerms/technical/records/{id}/reject
+Content-Type: application/json
+
+{"expectedRevision": 3}
+```
+
+- `submit`: yêu cầu `canEdit`, chuyển `Draft → In Review`.
+- `approve`: yêu cầu `canApprove`, chuyển `In Review → Approved`; lúc này CDE/rank mới có hiệu lực trên Column projection.
+- `reject`: yêu cầu `canApprove`, chuyển `In Review → Rejected`.
+- Người tạo record không được tự approve/reject, kể cả khi đồng thời có capability phê duyệt; vi phạm trả `403 TD_SELF_APPROVAL_FORBIDDEN`.
+- `PATCH` một record `Rejected` bằng người đề xuất đồng thời lưu giá trị mới và chuyển lại `In Review`; không có endpoint `reopen` riêng cho Technical Dictionary.
+- Mỗi chuyển trạng thái kiểm tra `expectedRevision`; stale revision trả `409 TD_RECORD_REVISION_CONFLICT`.
+
+#### 5.4.2. Workflow hàng loạt
+
+```http
+POST /api/v1/glossaryTerms/technical/records/bulk/submit
+POST /api/v1/glossaryTerms/technical/records/bulk/approve
+POST /api/v1/glossaryTerms/technical/records/bulk/reject
+Content-Type: application/json
+```
+
+```json
+{
+  "items": [
+    {"id": "e3910764-2ddf-422c-9b51-b30b00b6873f", "expectedRevision": 3},
+    {"id": "3ab34551-9ea2-4124-9aa4-e87fb5df477a", "expectedRevision": 1}
+  ]
+}
+```
+
+Tối đa 100 record, không được lặp ID. Mỗi item chạy trong transaction riêng: lỗi của một item không rollback item khác. Response giữ nguyên thứ tự request:
+
+```json
+{
+  "succeeded": 1,
+  "failed": 1,
+  "results": [
+    {"termId": "e3910764-2ddf-422c-9b51-b30b00b6873f", "outcome": "SUCCEEDED", "record": {}},
+    {"termId": "3ab34551-9ea2-4124-9aa4-e87fb5df477a", "outcome": "FAILED", "code": "TD_RECORD_REVISION_CONFLICT", "message": "..."}
+  ]
+}
+```
+
+#### 5.4.3. Change request cho record Approved
+
+Body của `POST` hoặc `PATCH .../{id}/change-request`:
+
+```json
+{
+  "expectedRevision": 3,
+  "operation": "UPDATE",
+  "cde": "a9812e11-1244-4902-8812-78129aa123bb",
+  "rank": 1,
+  "elementType": "DataElementType.AtomicDataElement",
+  "generationType": "FieldGenerationType.SystemGenerated",
+  "creationMethod": "DataCreationMethod.Parameterised",
+  "timeliness": "DataTimeliness.T1",
+  "systemOwners": [{"id": "2d242416-65bb-4aa7-9252-87da77ec23f8", "type": "team"}]
+}
+```
+
+`operation` là `UPDATE` hoặc `DELETE`. Với `UPDATE`, payload là toàn bộ tập giá trị đề xuất; trường vắng mặt được hiểu là xóa. Với `DELETE`, không có proposed values. Khi tạo proposal mới, `expectedRevision` là revision của Approved record; khi cập nhật proposal hiện hữu, đó là revision của change request. Response gồm `id`, `recordId`, `operation`, `baseRevision`, `status`, `revision`, audit fields, `proposedValues`, `approvedRecord` và `proposedRecord` nếu là UPDATE.
+
+Các action `/change-request/submit|approve|reject` nhận body `{"expectedRevision":n}`. Người tạo proposal không được tự approve/reject. `DELETE .../change-request?expectedRevision=n` chỉ hủy proposal `Draft` hoặc `Rejected`.
 
 `history` trả `{data:[{id, action, actor, at, dataDictionaryVersion, changes:[{field, oldValue, newValue}]}], paging}` mới nhất trước. Ngoài action của record mới, vòng đời proposal dùng `CREATE_CHANGE`, `UPDATE_CHANGE`,
 `SUBMIT_CHANGE`, `RESUBMIT_CHANGE`, `APPROVE_CHANGE`, `REJECT_CHANGE`, `CANCEL_CHANGE`, `RESET_CHANGE`.
@@ -1497,6 +1771,8 @@ POST /api/v1/glossaryTerms/import/technical/{importSessionId}/commit
 GET  /api/v1/glossaryTerms/technical/snapshots
 GET  /api/v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/export
 GET  /api/v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/records
+GET  /api/v1/glossaryTerms/technical/snapshots/{dataDictionaryVersion}/records/{id}
+GET  /api/v1/glossaryTerms/technical/records/{id}/versions
 GET  /api/v1/glossaryTerms/{cdeId}/technicalAssets?limit=15&offset=0
 POST /api/v1/glossaryTerms/technical/index/rebuild           # Admin
 ```
@@ -1505,6 +1781,8 @@ POST /api/v1/glossaryTerms/technical/index/rebuild           # Admin
 - **Import**: không có `updatePolicy`. Mỗi dòng match theo `Tên cơ sở dữ liệu + Tên Schema + Tên Bảng + Tên cột` (và `Nguồn` nếu có). `CREATE_RECORD` tạo record Draft; `UPDATE` trên record Approved tạo/cập nhật change request Draft và không đổi projection. Import không tự submit/approve. Proposal InReview trở thành lỗi của dòng ngay ở preview; session ghim cả record revision và change-request revision nên proposal thay đổi sau preview không bị ghi đè. Session gắn actor và `dataDictionaryVersion`, dùng một lần, hết hạn sau 30 phút; commit nguyên tử, kiểm tra lại quyền và revision từng dòng. File tối đa 20 MiB, 70.000 dòng, 32.000 ký tự/ô.
 - **`snapshots`**: `{data:[{dataDictionaryVersion, bindings, frozenAt}]}`, mới nhất trước. Bản chụp giữ vĩnh viễn, không có API xóa.
 - **`snapshots/{dataDictionaryVersion}/records`**: xem bản chụp trên bảng, chỉ đọc. Query `q` (khớp `columnFqn`, mã hoặc tên CDE), `limit` (1-100, mặc định 25), `offset`. Trả `{data:[bản ghi cùng dạng `/search`], paging:{total,limit,offset}}`; không có trường `hasPendingChange`.
+- **`snapshots/{dataDictionaryVersion}/records/{id}`**: lấy một record đóng băng theo ID. Nếu record hiện tại đã được tạo lại sau cutover, backend có thể đối sánh theo `columnKey` để tìm bản chụp tương ứng.
+- **`records/{id}/versions`**: trả `{data:["N",...], currentRecordId}`; `data` là các phiên bản DD đã bị thay thế có chứa cùng physical Column, mới nhất trước, còn `currentRecordId` có thể null nếu Column không còn trong Từ điển kỹ thuật hiện hành.
 - **`technicalAssets`** (tab Tài sản liên kết của CDE): `{source, dataDictionaryVersion, frozenAt, data, paging}`. `source = CURRENT` khi phiên bản DD của CDE đang hiệu lực (đọc index theo `cde.id`), `SNAPSHOT` khi đã bị thay thế (đọc bản chụp, chỉ đọc, kèm `frozenAt`), `NONE` khi phiên bản đang soạn (`data` rỗng). Không phụ thuộc phiên bản `N.x` của CDE.
 - **`index/rebuild`**: dựng physical index mới từ PostgreSQL rồi chuyển alias; reader dùng index cũ trong lúc dựng. Sai quyền `403`; index lỗi `503 TD_INDEX_UNAVAILABLE`.
 
@@ -1519,6 +1797,8 @@ POST /api/v1/glossaryTerms/technical/index/rebuild           # Admin
 | `TD_DATA_DICTIONARY_NOT_ACTIVE` | 409 | Chưa có DD Approved đang hiệu lực. |
 | `TD_RECORD_NOT_FOUND` | 404 | Record không tồn tại hoặc đã bị xóa khi làm mới. |
 | `TD_RECORD_REVISION_CONFLICT` | 409 | `expectedRevision` lệch với `revision` hiện tại. |
+| `TD_INVALID_STATUS_TRANSITION` | 409 | Action không hợp lệ với trạng thái hiện tại. |
+| `TD_SELF_APPROVAL_FORBIDDEN` | 403 | Người tạo record/proposal cố tự phê duyệt hoặc từ chối. |
 | `TD_APPROVED_EDIT_REQUIRES_CHANGE_REQUEST` | 409 | UPDATE/DELETE trực tiếp record Approved. |
 | `TD_CHANGE_REQUEST_NOT_FOUND` | 404 | Record không có proposal đang mở. |
 | `TD_CHANGE_REQUEST_STALE` | 409 | Proposal hoặc `baseRevision` không còn khớp. |
@@ -1622,14 +1902,15 @@ Các mục trong bảng dưới đây là sai khác đã biết hoặc quyết �
 | `GAP-OIDC-02` | OIDC | IAM chưa xác nhận `refresh_token`, cơ chế refresh/re-login và OIDC end-session/logout tương thích với OpenMetadata. | IAM và Nhóm tích hợp | Token response, grant hỗ trợ, logout endpoint và test hết hạn phiên. | Mở |
 | `GAP-OIDC-03` | OIDC/RBAC | Claim role của IAM (`auth`/`roles`/userinfo) chưa khớp cơ chế đọc role từ bearer ID Token của OpenMetadata. | IAM, ATTT và TT QLDL | Mapping claim-role được phê duyệt; test đủ năm vai trò nghiệp vụ. | Mở |
 | `GAP-OIDC-04` | Bảo mật | Runtime cần cưỡng chế `iss`, `aud`/`azp`, allowlist `redirectUri` và ngăn lộ ID Token trong URL/log. | Nhóm phát triển và ATTT | Code/config đã harden; kết quả kiểm thử bảo mật và log-redaction đạt. | Mở |
-| `GAP-RBAC-01` | RBAC | Quyền `Reject`, `Reopen`, `Archive/Thu hồi`, tạo Scope, Import và Cutover chưa được tài liệu nguồn quy định độc lập. | TT QLDL | Policy nghiệp vụ bổ sung được phê duyệt và ánh xạ thành test case `200/403`. | Mở |
+| `GAP-RBAC-01` | RBAC | Quyền `Reject`, `Reopen`, `Archive/Thu hồi`, tạo Scope, Import và Cutover chưa được ma trận phân quyền tại mục 2.1.5 quy định độc lập. | TT QLDL | Policy nghiệp vụ bổ sung được phê duyệt và tích hợp trực tiếp vào tài liệu này, kèm test case `200/403`. | Mở |
 | `GAP-RBAC-02` | RBAC | Cơ chế Admin/superuser, Owner/Reviewer và policy kế thừa có thể cấp quyền rộng hơn ma trận chuẩn. | TT QLDL và Nhóm phát triển | Kiểm thử phủ định chứng minh role không được phép nhận `403`/`404`; không có bypass ngoài phê duyệt. | Mở |
 | `GAP-CDE-01` | CDE | Một số thuộc tính nghiệp vụ bắt buộc trong Schema 16 thuộc tính chưa được JSON Schema/backend cưỡng chế đầy đủ. | TT QLDL và Nhóm phát triển | Danh sách field bắt buộc được chốt; schema và API validation test đạt. | Mở |
 | `GAP-DQ-01` | DQ | Chưa có API server chuyên biệt cho import/export DQ nguyên tử; UI đang xử lý file và gọi API từng rule. | TT QLDL và Nhóm phát triển | Quyết định chấp nhận luồng hiện tại hoặc contract backend mới được đặc tả, triển khai và kiểm thử. | Mở |
+| `GAP-DQ-02` | DQ/RBAC | Quyền cấu hình lịch, chạy ngay và reconcile kiểm thử chưa được ma trận nguồn quy định độc lập; runtime hiện gắn `canRun` với `canEdit`, reconcile chỉ dành cho Admin. | TT QLDL và Nhóm phát triển | Phê duyệt ánh xạ quyền vận hành DQ test và bổ sung test `200/403` theo vai trò. | Mở |
 | `GAP-TD-01` | Từ điển kỹ thuật | Runtime đã có Draft/Submit/Approve cho record mới và change request cho update/delete Approved. | TT QLDL và Nhóm phát triển | Test nguồn đã mô tả maker-checker; cần chạy bộ test trong giai đoạn xác minh. | Đã triển khai |
 | `GAP-TD-02` | Từ điển kỹ thuật | Capability hiện tại cho Admin/DataSteward và phạm vi `canView` chưa khớp ma trận nguồn. | TT QLDL và Nhóm phát triển | Policy theo vai trò/đơn vị và bộ test RBAC đạt ma trận mục 2.1.5. | Mở |
 | `GAP-TD-03` | Từ điển kỹ thuật | `GET /api/v1/glossaryTerms/{cdeId}/technicalAssets` chưa kiểm tra thêm quyền xem Từ điển kỹ thuật. | Nhóm phát triển và ATTT | Endpoint kiểm tra `TechnicalDictionaryAccess.canView`; test `BasicConsumer` bị từ chối. | Mở |
-| `GAP-DOC-01` | Tài liệu/API | Danh mục as-built phải được đối chiếu lại với Swagger/OpenAPI sinh từ đúng revision dùng cho UAT sau khi các gap trên được xử lý. | Nhóm phát triển và QA | Báo cáo diff endpoint/method/schema bằng `0` hoặc có biên bản chấp thuận sai khác. | Mở |
+| `GAP-DOC-01` | Tài liệu/API | Danh mục as-built đã được đối chiếu với Swagger runtime, backend và frontend tại revision `dd61210ed5bef553e7c5667d75529506f17b8641`. Khi chốt revision UAT khác, phải chạy lại đối chiếu. | Nhóm phát triển và QA | Đã bổ sung DQ execution, TD workflow/snapshot và CDE deletion/discard; đã loại bỏ archive route cũ. | Đã đối chiếu 07/10/2026 |
 
 ### 7.1. Điều kiện chuyển trạng thái tài liệu sang chính thức
 

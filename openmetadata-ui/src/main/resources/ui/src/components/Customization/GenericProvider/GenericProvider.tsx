@@ -89,9 +89,18 @@ export const GenericProvider = <T extends Omit<EntityReference, 'type'>>({
   const navigate = useNavigate();
   const pageType = useMemo(() => ENTITY_PAGE_TYPE_MAP[type], [type]);
   const { tab } = useRequiredParams<{ tab: EntityTabs }>();
+  const layoutTab =
+    type === EntityType.GLOSSARY && tab === EntityTabs.PENDING_REQUESTS
+      ? EntityTabs.TERMS
+      : tab;
   const expandedLayout = useRef<WidgetConfig[]>([]);
   const [layout, setLayout] = useState<WidgetConfig[]>(
-    getLayoutFromCustomizedPage(pageType, tab, customizedPage, isVersionView)
+    getLayoutFromCustomizedPage(
+      pageType,
+      layoutTab,
+      customizedPage,
+      isVersionView
+    )
   );
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
   const [activeTagDropdownKey, setActiveTagDropdownKey] = useState<
@@ -183,9 +192,14 @@ export const GenericProvider = <T extends Omit<EntityReference, 'type'>>({
 
   useEffect(() => {
     setLayout(
-      getLayoutFromCustomizedPage(pageType, tab, customizedPage, isVersionView)
+      getLayoutFromCustomizedPage(
+        pageType,
+        layoutTab,
+        customizedPage,
+        isVersionView
+      )
     );
-  }, [customizedPage, tab, pageType, isVersionView]);
+  }, [customizedPage, layoutTab, pageType, isVersionView]);
 
   const onThreadPanelClose = useCallback(() => {
     setThreadLink('');

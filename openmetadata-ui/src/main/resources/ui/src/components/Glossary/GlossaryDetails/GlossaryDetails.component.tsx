@@ -43,6 +43,14 @@ import { GenericProvider } from '../../Customization/GenericProvider/GenericProv
 import { Glossary } from '../../../generated/entity/data/glossary';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { GenericTab } from '../../Customization/GenericTab/GenericTab';
+import { getGlossaryVersionPermissions } from '../../../rest/glossaryAPI';
+import GlossaryPendingRequests from '../GlossaryPendingRequests/GlossaryPendingRequests.component';
+import { useGlossaryPendingRequestsAdapter } from '../GlossaryPendingRequests/useGlossaryPendingRequestsAdapter';
+import { usePendingRequestsCount } from '../../common/PendingRequestsTab/usePendingRequestsCount';
+import {
+  PendingRequestAction,
+  PendingRequestsActionResult,
+} from '../../common/PendingRequestsTab/PendingRequestsTab.interface';
 import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import './glossary-details.less';
@@ -64,6 +72,7 @@ const GlossaryDetails = ({
     activeGlossary: glossary,
     updateActiveGlossary,
     visibleGlossaryTermsCount,
+    pendingRequestsRefreshVersion,
   } = useGlossaryStore();
   const [viewedVersion, setViewedVersion] = useState<Glossary | null>(null);
   const currentGlossary = viewedVersion ?? glossary;
@@ -75,7 +84,7 @@ const GlossaryDetails = ({
   const [feedCount, setFeedCount] = useState<FeedCounts>(
     FEED_COUNT_INITIAL_DATA
   );
-  const { onAddGlossaryTerm } = useGlossaryStore();
+  const { onAddGlossaryTerm, requestGlossaryTermsRefresh } = useGlossaryStore();
 
   // Since we are rendering this component for all customized tabs we need tab ID to get layout form store
   const { tab: activeTab = EntityTabs.TERMS } = useRequiredParams<{
@@ -121,6 +130,81 @@ const GlossaryDetails = ({
 
   const shouldHideActivityFeed = isRestrictedGlossary && !isAdmin;
 
+  const isDataDictionary = useMemo(
+    () =>
+      isDataDictionaryGlossary(
+        glossary.fullyQualifiedName,
+        glossary.name,
+        glossary.displayName
+      ),
+    [glossary.fullyQualifiedName, glossary.name, glossary.displayName]
+  );
+  const [canDecideRequests, setCanDecideRequests] = useState(false);
+  const [canViewRequests, setCanViewRequests] = useState(false);
+
+  useEffect(() => {
+    setCanDecideRequests(false);
+    setCanViewRequests(false);
+    if (!isDataDictionary || isVersionView || !glossary.id) {
+      return;
+    }
+    let isCurrent = true;
+    getGlossaryVersionPermissions(glossary.id)
+      .then((permissions) => {
+        if (isCurrent) {
+          // Every role except Consumer sees the tab; only approvers get the decision actions.
+          setCanViewRequests(
+            !(permissions.isConsumer ?? !permissions.canViewWorking)
+          );
+          setCanDecideRequests(
+            Boolean(permissions.canApprove || permissions.canReject)
+          );
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setCanViewRequests(false);
+          setCanDecideRequests(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [glossary.id, isDataDictionary, isVersionView]);
+
+  const showPendingRequests = isDataDictionary && canViewRequests;
+  const pendingRequestsBusinessVersion = String(
+    currentGlossary.businessVersion
+  );
+  const pendingRequestsAdapter = useGlossaryPendingRequestsAdapter({
+    glossaryId: glossary.id,
+    glossaryName: glossary.name,
+    businessVersion: pendingRequestsBusinessVersion,
+  });
+  const { count: pendingRequestsCount, refresh: refreshPendingRequestsCount } =
+    usePendingRequestsCount(
+      pendingRequestsAdapter,
+      showPendingRequests,
+      pendingRequestsRefreshVersion
+    );
+  const glossaryTermsCount = isDataDictionary
+    ? visibleGlossaryTermsCount
+    : visibleGlossaryTermsCount ??
+      (Array.isArray(glossary.termRevisions)
+        ? glossary.termRevisions.length
+        : glossary.termCount ?? glossary.childrenCount ?? 0);
+
+  const handlePendingRequestsDecided = useCallback(
+    (result: PendingRequestsActionResult, action: PendingRequestAction) => {
+      refreshPendingRequestsCount();
+      if (action === 'approve' && result.succeeded > 0) {
+        requestGlossaryTermsRefresh();
+      }
+    },
+    [refreshPendingRequestsCount, requestGlossaryTermsRefresh]
+  );
+
   const handleTabChange = (activeKey: string) => {
     if (activeKey !== activeTab) {
       navigate(
@@ -162,22 +246,44 @@ const GlossaryDetails = ({
   const tabs = useMemo(() => {
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
+    const pendingRequestsItems = showPendingRequests
+        ? [
+            {
+              label: (
+                <TabsLabel
+                  count={pendingRequestsCount}
+                  id={EntityTabs.PENDING_REQUESTS}
+                  isActive={activeTab === EntityTabs.PENDING_REQUESTS}
+                  name={t('label.pending-request-plural')}
+                />
+              ),
+              key: EntityTabs.PENDING_REQUESTS,
+              children: (
+                <GlossaryPendingRequests
+                  adapter={pendingRequestsAdapter}
+                  canDecide={canDecideRequests}
+                  refreshKey={pendingRequestsRefreshVersion}
+                  scopeKey={`${glossary.id}:${pendingRequestsBusinessVersion}`}
+                  onDecided={handlePendingRequestsDecided}
+                />
+              ),
+            },
+          ]
+        : [];
+
     const items = [
       {
         label: (
           <TabsLabel
-            count={
-              visibleGlossaryTermsCount ??
-              (Array.isArray(glossary.termRevisions)
-                ? glossary.termRevisions.length
-                : glossary.termCount ?? glossary.childrenCount ?? 0)
-            }
+            count={glossaryTermsCount}
             id={EntityTabs.TERMS}
             isActive={activeTab === EntityTabs.TERMS}
+            isLoading={isDataDictionary && glossaryTermsCount === undefined}
             name={tabLabelMap[EntityTabs.TERMS] ?? t('label.term-plural')}
           />
         ),
         key: EntityTabs.TERMS,
+        forceRender: showPendingRequests,
         children: <GenericTab type={PageType.Glossary} />,
       },
       ...(!isVersionView && !shouldHideActivityFeed
@@ -213,16 +319,32 @@ const GlossaryDetails = ({
         : []),
     ];
 
-    return getDetailsTabWithNewLabel(items, customizedTabs, EntityTabs.TERMS);
+    const visibleTabs = getDetailsTabWithNewLabel(
+      items,
+      customizedTabs,
+      EntityTabs.TERMS
+    );
+
+    // The pending requests tab is not part of the customizable page layout, so it is added after
+    // the layout is applied; otherwise a customized page would drop it.
+    return [...visibleTabs, ...pendingRequestsItems];
   }, [
     customizedTabs,
     glossary.fullyQualifiedName,
     visibleGlossaryTermsCount,
+    glossaryTermsCount,
     feedCount.conversationCount,
     feedCount.totalTasksCount,
     activeTab,
     isVersionView,
     shouldHideActivityFeed,
+    showPendingRequests,
+    canDecideRequests,
+    currentGlossary.businessVersion,
+    pendingRequestsAdapter,
+    pendingRequestsCount,
+    pendingRequestsRefreshVersion,
+    handlePendingRequestsDecided,
   ]);
 
   useEffect(() => {

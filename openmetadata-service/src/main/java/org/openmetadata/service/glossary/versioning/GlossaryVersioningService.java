@@ -442,6 +442,66 @@ public class GlossaryVersioningService {
     return result;
   }
 
+  /**
+   * Withdraws an In Review working version on behalf of the user who submitted it. A deletion
+   * request is removed (null is returned), because a Draft deletion would still be approvable; any
+   * other request returns to Draft with its content kept.
+   */
+  public WorkingVersionRecord withdraw(
+      String entityType,
+      UUID entityId,
+      String parentBusinessVersion,
+      long expectedRevision,
+      String actor) {
+    final WorkingVersionRecord result =
+        Entity.getJdbi()
+            .inTransaction(
+                handle -> {
+                  GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+                  WorkingVersionRecord working =
+                      requireWorking(dao, entityType, entityId, parentBusinessVersion);
+                  requireSubmitter(working, actor);
+                  if (working.revision() != expectedRevision) {
+                    throw conflict("Working version revision conflict");
+                  }
+                  if (!EntityStatus.IN_REVIEW.value().equals(working.entityStatus())) {
+                    throw conflict(
+                        "Invalid working transition " + working.entityStatus() + " -> withdrawn");
+                  }
+                  if (GlossaryTermDeletion.isRequested(working)) {
+                    requireUpdated(
+                        dao.deleteWorking(
+                            entityType, entityId, parentBusinessVersion, expectedRevision));
+                    return null;
+                  }
+                  requireUpdated(
+                      dao.transitionWorking(
+                          entityType,
+                          entityId,
+                          parentBusinessVersion,
+                          expectedRevision,
+                          EntityStatus.IN_REVIEW.value(),
+                          EntityStatus.DRAFT.value(),
+                          EntityStatus.IN_REVIEW.value(),
+                          EntityStatus.REJECTED.value(),
+                          System.currentTimeMillis(),
+                          actor));
+                  return dao.findWorking(entityType, entityId, parentBusinessVersion);
+                });
+    refreshIndexes(entityType, entityId, result == null ? null : result.payload());
+    return result;
+  }
+
+  private static void requireSubmitter(WorkingVersionRecord working, String actor) {
+    if (actor == null || !actor.equals(working.submittedBy())) {
+      throw new WebApplicationException(
+          "Only the user who submitted the request can withdraw it",
+          Response.status(Response.Status.FORBIDDEN)
+              .entity(Map.of("code", "NOT_SUBMITTER"))
+              .build());
+    }
+  }
+
   public PublishedSnapshotRecord publish(
       String entityType, UUID entityId, long expectedRevision, String actor) {
     return publish(entityType, entityId, expectedRevision, actor, null);
