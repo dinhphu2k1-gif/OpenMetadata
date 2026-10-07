@@ -107,6 +107,7 @@ import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.dq.DqTestErrors;
 import org.openmetadata.service.glossary.dq.DqTestSpecService;
 import org.openmetadata.service.glossary.technical.TechnicalAssets;
+import org.openmetadata.service.glossary.versioning.CdeDeletionGuard;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter.ExportedWorkbook;
 import org.openmetadata.service.glossary.versioning.CdeImportService;
@@ -168,6 +169,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final GovernedScopeAuthorizer scopeAuthorizer;
   public static final String COLLECTION_PATH = "/v1/glossaryTerms/";
   private static final int MAX_TECHNICAL_ASSETS = 100;
+  private static final String RECORD_DELETED = "deleted";
   static final String FIELDS =
       "children,relatedTerms,reviewers,owners,tags,usageCount,domains,extension,childrenCount";
   // 100 keeps the query-string-encoded ids list (~37 chars per UUID +
@@ -654,6 +656,9 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     WorkingVersionRecord currentWorking =
         versioningService.getWorking(
             GlossaryVersioningService.GLOSSARY_TERM, id, parentBusinessVersion);
+    if (GlossaryVersioningService.isDeletionRequest(currentWorking)) {
+      throw new BadRequestException("A deletion request cannot be edited; discard it instead");
+    }
     GlossaryTerm currentPayload = JsonUtils.readValue(currentWorking.payload(), GlossaryTerm.class);
     GlossaryTerm payload =
         applyProfileDraftRules(
@@ -864,6 +869,40 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     return response;
   }
 
+  @POST
+  @Path("/{id}/working/deletion")
+  @Operation(
+      operationId = "requestGlossaryTermDeletion",
+      summary = "Open a Draft that proposes deleting an Approved CDE",
+      description =
+          "The Approved CDE stays effective until the Draft is submitted and approved. Approving it"
+              + " archives the CDE in its Data Dictionary scope; the Approved history is kept.")
+  public Map<String, Object> requestDeletion(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID id,
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
+    final GlossaryTerm term = createVersionEntity(uriInfo, securityContext, id);
+    DataDictionaryResolver.requireCde(term);
+    requireGovernedIdentityScope(term, parentBusinessVersion);
+    final WorkingVersionRecord working =
+        versioningService.createDeletionWorking(
+            id,
+            parentBusinessVersion,
+            securityContext.getUserPrincipal().getName(),
+            snapshot -> {
+              final GlossaryTerm published = publishedTerm(snapshot);
+              GlossaryAuthorizationResolver.requireCreateVersion(
+                  capabilitiesForAuthorizationTerm(securityContext, published));
+              CdeDeletionGuard.requireNoDependents(published, parentBusinessVersion);
+            });
+    final Map<String, Object> response = GlossaryVersionResponses.working(working);
+    response.put(
+        "capabilities",
+        withoutCreateVersion(capabilitiesForWorking(securityContext, working)).asMap());
+    return response;
+  }
+
   private PublishedSnapshotRecord requireReadablePublishedVersion(
       UriInfo uriInfo,
       SecurityContext securityContext,
@@ -1009,6 +1048,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       SecurityContext securityContext, WorkingVersionRecord working) {
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
     GlossaryAuthorizationResolver.requireSubmit(capabilitiesForWorking(securityContext, working));
+    if (GlossaryVersioningService.isDeletionRequest(working)) {
+      CdeDeletionGuard.requireNoDependents(payload, working.parentBusinessVersion());
+    } else {
+      validateWorkflowPayload(securityContext, payload, working);
+    }
+  }
+
+  private void validateWorkflowPayload(
+      SecurityContext securityContext, GlossaryTerm payload, WorkingVersionRecord working) {
     requireGovernedWorkflowPayload(securityContext, payload, working.glossaryId());
     DqTestSpecService.validateForWorkflow(payload);
     repository.prepareInternal(payload, true);
@@ -1019,6 +1067,15 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
     GlossaryAuthorizationResolver.requireReview(
         capabilitiesForAuthorizationTerm(securityContext, payload));
+    if (GlossaryVersioningService.isDeletionRequest(working)) {
+      CdeDeletionGuard.requireNoDependents(payload, working.parentBusinessVersion());
+    } else {
+      validateApprovedPayload(securityContext, payload, working);
+    }
+  }
+
+  private void validateApprovedPayload(
+      SecurityContext securityContext, GlossaryTerm payload, WorkingVersionRecord working) {
     requireGovernedWorkflowPayload(securityContext, payload, working.glossaryId());
     EntityRepository.validateOwners(payload.getOwners());
     EntityRepository.validateReviewers(payload.getReviewers());
@@ -1448,7 +1505,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       @QueryParam("dataSourceTags") String dataSourceTags,
       @QueryParam("classificationTags") String classificationTags,
       @QueryParam("sortField") String sortField,
-      @QueryParam("sortOrder") String sortOrder) {
+      @QueryParam("sortOrder") String sortOrder,
+      @Parameter(
+              description =
+                  "Also list the CDEs whose deletion was approved in this Data Dictionary version")
+          @QueryParam("includeDeleted")
+          @DefaultValue("false")
+          boolean includeDeleted) {
 
     if (parentBusinessVersion != null) {
       if (glossaryId == null) {
@@ -1468,7 +1531,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           sortField,
           sortOrder,
           limitParam,
-          offsetParam);
+          offsetParam,
+          includeDeleted);
     }
 
     Fields fields = getFields(fieldsParam);
@@ -1559,10 +1623,11 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String sortField,
       String sortOrder,
       int limit,
-      int offset) {
+      int offset,
+      boolean includeDeleted) {
     AuthorizedFlatRows authorized =
         loadAuthorizedGlossaryFlatRows(
-            securityContext, glossaryId.toString(), parentBusinessVersion, null);
+            securityContext, glossaryId.toString(), parentBusinessVersion, null, includeDeleted);
     Criteria criteria =
         new Criteria(
             glossaryId,
@@ -2271,14 +2336,32 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String glossaryIdParam,
       String requestedParentBusinessVersion,
       GovernedGlossaryProfileRegistry.Profile requiredProfile) {
+    return loadAuthorizedGlossaryFlatRows(
+        securityContext, glossaryIdParam, requestedParentBusinessVersion, requiredProfile, false);
+  }
+
+  private AuthorizedFlatRows loadAuthorizedGlossaryFlatRows(
+      SecurityContext securityContext,
+      String glossaryIdParam,
+      String requestedParentBusinessVersion,
+      GovernedGlossaryProfileRegistry.Profile requiredProfile,
+      boolean includeDeleted) {
     return loadFlatRows(
         securityContext,
         scopeAuthorizer.authorizeRead(
-            securityContext, glossaryIdParam, requestedParentBusinessVersion, requiredProfile));
+            securityContext, glossaryIdParam, requestedParentBusinessVersion, requiredProfile),
+        includeDeleted);
   }
 
   private AuthorizedFlatRows loadFlatRows(
       SecurityContext securityContext, GovernedScopeAuthorizer.ScopeAccess access) {
+    return loadFlatRows(securityContext, access, false);
+  }
+
+  private AuthorizedFlatRows loadFlatRows(
+      SecurityContext securityContext,
+      GovernedScopeAuthorizer.ScopeAccess access,
+      boolean includeDeleted) {
     UUID glossaryId = access.glossaryId();
     String parentBusinessVersion = access.parentBusinessVersion();
     Scope scope = access.scope();
@@ -2308,10 +2391,32 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       normalizeFlatRow(row, record.entityId(), parentBusinessVersion, "working");
       visibleRows.add(row);
     }
+    if (includeDeleted && !consumerOnly && isDataDictionaryProfile(profile)) {
+      visibleRows.addAll(deletedFlatRows(securityContext, glossaryId, scope));
+    }
 
     visibleRows.sort(GLOSSARY_FLAT_ROW_COMPARATOR);
     return new AuthorizedFlatRows(
         parentBusinessVersion, scope.type(), consumerOnly, profile, visibleRows);
+  }
+
+  private static boolean isDataDictionaryProfile(
+      GovernedGlossaryProfileRegistry.Profile profile) {
+    return profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY;
+  }
+
+  private List<Map<String, Object>> deletedFlatRows(
+      SecurityContext securityContext, UUID glossaryId, Scope scope) {
+    final List<Map<String, Object>> rows = new ArrayList<>();
+    for (PublishedSnapshotRecord record : glossaryFlatListService.loadDeleted(glossaryId, scope)) {
+      if (isPublishedVisible(securityContext, publishedTerm(record))) {
+        final Map<String, Object> row =
+            new LinkedHashMap<>(GlossaryVersionResponses.published(record));
+        normalizeFlatRow(row, record.entityId(), scope.parentBusinessVersion(), RECORD_DELETED);
+        rows.add(row);
+      }
+    }
+    return rows;
   }
 
   private boolean isPublishedVisible(SecurityContext securityContext, GlossaryTerm term) {

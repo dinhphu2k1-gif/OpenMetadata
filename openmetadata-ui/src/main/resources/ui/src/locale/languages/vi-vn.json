@@ -1,5 +1,16 @@
 {
   "cde": {
+    "deleted-record": "Đã xóa",
+    "deletion-approve-confirm": "Phê duyệt sẽ xóa CDE này khỏi phiên bản Từ điển đang hiệu lực. Lịch sử phê duyệt vẫn được lưu.",
+    "deletion-approved": "Đã phê duyệt xóa CDE {{name}}",
+    "deletion-cancel": "Hủy đề nghị xóa",
+    "deletion-cancelled": "Đã hủy đề nghị xóa",
+    "deletion-pending-banner": "Đây là đề nghị xóa. Sau khi được phê duyệt, CDE sẽ bị loại khỏi phiên bản Từ điển đang hiệu lực; lịch sử phê duyệt vẫn được lưu.",
+    "deletion-request": "Đề nghị xóa",
+    "deletion-request-confirm": "Thao tác này tạo bản nháp đề nghị xóa. CDE đã phê duyệt vẫn có hiệu lực cho tới khi đề nghị được phê duyệt.",
+    "deletion-request-created": "Đã tạo đề nghị xóa",
+    "deletion-request-tag": "Đề nghị xóa",
+    "deletion-request-title": "Đề nghị xóa CDE {{name}}?",
     "effective-date": "Ngày hiệu lực",
     "expiration-date": "Ngày hết hiệu lực",
     "invalid-date": "Ngày không hợp lệ. Sử dụng định dạng dd/MM/yyyy hoặc yyyy-MM-dd.",

@@ -146,6 +146,10 @@
       "type": "integer",
       "minimum": 1
     },
+    "pendingDeletion": {
+      "description": "True when this working version proposes deleting the Approved CDE. Approving it archives the CDE in its Data Dictionary scope. Server-owned.",
+      "type": "boolean"
+    },
     "snapshotId": {
       "description": "Identifier of the immutable published snapshot represented by this response.",
       "$ref": "../../type/basic.json#/definitions/uuid"

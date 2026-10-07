@@ -24,7 +24,9 @@ import {
   Modal,
   Row,
   Space,
+  Switch,
   TableProps,
+  Tag,
   Tooltip,
 } from 'antd';
 import {
@@ -144,6 +146,7 @@ import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEdit
 import StatusAction from '../../common/StatusAction/StatusAction';
 import Table from '../../common/Table/Table';
 import { useCDETablePreferences } from '../../../hooks/useCDETablePreferences';
+import { useTableFilters } from '../../../hooks/useTableFilters';
 import TagButton from '../../common/TagButton/TagButton.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
@@ -173,6 +176,7 @@ import GlossaryBulkActionModal, {
 } from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
 const SEARCH_DEBOUNCE_MS = 400;
+const SHOW_DELETED_FILTER = { showDeleted: false };
 
 const GlossarySearchInput = memo(
   ({
@@ -683,6 +687,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     EntityStatus.Rejected,
     EntityStatus.Approved,
   ]);
+  const { filters: deletedFilter, setFilters: setDeletedFilter } =
+    useTableFilters(SHOW_DELETED_FILTER);
+  const showDeleted = Boolean(deletedFilter.showDeleted);
 
   useEffect(() => {
     if (isWorkflowPermissionLoading) {
@@ -1031,6 +1038,37 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     ]
   );
 
+  const canShowDeleted =
+    isCDEGlossary &&
+    !isConsumer &&
+    !isVersionView &&
+    displayedGlossary.entityStatus === EntityStatus.Approved;
+
+  const handleShowDeletedChange = useCallback(
+    (checked: boolean) => {
+      setDeletedFilter({ showDeleted: checked ? true : undefined });
+      handlePageChange(INITIAL_PAGING_VALUE);
+    },
+    [handlePageChange, setDeletedFilter]
+  );
+
+  const showDeletedToggle = useMemo(
+    () =>
+      canShowDeleted ? (
+        <Space align="end" size={5}>
+          <Switch
+            checked={showDeleted}
+            data-testid="cde-show-deleted-toggle"
+            id="cde-switch-deleted"
+            size="small"
+            onChange={handleShowDeletedChange}
+          />
+          <label htmlFor="cde-switch-deleted">{t('label.show-deleted')}</label>
+        </Space>
+      ) : null,
+    [canShowDeleted, showDeleted, handleShowDeletedChange, t]
+  );
+
   const hasActiveDqFilters = useMemo(
     () =>
       !selectedDqDimensions.includes('all') ||
@@ -1259,9 +1297,11 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           values.filter((value) => value !== 'all');
         const hasStatusCriteria =
           !isConsumer && !selectedStatus.includes('all');
+        const includeDeleted = canShowDeleted && showDeleted;
         const hasSearchCriteria =
           Boolean(searchTerm.trim()) ||
           hasStatusCriteria ||
+          includeDeleted ||
           (isCDEGlossary ? hasActiveCdeFilters : hasActiveDqFilters);
         const dqClassificationTags = [
           ...withoutAll(selectedDqDimensions),
@@ -1288,6 +1328,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   ? withoutAll(selectedCdeClassifications)
                   : dqClassificationTags
                 ).join(',') || undefined,
+              includeDeleted: includeDeleted || undefined,
               limit: pageSize,
               offset: (currentPage - 1) * pageSize,
             })
@@ -1317,7 +1358,9 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               termId,
               flatRow.parentBusinessVersion,
               getBusinessVersion(flatRow.businessVersion),
-              flatRow.recordType === 'working' ? 'working' : 'published',
+              flatRow.recordType === 'working' || flatRow.recordType === 'deleted'
+                ? flatRow.recordType
+                : 'published',
             ].join('|'),
           } as ModifiedGlossary;
         });
@@ -2307,11 +2350,22 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           }
 
           return (
-            <StatusBadge
-              dataTestId={(record.fullyQualifiedName ?? '') + '-status'}
-              label={status}
-              status={EntityStatusClass[status]}
-            />
+            <Space size={4}>
+              <StatusBadge
+                dataTestId={(record.fullyQualifiedName ?? '') + '-status'}
+                label={status}
+                status={EntityStatusClass[status]}
+              />
+              {record.pendingDeletion && (
+                <Tag
+                  color="error"
+                  data-testid={
+                    (record.fullyQualifiedName ?? '') + '-pending-deletion'
+                  }>
+                  {t('cde.deletion-request-tag')}
+                </Tag>
+              )}
+            </Space>
           );
         },
         onFilter: (value, record) => record.entityStatus === value,
@@ -2684,6 +2738,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       const isExpanded = expandedRowKeys.includes(
         record.fullyQualifiedName || ''
       );
+
+      if (record.recordType === 'deleted') {
+        return 'glossary-deleted-row';
+      }
 
       return isNested || isExpanded ? 'glossary-nested-row' : '';
     },
@@ -3075,6 +3133,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             handleEditGlossary
           )}
 
+        {showDeletedToggle}
+
         <Button
           className={classNames('text-primary remove-button-background-hover', {
             'cde-toolbar-collapse-action': isCDEGlossary,
@@ -3104,6 +3164,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     isAllExpanded,
     isExpandingAll,
     isStatusDropdownVisible,
+    showDeletedToggle,
     isCDEGlossary,
     isDQGlossary,
     statusDropdownMenu,
@@ -3154,6 +3215,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         isConsumer ? 'consumer' : 'authoring',
         searchTerm,
         selectedStatus.join(','),
+        showDeleted ? 'with-deleted' : 'without-deleted',
         pageSize,
         currentPage,
         pagingCursor.cursorType,
@@ -3176,6 +3238,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       isConsumer,
       searchTerm,
       selectedStatus,
+      showDeleted,
       pageSize,
       currentPage,
       pagingCursor.cursorType,
@@ -3290,7 +3353,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     isSearchActive ||
     isStatusFilterActive ||
     hasActiveCdeFilters ||
-    hasActiveDqFilters;
+    hasActiveDqFilters ||
+    showDeleted;
 
   const glossaryPlaceholderText = useMemo(() => {
     if (displayedGlossary.entityStatus === EntityStatus.Archived) {
@@ -3306,7 +3370,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       return t('label.no-data-found');
     }
 
-    return t('message.no-entity-available', {
+    return t('label.no-entity-available', {
       entity: t('label.glossary-term-plural'),
     });
   }, [
@@ -3323,6 +3387,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   if (
     hasNoTerms &&
+    !canShowDeleted &&
     !isAnyFilterActive &&
     totalTermsCount === 0 &&
     !isTableLoading

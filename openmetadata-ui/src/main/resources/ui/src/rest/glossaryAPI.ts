@@ -62,6 +62,7 @@ export type SearchGlossaryTermsParams = ListParamsWithOffset & {
   ownerIds?: string;
   dataSourceTags?: string;
   classificationTags?: string;
+  includeDeleted?: boolean;
   sortField?: 'name' | 'displayName' | 'businessVersion' | 'entityStatus';
   sortOrder?: 'asc' | 'desc';
 };
@@ -497,6 +498,25 @@ export const createGlossaryTermCorrection = async (
     `/glossaryTerms/${id}/published/${encodeURIComponent(
       businessVersion
     )}/correction`,
+    undefined,
+    {
+      params: {
+        parentBusinessVersion:
+          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+          parentBusinessVersion,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export const requestGlossaryTermDeletion = async (
+  id: string,
+  parentBusinessVersion: string
+) => {
+  const response = await APIClient.post<undefined, AxiosResponse<GlossaryTerm>>(
+    `/glossaryTerms/${id}/working/deletion`,
     undefined,
     {
       params: {

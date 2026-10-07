@@ -6,10 +6,13 @@
 package org.openmetadata.service.glossary.versioning;
 
 import jakarta.ws.rs.NotFoundException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.jdbi3.GlossaryFlatListDAO;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.util.GlossaryBusinessVersion;
@@ -63,6 +66,22 @@ public class GlossaryFlatListService {
     return new Candidates(
         dao.listActivePublished(glossaryId, scope.parentBusinessVersion()),
         dao.listWorking(glossaryId, scope.parentBusinessVersion()));
+  }
+
+  /**
+   * The newest Approved snapshot of every term whose deletion was approved in an active scope.
+   * Archived snapshots only exist in an active scope when a deletion archived them; a cutover
+   * archives the whole scope at once and turns it into an archived scope.
+   */
+  public List<PublishedSnapshotRecord> loadDeleted(UUID glossaryId, Scope scope) {
+    final Map<UUID, PublishedSnapshotRecord> newestByTerm = new LinkedHashMap<>();
+    if (scope.type() == ScopeType.ACTIVE) {
+      Entity.getJdbi()
+          .onDemand(GlossaryVersionDAO.class)
+          .listArchivedTermSnapshotsForGlossaryAndParent(glossaryId, scope.parentBusinessVersion())
+          .forEach(snapshot -> newestByTerm.putIfAbsent(snapshot.entityId(), snapshot));
+    }
+    return List.copyOf(newestByTerm.values());
   }
 
   private static NotFoundException scopeNotFound() {

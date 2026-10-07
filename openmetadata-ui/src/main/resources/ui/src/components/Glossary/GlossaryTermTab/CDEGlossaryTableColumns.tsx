@@ -202,7 +202,9 @@ export const getCDEGlossaryTableColumns = ({
         // stable identity from the flat-list response so the detail page does
         // not resolve a different revision through the generic FQN endpoint.
         termId: record.termId ?? record.id,
-        isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
+        isWorkingDraft:
+          record.recordType !== 'deleted' &&
+          record.entityStatus !== EntityStatus.Approved,
       });
 
       return (
@@ -385,6 +387,16 @@ export const getCDEGlossaryTableColumns = ({
     render: (entityStatus: EntityStatus | undefined, record) => {
       if (record.isLoadMoreButton) {
         return null;
+      }
+      if (record.recordType === 'deleted') {
+        return (
+          <Tag
+            color="error"
+            data-testid={`cde-deleted-${record.name}`}
+            title={record.archivedBy}>
+            {t('cde.deleted-record')}
+          </Tag>
+        );
       }
       const status = entityStatus ?? EntityStatus.Approved;
 

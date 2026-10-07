@@ -63,6 +63,7 @@ public class GlossaryVersioningService {
   public static final String GLOSSARY = "glossary";
   public static final String GLOSSARY_TERM = "glossaryTerm";
   public static final String SNAPSHOT_UPSERT_EVENT = "PUBLISHED_SNAPSHOT_UPSERT";
+  static final String SNAPSHOT_ARCHIVE_EVENT = "PUBLISHED_SNAPSHOT_ARCHIVE";
 
   public WorkingVersionRecord createWorking(
       String entityType,
@@ -502,6 +503,9 @@ public class GlossaryVersioningService {
                     if (authorizationAndValidation != null) {
                       authorizationAndValidation.accept(working);
                     }
+                    if (GlossaryTermDeletion.isRequested(working)) {
+                      return GlossaryTermDeletion.apply(dao, working, actor);
+                    }
                     PublishedSnapshotRecord corrected =
                         dao.lockPublishedVersion(entityType, entityId, working.businessVersion());
                     if (corrected != null) {
@@ -644,6 +648,10 @@ public class GlossaryVersioningService {
             GLOSSARY_TERM, glossaryId, requireParentScope(parentBusinessVersion));
     List<PublishedSnapshotRecord> publishedTerms = new ArrayList<>(workingTerms.size());
     for (WorkingVersionRecord working : workingTerms) {
+      if (GlossaryTermDeletion.isRequested(working)) {
+        GlossaryTermDeletion.apply(dao, working, actor);
+        continue;
+      }
       PublishedSnapshotRecord corrected =
           dao.lockPublishedVersion(GLOSSARY_TERM, working.entityId(), working.businessVersion());
       if (corrected != null) {
@@ -754,6 +762,40 @@ public class GlossaryVersioningService {
     }
     refreshIndexes(GLOSSARY_TERM, entityId, result.payload());
     return result;
+  }
+
+  /**
+   * Opens a Draft that proposes deleting an Approved CDE. The CDE stays effective until the Draft
+   * is approved; see {@link GlossaryTermDeletion}.
+   */
+  public WorkingVersionRecord createDeletionWorking(
+      UUID entityId,
+      String parentBusinessVersion,
+      String actor,
+      Consumer<PublishedSnapshotRecord> authorization) {
+    final GlossaryTermDeletion.DeletionRequest request =
+        new GlossaryTermDeletion.DeletionRequest(
+            entityId, parentBusinessVersion, actor, authorization);
+    final WorkingVersionRecord result;
+    try {
+      result =
+          Entity.getJdbi()
+              .inTransaction(
+                  handle ->
+                      GlossaryTermDeletion.createWorking(
+                          handle.attach(GlossaryVersionDAO.class), request));
+    } catch (UnableToExecuteStatementException exception) {
+      if (isConstraintConflict(exception)) {
+        throw conflict("A working version was created concurrently");
+      }
+      throw exception;
+    }
+    refreshIndexes(GLOSSARY_TERM, entityId, result.payload());
+    return result;
+  }
+
+  public static boolean isDeletionRequest(WorkingVersionRecord working) {
+    return GlossaryTermDeletion.isRequested(working);
   }
 
   public List<SnapshotHistoryRecord> listCorrectionHistory(
@@ -1165,11 +1207,7 @@ public class GlossaryVersioningService {
         dao.updateSnapshotPayload(
             predecessor.snapshotId(), repairedPayload, sha256(repairedPayload)));
     dao.insertOutbox(
-        UUID.randomUUID(),
-        predecessor.snapshotId(),
-        "PUBLISHED_SNAPSHOT_ARCHIVE",
-        repairedPayload,
-        now);
+        UUID.randomUUID(), predecessor.snapshotId(), SNAPSHOT_ARCHIVE_EVENT, repairedPayload, now);
   }
 
   public PublishPreview publishPreview(UUID glossaryId, int limit, String after) {
@@ -1494,7 +1532,7 @@ public class GlossaryVersioningService {
       requireUpdated(dao.archiveSnapshot(term.snapshotId(), now, actor));
       dao.deletePublishedHead(GLOSSARY_TERM, term.entityId(), term.snapshotId());
       dao.insertOutbox(
-          UUID.randomUUID(), term.snapshotId(), "PUBLISHED_SNAPSHOT_ARCHIVE", term.payload(), now);
+          UUID.randomUUID(), term.snapshotId(), SNAPSHOT_ARCHIVE_EVENT, term.payload(), now);
     }
     dao.deleteWorkingByGlossaryAndParent(GLOSSARY_TERM, glossaryId, parentBusinessVersion);
   }
@@ -1546,7 +1584,7 @@ public class GlossaryVersioningService {
     dao.insertOutbox(
         UUID.randomUUID(),
         predecessor.snapshotId(),
-        "PUBLISHED_SNAPSHOT_ARCHIVE",
+        SNAPSHOT_ARCHIVE_EVENT,
         predecessor.payload(),
         now);
   }

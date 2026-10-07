@@ -86,6 +86,7 @@ import {
   getGlossaryWorkingVersion,
   GlossaryVersionPermissions,
   GlossaryWorkflowAction,
+  requestGlossaryTermDeletion,
   transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
 } from '../../../rest/glossaryAPI';
@@ -229,6 +230,12 @@ const GlossaryHeader = ({
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] =
     useState<boolean>(false);
   const [isCreatingCorrection, setIsCreatingCorrection] =
+    useState<boolean>(false);
+  const [isDeletionRequestModalOpen, setIsDeletionRequestModalOpen] =
+    useState<boolean>(false);
+  const [isRequestingDeletion, setIsRequestingDeletion] =
+    useState<boolean>(false);
+  const [isCancellingDeletion, setIsCancellingDeletion] =
     useState<boolean>(false);
   const [isSubmitForReviewModalOpen, setIsSubmitForReviewModalOpen] =
     useState<boolean>(false);
@@ -482,8 +489,11 @@ const GlossaryHeader = ({
   const isCustomManaged = isCustomManagedTerm || isCustomManagedGlossary;
   const isImmutableApprovedTerm =
     !isGlossary && glossaryTermStatus === EntityStatus.Approved;
+  const isPendingDeletion =
+    !isGlossary && Boolean(selectedData.pendingDeletion);
   const canManageBusinessContent =
     !isImmutableApprovedTerm &&
+    !isPendingDeletion &&
     (!isCustomManaged || Boolean(workflowPermissions?.canEditWorking));
   const canDeleteBusinessContent =
     canManageBusinessContent &&
@@ -944,6 +954,15 @@ const GlossaryHeader = ({
     selectedData.workingRevision,
   ]);
 
+  const canRequestDeletion = canCreateCorrection && isCDEGlossaryTerm;
+
+  const canCancelDeletion =
+    !isVersionView &&
+    isPendingDeletion &&
+    [EntityStatus.Draft, EntityStatus.Rejected].includes(glossaryTermStatus) &&
+    selectedData.workingRevision != null &&
+    Boolean(workflowPermissions?.canEditWorking);
+
   const canViewCorrectionHistory =
     !isVersionView &&
     !isGlossary &&
@@ -1154,6 +1173,49 @@ const GlossaryHeader = ({
     }
   };
 
+  const handleRequestDeletion = async () => {
+    if (isRequestingDeletion) {
+      return;
+    }
+    try {
+      setIsRequestingDeletion(true);
+      const created = await requestGlossaryTermDeletion(
+        selectedData.id,
+        getParentBusinessVersion()
+      );
+      navigateToWorkingDraft(
+        getBusinessVersion(
+          created.businessVersion,
+          getBusinessVersion(businessVersion ?? undefined, '')
+        )
+      );
+      await onWorkflowTransition?.(created, 'createDraft');
+      showSuccessToast(t('cde.deletion-request-created'));
+      setIsDeletionRequestModalOpen(false);
+    } catch (error) {
+      handleWorkflowError(error);
+    } finally {
+      setIsRequestingDeletion(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    try {
+      setIsCancellingDeletion(true);
+      await discardGlossaryTermWorkingVersion(
+        selectedData.id,
+        Number(selectedData.workingRevision),
+        getParentBusinessVersion()
+      );
+      showSuccessToast(t('cde.deletion-cancelled'));
+      navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
+    } catch (error) {
+      handleWorkflowError(error);
+    } finally {
+      setIsCancellingDeletion(false);
+    }
+  };
+
   const canSubmitForReview = useMemo(() => {
     if (isVersionView || glossaryTermStatus !== EntityStatus.Draft) {
       return false;
@@ -1199,12 +1261,19 @@ const GlossaryHeader = ({
     try {
       setIsApproving(true);
       await runWorkflowAction('approve');
-      showSuccessToast(
-        t('message.entity-approved-success', {
-          entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
-        })
-      );
       setIsApproveModalOpen(false);
+      if (isPendingDeletion) {
+        showSuccessToast(
+          t('cde.deletion-approved', { name: getEntityName(selectedData) })
+        );
+        navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
+      } else {
+        showSuccessToast(
+          t('message.entity-approved-success', {
+            entity: isGlossary ? t('label.glossary') : t('label.glossary-term'),
+          })
+        );
+      }
     } catch (error) {
       handleWorkflowError(error);
     } finally {
@@ -1693,9 +1762,32 @@ const GlossaryHeader = ({
             {t('label.correct-version')}
           </Button>
         )}
+
+        {canRequestDeletion && (
+          <Button
+            danger
+            className="m-l-xs"
+            data-testid="request-cde-deletion-button"
+            onClick={() => setIsDeletionRequestModalOpen(true)}>
+            {t('cde.deletion-request')}
+          </Button>
+        )}
+
+        {canCancelDeletion && (
+          <Button
+            className="m-l-xs"
+            data-testid="cancel-cde-deletion-button"
+            loading={isCancellingDeletion}
+            onClick={handleCancelDeletion}>
+            {t('cde.deletion-cancel')}
+          </Button>
+        )}
       </Space>
     );
   }, [
+    canRequestDeletion,
+    canCancelDeletion,
+    isCancellingDeletion,
     isVersionView,
     canApproveOrReject,
     canApprove,
@@ -1903,6 +1995,15 @@ const GlossaryHeader = ({
               : ''}
           </Typography.Text>
         )}
+      {isPendingDeletion && (
+        <Alert
+          showIcon
+          className="m-b-sm"
+          data-testid="cde-pending-deletion-banner"
+          message={t('cde.deletion-pending-banner')}
+          type="error"
+        />
+      )}
       {selectedData && (
         <EntityDeleteModal
           bodyText={getEntityDeleteMessage(selectedData.name, '')}
@@ -1977,6 +2078,19 @@ const GlossaryHeader = ({
         visible={isCorrectionModalOpen}
         onCancel={() => setIsCorrectionModalOpen(false)}
         onConfirm={handleCreateCorrection}
+      />
+
+      <ConfirmationModal
+        bodyText={t('cde.deletion-request-confirm')}
+        cancelText={t('label.cancel')}
+        confirmText={t('cde.deletion-request')}
+        header={t('cde.deletion-request-title', {
+          name: getEntityName(selectedData),
+        })}
+        isLoading={isRequestingDeletion}
+        visible={isDeletionRequestModalOpen}
+        onCancel={() => setIsDeletionRequestModalOpen(false)}
+        onConfirm={handleRequestDeletion}
       />
 
       {hasWorkflowConflict && !isGlossary && (
@@ -2104,6 +2218,8 @@ const GlossaryHeader = ({
             ? t('message.confirm-approve-entity-message', {
                 entity: t('label.glossary'),
               })
+            : isPendingDeletion
+            ? t('cde.deletion-approve-confirm')
             : t('message.confirm-approve-glossary-term-message')
         }
         open={isApproveModalOpen}

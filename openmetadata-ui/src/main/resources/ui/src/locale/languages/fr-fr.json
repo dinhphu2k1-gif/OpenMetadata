@@ -1,5 +1,16 @@
 {
   "cde": {
+    "deleted-record": "Deleted",
+    "deletion-approve-confirm": "Approving deletes this CDE from the effective Data Dictionary version. Its approval history is kept.",
+    "deletion-approved": "Deletion of CDE {{name}} was approved",
+    "deletion-cancel": "Cancel deletion request",
+    "deletion-cancelled": "Deletion request cancelled",
+    "deletion-pending-banner": "This is a deletion request. Once approved, the CDE leaves the effective Data Dictionary version; its approval history is kept.",
+    "deletion-request": "Request deletion",
+    "deletion-request-confirm": "This creates a draft deletion request. The Approved CDE stays effective until the request is approved.",
+    "deletion-request-created": "Deletion request created",
+    "deletion-request-tag": "Deletion request",
+    "deletion-request-title": "Request deletion of CDE {{name}}?",
     "business-group": "Business Group",
     "business-meaning": "Business Meaning",
     "business-term-name": "Business Term Name",

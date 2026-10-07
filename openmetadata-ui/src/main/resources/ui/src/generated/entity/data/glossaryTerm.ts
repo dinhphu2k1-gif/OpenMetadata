@@ -141,7 +141,12 @@ export interface GlossaryTerm {
      * Canonical Data Dictionary business version that scopes this CDE version.
      */
     parentBusinessVersion?: string;
-    provider?:              ProviderType;
+    /**
+     * True when this working version proposes deleting the Approved CDE. Approving it archives
+     * the CDE in its Data Dictionary scope. Server-owned.
+     */
+    pendingDeletion?: boolean;
+    provider?:        ProviderType;
     /**
      * Monotonic publication order used to resolve the latest published snapshot.
      */
