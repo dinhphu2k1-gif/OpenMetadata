@@ -1215,6 +1215,8 @@ CREATE TABLE IF NOT EXISTS `glossary_business_snapshot_history` (
   `publishedBy` varchar(256) NOT NULL,
   `supersededAt` bigint unsigned NOT NULL,
   `supersededBy` varchar(256) NOT NULL,
+  `proposedAt` bigint unsigned DEFAULT NULL,
+  `proposedBy` varchar(256) DEFAULT NULL,
   PRIMARY KEY (`historyId`),
   KEY `idx_glossary_snapshot_history_version` (`entityType`, `entityId`, `businessVersion`, `supersededAt`),
   KEY `idx_glossary_snapshot_history_snapshot` (`snapshotId`)
@@ -1243,6 +1245,16 @@ CREATE TABLE IF NOT EXISTS `glossary_snapshot_outbox` (
   PRIMARY KEY (`eventId`),
   UNIQUE KEY `uq_glossary_outbox_snapshot_event` (`snapshotId`,`eventType`),
   KEY `idx_glossary_outbox_pending` (`processedAt`,`createdAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `governed_glossary_search_outbox` (
+  `glossaryId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) NOT NULL,
+  `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `lastError` text,
+  PRIMARY KEY (`glossaryId`, `parentBusinessVersion`),
+  KEY `idx_governed_glossary_search_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `technical_dictionary_state` (

@@ -313,3 +313,18 @@ CREATE TABLE IF NOT EXISTS `dq_test_outbox` (
   PRIMARY KEY (`kind`, `subjectKey`),
   KEY `idx_dq_test_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Who sent an Approved-version correction for review; null on rows written before this column.
+ALTER TABLE `glossary_business_snapshot_history`
+  ADD COLUMN `proposedAt` bigint unsigned DEFAULT NULL AFTER `supersededBy`,
+  ADD COLUMN `proposedBy` varchar(256) DEFAULT NULL AFTER `proposedAt`;
+
+CREATE TABLE IF NOT EXISTS `governed_glossary_search_outbox` (
+  `glossaryId` varchar(36) NOT NULL,
+  `parentBusinessVersion` varchar(64) NOT NULL,
+  `enqueuedAt` bigint unsigned NOT NULL,
+  `attempts` int unsigned NOT NULL DEFAULT 0,
+  `lastError` text,
+  PRIMARY KEY (`glossaryId`, `parentBusinessVersion`),
+  KEY `idx_governed_glossary_search_outbox_enqueued` (`enqueuedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

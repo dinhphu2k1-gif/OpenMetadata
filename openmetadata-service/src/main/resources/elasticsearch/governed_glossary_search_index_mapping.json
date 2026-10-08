@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "index": {
+      "max_result_window": 10000
+    }
+  },
+  "mappings": {
+    "dynamic": false,
+    "properties": {
+      "termId": {"type": "keyword"},
+      "id": {"type": "keyword"},
+      "glossaryId": {"type": "keyword"},
+      "parentBusinessVersion": {"type": "keyword"},
+      "recordType": {"type": "keyword"},
+      "revisionMarker": {"type": "long"},
+      "name": {"type": "keyword"},
+      "displayName": {"type": "keyword"},
+      "nameSearch": {"type": "keyword"},
+      "displayNameSearch": {"type": "keyword"},
+      "businessVersion": {"type": "keyword"},
+      "businessVersionSort": {"type": "keyword"},
+      "entityStatus": {"type": "keyword"},
+      "createdBy": {"type": "keyword"},
+      "ownerIds": {"type": "keyword"},
+      "domainIds": {"type": "keyword"},
+      "dataSourceTags": {"type": "keyword"},
+      "classificationTags": {"type": "keyword"},
+      "pendingDeletion": {"type": "boolean"}
+    }
+  }
+}

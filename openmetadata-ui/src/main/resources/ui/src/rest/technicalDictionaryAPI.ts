@@ -758,31 +758,25 @@ export interface TechnicalHistoryChange {
   newValue?: string | null;
 }
 
-export interface TechnicalHistoryEntry {
+export interface TechnicalCorrectionEntry {
   id: string;
-  /** CREATE, SUBMIT, APPROVE_CHANGE and so on. */
-  action: string;
-  actor: string;
-  at: number;
-  dataDictionaryVersion?: string | null;
+  approvedAt: number;
+  approvedBy: string;
+  proposedAt?: number | null;
+  proposedBy?: string | null;
   changes: TechnicalHistoryChange[];
 }
 
-export interface TechnicalHistoryPage {
-  data: TechnicalHistoryEntry[];
-  paging: { total: number; limit: number; offset: number };
-}
-
-/** Who changed a record and when, newest first. */
-export const getTechnicalRecordHistory = async (
+/** Edits of an Approved record, newest first. */
+export const getTechnicalRecordCorrections = async (
   termId: string,
-  limit: number,
-  offset: number
-): Promise<TechnicalHistoryPage> => {
-  const response = await APIClient.get<TechnicalHistoryPage>(
-    `/glossaryTerms/technical/records/${termId}/history`,
+  limit = 100,
+  offset = 0
+): Promise<TechnicalCorrectionEntry[]> => {
+  const response = await APIClient.get<{ data: TechnicalCorrectionEntry[] }>(
+    `/glossaryTerms/technical/records/${termId}/corrections`,
     { params: { limit, offset } }
   );
 
-  return response.data;
+  return response.data.data;
 };

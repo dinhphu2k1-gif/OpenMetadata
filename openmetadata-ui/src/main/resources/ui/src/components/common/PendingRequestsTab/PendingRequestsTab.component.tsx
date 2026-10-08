@@ -33,10 +33,10 @@ import { TABLE_CONSTANTS } from '../../../constants/Teams.constants';
 import { ERROR_PLACEHOLDER_TYPE } from '../../../enums/common.enum';
 import { customFormatDateTime } from '../../../utils/date-time/DateTimeUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
-import CDEFilterDropdown from '../../Glossary/GlossaryTermTab/CDEFilterDropdown.component';
 import BulkSelectionBar from '../BulkSelectionBar/BulkSelectionBar.component';
 import { BulkSelectionChip } from '../BulkSelectionBar/BulkSelectionBar.interface';
 import ErrorPlaceHolder from '../ErrorWithPlaceholder/ErrorPlaceHolder';
+import GovernanceListFilterDropdown from '../GovernanceList/GovernanceListFilterDropdown.component';
 import { OwnerLabel } from '../OwnerLabel/OwnerLabel.component';
 import ReviewActionConfirmModal from '../ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import StatusBadge from '../StatusBadge/StatusBadge.component';
@@ -467,7 +467,7 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
         })}
       </div>
       {filters.map((filter) => (
-        <CDEFilterDropdown
+        <GovernanceListFilterDropdown
           dataTestId={`pending-requests-filter-${filter.key}`}
           key={filter.key}
           label={filter.label}

@@ -37,6 +37,7 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.PATCH;
@@ -60,7 +61,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,6 +107,10 @@ import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqTestErrors;
 import org.openmetadata.service.glossary.dq.DqTestSpecService;
+import org.openmetadata.service.glossary.search.GovernedGlossaryIndexRebuilder;
+import org.openmetadata.service.glossary.search.GovernedGlossarySearchRequest;
+import org.openmetadata.service.glossary.search.GovernedGlossarySearchService;
+import org.openmetadata.service.glossary.search.GovernedGlossarySearchSettings;
 import org.openmetadata.service.glossary.technical.TechnicalAssets;
 import org.openmetadata.service.glossary.versioning.CdeDeletionGuard;
 import org.openmetadata.service.glossary.versioning.CdeExcelExporter;
@@ -123,10 +127,13 @@ import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Scop
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.ScopeType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.glossary.versioning.GovernedBulkWorkflowService;
+import org.openmetadata.service.governance.search.GovernanceSearchMetrics;
+import org.openmetadata.service.governance.search.GovernanceSearchUnavailableException;
 import org.openmetadata.service.jdbi3.EntityRepository;
 import org.openmetadata.service.jdbi3.GlossaryRepository;
 import org.openmetadata.service.jdbi3.GlossaryTermRepository;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotHistoryRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 import org.openmetadata.service.jdbi3.ListFilter;
 import org.openmetadata.service.limits.Limits;
@@ -136,6 +143,7 @@ import org.openmetadata.service.security.AuthRequest;
 import org.openmetadata.service.security.AuthorizationException;
 import org.openmetadata.service.security.AuthorizationLogic;
 import org.openmetadata.service.security.Authorizer;
+import org.openmetadata.service.security.DefaultAuthorizer;
 import org.openmetadata.service.security.policyevaluator.CreateResourceContext;
 import org.openmetadata.service.security.policyevaluator.OperationContext;
 import org.openmetadata.service.security.policyevaluator.ResourceContext;
@@ -165,6 +173,8 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private final GlossaryFlatListService glossaryFlatListService = new GlossaryFlatListService();
   private final GlossaryBusinessVersionSearchService glossarySearchService =
       new GlossaryBusinessVersionSearchService();
+  private final GovernedGlossarySearchService governedIndexSearchService =
+      new GovernedGlossarySearchService();
   private final CdeImportService cdeImportService = new CdeImportService();
   private final GovernedBulkWorkflowService bulkWorkflowService = new GovernedBulkWorkflowService();
   private final GovernedScopeAuthorizer scopeAuthorizer;
@@ -341,6 +351,19 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     this.scopeAuthorizer = new GovernedScopeAuthorizer(authorizer);
   }
 
+  @POST
+  @Path("/index/rebuild")
+  @Operation(
+      operationId = "rebuildGovernedGlossaryIndex",
+      summary = "Rebuild the governed glossary list search index from the database")
+  public Map<String, Object> rebuildGovernedGlossaryIndex(
+      @Context final SecurityContext securityContext) {
+    if (!DefaultAuthorizer.getSubjectContext(securityContext).isAdmin()) {
+      throw new ForbiddenException("Administrator permission is required");
+    }
+    return GovernedGlossaryIndexRebuilder.rebuild();
+  }
+
   private static GlossaryTerm publishedTerm(PublishedSnapshotRecord snapshot) {
     return JsonUtils.readValue(
         JsonUtils.pojoToJson(GlossaryVersionResponses.published(snapshot)), GlossaryTerm.class);
@@ -365,17 +388,56 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     String version = access.parentBusinessVersion();
     return switch (access.profile()) {
       case DATA_DICTIONARY -> {
-        AuthorizedFlatRows authorized = loadFlatRows(securityContext, access);
+        final List<Map<String, Object>> rows = exportRows(securityContext, access);
         yield exportWorkbook(
             securityContext,
             glossaryId,
             version,
             "Agribank_CDE_Danh_Tu_Dien_Du_Lieu_v",
-            () -> CdeExcelExporter.write(authorized.rows(), version));
+            () -> CdeExcelExporter.write(rows, version));
       }
       case DATA_QUALITY -> throw new BadRequestException(
           "Export is not supported for this glossary profile");
     };
+  }
+
+  private List<Map<String, Object>> exportRows(
+      final SecurityContext securityContext, final GovernedScopeAuthorizer.ScopeAccess access) {
+    List<Map<String, Object>> rows = null;
+    if (GovernedGlossarySearchSettings.readFromIndex()) {
+      final Criteria criteria = emptyCriteria(access, 50, 0);
+      try {
+        rows =
+            governedIndexSearchService.filterAll(
+                indexRequest(securityContext, criteria, access, false, false));
+      } catch (GovernanceSearchUnavailableException exception) {
+        recordGovernedFallback(access, exception);
+      }
+    }
+    if (rows == null) {
+      rows = loadFlatRows(securityContext, access).rows();
+    }
+    return rows;
+  }
+
+  private static Criteria emptyCriteria(
+      final GovernedScopeAuthorizer.ScopeAccess access, final int limit, final int offset) {
+    return GlossaryBusinessVersionSearchService.validate(
+        new Criteria(
+            access.glossaryId(),
+            access.parentBusinessVersion(),
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            null,
+            limit,
+            offset),
+        access.consumerOnly(),
+        access.isArchived());
   }
 
   @FunctionalInterface
@@ -878,12 +940,16 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     final PublishedSnapshotRecord snapshot =
         requireReadablePublishedVersion(
             uriInfo, securityContext, id, businessVersion, parentBusinessVersion);
-    return versioningService
-        .listCorrectionHistory(
-            GlossaryVersioningService.GLOSSARY_TERM, id, snapshot.businessVersion())
-        .stream()
-        .map(GlossaryVersionResponses::history)
-        .toList();
+    final List<SnapshotHistoryRecord> history =
+        versioningService.listCorrectionHistory(
+            GlossaryVersioningService.GLOSSARY_TERM, id, snapshot.businessVersion());
+    final List<Map<String, Object>> entries = new ArrayList<>();
+    String replacingPayload = snapshot.payload();
+    for (SnapshotHistoryRecord record : history) {
+      entries.add(GlossaryVersionResponses.history(record, replacingPayload));
+      replacingPayload = record.payload();
+    }
+    return entries;
   }
 
   @POST
@@ -1690,22 +1756,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       int offset,
       Include include,
       boolean includeDeleted) {
-    boolean shouldLoadDeleted =
+    final GovernedScopeAuthorizer.ScopeAccess access =
+        scopeAuthorizer.authorizeRead(
+            securityContext, glossaryId.toString(), parentBusinessVersion, null);
+    final boolean shouldLoadDeleted =
         includeDeleted || include == Include.DELETED || include == Include.ALL;
-    AuthorizedFlatRows authorized =
-        loadAuthorizedGlossaryFlatRows(
-            securityContext, glossaryId.toString(), parentBusinessVersion, null, shouldLoadDeleted);
-    List<Map<String, Object>> rows = authorized.rows();
-    if (!includeDeleted && include != Include.ALL) {
-      boolean deletedOnly = include == Include.DELETED;
-      rows =
-          rows.stream()
-              .filter(
-                  row ->
-                      deletedOnly == RECORD_DELETED.equals(String.valueOf(row.get("recordType"))))
-              .toList();
-    }
-    Criteria criteria =
+    final boolean deletedOnly = !includeDeleted && include == Include.DELETED;
+    final Criteria criteria =
         new Criteria(
             glossaryId,
             parentBusinessVersion,
@@ -1719,14 +1776,25 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
             sortOrder,
             limit,
             offset);
-    Criteria validated =
+    final Criteria validated =
         GlossaryBusinessVersionSearchService.validate(
-            criteria, authorized.consumerOnly(), authorized.scopeType() == ScopeType.ARCHIVED);
-    if (authorized.scopeType() != ScopeType.ARCHIVED && validated.statuses().contains("Archived")) {
+            criteria, access.consumerOnly(), access.type() == ScopeType.ARCHIVED);
+    if (access.type() != ScopeType.ARCHIVED && validated.statuses().contains("Archived")) {
       throw new BadRequestException("Archived status is only valid for an archived scope");
     }
+    if (GovernedGlossarySearchSettings.readFromIndex()) {
+      try {
+        return governedIndexSearchService.search(
+            indexRequest(securityContext, validated, access, shouldLoadDeleted, deletedOnly));
+      } catch (GovernanceSearchUnavailableException exception) {
+        recordGovernedFallback(access, exception);
+      }
+    }
+    final AuthorizedFlatRows authorized = loadFlatRows(securityContext, access, shouldLoadDeleted);
+    final List<Map<String, Object>> rows =
+        filterDeletedRows(authorized.rows(), includeDeleted, include);
     return glossarySearchService.search(
-        validated, rows, authorized.consumerOnly(), authorized.scopeType() == ScopeType.ARCHIVED);
+        validated, rows, access.consumerOnly(), access.type() == ScopeType.ARCHIVED);
   }
 
   private boolean isConsumer(SecurityContext securityContext, GlossaryTerm term) {
@@ -2384,17 +2452,19 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       String requestedParentBusinessVersion,
       int limit,
       int offset) {
-    if (!List.of(10, 15, 25, 50).contains(limit)) {
-      throw new BadRequestException("limit must be one of 10, 15, 25, or 50");
-    }
-    if (offset < 0) {
-      throw new BadRequestException("offset must be greater than or equal to 0");
-    }
-
-    AuthorizedFlatRows authorized =
-        loadAuthorizedGlossaryFlatRows(
+    final GovernedScopeAuthorizer.ScopeAccess access =
+        scopeAuthorizer.authorizeRead(
             securityContext, glossaryIdParam, requestedParentBusinessVersion, null);
-    List<Map<String, Object>> visibleRows = authorized.rows();
+    final Criteria criteria = emptyCriteria(access, limit, offset);
+    if (GovernedGlossarySearchSettings.readFromIndex()) {
+      try {
+        return governedIndexSearchService.search(
+            indexRequest(securityContext, criteria, access, false, false));
+      } catch (GovernanceSearchUnavailableException exception) {
+        recordGovernedFallback(access, exception);
+      }
+    }
+    final List<Map<String, Object>> visibleRows = loadFlatRows(securityContext, access).rows();
     int total = visibleRows.size();
     int from = Math.min(offset, total);
     int to = Math.min(from + limit, total);
@@ -2403,6 +2473,47 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         new ArrayList<>(visibleRows.subList(from, to)),
         "paging",
         Map.of("total", total, "limit", limit, "offset", offset));
+  }
+
+  private static GovernedGlossarySearchRequest indexRequest(
+      final SecurityContext securityContext,
+      final Criteria criteria,
+      final GovernedScopeAuthorizer.ScopeAccess access,
+      final boolean includeDeleted,
+      final boolean deletedOnly) {
+    return new GovernedGlossarySearchRequest(
+        criteria,
+        access,
+        securityContext.getUserPrincipal().getName(),
+        includeDeleted,
+        deletedOnly);
+  }
+
+  private static List<Map<String, Object>> filterDeletedRows(
+      final List<Map<String, Object>> rows, final boolean includeDeleted, final Include include) {
+    List<Map<String, Object>> filtered = rows;
+    if (!includeDeleted && include != Include.ALL) {
+      final boolean deletedOnly = include == Include.DELETED;
+      filtered =
+          rows.stream()
+              .filter(
+                  row ->
+                      deletedOnly == RECORD_DELETED.equals(String.valueOf(row.get("recordType"))))
+              .toList();
+    }
+    return filtered;
+  }
+
+  private static void recordGovernedFallback(
+      final GovernedScopeAuthorizer.ScopeAccess access,
+      final GovernanceSearchUnavailableException exception) {
+    GovernanceSearchMetrics.GOVERNED.recordFallback();
+    GovernanceSearchMetrics.GOVERNED.setAvailable(false);
+    LOG.warn(
+        "Governed glossary index unavailable; using database glossary={} scope={}",
+        access.glossaryId(),
+        access.parentBusinessVersion(),
+        exception);
   }
 
   private AuthorizedFlatRows loadAuthorizedGlossaryFlatRows(
@@ -2449,27 +2560,25 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       if (!isPublishedVisible(securityContext, term)) {
         continue;
       }
-      Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.published(record));
-      normalizeFlatRow(
-          row,
-          record.entityId(),
-          parentBusinessVersion,
-          scope.type() == ScopeType.ARCHIVED ? "archived" : "published");
-      visibleRows.add(row);
+      visibleRows.add(
+          GovernedGlossaryRowMapper.published(
+              record,
+              parentBusinessVersion,
+              scope.type() == ScopeType.ARCHIVED
+                  ? GovernedGlossaryRowMapper.ARCHIVED
+                  : GovernedGlossaryRowMapper.PUBLISHED));
     }
     for (WorkingVersionRecord record : candidates.working()) {
       if (!isWorkingVisible(securityContext, record)) {
         continue;
       }
-      Map<String, Object> row = new LinkedHashMap<>(GlossaryVersionResponses.working(record));
-      normalizeFlatRow(row, record.entityId(), parentBusinessVersion, "working");
-      visibleRows.add(row);
+      visibleRows.add(GovernedGlossaryRowMapper.working(record, parentBusinessVersion));
     }
     if (includeDeleted && !consumerOnly && isDataDictionaryProfile(profile)) {
       visibleRows.addAll(deletedFlatRows(securityContext, glossaryId, scope));
     }
 
-    visibleRows.sort(GLOSSARY_FLAT_ROW_COMPARATOR);
+    visibleRows.sort(GovernedGlossaryRowMapper.defaultComparator());
     return new AuthorizedFlatRows(
         parentBusinessVersion, scope.type(), consumerOnly, profile, visibleRows);
   }
@@ -2483,10 +2592,9 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     final List<Map<String, Object>> rows = new ArrayList<>();
     for (PublishedSnapshotRecord record : glossaryFlatListService.loadDeleted(glossaryId, scope)) {
       if (isPublishedVisible(securityContext, publishedTerm(record))) {
-        final Map<String, Object> row =
-            new LinkedHashMap<>(GlossaryVersionResponses.published(record));
-        normalizeFlatRow(row, record.entityId(), scope.parentBusinessVersion(), RECORD_DELETED);
-        rows.add(row);
+        rows.add(
+            GovernedGlossaryRowMapper.published(
+                record, scope.parentBusinessVersion(), GovernedGlossaryRowMapper.DELETED));
       }
     }
     return rows;
@@ -2865,52 +2973,6 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   private boolean policyAllowsGlossary(
       SecurityContext securityContext, Glossary glossary, MetadataOperation operation) {
     return scopeAuthorizer.policyAllows(securityContext, glossary, operation);
-  }
-
-  private static void normalizeFlatRow(
-      Map<String, Object> row, UUID termId, String parentBusinessVersion, String recordType) {
-    row.put("termId", termId.toString());
-    row.put("id", termId.toString());
-    row.put("parentBusinessVersion", parentBusinessVersion);
-    row.put("recordType", recordType);
-    row.putIfAbsent("displayName", null);
-    row.putIfAbsent("description", null);
-    row.putIfAbsent("owners", List.of());
-    row.putIfAbsent("reviewers", List.of());
-    row.putIfAbsent("domains", List.of());
-    row.putIfAbsent("tags", List.of());
-    row.putIfAbsent("extension", Map.of());
-    Object businessVersion = row.get("businessVersion");
-    if (businessVersion != null) {
-      CdeReleaseVersionType.project(row, String.valueOf(businessVersion));
-    }
-  }
-
-  private static final Comparator<Map<String, Object>> GLOSSARY_FLAT_ROW_COMPARATOR =
-      Comparator.<Map<String, Object>, String>comparing(
-              row -> String.valueOf(row.getOrDefault("name", "")).toLowerCase(Locale.ROOT))
-          .thenComparing(
-              (left, right) ->
-                  compareNumericBusinessVersion(
-                      String.valueOf(right.get("businessVersion")),
-                      String.valueOf(left.get("businessVersion"))))
-          .thenComparing(row -> String.valueOf(row.get("termId")))
-          .thenComparing(row -> String.valueOf(row.get("recordType")));
-
-  private static int compareNumericBusinessVersion(String left, String right) {
-    String[] leftParts = left.split("\\.");
-    String[] rightParts = right.split("\\.");
-    int length = Math.max(leftParts.length, rightParts.length);
-    for (int i = 0; i < length; i++) {
-      BigInteger leftPart = i < leftParts.length ? new BigInteger(leftParts[i]) : BigInteger.ZERO;
-      BigInteger rightPart =
-          i < rightParts.length ? new BigInteger(rightParts[i]) : BigInteger.ZERO;
-      int result = leftPart.compareTo(rightPart);
-      if (result != 0) {
-        return result;
-      }
-    }
-    return 0;
   }
 
   private static void requireCdeIdentityScope(

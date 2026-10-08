@@ -2025,7 +2025,9 @@ CREATE TABLE IF NOT EXISTS public.glossary_business_snapshot_history (
   publishedAt bigint NOT NULL,
   publishedBy varchar(256) NOT NULL,
   supersededAt bigint NOT NULL,
-  supersededBy varchar(256) NOT NULL
+  supersededBy varchar(256) NOT NULL,
+  proposedAt bigint,
+  proposedBy varchar(256)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_snapshot_history_version
   ON public.glossary_business_snapshot_history (entityType, entityId, businessVersion, supersededAt DESC);
@@ -2053,6 +2055,17 @@ CREATE TABLE IF NOT EXISTS public.glossary_snapshot_outbox (
   CONSTRAINT uq_glossary_outbox_snapshot_event UNIQUE (snapshotId, eventType)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_outbox_pending ON public.glossary_snapshot_outbox (processedAt, createdAt);
+
+CREATE TABLE IF NOT EXISTS public.governed_glossary_search_outbox (
+  glossaryId varchar(36) NOT NULL,
+  parentBusinessVersion varchar(64) NOT NULL,
+  enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  lastError text,
+  PRIMARY KEY (glossaryId, parentBusinessVersion)
+);
+CREATE INDEX IF NOT EXISTS idx_governed_glossary_search_outbox_enqueued
+  ON public.governed_glossary_search_outbox (enqueuedAt);
 
 CREATE TABLE IF NOT EXISTS public.technical_dictionary_state (
   id integer PRIMARY KEY,
@@ -2169,6 +2182,7 @@ ALTER TABLE public.glossary_business_snapshot_history OWNER TO openmetadata_user
 ALTER TABLE public.glossary_published_head OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_term OWNER TO openmetadata_user;
 ALTER TABLE public.glossary_snapshot_outbox OWNER TO openmetadata_user;
+ALTER TABLE public.governed_glossary_search_outbox OWNER TO openmetadata_user;
 ALTER TABLE public.technical_dictionary_state OWNER TO openmetadata_user;
 ALTER TABLE public.technical_record OWNER TO openmetadata_user;
 ALTER TABLE public.technical_record_change_request OWNER TO openmetadata_user;

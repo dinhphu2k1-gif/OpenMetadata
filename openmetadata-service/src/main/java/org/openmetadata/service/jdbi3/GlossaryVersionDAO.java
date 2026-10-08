@@ -23,7 +23,7 @@ import org.openmetadata.service.jdbi3.locator.ConnectionAwareSqlUpdate;
 import org.openmetadata.service.util.jdbi.BindUUID;
 
 /** Persistence boundary for glossary working versions and immutable published snapshots. */
-public interface GlossaryVersionDAO {
+public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
 
   @SqlQuery("SELECT id FROM glossary_entity WHERE id = :glossaryId FOR UPDATE")
   String lockGlossaryIdentity(@BindUUID("glossaryId") UUID glossaryId);
@@ -325,17 +325,19 @@ public interface GlossaryVersionDAO {
 
   @SqlUpdate(
       "INSERT INTO glossary_business_snapshot_history "
-          + "(historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy) "
-          + "SELECT :historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, :supersededAt, :supersededBy "
+          + "(historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy, proposedAt, proposedBy) "
+          + "SELECT :historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, :supersededAt, :supersededBy, :proposedAt, :proposedBy "
           + "FROM glossary_business_snapshot WHERE snapshotId = :snapshotId")
   int insertSnapshotHistory(
       @BindUUID("historyId") UUID historyId,
       @BindUUID("snapshotId") UUID snapshotId,
       @Bind("supersededAt") long supersededAt,
-      @Bind("supersededBy") String supersededBy);
+      @Bind("supersededBy") String supersededBy,
+      @Bind("proposedAt") Long proposedAt,
+      @Bind("proposedBy") String proposedBy);
 
   @SqlQuery(
-      "SELECT historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy "
+      "SELECT historyId, snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, supersededAt, supersededBy, proposedAt, proposedBy "
           + "FROM glossary_business_snapshot_history WHERE entityType = :entityType AND entityId = :entityId AND businessVersion = :businessVersion "
           + "ORDER BY supersededAt DESC, historyId")
   @RegisterRowMapper(SnapshotHistoryMapper.class)
@@ -674,7 +676,9 @@ public interface GlossaryVersionDAO {
       long publishedAt,
       String publishedBy,
       long supersededAt,
-      String supersededBy) {}
+      String supersededBy,
+      Long proposedAt,
+      String proposedBy) {}
 
   record SnapshotOutboxRecord(
       UUID eventId,
@@ -750,7 +754,9 @@ public interface GlossaryVersionDAO {
           rs.getLong("publishedAt"),
           rs.getString("publishedBy"),
           rs.getLong("supersededAt"),
-          rs.getString("supersededBy"));
+          rs.getString("supersededBy"),
+          nullableLong(rs, "proposedAt"),
+          rs.getString("proposedBy"));
     }
   }
 

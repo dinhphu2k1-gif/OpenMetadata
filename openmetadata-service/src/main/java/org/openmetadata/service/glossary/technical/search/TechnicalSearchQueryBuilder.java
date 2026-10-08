@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.openmetadata.service.glossary.search.GovernedGlossaryText;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.technical.TechnicalRowMatcher;
@@ -212,7 +213,7 @@ public final class TechnicalSearchQueryBuilder {
    * characters use the ngram sub-fields; shorter ones fall back to a substring wildcard.
    */
   static Map<String, Object> textQuery(String q) {
-    final String text = q.trim().toLowerCase(Locale.ROOT);
+    final String text = GovernedGlossaryText.normalize(q.trim());
     return text.codePointCount(0, text.length()) >= MIN_NGRAM_LENGTH
         ? ngramQuery(text)
         : wildcardQuery(text);

@@ -530,6 +530,7 @@
     "search-placeholder": "Search table name, field name, CDE code, data type..."
   },
   "label": {
+    "proposed-by-on": "Proposed on {{date}} by {{user}}",
     "approved-by-on": "Approved on {{date}} by {{user}}",
     "bulk-actions": "Bulk actions",
     "bulk-scope-filtered": "All records matching the current filters",
@@ -3133,6 +3134,7 @@
     "domain-not-found": "Domain '{{domain}}' does not exist in the system",
     "datasource-not-found": "Data source '{{source}}' does not exist in the system",
     "data-classification-invalid": "Data classification '{{value}}' is invalid (allowed: Public, Internal, Confidential, Restricted)",
+    "no-field-changes": "No business field changed.",
     "no-correction-history": "This version has never been corrected.",
     "no-pending-requests": "No pending requests.",
     "pending-delete-approval-warning": "The CDE will be removed from the effective version",

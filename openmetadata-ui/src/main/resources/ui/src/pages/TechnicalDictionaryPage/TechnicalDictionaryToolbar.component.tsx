@@ -10,12 +10,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
-import { Button, Input } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 import { useTranslation } from 'react-i18next';
-import CDEFilterDropdown, {
-  FilterOption,
-} from '../../components/Glossary/GlossaryTermTab/CDEFilterDropdown.component';
+import GovernanceListFilterDropdown, {
+  GovernanceListFilterOption,
+} from '../../components/common/GovernanceList/GovernanceListFilterDropdown.component';
+import GovernanceListSearchInput from '../../components/common/GovernanceList/GovernanceListSearchInput.component';
+import GovernanceListToolbar from '../../components/common/GovernanceList/GovernanceListToolbar.component';
 import { Tag } from '../../generated/entity/classification/tag';
 import { TechnicalDictionaryOptions } from '../../hooks/useTechnicalDictionaryOptions';
 import { TechnicalDictionaryFilters } from './technicalDictionary.interface';
@@ -40,7 +42,7 @@ interface TechnicalDictionaryToolbarProps {
   onFilters: (patch: Partial<TechnicalDictionaryFilters>) => void;
 }
 
-const tagOptions = (tags: Tag[]): FilterOption[] =>
+const tagOptions = (tags: Tag[]): GovernanceListFilterOption[] =>
   tags.map((tag) => ({
     value: tag.fullyQualifiedName as string,
     label: tag.displayName || tag.name,
@@ -67,7 +69,7 @@ const TechnicalDictionaryToolbar = ({
     key: ColumnFilterKey;
     testId: string;
     label: string;
-    options: FilterOption[];
+    options: GovernanceListFilterOption[];
   }> = [
     {
       key: 'elementType',
@@ -95,22 +97,33 @@ const TechnicalDictionaryToolbar = ({
     },
   ];
 
-  // Rendered as direct children of the table toolbar so the filters share one
-  // row with the table's column customisation control.
   return (
-    <>
-      <Input
-        allowClear
-        data-testid="technical-dictionary-search"
-        placeholder={t('label.search-technical-dictionary')}
-        prefix={<SearchOutlined className="text-grey-muted" />}
-        style={{ width: 340 }}
-        value={searchText}
-        onChange={(event) => onSearchText(event.target.value)}
-      />
+    <GovernanceListToolbar
+      actions={
+        canAddColumn ? (
+          <Button
+            data-testid="technical-dictionary-add-column"
+            icon={<PlusOutlined />}
+            type="primary"
+            onClick={onAddColumn}>
+            {t('label.add-column')}
+          </Button>
+        ) : undefined
+      }
+      actionsClassName="tech-dict-toolbar-actions"
+      search={
+        <GovernanceListSearchInput
+          dataTestId="technical-dictionary-search"
+          debounceMs={0}
+          placeholder={t('label.search-technical-dictionary')}
+          value={searchText}
+          width={340}
+          onSearch={onSearchText}
+        />
+      }>
       {!searchOnly && (
         <>
-          <CDEFilterDropdown
+          <GovernanceListFilterDropdown
             dataTestId="technical-dictionary-filter-status"
             label={t('label.status')}
             options={[
@@ -130,7 +143,7 @@ const TechnicalDictionaryToolbar = ({
               })
             }
           />
-          <CDEFilterDropdown
+          <GovernanceListFilterDropdown
             dataTestId="technical-dictionary-filter-source"
             label={t('label.source')}
             options={options.services.map((service) => ({
@@ -143,7 +156,7 @@ const TechnicalDictionaryToolbar = ({
             }
           />
           {columnFilters.map((filter) => (
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId={filter.testId}
               key={filter.key}
               label={filter.label}
@@ -158,18 +171,7 @@ const TechnicalDictionaryToolbar = ({
           ))}
         </>
       )}
-      <div className="tech-dict-toolbar-actions">
-        {canAddColumn && (
-          <Button
-            data-testid="technical-dictionary-add-column"
-            icon={<PlusOutlined />}
-            type="primary"
-            onClick={onAddColumn}>
-            {t('label.add-column')}
-          </Button>
-        )}
-      </div>
-    </>
+    </GovernanceListToolbar>
   );
 };
 

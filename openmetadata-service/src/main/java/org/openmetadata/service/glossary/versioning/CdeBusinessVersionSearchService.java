@@ -12,11 +12,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.openmetadata.schema.type.EntityStatus;
+import org.openmetadata.service.glossary.search.GovernedGlossaryText;
 
 /** Search and filter boundary over the authoritative database-backed CDE flat read model. */
 public class CdeBusinessVersionSearchService {
@@ -254,8 +254,7 @@ public class CdeBusinessVersionSearchService {
   }
 
   private static String searchable(Object value) {
-    return Normalizer.normalize(value == null ? "" : String.valueOf(value), Normalizer.Form.NFKC)
-        .toLowerCase(Locale.ROOT);
+    return GovernedGlossaryText.normalize(value);
   }
 
   public record Criteria(

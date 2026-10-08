@@ -19,7 +19,6 @@ import {
   Checkbox,
   Col,
   Dropdown,
-  Input,
   MenuProps,
   Modal,
   Row,
@@ -37,8 +36,8 @@ import {
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { compare } from 'fast-json-patch';
-import { debounce, isEmpty, isUndefined } from 'lodash';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isEmpty, isUndefined } from 'lodash';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { ReactComponent as IconDrag } from '../../../assets/svg/drag.svg';
@@ -49,6 +48,10 @@ import { ReactComponent as DownUpArrowIcon } from '../../../assets/svg/ic-down-u
 import { ReactComponent as UpDownArrowIcon } from '../../../assets/svg/ic-up-down-arrow.svg';
 import { ReactComponent as PlusOutlinedIcon } from '../../../assets/svg/plus-outlined.svg';
 import ErrorPlaceHolder from '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder';
+import GovernanceListFilterDropdown from '../../../components/common/GovernanceList/GovernanceListFilterDropdown.component';
+import GovernanceListSearchInput from '../../../components/common/GovernanceList/GovernanceListSearchInput.component';
+import GovernanceListTable from '../../../components/common/GovernanceList/GovernanceListTable.component';
+import GovernanceListToolbar from '../../../components/common/GovernanceList/GovernanceListToolbar.component';
 import { OwnerLabel } from '../../../components/common/OwnerLabel/OwnerLabel.component';
 import StatusBadge from '../../../components/common/StatusBadge/StatusBadge.component';
 import {
@@ -145,7 +148,6 @@ import Loader from '../../common/Loader/Loader';
 import { PagingHandlerParams } from '../../common/NextPrevious/NextPrevious.interface';
 import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEditorPreviewNew';
 import StatusAction from '../../common/StatusAction/StatusAction';
-import Table from '../../common/Table/Table';
 import { useCDETablePreferences } from '../../../hooks/useCDETablePreferences';
 import { useTableFilters } from '../../../hooks/useTableFilters';
 import TagButton from '../../common/TagButton/TagButton.component';
@@ -160,7 +162,6 @@ import {
   DQ_OUTCOME_LABEL_KEY,
   DQ_TEST_FILTER_STATUSES,
 } from '../DQRuleTests/DQRuleTests.constants';
-import CDEFilterDropdown from './CDEFilterDropdown.component';
 import {
   DQ_TAG_CLASSIFICATIONS,
   getDQGlossaryTableColumns,
@@ -176,91 +177,7 @@ import GlossaryBulkActionModal, {
   BulkActionType,
 } from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
-const SEARCH_DEBOUNCE_MS = 400;
 const SHOW_DELETED_FILTER = { showDeleted: false };
-
-const GlossarySearchInput = memo(
-  ({
-    isCDEGlossary,
-    isDQGlossary,
-    onSearch,
-    placeholder,
-    valueRef,
-  }: {
-    isCDEGlossary: boolean;
-    isDQGlossary: boolean;
-    onSearch: (value: string) => void;
-    placeholder: string;
-    valueRef: React.MutableRefObject<string>;
-  }) => {
-    const [value, setValue] = useState(() => valueRef.current);
-    const isComposingRef = useRef(false);
-    const onSearchRef = useRef(onSearch);
-    onSearchRef.current = onSearch;
-
-    const debouncedSearch = useMemo(
-      () =>
-        debounce(
-          (nextValue: string) => onSearchRef.current(nextValue),
-          SEARCH_DEBOUNCE_MS
-        ),
-      []
-    );
-
-    useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
-
-    const submitSearch = useCallback(
-      (nextValue: string) => {
-        debouncedSearch.cancel();
-        onSearchRef.current(nextValue);
-      },
-      [debouncedSearch]
-    );
-
-    const handleChange = useCallback(
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        const nextValue = event.target.value;
-        valueRef.current = nextValue;
-        setValue(nextValue);
-        if (!nextValue) {
-          submitSearch(nextValue);
-
-          return;
-        }
-        if (!isComposingRef.current) {
-          debouncedSearch(nextValue);
-        }
-      },
-      [debouncedSearch, submitSearch, valueRef]
-    );
-
-    return (
-      <Input
-        allowClear
-        data-testid="search-glossary-terms-input"
-        placeholder={placeholder}
-        style={{ width: isDQGlossary ? 300 : isCDEGlossary ? 280 : 250 }}
-        value={value}
-        onChange={handleChange}
-        onCompositionEnd={(event) => {
-          isComposingRef.current = false;
-          debouncedSearch(event.currentTarget.value);
-        }}
-        onCompositionStart={() => {
-          isComposingRef.current = true;
-          debouncedSearch.cancel();
-        }}
-        onPressEnter={(event) => {
-          if (!isComposingRef.current) {
-            submitSearch(event.currentTarget.value);
-          }
-        }}
-      />
-    );
-  }
-);
-
-GlossarySearchInput.displayName = 'GlossarySearchInput';
 
 const compareCDETermVersions = (
   first: ModifiedGlossaryTerm,
@@ -3043,23 +2960,24 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     }
 
     return (
-      <>
-        <GlossarySearchInput
-          isCDEGlossary={isCDEGlossary}
-          isDQGlossary={isDQGlossary}
-          placeholder={
-            isDQGlossary
-              ? t('dq.search-placeholder')
-              : isCDEGlossary
-              ? t('cde.search-placeholder')
-              : t('label.search-entity', {
-                  entity: t('label.term-plural'),
-                })
-          }
-          valueRef={searchInputValueRef}
-          onSearch={handleSearch}
-        />
-
+      <GovernanceListToolbar
+        search={
+          <GovernanceListSearchInput
+            dataTestId="search-glossary-terms-input"
+            placeholder={
+              isDQGlossary
+                ? t('dq.search-placeholder')
+                : isCDEGlossary
+                ? t('cde.search-placeholder')
+                : t('label.search-entity', {
+                    entity: t('label.term-plural'),
+                  })
+            }
+            valueRef={searchInputValueRef}
+            width={isDQGlossary ? 300 : isCDEGlossary ? 280 : 250}
+            onSearch={handleSearch}
+          />
+        }>
         <Dropdown
           className="custom-glossary-dropdown-menu status-dropdown"
           menu={statusDropdownMenu}
@@ -3080,28 +2998,28 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
         {isCDEGlossary && (
           <>
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="cde-domain-filter"
               label={t('cde.business-group')}
               options={cdeDomainOptions}
               selectedValues={selectedCdeDomains}
               onChange={handleCdeDomainsChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="cde-datasource-filter"
               label={t('cde.data-source')}
               options={cdeDataSourceOptions}
               selectedValues={selectedCdeDataSources}
               onChange={handleCdeDataSourcesChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="cde-owner-filter"
               label={t('cde.data-owner')}
               options={cdeOwnerOptions}
               selectedValues={selectedCdeOwners}
               onChange={handleCdeOwnersChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="cde-classification-filter"
               label={t('cde.data-classification')}
               options={cdeClassificationOptions}
@@ -3113,35 +3031,35 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
         {isDQGlossary && (
           <>
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="dq-dimension-filter"
               label={t('dq.dimension', 'Tiêu chí')}
               options={dqDimensionOptions}
               selectedValues={selectedDqDimensions}
               onChange={handleDqDimensionsChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="dq-owner-filter"
               label={t('dq.owners', 'Chủ sở hữu')}
               options={dqOwnerOptions}
               selectedValues={selectedDqOwners}
               onChange={handleDqOwnersChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="dq-method-filter"
               label={t('dq.method', 'Hình thức kiểm tra')}
               options={dqMethodOptions}
               selectedValues={selectedDqMethods}
               onChange={handleDqMethodsChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="dq-target-population-filter"
               label={t('dq.target-population', 'Tập dữ liệu kiểm tra')}
               options={dqTargetPopulationOptions}
               selectedValues={selectedDqTargetPopulations}
               onChange={handleDqTargetPopulationsChange}
             />
-            <CDEFilterDropdown
+            <GovernanceListFilterDropdown
               dataTestId="dq-test-filter"
               label={t('dq.test.filter-title', 'Kiểm thử')}
               options={dqTestStatusOptions}
@@ -3183,7 +3101,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             {expandCollapseLabel}
           </Space>
         </Button>
-      </>
+      </GovernanceListToolbar>
     );
   }, [
     isAllExpanded,
@@ -3444,12 +3362,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     <Row className={className} gutter={[0, 16]}>
       {/* Have use the col to set the width of the table, to only use the viewport width for the table columns */}
       <Col className="w-full" ref={tableContainerRef} span={24}>
-        <div
-          className="glossary-terms-scroll-container"
-          style={{
-            position: 'relative',
-          }}>
-          <Table
+        <GovernanceListTable
             resizableColumns
             className={classNames(
               'drop-over-background',
@@ -3541,8 +3454,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             }}
             onHeaderRow={onTableHeader}
             onRow={onTableRow}
-          />
-        </div>
+        />
         <Modal
           centered
           destroyOnClose

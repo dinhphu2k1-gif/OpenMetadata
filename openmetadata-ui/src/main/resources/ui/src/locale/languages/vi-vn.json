@@ -530,6 +530,7 @@
     "search-placeholder": "Tìm kiếm tên bảng, cột, mã CDE, kiểu DL..."
   },
   "label": {
+    "proposed-by-on": "Đề xuất lúc {{date}} bởi {{user}}",
     "approved-by-on": "Được phê duyệt lúc {{date}} bởi {{user}}",
     "bulk-actions": "Thao tác hàng loạt",
     "bulk-scope-filtered": "Toàn bộ bản ghi khớp bộ lọc hiện tại",
@@ -3144,6 +3145,7 @@
     "domain-not-found": "Miền '{{domain}}' không tồn tại trên hệ thống",
     "datasource-not-found": "Nguồn dữ liệu '{{source}}' không tồn tại trên hệ thống",
     "data-classification-invalid": "Phân loại dữ liệu '{{value}}' không hợp lệ (hợp lệ: Công cộng, Nội bộ, Bí mật, Tối mật)",
+    "no-field-changes": "Không có trường nghiệp vụ nào thay đổi.",
     "no-correction-history": "Phiên bản này chưa từng được sửa.",
     "no-pending-requests": "Không có yêu cầu chờ xử lý.",
     "pending-delete-approval-warning": "CDE sẽ bị loại khỏi phiên bản hiệu lực",

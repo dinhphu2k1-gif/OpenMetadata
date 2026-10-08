@@ -23,7 +23,7 @@ import React, {
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
-import Table from '../../components/common/Table/Table';
+import GovernanceListTable from '../../components/common/GovernanceList/GovernanceListTable.component';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import {
   renderDictionaryMarkdown,
@@ -420,51 +420,47 @@ const TechnicalDictionaryTable = ({
   }, [columns, isLoading, rows.length]);
 
   return (
-    <div
-      className="glossary-terms-scroll-container"
-      ref={containerRef}
-      style={{ position: 'relative' }}>
-      <Table
-        resizableColumns
-        className="cde-glossary-terms-table glossary-terms-table tech-dict-table"
-        columns={columns}
-        containerClassName="cde-glossary-table-container"
-        customPaginationProps={paginationProps}
-        data-testid="technical-dictionary-table"
-        dataSource={rows}
-        defaultVisibleColumns={TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS}
-        entityType={TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY}
-        extraTableFilters={extraTableFilters}
-        extraTableFiltersClassName="cde-glossary-table-toolbar tech-dict-table-toolbar"
-        loading={isLoading}
-        locale={emptyContent ? { emptyText: emptyContent } : undefined}
-        pagination={false}
-        rowClassName="tech-dict-row"
-        rowKey="key"
-        rowSelection={
-          isReadOnly
-            ? undefined
-            : {
-                type: 'checkbox',
-                fixed: true,
-                columnWidth: 32,
-                selectedRowKeys,
-                onChange: onSelectionChange,
-              }
-        }
-        selectionBar={bulkActionBar}
-        size="small"
-        staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
-        sticky={{
-          offsetScroll: 0,
-          getContainer: () =>
-            containerRef.current?.closest<HTMLElement>(
-              '.page-layout-v1-vertical-scroll'
-            ) ?? document.body,
-        }}
-        onRow={(row) => ({ onClick: () => onView(row) })}
-      />
-    </div>
+    <GovernanceListTable
+      resizableColumns
+      className="cde-glossary-terms-table glossary-terms-table tech-dict-table"
+      columns={columns}
+      containerClassName="cde-glossary-table-container"
+      customPaginationProps={paginationProps}
+      data-testid="technical-dictionary-table"
+      dataSource={rows}
+      defaultVisibleColumns={TECHNICAL_DICTIONARY_DEFAULT_VISIBLE_COLUMNS}
+      entityType={TECHNICAL_DICTIONARY_COLUMN_PREFERENCE_KEY}
+      extraTableFilters={extraTableFilters}
+      extraTableFiltersClassName="cde-glossary-table-toolbar tech-dict-table-toolbar"
+      loading={isLoading}
+      locale={emptyContent ? { emptyText: emptyContent } : undefined}
+      pagination={false}
+      rowClassName="tech-dict-row"
+      rowKey="key"
+      rowSelection={
+        isReadOnly
+          ? undefined
+          : {
+              type: 'checkbox',
+              fixed: true,
+              columnWidth: 32,
+              selectedRowKeys,
+              onChange: onSelectionChange,
+            }
+      }
+      scrollContainerRef={containerRef}
+      selectionBar={bulkActionBar}
+      size="small"
+      staticVisibleColumns={TECHNICAL_DICTIONARY_STATIC_VISIBLE_COLUMNS}
+      sticky={{
+        offsetScroll: 0,
+        getContainer: () =>
+          containerRef.current?.closest<HTMLElement>(
+            '.page-layout-v1-vertical-scroll'
+          ) ?? document.body,
+      }}
+      onRow={(row) => ({ onClick: () => onView(row) })}
+    />
   );
 };
 

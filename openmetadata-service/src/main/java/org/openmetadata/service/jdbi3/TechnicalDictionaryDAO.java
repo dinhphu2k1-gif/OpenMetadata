@@ -244,6 +244,20 @@ public interface TechnicalDictionaryDAO {
   List<AuditRow> listEffectiveAudit(
       @Bind("recordId") String recordId, @Bind("limit") int limit, @Bind("offset") int offset);
 
+  /** Corrections of an Approved record: the approvals of change requests, newest first. */
+  @SqlQuery(
+      "SELECT * FROM technical_record_audit WHERE recordId = :recordId "
+          + "AND action = 'APPROVE_CHANGE' "
+          + "ORDER BY changedAt DESC, id DESC LIMIT :limit OFFSET :offset")
+  @RegisterRowMapper(AuditMapper.class)
+  List<AuditRow> listCorrectionAudit(
+      @Bind("recordId") String recordId, @Bind("limit") int limit, @Bind("offset") int offset);
+
+  @SqlQuery(
+      "SELECT COUNT(*) FROM technical_record_audit WHERE recordId = :recordId "
+          + "AND action = 'APPROVE_CHANGE'")
+  long countCorrectionAudit(@Bind("recordId") String recordId);
+
   @SqlQuery("SELECT COUNT(*) FROM technical_record_audit WHERE recordId = :recordId")
   long countAudit(@Bind("recordId") String recordId);
 
@@ -346,13 +360,16 @@ public interface TechnicalDictionaryDAO {
       value =
           "INSERT INTO technical_outbox (kind, subjectKey, payload, enqueuedAt, attempts) "
               + "VALUES (:kind, :subjectKey, :payload, :now, 0) ON DUPLICATE KEY UPDATE "
-              + "payload = VALUES(payload), enqueuedAt = VALUES(enqueuedAt)",
+              + "payload = VALUES(payload), enqueuedAt = GREATEST(VALUES(enqueuedAt), enqueuedAt + 1), "
+              + "attempts = 0, lastError = NULL",
       connectionType = MYSQL)
   @ConnectionAwareSqlUpdate(
       value =
           "INSERT INTO technical_outbox (kind, subjectKey, payload, enqueuedAt, attempts) "
               + "VALUES (:kind, :subjectKey, :payload, :now, 0) ON CONFLICT (kind, subjectKey) "
-              + "DO UPDATE SET payload = EXCLUDED.payload, enqueuedAt = EXCLUDED.enqueuedAt",
+              + "DO UPDATE SET payload = EXCLUDED.payload, "
+              + "enqueuedAt = GREATEST(EXCLUDED.enqueuedAt, technical_outbox.enqueuedAt + 1), "
+              + "attempts = 0, lastError = NULL",
       connectionType = POSTGRES)
   void enqueue(
       @Bind("kind") String kind,
@@ -366,8 +383,18 @@ public interface TechnicalDictionaryDAO {
   @RegisterRowMapper(OutboxMapper.class)
   List<OutboxEntry> listPending(@Bind("limit") int limit);
 
+  /** Entries that have not failed yet; failed ones wait for the worker. */
+  @SqlQuery(
+      "SELECT kind, subjectKey, payload, enqueuedAt, attempts, lastError FROM technical_outbox "
+          + "WHERE attempts = 0 ORDER BY enqueuedAt, subjectKey LIMIT :limit")
+  @RegisterRowMapper(OutboxMapper.class)
+  List<OutboxEntry> listFresh(@Bind("limit") int limit);
+
   @SqlQuery("SELECT COUNT(*) FROM technical_outbox")
   long countPending();
+
+  @SqlQuery("SELECT COALESCE(MIN(enqueuedAt), 0) FROM technical_outbox")
+  long oldestPendingAt();
 
   /** Removes a processed entry unless it was enqueued again after it was read. */
   @SqlUpdate(

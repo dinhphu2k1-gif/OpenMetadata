@@ -44,9 +44,12 @@ class TechnicalRowMatcherTest {
   @Test
   void approvalStatusesAreValidated() {
     assertEquals(
-        List.of(TechnicalRecord.STATUS_IN_REVIEW, TechnicalRecord.STATUS_APPROVED),
-        filters(TechnicalRowMatcher.STATUSES, "In Review,Approved").get("statuses"));
-    assertThrows(BadRequestException.class, () -> filters(TechnicalRowMatcher.STATUSES, "Draft"));
+        List.of(
+            TechnicalRecord.STATUS_DRAFT,
+            TechnicalRecord.STATUS_IN_REVIEW,
+            TechnicalRecord.STATUS_APPROVED),
+        filters(TechnicalRowMatcher.STATUSES, "Draft,In Review,Approved").get("statuses"));
+    assertThrows(BadRequestException.class, () -> filters(TechnicalRowMatcher.STATUSES, "Pending"));
   }
 
   @Test

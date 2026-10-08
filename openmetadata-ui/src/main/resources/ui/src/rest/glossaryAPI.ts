@@ -606,6 +606,13 @@ export interface GlossaryTermCorrectionHistoryEntry extends GlossaryTerm {
   publishedBy: string;
   supersededAt: number;
   supersededBy: string;
+  proposedAt?: number | null;
+  proposedBy?: string | null;
+  changes?: {
+    field: string;
+    oldValue?: string | null;
+    newValue?: string | null;
+  }[];
 }
 
 export const getGlossaryTermCorrectionHistory = async (

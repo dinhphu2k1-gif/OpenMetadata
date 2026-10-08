@@ -16,6 +16,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryErrors;
+import org.openmetadata.service.governance.search.GovernanceSearchMetrics;
 
 /**
  * Technical Dictionary reads over `technical_dictionary_search_index`. An unreachable index is
@@ -132,6 +133,7 @@ public final class TechnicalSearchService {
     try {
       result = operation.get();
     } catch (TechnicalIndexUnavailableException exception) {
+      GovernanceSearchMetrics.TECHNICAL.setAvailable(false);
       throw TechnicalDictionaryErrors.indexUnavailable(
           "Technical Dictionary search index is not available: " + exception.getMessage());
     }

@@ -50,9 +50,12 @@ jest.mock('../../hooks/useTechnicalDictionaryOptions', () => ({
 jest.mock('./TechnicalVersionBadges.component', () => () => (
   <span data-testid="badges" />
 ));
-jest.mock('./TechnicalHistoryPanel.component', () => () => (
-  <div data-testid="history-panel" />
-));
+jest.mock(
+  '../../components/common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component',
+  () =>
+    ({ open }: { open: boolean }) =>
+      open ? <div data-testid="history-panel" /> : null
+);
 jest.mock(
   '../../components/Modals/ConfirmationModal/ConfirmationModal',
   () =>
@@ -192,7 +195,7 @@ describe('TechnicalRecordDetailPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers Edit on a current approved record and reads history from its tab', async () => {
+  it('offers Edit on a current approved record and opens the correction history from its button', async () => {
     (getTechnicalRecord as jest.Mock).mockResolvedValue(RECORD);
     render(<TechnicalRecordDetailPage />);
 
@@ -200,7 +203,7 @@ describe('TechnicalRecordDetailPage', () => {
       await screen.findByTestId('technical-record-create-change')
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('technical-record-history-tab'));
+    fireEvent.click(screen.getByTestId('correction-history-button'));
 
     expect(screen.getByTestId('history-panel')).toBeInTheDocument();
   });
@@ -216,7 +219,7 @@ describe('TechnicalRecordDetailPage', () => {
     expect(getTechnicalSnapshotRecord).toHaveBeenCalledWith('1', 'term-1');
     expect(screen.queryByTestId('technical-edit-rank')).not.toBeInTheDocument();
     expect(
-      screen.queryByTestId('technical-record-history-tab')
+      screen.queryByTestId('correction-history-button')
     ).not.toBeInTheDocument();
   });
 

@@ -46,7 +46,7 @@ public final class TechnicalAssets {
     result.put("dataDictionaryVersion", scope);
     switch (source) {
       case CURRENT -> {
-        TechnicalOutbox.flush();
+        TechnicalOutbox.drainBeforeRead();
         result.putAll(new TechnicalSearchService().rowsOfCde(scope, cdeId, limit, offset));
       }
       case SNAPSHOT -> result.putAll(snapshot(cdeId, scope, limit, offset));

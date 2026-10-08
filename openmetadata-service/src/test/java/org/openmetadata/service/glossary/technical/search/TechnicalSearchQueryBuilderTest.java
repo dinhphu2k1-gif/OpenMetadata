@@ -133,6 +133,18 @@ class TechnicalSearchQueryBuilderTest {
   }
 
   @Test
+  void vietnameseTextIsFoldedBeforeBuildingTheQuery() {
+    final JsonNode multiMatch =
+        json(TechnicalSearchQueryBuilder.query(criteria("Điểm", Map.of())))
+            .path("bool")
+            .path("must")
+            .get(0)
+            .path("multi_match");
+
+    assertEquals("diem", multiMatch.path("query").asText());
+  }
+
+  @Test
   void shortTextFallsBackToEscapedLowercaseWildcards() {
     final JsonNode should =
         json(TechnicalSearchQueryBuilder.query(criteria("A*", Map.of())))

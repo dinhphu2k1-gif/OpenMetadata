@@ -13,11 +13,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.governance.search.GovernanceSearchScanner;
 
 /** Full scans of `technical_dictionary_search_index` with {@code search_after}, used by export. */
 public final class TechnicalSearchQueries {
   static final int PAGE_SIZE = 1_000;
-  private static final String ASC = "asc";
   private static final String HITS = "hits";
   private static final String SORT = "sort";
   private static final String SOURCE = "_source";
@@ -26,12 +26,7 @@ public final class TechnicalSearchQueries {
 
   /** Sort that makes {@code search_after} deterministic: the given order, then the record id. */
   public static List<Object> stableSort(String... fields) {
-    final List<Object> sort = new ArrayList<>();
-    for (String field : fields) {
-      sort.add(Map.of(field, ASC));
-    }
-    sort.add(Map.of(TechnicalIndexFields.TERM_ID, ASC));
-    return sort;
+    return GovernanceSearchScanner.stableSort(TechnicalIndexFields.TERM_ID, fields);
   }
 
   /** Visits every matching hit in sort order. */

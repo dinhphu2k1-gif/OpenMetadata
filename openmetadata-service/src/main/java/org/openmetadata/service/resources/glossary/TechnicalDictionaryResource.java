@@ -165,7 +165,7 @@ public class TechnicalDictionaryResource {
             creationMethods,
             timeliness);
     final String version = requireVersion();
-    TechnicalOutbox.flush();
+    TechnicalOutbox.drainBeforeRead();
     final TechnicalSearchCriteria criteria =
         TechnicalSearchParameters.criteria(version, parameters, limit, offset)
             .withUnapprovedHidden(!capabilities.canSeeWorkingRecords());
@@ -184,7 +184,7 @@ public class TechnicalDictionaryResource {
   public Map<String, Long> stats(@Context SecurityContext securityContext) {
     final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final String version = requireVersion();
-    TechnicalOutbox.flush();
+    TechnicalOutbox.drainBeforeRead();
     return searchService.stats(
         TechnicalSearchCriteria.scopeOnly(version)
             .withUnapprovedHidden(!capabilities.canSeeWorkingRecords()));
@@ -618,6 +618,22 @@ public class TechnicalDictionaryResource {
   }
 
   @GET
+  @Path("/records/{id}/corrections")
+  @Operation(
+      operationId = "getTechnicalDictionaryRecordCorrections",
+      summary = "Edits of an Approved record: proposer, approver and changed fields, newest first")
+  public Map<String, Object> corrections(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @DefaultValue(DEFAULT_HISTORY_LIMIT) @Min(1) @Max(MAX_HISTORY_LIMIT) @QueryParam("limit")
+          int limit,
+      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset) {
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
+    hideDraftFrom(dao().findById(recordId.toString()), capabilities);
+    return new TechnicalHistory().corrections(recordId.toString(), limit, offset);
+  }
+
+  @GET
   @Path("/export")
   @Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @Operation(
@@ -626,7 +642,7 @@ public class TechnicalDictionaryResource {
   public Response export(@Context SecurityContext securityContext) {
     final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final String version = requireVersion();
-    TechnicalOutbox.flush();
+    TechnicalOutbox.drainBeforeRead();
     final TechnicalSearchCriteria criteria =
         TechnicalSearchCriteria.scopeOnly(version)
             .withUnapprovedHidden(!capabilities.canSeeWorkingRecords());

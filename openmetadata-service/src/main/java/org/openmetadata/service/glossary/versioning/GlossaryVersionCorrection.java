@@ -86,7 +86,13 @@ final class GlossaryVersionCorrection {
             actor);
     final String contentHash = GlossaryVersioningService.sha256(approvedPayload);
     GlossaryVersioningService.requireUpdated(
-        dao.insertSnapshotHistory(UUID.randomUUID(), corrected.snapshotId(), now, actor));
+        dao.insertSnapshotHistory(
+            UUID.randomUUID(),
+            corrected.snapshotId(),
+            now,
+            actor,
+            working.submittedAt() == null ? working.createdAt() : working.submittedAt(),
+            working.submittedBy() == null ? working.createdBy() : working.submittedBy()));
     GlossaryVersioningService.requireUpdated(
         dao.correctSnapshot(
             corrected.snapshotId(),

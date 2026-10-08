@@ -5,8 +5,23 @@
       "max_result_window": 10000
     },
     "analysis": {
+      "char_filter": {
+        "vietnamese_d": {
+          "type": "mapping",
+          "mappings": [
+            "đ => d",
+            "Đ => d"
+          ]
+        }
+      },
+      "filter": {
+        "governance_ascii": {
+          "type": "asciifolding",
+          "preserve_original": false
+        }
+      },
       "tokenizer": {
-        "n_gram_tokenizer": {
+        "governance_ngram_tokenizer": {
           "type": "ngram",
           "min_gram": 3,
           "max_gram": 10,
@@ -19,18 +34,25 @@
       "normalizer": {
         "lowercase_normalizer": {
           "type": "custom",
-          "char_filter": [],
+          "char_filter": [
+            "vietnamese_d"
+          ],
           "filter": [
-            "lowercase"
+            "lowercase",
+            "governance_ascii"
           ]
         }
       },
       "analyzer": {
-        "om_ngram": {
+        "governance_ngram": {
           "type": "custom",
-          "tokenizer": "n_gram_tokenizer",
+          "char_filter": [
+            "vietnamese_d"
+          ],
+          "tokenizer": "governance_ngram_tokenizer",
           "filter": [
-            "lowercase"
+            "lowercase",
+            "governance_ascii"
           ]
         }
       }
@@ -51,7 +73,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -61,7 +83,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -71,7 +93,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -81,7 +103,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -91,7 +113,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -101,7 +123,7 @@
         "fields": {
           "ngram": {
             "type": "text",
-            "analyzer": "om_ngram"
+            "analyzer": "governance_ngram"
           }
         }
       },
@@ -155,7 +177,7 @@
             "fields": {
               "ngram": {
                 "type": "text",
-                "analyzer": "om_ngram"
+                "analyzer": "governance_ngram"
               }
             }
           },
@@ -165,7 +187,7 @@
             "fields": {
               "ngram": {
                 "type": "text",
-                "analyzer": "om_ngram"
+                "analyzer": "governance_ngram"
               }
             }
           },

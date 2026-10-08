@@ -20,6 +20,7 @@ import org.openmetadata.schema.type.customProperties.EnumConfig;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.search.GovernedGlossaryOutbox;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.CollectionDAO;
@@ -143,6 +144,7 @@ public final class DataDictionaryBootstrap {
       if (updated != 1) {
         throw inconsistent("working CDE release version type changed concurrently");
       }
+      GovernedGlossaryOutbox.enqueue(dao, working.glossaryId(), working.parentBusinessVersion());
     }
   }
 

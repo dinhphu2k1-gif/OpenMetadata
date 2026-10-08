@@ -12,11 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jdbi.v3.core.JdbiException;
@@ -27,6 +22,8 @@ import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.glossary.technical.search.TechnicalDocumentBuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalIndexRebuilder;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex;
+import org.openmetadata.service.governance.search.GovernanceOutboxRunner;
+import org.openmetadata.service.governance.search.GovernanceSearchMetrics;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.OutboxEntry;
@@ -51,16 +48,8 @@ public final class TechnicalOutbox {
   private static final int MAX_ERROR_LENGTH = 2_000;
   private static final long WORKER_PERIOD_SECONDS = 60;
 
-  private static final ReentrantLock LOCK = new ReentrantLock();
-  private static final AtomicBoolean WORKER_STARTED = new AtomicBoolean();
-  private static final AtomicBoolean REBUILDING = new AtomicBoolean();
-  private static final ScheduledExecutorService WORKER =
-      Executors.newSingleThreadScheduledExecutor(
-          runnable -> {
-            final Thread thread = new Thread(runnable, "technical-outbox");
-            thread.setDaemon(true);
-            return thread;
-          });
+  private static final GovernanceOutboxRunner RUNNER =
+      new GovernanceOutboxRunner("technical-outbox");
 
   private TechnicalOutbox() {}
 
@@ -86,22 +75,40 @@ public final class TechnicalOutbox {
     dao.enqueue(RESET, replacedVersion, replacedVersion, System.currentTimeMillis());
   }
 
-  /** Processes a few batches after a committed write; never throws. */
+  /**
+   * Processes the fresh entries after a committed write, waiting briefly for the lock so the write
+   * is visible to the next list read; never throws.
+   */
   public static void flush() {
-    process(REQUEST_BATCHES);
+    flush(REQUEST_BATCHES);
   }
 
   public static void flush(int maxBatches) {
-    process(maxBatches);
+    RUNNER.processAfterWrite(
+        maxBatches, () -> processBatch(dao().listFresh(BATCH_SIZE)), TechnicalOutbox::readFailed);
   }
 
+  /** Before a read: fresh entries only, never waits, and skipped while the index is unreachable. */
+  public static void drainBeforeRead() {
+    if (TechnicalSearchIndex.isReachable()) {
+      RUNNER.process(
+          REQUEST_BATCHES,
+          () -> processBatch(dao().listFresh(BATCH_SIZE)),
+          TechnicalOutbox::readFailed);
+    }
+  }
+
+  /** Every pending entry, including the failed ones; for the worker, startup and rebuilds. */
   public static void drainPending() {
-    process(DRAIN_BATCHES);
+    RUNNER.process(
+        DRAIN_BATCHES,
+        () -> processBatch(dao().listPending(BATCH_SIZE)),
+        TechnicalOutbox::readFailed);
   }
 
   /** Processes the outbox on the worker thread, for work too long for a request. */
   public static void drainAsync() {
-    WORKER.execute(TechnicalOutbox::drainSafely);
+    RUNNER.execute(TechnicalOutbox::drainSafely);
   }
 
   /**
@@ -137,46 +144,31 @@ public final class TechnicalOutbox {
 
   /** While true nothing is processed: entries queued during a rebuild are written after it. */
   public static void markRebuilding(boolean rebuilding) {
-    REBUILDING.set(rebuilding);
+    RUNNER.markRebuilding(rebuilding);
   }
 
   public static void startWorker() {
-    if (WORKER_STARTED.compareAndSet(false, true)) {
-      WORKER.scheduleWithFixedDelay(
-          TechnicalOutbox::drainSafely,
-          WORKER_PERIOD_SECONDS,
-          WORKER_PERIOD_SECONDS,
-          TimeUnit.SECONDS);
-    }
+    RUNNER.start(TechnicalOutbox::drainSafely, WORKER_PERIOD_SECONDS);
   }
 
   private static void drainSafely() {
     try {
       TechnicalIndexRebuilder.ensureAliasExists();
       drainPending();
+      reconcile();
     } catch (RuntimeException exception) {
       LOG.warn("Technical Dictionary outbox worker run failed", exception);
+    } finally {
+      updateMetrics();
     }
   }
 
-  private static void process(int maxBatches) {
-    if (!REBUILDING.get() && LOCK.tryLock()) {
-      try {
-        boolean more = true;
-        for (int batch = 0; batch < maxBatches && more; batch++) {
-          more = processBatch();
-        }
-      } catch (JdbiException exception) {
-        LOG.warn("Technical Dictionary outbox could not be read", exception);
-      } finally {
-        LOCK.unlock();
-      }
-    }
+  private static void readFailed(JdbiException exception) {
+    LOG.warn("Technical Dictionary outbox could not be read", exception);
   }
 
   /** Returns true when a full batch succeeded, so more work may remain. */
-  private static boolean processBatch() {
-    final List<OutboxEntry> entries = dao().listPending(BATCH_SIZE);
+  private static boolean processBatch(List<OutboxEntry> entries) {
     boolean succeeded = true;
     succeeded &= processIndex(kind(entries, INDEX));
     succeeded &= processEach(kind(entries, PROJECTION), TechnicalOutbox::project);
@@ -196,11 +188,17 @@ public final class TechnicalOutbox {
         final List<String> failed =
             TechnicalSearchIndex.bulk(new TechnicalDocumentBuilder().build(ids), true);
         entries.forEach(entry -> settle(entry, failed.contains(entry.subjectKey()), "Rejected"));
+        if (!failed.isEmpty()) {
+          GovernanceSearchMetrics.TECHNICAL.recordRetry();
+          GovernanceSearchMetrics.TECHNICAL.setAvailable(false);
+        }
         succeeded = failed.isEmpty();
       } catch (RuntimeException exception) {
         LOG.warn("Technical Dictionary index batch failed", exception);
         entries.forEach(
             entry -> dao().markFailed(entry.kind(), entry.subjectKey(), error(exception)));
+        GovernanceSearchMetrics.TECHNICAL.recordRetry();
+        GovernanceSearchMetrics.TECHNICAL.setAvailable(false);
         succeeded = false;
       }
     }
@@ -217,6 +215,7 @@ public final class TechnicalOutbox {
         LOG.warn(
             "Technical Dictionary {} entry {} failed", entry.kind(), entry.subjectKey(), exception);
         dao().markFailed(entry.kind(), entry.subjectKey(), error(exception));
+        GovernanceSearchMetrics.TECHNICAL.recordRetry();
         succeeded = false;
       }
     }
@@ -262,6 +261,28 @@ public final class TechnicalOutbox {
             ? exception.getClass().getSimpleName()
             : exception.getMessage();
     return message.length() > MAX_ERROR_LENGTH ? message.substring(0, MAX_ERROR_LENGTH) : message;
+  }
+
+  private static void updateMetrics() {
+    try {
+      final TechnicalDictionaryDAO dao = dao();
+      GovernanceSearchMetrics.TECHNICAL.updateOutbox(dao.countPending(), dao.oldestPendingAt());
+    } catch (JdbiException exception) {
+      LOG.warn("Technical Dictionary outbox metrics could not be read", exception);
+    }
+  }
+
+  private static void reconcile() {
+    final long databaseCount = dao().countRecords();
+    final long indexCount =
+        TechnicalSearchIndex.search(
+                Map.of("size", 0, "track_total_hits", true, "query", Map.of("match_all", Map.of())))
+            .path("hits")
+            .path("total")
+            .path("value")
+            .asLong();
+    GovernanceSearchMetrics.TECHNICAL.setDriftRows(Math.abs(databaseCount - indexCount));
+    GovernanceSearchMetrics.TECHNICAL.setAvailable(true);
   }
 
   private static TechnicalDictionaryDAO dao() {

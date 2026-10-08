@@ -40,6 +40,7 @@ import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqTestOutbox;
+import org.openmetadata.service.glossary.search.GovernedGlossaryOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
@@ -254,6 +255,7 @@ public class GlossaryVersioningService {
                         JsonUtils.pojoToJson(payload),
                         now,
                         actor);
+                    enqueueSearch(dao, entityType, glossaryId, parentBusinessVersion);
                     return dao.findWorking(entityType, entityId, parentBusinessVersion);
                   });
     } catch (UnableToExecuteStatementException exception) {
@@ -324,6 +326,8 @@ public class GlossaryVersioningService {
                           now,
                           actor);
                   requireUpdated(updated);
+                  enqueueSearch(
+                      dao, entityType, working.glossaryId(), working.parentBusinessVersion());
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     refreshIndexes(entityType, entityId, result.payload());
@@ -436,6 +440,8 @@ public class GlossaryVersioningService {
                           System.currentTimeMillis(),
                           actor);
                   requireUpdated(updated);
+                  enqueueSearch(
+                      dao, entityType, working.glossaryId(), working.parentBusinessVersion());
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     refreshIndexes(entityType, entityId, result.payload());
@@ -472,6 +478,8 @@ public class GlossaryVersioningService {
                     requireUpdated(
                         dao.deleteWorking(
                             entityType, entityId, parentBusinessVersion, expectedRevision));
+                    enqueueSearch(
+                        dao, entityType, working.glossaryId(), working.parentBusinessVersion());
                     return null;
                   }
                   requireUpdated(
@@ -486,6 +494,8 @@ public class GlossaryVersioningService {
                           EntityStatus.REJECTED.value(),
                           System.currentTimeMillis(),
                           actor));
+                  enqueueSearch(
+                      dao, entityType, working.glossaryId(), working.parentBusinessVersion());
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     refreshIndexes(entityType, entityId, result == null ? null : result.payload());
@@ -554,6 +564,8 @@ public class GlossaryVersioningService {
                     lockPublicationScope(dao, entityType, entityId, parentBusinessVersion);
                     WorkingVersionRecord working =
                         requireWorking(dao, entityType, entityId, parentBusinessVersion);
+                    enqueueSearch(
+                        dao, entityType, working.glossaryId(), working.parentBusinessVersion());
                     if (working.revision() != expectedRevision) {
                       throw conflict("Working version revision conflict");
                     }
@@ -715,6 +727,7 @@ public class GlossaryVersioningService {
     for (WorkingVersionRecord working : workingTerms) {
       if (GlossaryTermDeletion.isRequested(working)) {
         GlossaryTermDeletion.apply(handle, dao, working, actor);
+        enqueueSearch(dao, GLOSSARY_TERM, working.glossaryId(), parentBusinessVersion);
         continue;
       }
       PublishedSnapshotRecord corrected =
@@ -724,6 +737,7 @@ public class GlossaryVersioningService {
         requireUpdated(
             dao.deleteWorking(
                 GLOSSARY_TERM, working.entityId(), parentBusinessVersion, working.revision()));
+        enqueueSearch(dao, GLOSSARY_TERM, working.glossaryId(), parentBusinessVersion);
         continue;
       }
 
@@ -756,6 +770,7 @@ public class GlossaryVersioningService {
       requireUpdated(
           dao.deleteWorking(
               GLOSSARY_TERM, working.entityId(), parentBusinessVersion, working.revision()));
+      enqueueSearch(dao, GLOSSARY_TERM, working.glossaryId(), parentBusinessVersion);
       publishedTerms.add(
           new PublishedSnapshotRecord(
               snapshotId,
@@ -817,8 +832,7 @@ public class GlossaryVersioningService {
           Entity.getJdbi()
               .inTransaction(
                   handle ->
-                      GlossaryVersionCorrection.createWorking(
-                          handle.attach(GlossaryVersionDAO.class), request));
+                      createCorrectionWorking(handle.attach(GlossaryVersionDAO.class), request));
     } catch (UnableToExecuteStatementException exception) {
       if (isConstraintConflict(exception)) {
         throw conflict("A working version was created concurrently");
@@ -847,8 +861,7 @@ public class GlossaryVersioningService {
           Entity.getJdbi()
               .inTransaction(
                   handle ->
-                      GlossaryTermDeletion.createWorking(
-                          handle.attach(GlossaryVersionDAO.class), request));
+                      createDeletionWorking(handle.attach(GlossaryVersionDAO.class), request));
     } catch (UnableToExecuteStatementException exception) {
       if (isConstraintConflict(exception)) {
         throw conflict("A working version was created concurrently");
@@ -861,6 +874,20 @@ public class GlossaryVersioningService {
 
   public static boolean isDeletionRequest(WorkingVersionRecord working) {
     return GlossaryTermDeletion.isRequested(working);
+  }
+
+  private static WorkingVersionRecord createCorrectionWorking(
+      final GlossaryVersionDAO dao, final GlossaryVersionCorrection.CorrectionRequest request) {
+    final WorkingVersionRecord working = GlossaryVersionCorrection.createWorking(dao, request);
+    enqueueSearch(dao, GLOSSARY_TERM, working.glossaryId(), working.parentBusinessVersion());
+    return working;
+  }
+
+  private static WorkingVersionRecord createDeletionWorking(
+      final GlossaryVersionDAO dao, final GlossaryTermDeletion.DeletionRequest request) {
+    final WorkingVersionRecord working = GlossaryTermDeletion.createWorking(dao, request);
+    enqueueSearch(dao, GLOSSARY_TERM, working.glossaryId(), working.parentBusinessVersion());
+    return working;
   }
 
   public List<SnapshotHistoryRecord> listCorrectionHistory(
@@ -983,10 +1010,18 @@ public class GlossaryVersioningService {
   /** Deletes the working version only; the published versions of the entity stay untouched. */
   public void discardWorking(
       String entityType, UUID entityId, String parentBusinessVersion, long expectedRevision) {
-    final GlossaryVersionDAO dao = Entity.getJdbi().onDemand(GlossaryVersionDAO.class);
-    if (dao.deleteWorking(entityType, entityId, parentBusinessVersion, expectedRevision) == 0) {
-      throw conflict("The working version was changed; reload it before discarding");
-    }
+    Entity.getJdbi()
+        .useTransaction(
+            handle -> {
+              final GlossaryVersionDAO dao = handle.attach(GlossaryVersionDAO.class);
+              final WorkingVersionRecord working =
+                  requireWorking(dao, entityType, entityId, parentBusinessVersion);
+              if (dao.deleteWorking(entityType, entityId, parentBusinessVersion, expectedRevision)
+                  == 0) {
+                throw conflict("The working version was changed; reload it before discarding");
+              }
+              enqueueSearch(dao, entityType, working.glossaryId(), working.parentBusinessVersion());
+            });
     refreshIndexes(entityType, entityId, null);
   }
 
@@ -1068,6 +1103,7 @@ public class GlossaryVersioningService {
       processPendingOutbox();
     }
     entityIds.forEach(entityId -> refreshManagerIndexSafely(entityType, entityId));
+    GovernedGlossaryOutbox.flushAll();
   }
 
   /**
@@ -1076,6 +1112,9 @@ public class GlossaryVersioningService {
    */
   private void refreshIndexes(String entityType, UUID entityId, String payload) {
     refreshManagerIndexSafely(entityType, entityId);
+    if (!DEFER_SIDE_EFFECTS.get()) {
+      GovernedGlossaryOutbox.flush();
+    }
   }
 
   private void refreshManagerIndexSafely(String entityType, UUID entityId) {
@@ -1245,6 +1284,7 @@ public class GlossaryVersioningService {
         dao.updateSnapshotPayload(active.snapshotId(), repairedPayload, sha256(repairedPayload)));
     dao.insertOutbox(
         UUID.randomUUID(), active.snapshotId(), "PUBLISHED_SNAPSHOT_UPSERT", repairedPayload, now);
+    enqueueSearch(dao, GLOSSARY_TERM, glossaryId, active.businessVersion());
     return true;
   }
 
@@ -1273,6 +1313,7 @@ public class GlossaryVersioningService {
             predecessor.snapshotId(), repairedPayload, sha256(repairedPayload)));
     dao.insertOutbox(
         UUID.randomUUID(), predecessor.snapshotId(), SNAPSHOT_ARCHIVE_EVENT, repairedPayload, now);
+    enqueueSearch(dao, GLOSSARY_TERM, glossaryId, predecessor.businessVersion());
   }
 
   public PublishPreview publishPreview(UUID glossaryId, int limit, String after) {
@@ -1329,6 +1370,16 @@ public class GlossaryVersioningService {
   private static void requireEntityType(String entityType) {
     if (!GLOSSARY.equals(entityType) && !GLOSSARY_TERM.equals(entityType)) {
       throw new BadRequestException("Unsupported glossary version entity type: " + entityType);
+    }
+  }
+
+  private static void enqueueSearch(
+      final GlossaryVersionDAO dao,
+      final String entityType,
+      final UUID glossaryId,
+      final String parentBusinessVersion) {
+    if (GLOSSARY_TERM.equals(entityType)) {
+      GovernedGlossaryOutbox.enqueue(dao, glossaryId, parentBusinessVersion);
     }
   }
 
@@ -1600,6 +1651,7 @@ public class GlossaryVersioningService {
           UUID.randomUUID(), term.snapshotId(), SNAPSHOT_ARCHIVE_EVENT, term.payload(), now);
     }
     dao.deleteWorkingByGlossaryAndParent(GLOSSARY_TERM, glossaryId, parentBusinessVersion);
+    enqueueSearch(dao, GLOSSARY_TERM, glossaryId, parentBusinessVersion);
   }
 
   /**

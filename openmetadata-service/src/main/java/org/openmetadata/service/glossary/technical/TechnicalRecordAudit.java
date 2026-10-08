@@ -37,6 +37,8 @@ public final class TechnicalRecordAudit {
   public static final String WITHDRAW_CHANGE = "WITHDRAW_CHANGE";
   public static final String RESET_CHANGE = "RESET_CHANGE";
 
+  public static final String PROPOSED_BY = "proposedBy";
+  public static final String PROPOSED_AT = "proposedAt";
   private static final String FIELD = "field";
   private static final String OLD_VALUE = "oldValue";
   private static final String NEW_VALUE = "newValue";
@@ -77,6 +79,8 @@ public final class TechnicalRecordAudit {
     values.add(change("operation", null, request.operation()));
     values.add(change("baseRevision", null, String.valueOf(request.baseRevision())));
     values.add(change("changeRevision", null, String.valueOf(request.revision())));
+    values.add(change(PROPOSED_BY, null, proposer(request)));
+    values.add(change(PROPOSED_AT, null, String.valueOf(proposedAt(request))));
     values.addAll(changes(before, after));
     final TechnicalRecord subject = before == null ? after : before;
     dao.insertAudit(
@@ -89,6 +93,14 @@ public final class TechnicalRecordAudit {
             JsonUtils.pojoToJson(values),
             actor,
             System.currentTimeMillis()));
+  }
+
+  private static String proposer(TechnicalRecordChangeRequest request) {
+    return request.submittedBy() == null ? request.createdBy() : request.submittedBy();
+  }
+
+  private static long proposedAt(TechnicalRecordChangeRequest request) {
+    return request.submittedAt() == null ? request.createdAt() : request.submittedAt();
   }
 
   /** The editable and source fields that differ, as {@code [{field, oldValue, newValue}]}. */

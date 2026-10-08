@@ -68,6 +68,20 @@ class GlossaryBusinessVersionSearchServiceTest {
   }
 
   @Test
+  void searchIgnoresVietnameseDiacritics() {
+    final GlossaryBusinessVersionSearchService service = new GlossaryBusinessVersionSearchService();
+
+    final Map<String, Object> response =
+        service.search(
+            criteria("diem tin dung", List.of(), 10, 0),
+            List.of(row("Điểm tín dụng", "1.0", "Approved")),
+            false,
+            false);
+
+    assertEquals(1, ((Map<?, ?>) response.get("paging")).get("total"));
+  }
+
+  @Test
   void rejectsMalformedCriteria() {
     assertThrows(
         BadRequestException.class,

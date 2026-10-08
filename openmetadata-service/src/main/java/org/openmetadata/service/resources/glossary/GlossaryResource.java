@@ -74,6 +74,7 @@ import org.openmetadata.service.glossary.DataDictionaryBootstrap;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.DataQualityBootstrap;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.GovernedGlossarySearchBootstrap;
 import org.openmetadata.service.glossary.TechnicalDictionaryBootstrap;
 import org.openmetadata.service.glossary.dq.DqTestBootstrap;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
@@ -120,6 +121,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
     if (!config.getPortalConfiguration().isEnabled()) {
       DataDictionaryBootstrap.initialize();
       DataQualityBootstrap.initialize();
+      GovernedGlossarySearchBootstrap.initialize();
       TechnicalDictionaryBootstrap.initialize();
       versioningService.processPendingOutbox();
       DqTestBootstrap.initialize(config);

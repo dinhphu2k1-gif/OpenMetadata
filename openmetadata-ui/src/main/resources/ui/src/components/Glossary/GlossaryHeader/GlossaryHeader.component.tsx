@@ -44,6 +44,7 @@ import { ManageButtonItemLabel } from '../../../components/common/ManageButtonCo
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
 import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
+import ApprovedRecordHistoryModal from '../../common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
 import ReviewActionConfirmModal from '../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
@@ -72,6 +73,7 @@ import {
   exportDataDictionaryVersion,
   exportGlossaryInCSVFormat,
   createGlossaryTermCorrection,
+  getGlossaryTermCorrectionHistory,
   createGlossaryTermWorkingVersion,
   discardGlossaryTermWorkingVersion,
   getGlossariesById,
@@ -100,6 +102,7 @@ import {
   compareBusinessVersions,
   getBusinessVersion,
 } from '../../../utils/BusinessVersionUtils';
+import { fromGlossaryCorrection } from '../../../utils/ApprovedRecordHistoryUtils';
 import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
 import Fqn from '../../../utils/Fqn';
@@ -131,7 +134,6 @@ import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
 import StyleModal from '../../Modals/StyleModal/StyleModal.component';
 import { useGlossaryStore } from '../useGlossary.store';
-import CorrectionHistoryModal from './CorrectionHistoryModal.component';
 import { GlossaryHeaderProps } from './GlossaryHeader.interface';
 import './glossery-header.less';
 
@@ -1163,6 +1165,19 @@ const GlossaryHeader = ({
     }
   };
 
+  const historyParentVersion = getParentBusinessVersion();
+  const loadCorrectionHistory = useCallback(
+    async () =>
+      (
+        await getGlossaryTermCorrectionHistory(
+          selectedData.id,
+          getBusinessVersion(businessVersion ?? undefined, ''),
+          historyParentVersion
+        )
+      ).map(fromGlossaryCorrection),
+    [selectedData.id, businessVersion, historyParentVersion]
+  );
+
   const handleCreateCorrection = async () => {
     if (isCreatingCorrection) {
       return;
@@ -2115,11 +2130,11 @@ const GlossaryHeader = ({
       )}
 
       {canViewCorrectionHistory && (
-        <CorrectionHistoryModal
-          businessVersion={getBusinessVersion(businessVersion ?? undefined, '')}
+        <ApprovedRecordHistoryModal
+          load={loadCorrectionHistory}
           open={isCorrectionHistoryOpen}
-          parentBusinessVersion={getParentBusinessVersion()}
-          termId={selectedData.id}
+          scope={isDQGlossaryTerm ? 'dq' : 'cde'}
+          subtitle={getBusinessVersion(businessVersion ?? undefined, '')}
           onClose={() => setIsCorrectionHistoryOpen(false)}
         />
       )}

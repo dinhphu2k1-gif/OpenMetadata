@@ -319,3 +319,19 @@ CREATE TABLE IF NOT EXISTS dq_test_outbox (
   PRIMARY KEY (kind, subjectKey)
 );
 CREATE INDEX IF NOT EXISTS idx_dq_test_outbox_enqueued ON dq_test_outbox (enqueuedAt);
+
+-- Who sent an Approved-version correction for review; null on rows written before this column.
+ALTER TABLE glossary_business_snapshot_history
+  ADD COLUMN IF NOT EXISTS proposedAt bigint,
+  ADD COLUMN IF NOT EXISTS proposedBy varchar(256);
+
+CREATE TABLE IF NOT EXISTS governed_glossary_search_outbox (
+  glossaryId varchar(36) NOT NULL,
+  parentBusinessVersion varchar(64) NOT NULL,
+  enqueuedAt bigint NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  lastError text,
+  PRIMARY KEY (glossaryId, parentBusinessVersion)
+);
+CREATE INDEX IF NOT EXISTS idx_governed_glossary_search_outbox_enqueued
+  ON governed_glossary_search_outbox (enqueuedAt);

@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.openmetadata.schema.type.EntityReference;
 import org.openmetadata.schema.type.Include;
@@ -25,6 +26,13 @@ import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.AuditRow;
  */
 public final class TechnicalHistory {
   private static final String FIELD = "field";
+  private static final Set<String> METADATA_FIELDS =
+      Set.of(
+          "operation",
+          "baseRevision",
+          "changeRevision",
+          TechnicalRecordAudit.PROPOSED_BY,
+          TechnicalRecordAudit.PROPOSED_AT);
 
   private final Map<String, String> labels = new HashMap<>();
 
@@ -47,6 +55,47 @@ public final class TechnicalHistory {
     paging.put("limit", limit);
     paging.put("offset", offset);
     return Map.of("data", entries, "paging", paging);
+  }
+
+  /** Edits of an Approved record: who proposed, who approved and which fields changed. */
+  public Map<String, Object> corrections(String recordId, int limit, int offset) {
+    final TechnicalDictionaryDAO dao = dao();
+    final List<Map<String, Object>> entries =
+        dao.listCorrectionAudit(recordId, limit, offset).stream().map(this::correction).toList();
+    final Map<String, Object> paging = new LinkedHashMap<>();
+    paging.put("total", dao.countCorrectionAudit(recordId));
+    paging.put("limit", limit);
+    paging.put("offset", offset);
+    return Map.of("data", entries, "paging", paging);
+  }
+
+  private Map<String, Object> correction(AuditRow audit) {
+    final List<Map<String, Object>> all = labelled(audit);
+    final Map<String, Object> entry = new LinkedHashMap<>();
+    entry.put("id", audit.id());
+    entry.put("approvedAt", audit.at());
+    entry.put("approvedBy", audit.actor());
+    entry.put("proposedBy", valueOf(all, TechnicalRecordAudit.PROPOSED_BY));
+    entry.put("proposedAt", longValueOf(all, TechnicalRecordAudit.PROPOSED_AT));
+    entry.put("changes", all.stream().filter(TechnicalHistory::isFieldChange).toList());
+    return entry;
+  }
+
+  private static boolean isFieldChange(Map<String, Object> change) {
+    return !METADATA_FIELDS.contains(String.valueOf(change.get(FIELD)));
+  }
+
+  private static Object valueOf(List<Map<String, Object>> changes, String field) {
+    return changes.stream()
+        .filter(change -> field.equals(change.get(FIELD)))
+        .map(change -> change.get("newValue"))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private static Long longValueOf(List<Map<String, Object>> changes, String field) {
+    final Object value = valueOf(changes, field);
+    return value == null ? null : Long.valueOf(String.valueOf(value));
   }
 
   private Map<String, Object> entry(AuditRow audit) {

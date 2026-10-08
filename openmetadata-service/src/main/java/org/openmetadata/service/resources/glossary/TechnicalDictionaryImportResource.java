@@ -91,7 +91,7 @@ public class TechnicalDictionaryImportResource {
       @FormDataParam("file") FormDataContentDisposition fileDetail) {
     access.requireEdit(securityContext);
     final String version = activeVersion();
-    TechnicalOutbox.flush();
+    TechnicalOutbox.drainBeforeRead();
     final byte[] fileBytes =
         TechnicalImportSheet.readBytes(input, fileDetail == null ? -1 : fileDetail.getSize());
     return IMPORTS.preview(

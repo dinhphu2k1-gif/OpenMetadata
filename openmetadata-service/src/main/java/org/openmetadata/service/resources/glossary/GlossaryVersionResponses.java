@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
+import org.openmetadata.service.glossary.versioning.GlossaryCorrectionChanges;
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotHistoryRecord;
@@ -66,7 +67,7 @@ final class GlossaryVersionResponses {
     return payload;
   }
 
-  static Map<String, Object> history(SnapshotHistoryRecord record) {
+  static Map<String, Object> history(SnapshotHistoryRecord record, String replacingPayload) {
     final Map<String, Object> payload = payload(record.payload());
     projectCdeReleaseVersionType(payload, record.entityType(), record.businessVersion());
     normalizeScopedTermFqn(payload, record.parentBusinessVersion());
@@ -79,6 +80,9 @@ final class GlossaryVersionResponses {
     payload.put("publishedBy", record.publishedBy());
     payload.put("supersededAt", record.supersededAt());
     payload.put("supersededBy", record.supersededBy());
+    putIfPresent(payload, "proposedAt", record.proposedAt());
+    putIfPresent(payload, "proposedBy", record.proposedBy());
+    payload.put("changes", GlossaryCorrectionChanges.between(record.payload(), replacingPayload));
     return payload;
   }
 
