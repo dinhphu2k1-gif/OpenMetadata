@@ -19,8 +19,7 @@ import {
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
-import TechnicalDictionaryPage, {
-} from './TechnicalDictionaryPage.component';
+import TechnicalDictionaryPage from './TechnicalDictionaryPage.component';
 
 const ROW = {
   key: 'term-1',
@@ -163,6 +162,13 @@ jest.mock('../../rest/technicalDictionaryAPI', () => ({
   approveTechnicalChangeRequest: jest.fn().mockResolvedValue({}),
   rejectTechnicalChangeRequest: jest.fn().mockResolvedValue({}),
   submitTechnicalChangeRequest: jest.fn().mockResolvedValue({}),
+  withdrawTechnicalChangeRequest: jest.fn().mockResolvedValue({}),
+  withdrawTechnicalRecord: jest.fn().mockResolvedValue({}),
+  getTechnicalPendingRequests: jest.fn().mockResolvedValue({
+    data: [],
+    paging: { total: 0, limit: 25, offset: 0 },
+    counts: { create: 0, update: 0, delete: 0 },
+  }),
   approveTechnicalRecord: jest.fn().mockResolvedValue({}),
   bulkApproveTechnicalRecords: jest.fn(),
   bulkRejectTechnicalRecords: jest.fn(),
@@ -390,7 +396,6 @@ describe('TechnicalDictionaryPage', () => {
     expect(screen.queryByText('edit-modal')).not.toBeInTheDocument();
     expect(screen.queryByText('delete-modal')).not.toBeInTheDocument();
   });
-
 });
 
 describe('TechnicalDictionaryPage record pages', () => {
@@ -793,6 +798,7 @@ describe('TechnicalDictionaryPage bulk review', () => {
     unmount();
     mockContextState.capabilities.canEdit = true;
     mockContextState.capabilities.canApprove = false;
+    mockRows = [...mockRows, DRAFT_ROW];
     render(<TechnicalDictionaryPage isEmbedded />);
     fireEvent.click(screen.getByText('select-all'));
 

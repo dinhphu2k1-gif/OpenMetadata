@@ -201,6 +201,34 @@ export interface TechnicalChangeRequestInput extends TechnicalRecordValues {
   operation: TechnicalChangeOperation;
 }
 
+export type TechnicalPendingRequestType = 'CREATE' | 'UPDATE' | 'DELETE';
+
+export interface TechnicalPendingRequest {
+  requestId: string;
+  recordId: string;
+  requestType: TechnicalPendingRequestType;
+  revision: number;
+  baseRevision?: number;
+  createdBy?: string;
+  submittedBy?: string;
+  submittedAt?: number;
+  columnFqn: string;
+  sourceService?: string;
+  sourceDatabase?: string;
+  sourceSchema?: string;
+  sourceTable?: string;
+  cdeTermId?: string;
+  dataDictionaryVersion?: string;
+  approvedRecord?: Record<string, unknown> | null;
+  proposedRecord?: Record<string, unknown> | null;
+}
+
+export interface TechnicalPendingRequestsPage {
+  data: TechnicalPendingRequest[];
+  paging: { total: number; limit: number; offset: number };
+  counts: { create: number; update: number; delete: number };
+}
+
 export interface TechnicalSnapshotSummary {
   dataDictionaryVersion: string;
   bindings: number;
@@ -380,7 +408,7 @@ export const getTechnicalChangeRequest = async (
 
 const reviewTechnicalChangeRequest = async (
   termId: string,
-  action: 'submit' | 'approve' | 'reject',
+  action: 'submit' | 'approve' | 'reject' | 'withdraw',
   expectedRevision: number
 ) => {
   const response = await APIClient.post<
@@ -407,6 +435,52 @@ export const rejectTechnicalChangeRequest = (
   termId: string,
   expectedRevision: number
 ) => reviewTechnicalChangeRequest(termId, 'reject', expectedRevision);
+
+export const withdrawTechnicalChangeRequest = (
+  termId: string,
+  expectedRevision: number
+) => reviewTechnicalChangeRequest(termId, 'withdraw', expectedRevision);
+
+export const requestTechnicalRecordDeletion = async (
+  termId: string,
+  expectedRevision: number
+): Promise<TechnicalChangeRequest> => {
+  const response = await APIClient.post<
+    { expectedRevision: number },
+    AxiosResponse<TechnicalChangeRequest>
+  >(`/glossaryTerms/technical/records/${termId}/deletion-request`, {
+    expectedRevision,
+  });
+
+  return response.data;
+};
+
+export const getTechnicalPendingRequests = async (query: {
+  q?: string;
+  types?: string[];
+  requesters?: string[];
+  sourceServices?: string[];
+  cdeTermIds?: string[];
+  limit: number;
+  offset: number;
+}): Promise<TechnicalPendingRequestsPage> => {
+  const response = await APIClient.get<TechnicalPendingRequestsPage>(
+    '/glossaryTerms/technical/requests',
+    {
+      params: {
+        q: query.q || undefined,
+        types: csv(query.types),
+        requesters: csv(query.requesters),
+        sourceServices: csv(query.sourceServices),
+        cdeTermIds: csv(query.cdeTermIds),
+        limit: query.limit,
+        offset: query.offset,
+      },
+    }
+  );
+
+  return response.data;
+};
 
 export const cancelTechnicalChangeRequest = async (
   termId: string,
@@ -454,6 +528,20 @@ export const rejectTechnicalRecord = async (
     { expectedRevision: number },
     AxiosResponse<TechnicalRecordApiRow>
   >(`/glossaryTerms/technical/records/${termId}/reject`, {
+    expectedRevision,
+  });
+
+  return response.data;
+};
+
+export const withdrawTechnicalRecord = async (
+  termId: string,
+  expectedRevision: number
+): Promise<TechnicalRecordApiRow> => {
+  const response = await APIClient.post<
+    { expectedRevision: number },
+    AxiosResponse<TechnicalRecordApiRow>
+  >(`/glossaryTerms/technical/records/${termId}/withdraw`, {
     expectedRevision,
   });
 

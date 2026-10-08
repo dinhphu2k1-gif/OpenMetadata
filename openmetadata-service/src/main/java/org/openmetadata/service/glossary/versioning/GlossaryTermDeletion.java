@@ -12,20 +12,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.jdbi.v3.core.Handle;
 import org.openmetadata.schema.type.EntityStatus;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.glossary.dq.DqTestOutbox;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 
 /**
- * Deletes an Approved Data Dictionary CDE through the approval workflow.
+ * Deletes an Approved governed glossary term through the approval workflow.
  *
  * <p>A deletion working row is marked {@code pendingDeletion}, carries the businessVersion of the
- * newest Approved snapshot of the CDE in its scope and is submitted for review immediately. Until
- * it is approved the Approved CDE stays effective. Approving it archives every Approved snapshot
- * of the CDE in the scope and drops its published head, the same state a Data Dictionary cutover
- * leaves behind: the CDE leaves the active list while its Approved history is kept.
+ * newest Approved snapshot of the term in its scope and is submitted for review immediately. Until
+ * it is approved the Approved term stays effective. Approving it archives every Approved snapshot
+ * of the term in the scope and drops its published head while keeping its Approved history.
  */
 final class GlossaryTermDeletion {
   static final String PENDING_DELETION = "pendingDeletion";
@@ -80,19 +81,30 @@ final class GlossaryTermDeletion {
     return dao.findWorking(GLOSSARY_TERM, request.entityId(), scope);
   }
 
-  /** Archives the Approved snapshots of the CDE in its scope and returns the newest one. */
+  /** Archives the Approved snapshots of the term in its scope and returns the newest one. */
   static PublishedSnapshotRecord apply(
-      GlossaryVersionDAO dao, WorkingVersionRecord working, String actor) {
+      Handle handle, GlossaryVersionDAO dao, WorkingVersionRecord working, String actor) {
     final List<PublishedSnapshotRecord> approved =
         activeSnapshots(dao, working.entityId(), working.parentBusinessVersion());
     if (approved.isEmpty()) {
       throw GlossaryVersioningService.conflict(
           String.format(
-              "CDE has no Approved version left to delete in scope '%s'",
+              "Governed glossary term has no Approved version left to delete in scope '%s'",
               working.parentBusinessVersion()));
     }
     final long now = System.currentTimeMillis();
     approved.forEach(snapshot -> archive(dao, snapshot, now, actor));
+    // A deleted Data Quality Rule becomes ineffective. Queue its reconciliation in the same
+    // transaction as the archive so managed test cases and pipelines can never be left active
+    // without a durable retry record.
+    approved.stream()
+        .filter(DqTestOutbox::isDataQualityRule)
+        .findFirst()
+        .ifPresent(
+            snapshot ->
+                DqTestOutbox.enqueueRule(
+                    handle.attach(org.openmetadata.service.jdbi3.DqRuleTestDAO.class),
+                    snapshot.entityId().toString()));
     GlossaryVersioningService.requireUpdated(
         dao.deleteWorking(
             GLOSSARY_TERM,
@@ -108,7 +120,9 @@ final class GlossaryTermDeletion {
         dao.lockLatestPublishedByParent(GLOSSARY_TERM, entityId, scope);
     if (latest == null || latest.archivedAt() != null) {
       throw GlossaryVersioningService.conflict(
-          String.format("CDE has no active Approved version in scope '%s' to delete", scope));
+          String.format(
+              "Governed glossary term has no active Approved version in scope '%s' to delete",
+              scope));
     }
     return latest;
   }

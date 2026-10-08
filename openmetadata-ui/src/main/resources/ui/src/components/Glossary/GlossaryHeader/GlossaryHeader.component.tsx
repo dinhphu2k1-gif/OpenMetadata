@@ -196,11 +196,8 @@ const GlossaryHeader = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { fqn } = useFqn();
-  const {
-    activeGlossary,
-    createDraftRequest,
-    requestPendingRequestsRefresh,
-  } = useGlossaryStore();
+  const { activeGlossary, createDraftRequest, requestPendingRequestsRefresh } =
+    useGlossaryStore();
   const cdeRoute = useMemo(
     () =>
       parseCdeRoute({
@@ -635,7 +632,7 @@ const GlossaryHeader = ({
             selectedData.id,
             cdeRoute.parentBusinessVersion ?? selectedData.parentBusinessVersion
           );
-      let versions: {
+      const versions: {
         label: string;
         snapshotVersion: string;
         snapshot?: Glossary | GlossaryTerm;
@@ -965,7 +962,11 @@ const GlossaryHeader = ({
     selectedData.workingRevision,
   ]);
 
-  const canRequestDeletion = canCreateCorrection && isCDEGlossaryTerm;
+  const canRequestDeletion =
+    canCreateCorrection &&
+    (isCDEGlossaryTerm || isDQGlossaryTerm) &&
+    Boolean(workflowPermissions?.canSubmit);
+  const deletionTextScope = isDQGlossaryTerm ? 'dq' : 'cde';
 
   const canCancelDeletion =
     !isVersionView &&
@@ -1209,7 +1210,7 @@ const GlossaryHeader = ({
       );
       await onWorkflowTransition?.(created, 'createDraft');
       requestPendingRequestsRefresh();
-      showSuccessToast(t('cde.deletion-request-created'));
+      showSuccessToast(t(`${deletionTextScope}.deletion-request-created`));
       setIsDeletionRequestModalOpen(false);
     } catch (error) {
       handleWorkflowError(error);
@@ -1286,7 +1287,9 @@ const GlossaryHeader = ({
       setIsApproveModalOpen(false);
       if (isPendingDeletion) {
         showSuccessToast(
-          t('cde.deletion-approved', { name: getEntityName(selectedData) })
+          t(`${deletionTextScope}.deletion-approved`, {
+            name: getEntityName(selectedData),
+          })
         );
         navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
       } else {
@@ -1934,7 +1937,6 @@ const GlossaryHeader = ({
     }
 
     const term = selectedData as GlossaryTerm;
-    const extension = term.extension ?? {};
 
     return {
       ...term,
@@ -1948,13 +1950,13 @@ const GlossaryHeader = ({
       <div className="glossary-header flex gap-4 justify-between no-wrap ">
         <div className="flex w-min-0 flex-auto">
           <EntityHeader
+            showNameRow
             badge={statusBadge}
             breadcrumb={breadcrumb}
             entityData={dqHeaderData ?? selectedData}
             entityType={EntityType.GLOSSARY_TERM}
             icon={icon}
             serviceName=""
-            showNameRow
             suffix={
               !isGlossary && (
                 <LearningIcon pageId={LEARNING_PAGE_IDS.GLOSSARY_TERM} />
@@ -2057,7 +2059,7 @@ const GlossaryHeader = ({
           showIcon
           className="m-b-sm"
           data-testid="cde-pending-deletion-banner"
-          message={t('cde.deletion-pending-banner')}
+          message={t(`${deletionTextScope}.deletion-pending-banner`)}
           type="error"
         />
       )}
@@ -2138,10 +2140,10 @@ const GlossaryHeader = ({
       />
 
       <ConfirmationModal
-        bodyText={t('cde.deletion-request-confirm')}
+        bodyText={t(`${deletionTextScope}.deletion-request-confirm`)}
         cancelText={t('label.cancel')}
         confirmText={t('cde.deletion-request')}
-        header={t('cde.deletion-request-title', {
+        header={t(`${deletionTextScope}.deletion-request-title`, {
           name: getEntityName(selectedData),
         })}
         isLoading={isRequestingDeletion}
@@ -2202,12 +2204,12 @@ const GlossaryHeader = ({
               <Input
                 autoFocus
                 data-testid="cde-draft-version-input"
+                disabled={isGlossary}
                 placeholder={
                   isGlossary ? 'Ví dụ: 2, 3...' : 'Ví dụ: 1.1, 2.0...'
                 }
-                value={draftVersion}
-                disabled={isGlossary}
                 status={draftVersionError ? 'error' : undefined}
+                value={draftVersion}
                 onChange={(e) => {
                   const value = e.target.value;
                   setDraftVersion(value);
@@ -2276,15 +2278,18 @@ const GlossaryHeader = ({
                 entity: t('label.glossary'),
               })
             : isPendingDeletion
-            ? t('cde.deletion-approve-confirm')
+            ? t(`${deletionTextScope}.deletion-approve-confirm`)
             : t('message.confirm-approve-glossary-term-message')
         }
         open={isApproveModalOpen}
         onCancel={() => setIsApproveModalOpen(false)}
         onConfirm={handleApproveTerm}>
-        {!isGlossary && isDQGlossaryTerm && isApproveModalOpen && (
-          <DQApprovePreview rule={selectedData as GlossaryTerm} />
-        )}
+        {!isGlossary &&
+          isDQGlossaryTerm &&
+          !isPendingDeletion &&
+          isApproveModalOpen && (
+            <DQApprovePreview rule={selectedData as GlossaryTerm} />
+          )}
       </ReviewActionConfirmModal>
 
       <ReviewActionConfirmModal

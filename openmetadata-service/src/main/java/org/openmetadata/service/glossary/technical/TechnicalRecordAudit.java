@@ -22,6 +22,7 @@ public final class TechnicalRecordAudit {
   public static final String SUBMIT = "SUBMIT";
   public static final String APPROVE = "APPROVE";
   public static final String REJECT = "REJECT";
+  public static final String WITHDRAW = "WITHDRAW";
   public static final String RESUBMIT = "RESUBMIT";
   public static final String DELETE = "DELETE";
   public static final String IMPORT = "IMPORT";
@@ -33,6 +34,7 @@ public final class TechnicalRecordAudit {
   public static final String APPROVE_CHANGE = "APPROVE_CHANGE";
   public static final String REJECT_CHANGE = "REJECT_CHANGE";
   public static final String CANCEL_CHANGE = "CANCEL_CHANGE";
+  public static final String WITHDRAW_CHANGE = "WITHDRAW_CHANGE";
   public static final String RESET_CHANGE = "RESET_CHANGE";
 
   private static final String FIELD = "field";

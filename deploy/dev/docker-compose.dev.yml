@@ -583,22 +583,17 @@ services:
       - ingestion-volume-dags:/opt/airflow/dags
       - ingestion-volume-tmp:/tmp
 
-  # Oracle nguồn dữ liệu nhỏ để thử kiểm thử theo quy tắc CLDL. Chỉ chạy khi bật profile:
-  #   docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-oracle
-  # Lần đầu tạo database mất 15-30 phút. Chi tiết dữ liệu và kịch bản thử: dq-sandbox/README.md
   dq-sandbox-oracle:
     image: container-registry.oracle.com/database/enterprise:21.3.0.0
     container_name: dq-sandbox-oracle
     profiles: ["dq-sandbox"]
     environment:
       ORACLE_SID: ORCLCDB
-      ORACLE_PDB: ORCLPDB1
+      ORACLE_PDB: MISDB
       ORACLE_PWD: ${DQ_SANDBOX_ORACLE_PWD:-Oracle_pw1}
       ORACLE_EDITION: enterprise
-      # Bộ nhớ của Oracle (MB). Mặc định image dùng 2 GB; giữ nhỏ để chạy cùng server, Airflow và OpenSearch.
-      INIT_SGA_SIZE: ${DQ_SANDBOX_ORACLE_SGA_MB:-1024}
+      INIT_SGA_SIZE: ${DQ_SANDBOX_ORACLE_SGA_MB:-1280}
       INIT_PGA_SIZE: ${DQ_SANDBOX_ORACLE_PGA_MB:-256}
-    # Trần bộ nhớ của container: vượt trần thì Oracle bị dừng, không làm tràn RAM máy
     mem_limit: ${DQ_SANDBOX_ORACLE_MEM_LIMIT:-2560m}
     shm_size: 1g
     ports:

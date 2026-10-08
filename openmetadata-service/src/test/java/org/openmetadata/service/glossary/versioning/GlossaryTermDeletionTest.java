@@ -13,9 +13,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.UUID;
+import org.jdbi.v3.core.Handle;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.schema.type.EntityStatus;
+import org.openmetadata.service.jdbi3.DqRuleTestDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
@@ -29,8 +32,7 @@ class GlossaryTermDeletionTest {
     UUID entityId = UUID.randomUUID();
     UUID glossaryId = UUID.randomUUID();
 
-    when(dao.findLatestPublishedByParent(
-            GlossaryVersioningService.GLOSSARY_TERM, entityId, "1"))
+    when(dao.findLatestPublishedByParent(GlossaryVersioningService.GLOSSARY_TERM, entityId, "1"))
         .thenReturn(published);
     when(dao.lockGlossaryIdentity(glossaryId)).thenReturn(glossaryId.toString());
     when(dao.lockLatestPublishedByParent(GlossaryVersioningService.GLOSSARY_TERM, entityId, "1"))
@@ -72,5 +74,52 @@ class GlossaryTermDeletionTest {
             any(String.class),
             anyLong(),
             eq("maker"));
+  }
+
+  @Test
+  void approvingDataQualityDeletionArchivesScopeAndQueuesReconciliation() {
+    final Handle handle = mock(Handle.class);
+    final GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);
+    final DqRuleTestDAO dqDao = mock(DqRuleTestDAO.class);
+    final PublishedSnapshotRecord current;
+    final PublishedSnapshotRecord otherScope = mock(PublishedSnapshotRecord.class);
+    final WorkingVersionRecord working = mock(WorkingVersionRecord.class);
+    final UUID ruleId = UUID.randomUUID();
+    final UUID snapshotId = UUID.randomUUID();
+
+    when(working.entityId()).thenReturn(ruleId);
+    when(working.parentBusinessVersion()).thenReturn("2");
+    when(working.revision()).thenReturn(7L);
+    current =
+        new PublishedSnapshotRecord(
+            snapshotId,
+            GlossaryVersioningService.GLOSSARY_TERM,
+            ruleId,
+            UUID.randomUUID(),
+            "2",
+            "2.1",
+            1.0,
+            3L,
+            "{\"glossary\":{\"name\":\"Data Quality\"},\"name\":\"DQ1\"}",
+            "hash",
+            1L,
+            "publisher",
+            null,
+            null);
+    when(otherScope.parentBusinessVersion()).thenReturn("1");
+    when(dao.listPublished(GlossaryVersioningService.GLOSSARY_TERM, ruleId))
+        .thenReturn(List.of(current, otherScope));
+    when(dao.archiveSnapshot(eq(snapshotId), anyLong(), eq("checker"))).thenReturn(1);
+    when(dao.deleteWorking(GlossaryVersioningService.GLOSSARY_TERM, ruleId, "2", 7L)).thenReturn(1);
+    when(handle.attach(DqRuleTestDAO.class)).thenReturn(dqDao);
+
+    GlossaryTermDeletion.apply(handle, dao, working, "checker");
+
+    verify(dao).archiveSnapshot(eq(snapshotId), anyLong(), eq("checker"));
+    verify(dao).deletePublishedHead(GlossaryVersioningService.GLOSSARY_TERM, ruleId, snapshotId);
+    verify(dao)
+        .insertOutbox(any(UUID.class), eq(snapshotId), eq("SNAPSHOT_ARCHIVE"), any(), anyLong());
+    verify(dqDao).enqueue(eq("RECONCILE_RULE"), eq(ruleId.toString()), eq(null), anyLong());
+    verify(dao).deleteWorking(GlossaryVersioningService.GLOSSARY_TERM, ruleId, "2", 7L);
   }
 }

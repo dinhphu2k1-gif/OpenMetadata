@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 import jakarta.ws.rs.NotFoundException;
 import java.util.List;
 import java.util.UUID;
+import org.jdbi.v3.core.Handle;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
@@ -78,6 +79,7 @@ class GlossaryVersioningServiceTest {
   @Test
   void catalogApprovalPublishesEveryWorkingRecordRegardlessOfRecordStatus() {
     GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);
+    Handle handle = mock(Handle.class);
     UUID glossaryId = UUID.randomUUID();
     WorkingVersionRecord draft = working(glossaryId, "2", "2.0", "Draft");
     WorkingVersionRecord rejected = working(glossaryId, "2", "2.1", "Rejected");
@@ -88,7 +90,7 @@ class GlossaryVersioningServiceTest {
     when(dao.deleteWorking(eq("glossaryTerm"), any(UUID.class), eq("2"), anyLong())).thenReturn(1);
 
     List<PublishedSnapshotRecord> published =
-        GlossaryVersioningService.publishWorkingTerms(dao, glossaryId, "2", "reviewer");
+        GlossaryVersioningService.publishWorkingTerms(handle, dao, glossaryId, "2", "reviewer");
 
     assertEquals(2, published.size());
     assertTrue(

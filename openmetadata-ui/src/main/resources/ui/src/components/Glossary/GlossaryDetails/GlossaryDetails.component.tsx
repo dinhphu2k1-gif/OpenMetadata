@@ -46,6 +46,7 @@ import { GenericTab } from '../../Customization/GenericTab/GenericTab';
 import { getGlossaryVersionPermissions } from '../../../rest/glossaryAPI';
 import GlossaryPendingRequests from '../GlossaryPendingRequests/GlossaryPendingRequests.component';
 import { useGlossaryPendingRequestsAdapter } from '../GlossaryPendingRequests/useGlossaryPendingRequestsAdapter';
+import { useDataQualityPendingRequestsAdapter } from '../GlossaryPendingRequests/useDataQualityPendingRequestsAdapter';
 import { usePendingRequestsCount } from '../../common/PendingRequestsTab/usePendingRequestsCount';
 import {
   PendingRequestAction,
@@ -139,13 +140,23 @@ const GlossaryDetails = ({
       ),
     [glossary.fullyQualifiedName, glossary.name, glossary.displayName]
   );
+  const isDataQuality = useMemo(
+    () =>
+      isDataQualityGlossary(
+        glossary.fullyQualifiedName,
+        glossary.name,
+        glossary.displayName
+      ),
+    [glossary.fullyQualifiedName, glossary.name, glossary.displayName]
+  );
+  const isGovernedGlossary = isDataDictionary || isDataQuality;
   const [canDecideRequests, setCanDecideRequests] = useState(false);
   const [canViewRequests, setCanViewRequests] = useState(false);
 
   useEffect(() => {
     setCanDecideRequests(false);
     setCanViewRequests(false);
-    if (!isDataDictionary || isVersionView || !glossary.id) {
+    if (!isGovernedGlossary || isVersionView || !glossary.id) {
       return;
     }
     let isCurrent = true;
@@ -171,17 +182,26 @@ const GlossaryDetails = ({
     return () => {
       isCurrent = false;
     };
-  }, [glossary.id, isDataDictionary, isVersionView]);
+  }, [glossary.id, isGovernedGlossary, isVersionView]);
 
-  const showPendingRequests = isDataDictionary && canViewRequests;
+  const showPendingRequests = isGovernedGlossary && canViewRequests;
   const pendingRequestsBusinessVersion = String(
     currentGlossary.businessVersion
   );
-  const pendingRequestsAdapter = useGlossaryPendingRequestsAdapter({
+  const glossaryPendingRequestsAdapter = useGlossaryPendingRequestsAdapter({
     glossaryId: glossary.id,
     glossaryName: glossary.name,
     businessVersion: pendingRequestsBusinessVersion,
   });
+  const dataQualityPendingRequestsAdapter =
+    useDataQualityPendingRequestsAdapter({
+      glossaryId: glossary.id,
+      glossaryName: glossary.name,
+      businessVersion: pendingRequestsBusinessVersion,
+    });
+  const pendingRequestsAdapter = isDataQuality
+    ? dataQualityPendingRequestsAdapter
+    : glossaryPendingRequestsAdapter;
   const { count: pendingRequestsCount, refresh: refreshPendingRequestsCount } =
     usePendingRequestsCount(
       pendingRequestsAdapter,
@@ -247,29 +267,29 @@ const GlossaryDetails = ({
     const tabLabelMap = getTabLabelMapFromTabs(customizedTabs);
 
     const pendingRequestsItems = showPendingRequests
-        ? [
-            {
-              label: (
-                <TabsLabel
-                  count={pendingRequestsCount}
-                  id={EntityTabs.PENDING_REQUESTS}
-                  isActive={activeTab === EntityTabs.PENDING_REQUESTS}
-                  name={t('label.pending-request-plural')}
-                />
-              ),
-              key: EntityTabs.PENDING_REQUESTS,
-              children: (
-                <GlossaryPendingRequests
-                  adapter={pendingRequestsAdapter}
-                  canDecide={canDecideRequests}
-                  refreshKey={pendingRequestsRefreshVersion}
-                  scopeKey={`${glossary.id}:${pendingRequestsBusinessVersion}`}
-                  onDecided={handlePendingRequestsDecided}
-                />
-              ),
-            },
-          ]
-        : [];
+      ? [
+          {
+            label: (
+              <TabsLabel
+                count={pendingRequestsCount}
+                id={EntityTabs.PENDING_REQUESTS}
+                isActive={activeTab === EntityTabs.PENDING_REQUESTS}
+                name={t('label.pending-request-plural')}
+              />
+            ),
+            key: EntityTabs.PENDING_REQUESTS,
+            children: (
+              <GlossaryPendingRequests
+                adapter={pendingRequestsAdapter}
+                canDecide={canDecideRequests}
+                refreshKey={pendingRequestsRefreshVersion}
+                scopeKey={`${glossary.id}:${pendingRequestsBusinessVersion}`}
+                onDecided={handlePendingRequestsDecided}
+              />
+            ),
+          },
+        ]
+      : [];
 
     const items = [
       {
@@ -386,9 +406,10 @@ const GlossaryDetails = ({
                 'businessVersion',
                 String(selected.businessVersion)
               );
-              navigate(
-                { pathname: location.pathname, search: searchParams.toString() }
-              );
+              navigate({
+                pathname: location.pathname,
+                search: searchParams.toString(),
+              });
               setViewedVersion(selected);
             }}
             onWorkflowTransition={(updated) => {

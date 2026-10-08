@@ -564,7 +564,7 @@ public class GlossaryVersioningService {
                       authorizationAndValidation.accept(working);
                     }
                     if (GlossaryTermDeletion.isRequested(working)) {
-                      return GlossaryTermDeletion.apply(dao, working, actor);
+                      return GlossaryTermDeletion.apply(handle, dao, working, actor);
                     }
                     PublishedSnapshotRecord corrected =
                         dao.lockPublishedVersion(entityType, entityId, working.businessVersion());
@@ -592,7 +592,8 @@ public class GlossaryVersioningService {
                     List<TermRevision> termRevisions = List.of();
                     if (GLOSSARY.equals(entityType)) {
                       termsPublishedWithGlossary.addAll(
-                          publishWorkingTerms(dao, entityId, working.businessVersion(), actor));
+                          publishWorkingTerms(
+                              handle, dao, entityId, working.businessVersion(), actor));
                       termRevisions =
                           buildActiveTermRevisions(dao, entityId, working.businessVersion());
                       publicationPayload = withTermRevisions(working.payload(), termRevisions);
@@ -702,14 +703,18 @@ public class GlossaryVersioningService {
    * approval for every record contained in that version.
    */
   static List<PublishedSnapshotRecord> publishWorkingTerms(
-      GlossaryVersionDAO dao, UUID glossaryId, String parentBusinessVersion, String actor) {
+      Handle handle,
+      GlossaryVersionDAO dao,
+      UUID glossaryId,
+      String parentBusinessVersion,
+      String actor) {
     List<WorkingVersionRecord> workingTerms =
         dao.listWorkingByGlossaryAndParent(
             GLOSSARY_TERM, glossaryId, requireParentScope(parentBusinessVersion));
     List<PublishedSnapshotRecord> publishedTerms = new ArrayList<>(workingTerms.size());
     for (WorkingVersionRecord working : workingTerms) {
       if (GlossaryTermDeletion.isRequested(working)) {
-        GlossaryTermDeletion.apply(dao, working, actor);
+        GlossaryTermDeletion.apply(handle, dao, working, actor);
         continue;
       }
       PublishedSnapshotRecord corrected =

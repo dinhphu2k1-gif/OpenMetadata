@@ -16,6 +16,7 @@ import {
   getTechnicalChangeRequest,
   getTechnicalRecord,
   getTechnicalSnapshotRecord,
+  requestTechnicalRecordDeletion,
   saveTechnicalChangeRequest,
   submitTechnicalRecord,
   updateTechnicalRecord,
@@ -54,7 +55,11 @@ jest.mock('./TechnicalHistoryPanel.component', () => () => (
 ));
 jest.mock(
   '../../components/Modals/ConfirmationModal/ConfirmationModal',
-  () => () => null
+  () =>
+    ({ visible, onConfirm }: { visible: boolean; onConfirm: () => void }) =>
+      visible ? (
+        <button data-testid="confirm-delete" onClick={onConfirm} />
+      ) : null
 );
 jest.mock(
   '../../components/Glossary/CDESelector/CDESelector.component',
@@ -101,6 +106,7 @@ jest.mock('../../rest/technicalDictionaryAPI', () => ({
   submitTechnicalRecord: jest.fn().mockResolvedValue({}),
   updateTechnicalRecord: jest.fn().mockResolvedValue({}),
   saveTechnicalChangeRequest: jest.fn().mockResolvedValue({ revision: 1 }),
+  requestTechnicalRecordDeletion: jest.fn().mockResolvedValue({ revision: 2 }),
   getTechnicalChangeRequest: jest.fn(),
   exportTechnicalSnapshot: jest.fn(),
   getTechnicalRecord: jest.fn(),
@@ -272,6 +278,24 @@ describe('TechnicalRecordDetailPage', () => {
         'term-1',
         expect.objectContaining({ operation: 'UPDATE', expectedRevision: 1 })
       )
+    );
+  });
+
+  it('creates and submits an approved-record deletion request atomically', async () => {
+    (getTechnicalRecord as jest.Mock).mockResolvedValue(RECORD);
+    render(<TechnicalRecordDetailPage />);
+
+    fireEvent.click(await screen.findByTestId('technical-record-more-actions'));
+    fireEvent.click(await screen.findByTestId('delete-button'));
+    fireEvent.click(screen.getByTestId('confirm-delete'));
+
+    await waitFor(() =>
+      expect(requestTechnicalRecordDeletion).toHaveBeenCalledWith('term-1', 1)
+    );
+
+    expect(saveTechnicalChangeRequest).not.toHaveBeenCalledWith(
+      'term-1',
+      expect.objectContaining({ operation: 'DELETE' })
     );
   });
 

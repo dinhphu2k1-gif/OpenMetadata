@@ -104,6 +104,7 @@ import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqTestErrors;
 import org.openmetadata.service.glossary.dq.DqTestSpecService;
 import org.openmetadata.service.glossary.technical.TechnicalAssets;
@@ -918,17 +919,17 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Path("/{id}/working/deletion")
   @Operation(
       operationId = "requestGlossaryTermDeletion",
-      summary = "Submit a request to delete an Approved CDE",
+      summary = "Submit a request to delete an Approved governed glossary term",
       description =
-          "The Approved CDE stays effective until the request is approved. Approving it archives"
-              + " the CDE in its Data Dictionary scope; the Approved history is kept.")
+          "The Approved term stays effective until the request is approved. Approving it archives"
+              + " the term in its governed glossary scope; the Approved history is kept.")
   public Map<String, Object> requestDeletion(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
       @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
     final GlossaryTerm term = createVersionEntity(uriInfo, securityContext, id);
-    DataDictionaryResolver.requireCde(term);
+    requireDeletableGovernedTerm(term);
     requireGovernedIdentityScope(term, parentBusinessVersion);
     final WorkingVersionRecord working =
         versioningService.createDeletionWorking(
@@ -941,7 +942,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
                   capabilitiesForAuthorizationTerm(securityContext, published);
               GlossaryAuthorizationResolver.requireCreateVersion(capabilities);
               GlossaryAuthorizationResolver.requireSubmit(capabilities);
-              CdeDeletionGuard.requireNoDependents(published, parentBusinessVersion);
+              validateDeletionRequest(published, parentBusinessVersion);
             });
     final Map<String, Object> response = GlossaryVersionResponses.working(working);
     response.put(
@@ -1096,7 +1097,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryTerm payload = JsonUtils.readValue(working.payload(), GlossaryTerm.class);
     GlossaryAuthorizationResolver.requireSubmit(capabilitiesForWorking(securityContext, working));
     if (GlossaryVersioningService.isDeletionRequest(working)) {
-      CdeDeletionGuard.requireNoDependents(payload, working.parentBusinessVersion());
+      validateDeletionRequest(payload, working.parentBusinessVersion());
     } else {
       validateWorkflowPayload(securityContext, payload, working);
     }
@@ -1115,9 +1116,24 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     GlossaryAuthorizationResolver.requireReview(
         capabilitiesForAuthorizationTerm(securityContext, payload));
     if (GlossaryVersioningService.isDeletionRequest(working)) {
-      CdeDeletionGuard.requireNoDependents(payload, working.parentBusinessVersion());
+      validateDeletionRequest(payload, working.parentBusinessVersion());
     } else {
       validateApprovedPayload(securityContext, payload, working);
+    }
+  }
+
+  private static void requireDeletableGovernedTerm(GlossaryTerm term) {
+    switch (governedProfile(term)) {
+      case DATA_DICTIONARY -> DataDictionaryResolver.requireCde(term);
+      case DATA_QUALITY -> DqCatalog.requireRule(term.getId());
+    }
+  }
+
+  /** Profile-specific validation repeated at request, submit and approve to close race windows. */
+  private static void validateDeletionRequest(GlossaryTerm term, String parentBusinessVersion) {
+    switch (governedProfile(term)) {
+      case DATA_DICTIONARY -> CdeDeletionGuard.requireNoDependents(term, parentBusinessVersion);
+      case DATA_QUALITY -> DqCatalog.requireRule(term.getId());
     }
   }
 

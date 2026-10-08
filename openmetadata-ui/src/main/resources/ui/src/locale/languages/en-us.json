@@ -7,7 +7,7 @@
     "deletion-cancelled": "Deletion request cancelled",
     "deletion-pending-banner": "This is a deletion request. Once approved, the CDE leaves the effective Data Dictionary version; its approval history is kept.",
     "deletion-request": "Request deletion",
-    "deletion-request-confirm": "This creates a draft deletion request. The Approved CDE stays effective until the request is approved.",
+    "deletion-request-confirm": "The deletion request is submitted for review immediately. The Approved CDE stays effective until the request is approved.",
     "deletion-request-created": "Deletion request created",
     "deletion-request-tag": "Deletion request",
     "deletion-request-title": "Request deletion of CDE {{name}}?",
@@ -100,6 +100,12 @@
     "error-server-internal": "Internal server error. Please try again later."
   },
   "dq": {
+    "deletion-approve-confirm": "Approving removes this rule from the effective Data Quality version, retires its managed tests and disables their pipelines. Rule history and test results are retained.",
+    "deletion-approved": "Deletion of Data Quality rule {{name}} was approved",
+    "deletion-pending-banner": "This deletion request is in review. The Approved rule and its managed tests remain effective until approval.",
+    "deletion-request-confirm": "The request is submitted for review immediately. The Approved rule remains effective until approval. On approval, managed test cases are retired and pipelines disabled; rule history and test results are retained.",
+    "deletion-request-created": "Data Quality rule deletion request submitted",
+    "deletion-request-title": "Request deletion of Data Quality rule {{name}}?",
     "data-quality": "Data Quality",
     "rule-code": "Rule Code",
     "cde-code": "CDE Code",
@@ -4058,8 +4064,11 @@
     "technical-rank-range": "Rank must be an integer between 1 and {{max}}",
     "technical-record-updated": "The record was updated",
     "technical-change-draft-saved": "The proposed change was saved without changing the Approved record",
-    "technical-delete-change-review": "Approval will delete this Approved record and remove its Column projection.",
-    "technical-request-delete-confirm": "This creates a deletion draft. The Approved record remains effective until another user approves the request.",
+    "technical-delete-change-review": "Approval removes this record from the Technical Dictionary, removes managed CDE/classification tags from the Column and may reconcile related DQ bindings. Audit history is retained.",
+    "technical-deletion-request-submitted": "Deletion request submitted for review",
+    "bulk-action-completed": "Successfully processed {{success}} record(s){{failedText}}.",
+    "partial-action-failure": "Some requests could not be processed. Review each error below.",
+    "technical-request-delete-confirm": "This submits a deletion request immediately. The Approved record and its Column mapping remain effective until another user approves the request. Approval removes managed tags and may reconcile DQ bindings; audit history is retained.",
     "technical-record-approved": "The record was approved",
     "technical-record-rejected": "The record was rejected",
     "review-confirm-submit": "Are you sure you want to submit {{count}} draft record(s) for approval? They will move to In review.",
@@ -4294,7 +4303,6 @@
     "confirm-bulk-revoke-title": "Confirm Bulk Revoke Approval",
     "confirm-bulk-revoke-desc": "Are you sure you want to revoke approval for {{count}} approved record(s)? They will be returned to Draft status.",
     "bulk-progress-processing": "Processing {{current}} / {{total}} records...",
-    "bulk-action-completed": "Successfully processed {{success}} record(s){{failedText}}.",
     "all-imported-submitted-success": "Successfully submitted all {{count}} imported records for review!"
   }
 }

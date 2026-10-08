@@ -26,11 +26,16 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
@@ -262,6 +267,23 @@ public class TechnicalDictionaryResource {
         true);
   }
 
+  @POST
+  @Path("/records/{id}/deletion-request")
+  @Operation(
+      operationId = "requestTechnicalDictionaryRecordDeletion",
+      summary = "Create and submit a deletion request for an Approved record atomically")
+  public Map<String, Object> requestDeletion(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireEdit(securityContext);
+    requireExpectedRevision(review);
+    return changeRequest(
+        changeRequestService.requestDeletion(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()),
+        true);
+  }
+
   @GET
   @Path("/records/{id}/change-request")
   @Operation(
@@ -364,6 +386,22 @@ public class TechnicalDictionaryResource {
   }
 
   @POST
+  @Path("/records/{id}/change-request/withdraw")
+  @Operation(
+      operationId = "withdrawTechnicalDictionaryChangeRequest",
+      summary = "Withdraw an In Review update/delete request as its submitter")
+  public Map<String, Object> withdrawChangeRequest(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireEdit(securityContext);
+    requireExpectedRevision(review);
+    changeRequestService.withdraw(
+        recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName());
+    return Map.of("termId", recordId, "withdrawn", true);
+  }
+
+  @POST
   @Path("/records/{id}/submit")
   @Operation(
       operationId = "submitTechnicalDictionaryRecord",
@@ -419,6 +457,102 @@ public class TechnicalDictionaryResource {
     return row(
         recordService.reject(
             recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()));
+  }
+
+  @POST
+  @Path("/records/{id}/withdraw")
+  @Operation(
+      operationId = "withdrawTechnicalDictionaryRecord",
+      summary = "Withdraw an In Review new-record request as its submitter")
+  public Map<String, Object> withdraw(
+      @Context SecurityContext securityContext,
+      @PathParam("id") UUID recordId,
+      @NotNull TechnicalRecordReview review) {
+    access.requireEdit(securityContext);
+    requireExpectedRevision(review);
+    return row(
+        recordService.withdraw(
+            recordId, review.expectedRevision(), securityContext.getUserPrincipal().getName()));
+  }
+
+  @GET
+  @Path("/requests")
+  @Operation(
+      operationId = "listTechnicalDictionaryPendingRequests",
+      summary = "List pending create, update and delete requests without per-request queries")
+  public Map<String, Object> requests(
+      @Context SecurityContext securityContext,
+      @QueryParam("q") String q,
+      @QueryParam("types") String types,
+      @QueryParam("requesters") String requesters,
+      @QueryParam("sourceServices") String sourceServices,
+      @QueryParam("cdeTermIds") String cdeTermIds,
+      @DefaultValue(DEFAULT_PAGE_SIZE) @Min(1) @Max(100) @QueryParam("limit") int limit,
+      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset) {
+    final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
+    if (!capabilities.canSeeWorkingRecords()) {
+      throw TechnicalDictionaryErrors.forbidden(
+          TechnicalDictionaryErrors.CHANGE_REQUEST_NOT_FOUND,
+          "Not authorized to view Technical Dictionary requests");
+    }
+
+    final TechnicalDictionaryDAO dao = dao();
+    final List<TechnicalRecord> creates = dao.listRecordsByStatus(TechnicalRecord.STATUS_IN_REVIEW);
+    final List<TechnicalRecordChangeRequest> changes =
+        dao.listChangeRequestsByStatus(TechnicalRecordChangeRequest.STATUS_IN_REVIEW);
+    final Map<String, TechnicalRecord> approved = new HashMap<>();
+    if (!changes.isEmpty()) {
+      dao.findByIds(changes.stream().map(TechnicalRecordChangeRequest::recordId).toList())
+          .forEach(record -> approved.put(record.id(), record));
+    }
+
+    final String dataDictionaryVersion = requireVersion();
+    final List<Map<String, Object>> all = new ArrayList<>();
+    creates.forEach(record -> all.add(createRequestView(record, dataDictionaryVersion)));
+    changes.forEach(
+        request -> {
+          final TechnicalRecord active = approved.get(request.recordId());
+          if (active != null) {
+            all.add(changeRequestView(request, active, dataDictionaryVersion));
+          }
+        });
+
+    final Set<String> typeFilter = csv(types, true);
+    final Set<String> requesterFilter = csv(requesters, false);
+    final Set<String> serviceFilter = csv(sourceServices, false);
+    final Set<String> cdeFilter = csv(cdeTermIds, false);
+    final String query = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+    final Predicate<Map<String, Object>> commonFilter =
+        item ->
+            (query.isEmpty() || requestSearchText(item).contains(query))
+                && (requesterFilter.isEmpty()
+                    || requesterFilter.contains(String.valueOf(item.get("submittedBy"))))
+                && (serviceFilter.isEmpty()
+                    || serviceFilter.contains(String.valueOf(item.get("sourceService"))))
+                && (cdeFilter.isEmpty()
+                    || cdeFilter.contains(String.valueOf(item.get("cdeTermId"))));
+    final List<Map<String, Object>> matching = all.stream().filter(commonFilter).toList();
+    final Map<String, Long> counts = new LinkedHashMap<>();
+    counts.put("create", countType(matching, "CREATE"));
+    counts.put("update", countType(matching, "UPDATE"));
+    counts.put("delete", countType(matching, "DELETE"));
+    final List<Map<String, Object>> filtered =
+        matching.stream()
+            .filter(
+                item ->
+                    typeFilter.isEmpty()
+                        || typeFilter.contains(String.valueOf(item.get("requestType"))))
+            .sorted(Comparator.comparingLong(TechnicalDictionaryResource::submittedAt).reversed())
+            .toList();
+    final int from = Math.min(offset, filtered.size());
+    final int to = Math.min(from + limit, filtered.size());
+    return Map.of(
+        DATA,
+        filtered.subList(from, to),
+        "counts",
+        counts,
+        "paging",
+        Map.of("total", filtered.size(), "limit", limit, "offset", offset));
   }
 
   @POST
@@ -756,6 +890,83 @@ public class TechnicalDictionaryResource {
     final Map<String, Object> result = new LinkedHashMap<>();
     ((Map<?, ?>) value).forEach((key, item) -> result.put(String.valueOf(key), item));
     return result;
+  }
+
+  private Map<String, Object> createRequestView(
+      TechnicalRecord record, String dataDictionaryVersion) {
+    final Map<String, Object> view =
+        requestBase(record, "CREATE", record.id(), dataDictionaryVersion);
+    view.put("approvedRecord", null);
+    view.put("proposedRecord", requestRecord(record));
+    return view;
+  }
+
+  private Map<String, Object> changeRequestView(
+      TechnicalRecordChangeRequest request, TechnicalRecord active, String dataDictionaryVersion) {
+    final Map<String, Object> view =
+        requestBase(active, request.operation(), request.id(), dataDictionaryVersion);
+    view.put("recordId", request.recordId());
+    view.put("revision", request.revision());
+    view.put("baseRevision", request.baseRevision());
+    view.put("createdBy", request.createdBy());
+    view.put("submittedBy", request.submittedBy());
+    view.put("submittedAt", request.submittedAt());
+    view.put("approvedRecord", requestRecord(active));
+    final TechnicalRecord proposed = changeRequestService.proposedRecord(request, active);
+    view.put("proposedRecord", proposed == null ? null : requestRecord(proposed));
+    return view;
+  }
+
+  private static Map<String, Object> requestBase(
+      TechnicalRecord record, String requestType, String requestId, String dataDictionaryVersion) {
+    final Map<String, Object> view = new LinkedHashMap<>();
+    view.put("requestId", requestId);
+    view.put("recordId", record.id());
+    view.put("requestType", requestType);
+    view.put("revision", record.revision());
+    view.put("createdBy", record.createdBy());
+    view.put("submittedBy", record.submittedBy());
+    view.put("submittedAt", record.submittedAt());
+    view.put("columnFqn", record.columnFqn());
+    view.put("sourceService", record.sourceService());
+    view.put("sourceDatabase", record.sourceDatabase());
+    view.put("sourceSchema", record.sourceSchema());
+    view.put("sourceTable", record.sourceTable());
+    view.put("cdeTermId", record.cdeTermId());
+    view.put("dataDictionaryVersion", dataDictionaryVersion);
+    return view;
+  }
+
+  /** Request snapshots deliberately use already-loaded data and never issue a query per item. */
+  private static Map<String, Object> requestRecord(TechnicalRecord record) {
+    return JsonUtils.convertValue(record, new TypeReference<Map<String, Object>>() {});
+  }
+
+  private static Set<String> csv(String value, boolean uppercase) {
+    if (value == null || value.isBlank()) {
+      return Set.of();
+    }
+    return java.util.Arrays.stream(value.split(","))
+        .map(String::trim)
+        .filter(item -> !item.isEmpty())
+        .map(item -> uppercase ? item.toUpperCase(Locale.ROOT) : item)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+  }
+
+  private static String requestSearchText(Map<String, Object> item) {
+    return List.of("columnFqn", "sourceService", "sourceDatabase", "sourceSchema", "sourceTable")
+        .stream()
+        .map(key -> String.valueOf(item.getOrDefault(key, "")))
+        .collect(java.util.stream.Collectors.joining(" "))
+        .toLowerCase(Locale.ROOT);
+  }
+
+  private static long countType(List<Map<String, Object>> items, String type) {
+    return items.stream().filter(item -> type.equals(item.get("requestType"))).count();
+  }
+
+  private static long submittedAt(Map<String, Object> item) {
+    return item.get("submittedAt") instanceof Number value ? value.longValue() : 0L;
   }
 
   private Map<String, Object> changeRequest(

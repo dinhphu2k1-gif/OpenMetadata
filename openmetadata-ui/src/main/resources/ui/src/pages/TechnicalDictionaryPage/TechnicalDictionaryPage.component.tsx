@@ -16,6 +16,8 @@ import { Key, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../../components/common/Loader/Loader';
+import PendingRequestsTab from '../../components/common/PendingRequestsTab/PendingRequestsTab.component';
+import { usePendingRequestsCount } from '../../components/common/PendingRequestsTab/usePendingRequestsCount';
 import ReviewActionConfirmModal from '../../components/common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
@@ -57,6 +59,7 @@ import {
   TechnicalReviewAction,
 } from './technicalReviewActions';
 import TechnicalSnapshotsModal from './TechnicalSnapshotsModal.component';
+import { useTechnicalPendingRequestsAdapter } from './useTechnicalPendingRequestsAdapter';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
 
@@ -166,6 +169,16 @@ const TechnicalDictionaryPage = ({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkResultView>();
   const [isBulkResultOpen, setIsBulkResultOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'records' | 'requests'>('records');
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
+  const pendingRequestsAdapter =
+    useTechnicalPendingRequestsAdapter(pendingRefreshKey);
+  const { count: pendingRequestsCount, refresh: refreshPendingCount } =
+    usePendingRequestsCount(
+      pendingRequestsAdapter,
+      capabilities.canEdit || capabilities.canApprove,
+      pendingRefreshKey
+    );
 
   const selectionScope = JSON.stringify([
     records.filters,
@@ -197,6 +210,7 @@ const TechnicalDictionaryPage = ({
 
   const refreshData = useCallback(() => {
     records.reload();
+    setPendingRefreshKey((value) => value + 1);
   }, [records.reload]);
 
   const fail = useCallback((failure: unknown) => {
@@ -474,21 +488,58 @@ const TechnicalDictionaryPage = ({
         />
         <div className="tech-dict-tab-card">
           <div className="tech-dict-tab-list" role="tablist">
-            <span
-              aria-selected
-              className="tech-dict-tab active"
+            <button
+              aria-selected={activeTab === 'records'}
+              className={`tech-dict-tab ${
+                activeTab === 'records' ? 'active' : ''
+              }`}
               data-testid="technical-dictionary-tab"
-              role="tab">
+              role="tab"
+              type="button"
+              onClick={() => setActiveTab('records')}>
               {t('label.technical-field-plural')}
               <span
                 className="tech-dict-tab-count"
                 data-testid="technical-dictionary-count">
                 {records.total}
               </span>
-            </span>
+            </button>
+            {(capabilities.canEdit || capabilities.canApprove) &&
+              !snapshotVersion && (
+                <button
+                  aria-selected={activeTab === 'requests'}
+                  className={`tech-dict-tab ${
+                    activeTab === 'requests' ? 'active' : ''
+                  }`}
+                  data-testid="technical-pending-requests-tab"
+                  role="tab"
+                  type="button"
+                  onClick={() => setActiveTab('requests')}>
+                  {t('label.pending-request-plural')}
+                  <span className="tech-dict-tab-count">
+                    {pendingRequestsCount}
+                  </span>
+                </button>
+              )}
           </div>
         </div>
-        {content}
+        {activeTab === 'requests' ? (
+          <div className="tech-dict-content-card">
+            <PendingRequestsTab
+              adapter={pendingRequestsAdapter}
+              canDecide={capabilities.canApprove}
+              refreshKey={pendingRefreshKey}
+              scopeKey={dataDictionaryVersion ?? ''}
+              testId="technical-pending-requests"
+              onDecided={() => {
+                refreshPendingCount();
+                refreshData();
+              }}
+            />
+          </div>
+        ) : (
+          content
+        )}
       </div>
     </PageLayoutV1>
   );

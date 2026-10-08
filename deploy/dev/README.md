@@ -115,7 +115,7 @@ docker compose -f docker-compose.dev.yml --profile dq-sandbox up -d dq-sandbox-o
 docker stop dq-sandbox-oracle                                                         # trả RAM khi không dùng
 ```
 
-Trong OpenMetadata khai báo service Oracle với host `dq-sandbox-oracle:1521`, service name `ORCLPDB1`, tài khoản
+Trong OpenMetadata khai báo service Oracle với host `dq-sandbox-oracle:1521`, service name `MISDB`, tài khoản
 `dq_reader` / `dq_reader_pw`. Dữ liệu, giới hạn bộ nhớ và kịch bản thử: `dq-sandbox/README.md`.
 
 ### 7.1. Chạy thử bằng local-dev (không build image)
@@ -161,6 +161,6 @@ gateway của `omd_network` (thường `172.16.239.1:8585`).
 | --- | --- | --- |
 | "Kiểm thử kết nối thất bại" ngay cả khi thông tin đúng | Server chạy không có `WITH_INGESTION=true`, hoặc container `openmetadata_ingestion` chưa chạy | Chạy `./local-dev.sh ingestion`, rồi chạy lại server với `WITH_INGESTION=true` |
 | Kiểm thử kết nối treo hoặc Airflow báo không gọi được OpenMetadata | Airflow không tới được server trên máy | Kiểm tra từ container: `docker exec openmetadata_ingestion curl -s http://172.16.239.1:8585/api/v1/system/version`; tường lửa máy phải cho cổng 8585 từ mạng Docker |
-| Không kết nối được Oracle | Sandbox chưa chạy, database chưa tạo xong hoặc sai host | `docker logs dq-sandbox-oracle` có "DATABASE IS READY TO USE!"; host `dq-sandbox-oracle:1521` (không dùng `localhost`), service name `ORCLPDB1` |
+| Không kết nối được Oracle | Sandbox chưa chạy, database chưa tạo xong hoặc sai host | `docker logs dq-sandbox-oracle` có "DATABASE IS READY TO USE!"; host `dq-sandbox-oracle:1521` (không dùng `localhost`), service name `MISDB` |
 | Approve Rule xong không có testcase | Lỗi reconcile | `GET /api/v1/glossaryTerms/dataQuality/reconcile/status` (admin) xem `outboxPending`, `errors`; log server tìm "Data Quality test outbox" |
 | Testcase SQL ra "Lỗi thực thi" | SQL sai cú pháp, dùng `COUNT(*)`, hoặc nguồn Oracle/DB2 | Xem log task trong Airflow; SQL phải trả về các dòng vi phạm (DQT-13) |

@@ -103,6 +103,52 @@ public class TechnicalRecordService {
     return rejected;
   }
 
+  /** Returns a submitted new-record request to Draft. Only its submitter may withdraw it. */
+  public TechnicalRecord withdraw(UUID recordId, long expectedRevision, String actor) {
+    final TechnicalRecord withdrawn =
+        write(
+            false,
+            (handle, version) -> {
+              final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
+              final TechnicalRecord existing = requireRecord(dao, recordId);
+              if (existing.revision() != expectedRevision) {
+                throw revisionConflict();
+              }
+              if (!existing.isInReview()) {
+                throw TechnicalDictionaryErrors.conflict(
+                    TechnicalDictionaryErrors.INVALID_STATUS_TRANSITION,
+                    "Only a record in review can be withdrawn");
+              }
+              if (!Objects.equals(existing.submittedBy(), actor)) {
+                throw TechnicalDictionaryErrors.forbidden(
+                    TechnicalDictionaryErrors.SELF_APPROVAL_FORBIDDEN,
+                    "Only the submitter can withdraw this record request");
+              }
+              final long now = System.currentTimeMillis();
+              final TechnicalRecord draft =
+                  existing.toBuilder()
+                      .status(TechnicalRecord.STATUS_DRAFT)
+                      .submittedAt(null)
+                      .submittedBy(null)
+                      .reviewedAt(null)
+                      .reviewedBy(null)
+                      .reviewComment(null)
+                      .revision(existing.revision() + 1)
+                      .updatedAt(now)
+                      .updatedBy(actor)
+                      .build();
+              if (dao.updateEditable(draft, expectedRevision) != 1) {
+                throw revisionConflict();
+              }
+              TechnicalRecordAudit.record(
+                  dao, TechnicalRecordAudit.WITHDRAW, existing, draft, version, actor);
+              TechnicalOutbox.enqueueRecord(dao, draft);
+              return draft;
+            });
+    TechnicalOutbox.flush();
+    return withdrawn;
+  }
+
   /** Submits each item in its own transaction; the outbox is flushed once after the last one. */
   public List<TechnicalBulkReview.Outcome> submitAll(
       List<TechnicalBulkReview.Item> items, String actor) {

@@ -138,6 +138,10 @@ public interface TechnicalDictionaryDAO {
   @SqlQuery("SELECT COUNT(*) FROM technical_record")
   long countRecords();
 
+  @SqlQuery("SELECT " + RECORD_COLUMNS + " FROM technical_record WHERE status = :status")
+  @RegisterRowMapper(RecordMapper.class)
+  List<TechnicalRecord> listRecordsByStatus(@Bind("status") String status);
+
   // ---- approved-record change requests ----------------------------------------------------
 
   @SqlUpdate(
@@ -184,6 +188,10 @@ public interface TechnicalDictionaryDAO {
 
   @SqlQuery("SELECT COUNT(*) FROM technical_record_change_request")
   long countChangeRequests();
+
+  @SqlQuery("SELECT * FROM technical_record_change_request WHERE status = :status")
+  @RegisterRowMapper(ChangeRequestMapper.class)
+  List<TechnicalRecordChangeRequest> listChangeRequestsByStatus(@Bind("status") String status);
 
   @SqlQuery(
       "SELECT COUNT(*) FROM technical_record WHERE cdeTermId IS NOT NULL AND status = 'Approved'")

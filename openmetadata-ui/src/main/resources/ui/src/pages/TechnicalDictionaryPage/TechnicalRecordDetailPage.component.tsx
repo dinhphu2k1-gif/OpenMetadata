@@ -62,6 +62,7 @@ import {
   getTechnicalRecord,
   getTechnicalRecordVersions,
   getTechnicalSnapshotRecord,
+  requestTechnicalRecordDeletion,
   saveTechnicalChangeRequest,
   submitTechnicalChangeRequest,
   TechnicalChangeRequest,
@@ -430,11 +431,8 @@ const TechnicalRecordDetailPage = () => {
     }
     try {
       if (deleteKind === 'request') {
-        await saveTechnicalChangeRequest(row.termId, {
-          expectedRevision: row.revision,
-          operation: 'DELETE',
-        });
-        showSuccessToast(t('message.technical-change-draft-saved'));
+        await requestTechnicalRecordDeletion(row.termId, row.revision);
+        showSuccessToast(t('message.technical-deletion-request-submitted'));
         navigate(detailPath(undefined, row.termId, true));
       } else if (deleteKind === 'change') {
         await cancelTechnicalChangeRequest(row.termId, row.revision);
@@ -992,7 +990,7 @@ const TechnicalRecordDetailPage = () => {
           cancelText={t('label.cancel')}
           confirmText={t(
             deleteKind === 'request'
-              ? 'label.technical-save-change-draft'
+              ? 'label.technical-request-delete'
               : 'label.delete'
           )}
           header={t(deleteOption?.labelKey ?? 'label.technical-request-delete')}

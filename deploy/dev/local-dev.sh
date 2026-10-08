@@ -24,6 +24,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 UI_DIR="$PROJECT_ROOT/openmetadata-ui/src/main/resources/ui"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.dev.yml"
 CLASSPATH_FILE="$PROJECT_ROOT/openmetadata-dist/target/local-dev.classpath"
+BACKEND_DEPS_STAMP="$SCRIPT_DIR/.dev-run/backend-deps.stamp"
 SPEC_CLASSES="$PROJECT_ROOT/openmetadata-spec/target/classes"
 APP_CLASS=org.openmetadata.service.OpenMetadataApplication
 OPS_CLASS=org.openmetadata.service.util.OpenMetadataOperations
@@ -45,6 +46,46 @@ MVN_FAST_FLAGS=(
     -Dspotless.check.skip=true
     -Djacoco.skip=true
 )
+
+# The service imports relocated packages from elasticsearch-deps/opensearch-deps (es.* and os.*).
+# Those packages exist only in the shaded JAR produced at package time, not in the modules'
+# target/classes directories. A reactor `compile -pl openmetadata-service -am` therefore replaces
+# the shaded JARs with the unshaded reactor output and makes every search-client import disappear.
+# Install the internal dependencies when their sources change, then compile the service outside the
+# reactor so Maven resolves the actual shaded JARs from the local repository.
+install_backend_dependencies() {
+    local refresh=false path
+    if [ ! -f "$BACKEND_DEPS_STAMP" ]; then
+        refresh=true
+    else
+        for path in \
+            "$PROJECT_ROOT/pom.xml" \
+            "$PROJECT_ROOT/openmetadata-spec/pom.xml" \
+            "$PROJECT_ROOT/common/pom.xml" \
+            "$PROJECT_ROOT/openmetadata-shaded-deps/pom.xml" \
+            "$PROJECT_ROOT/openmetadata-shaded-deps/elasticsearch-dep/pom.xml" \
+            "$PROJECT_ROOT/openmetadata-shaded-deps/opensearch-dep/pom.xml"; do
+            if [ "$path" -nt "$BACKEND_DEPS_STAMP" ]; then
+                refresh=true
+                break
+            fi
+        done
+        if [ "$refresh" = false ] && find \
+            "$PROJECT_ROOT/openmetadata-spec/src" \
+            "$PROJECT_ROOT/common/src" \
+            "$PROJECT_ROOT/openmetadata-shaded-deps" \
+            -type f -newer "$BACKEND_DEPS_STAMP" -print -quit | grep -q .; then
+            refresh=true
+        fi
+    fi
+    if [ "$refresh" = true ]; then
+        mkdir -p "$(dirname "$BACKEND_DEPS_STAMP")"
+        mvn -q install \
+            -pl openmetadata-spec,common,openmetadata-shaded-deps/elasticsearch-dep,openmetadata-shaded-deps/opensearch-dep \
+            -am "${MVN_FAST_FLAGS[@]}"
+        touch "$BACKEND_DEPS_STAMP"
+    fi
+}
 
 load_environment() {
     set -a
@@ -87,9 +128,9 @@ compile_backend() {
         incremental=()
     fi
     cd "$PROJECT_ROOT"
-    # Build reactor dependencies as well: openmetadata-spec generates the Java schema classes used by
-    # the service. Compiling only openmetadata-service can silently reuse an older schema jar from ~/.m2.
-    mvn -q compile -pl openmetadata-service -am "${MVN_FAST_FLAGS[@]}" "${incremental[@]}"
+    install_backend_dependencies
+    mvn -q -f "$PROJECT_ROOT/openmetadata-service/pom.xml" compile \
+        "${MVN_FAST_FLAGS[@]}" "${incremental[@]}"
 }
 
 # Dependencies are resolved the way the release package resolves them (openmetadata-dist), so the jar

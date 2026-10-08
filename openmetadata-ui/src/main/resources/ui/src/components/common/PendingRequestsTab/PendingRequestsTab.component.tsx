@@ -12,7 +12,7 @@
  */
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
-import { Input, Spin } from 'antd';
+import { Alert, Input, Modal, Spin } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
@@ -48,6 +48,7 @@ import {
   PendingRequestAction,
   PendingRequestChangeDetail,
   PendingRequestFilter,
+  PendingRequestFailure,
   PendingRequestsTabProps,
   PendingRequestType,
   PendingRequestTypeCounts,
@@ -107,6 +108,9 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
   const [pendingAction, setPendingAction] =
     useState<PendingRequestAction | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [actionFailures, setActionFailures] = useState<PendingRequestFailure[]>(
+    []
+  );
   const [typeCounts, setTypeCounts] =
     useState<PendingRequestTypeCounts>(EMPTY_COUNTS);
 
@@ -176,8 +180,12 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
     () => selectedRequests.filter((request) => request.canWithdraw),
     [selectedRequests]
   );
+  const decisionableRequests = useMemo(
+    () => selectedRequests.filter((request) => request.canDecide !== false),
+    [selectedRequests]
+  );
   const actionTargets =
-    pendingAction === 'withdraw' ? withdrawableRequests : selectedRequests;
+    pendingAction === 'withdraw' ? withdrawableRequests : decisionableRequests;
   const selectedCounts = useMemo(
     () =>
       selectedRequests.reduce<PendingRequestTypeCounts>(
@@ -220,6 +228,7 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
         attempts += 1;
       }
       const failed = result.failures.length;
+      setActionFailures(result.failures);
       showSuccessToast(
         t('message.bulk-action-completed', {
           success: result.succeeded,
@@ -312,7 +321,14 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
                   {code}
                 </Link>
               ) : (
-                <span className="pending-requests-code">{code}</span>
+                <span
+                  className="pending-requests-code"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleToggleExpand(!expanded, record);
+                  }}>
+                  {code}
+                </span>
               )}
             </>
           );
@@ -428,7 +444,10 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
               data-testid={`pending-requests-type-${type}`}
               key={type}
               type="button"
-              onClick={() => setActiveType(type)}>
+              onClick={() => {
+                setExpandedKeys([]);
+                setActiveType(type);
+              }}>
               {type !== 'all' && (
                 <span
                   className={`pending-requests-type-dot pending-requests-type-dot--${type}`}
@@ -467,7 +486,7 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
 
   const approvalWarning =
     pendingAction === 'approve'
-      ? adapter.getApprovalWarning?.(selectedRequests)
+      ? adapter.getApprovalWarning?.(decisionableRequests)
       : undefined;
 
   return (
@@ -605,6 +624,7 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
         }}
         extraTableFilters={toolbar}
         extraTableFiltersClassName="dictionary-table-toolbar"
+        key={activeType}
         loading={isLoading}
         locale={{
           emptyText: (
@@ -634,7 +654,10 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
           getCheckboxProps: (record) => ({
             disabled:
               record.selectable === false ||
-              !(canDecide || record.canWithdraw),
+              !(
+                (canDecide && record.canDecide !== false) ||
+                record.canWithdraw
+              ),
             'aria-label': t('label.select-entity', {
               entity: record.name,
             }),
@@ -664,17 +687,17 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
                       },
                     ]
                   : []),
-                ...(canDecide
+                ...(canDecide && decisionableRequests.length > 0
                   ? [
                       {
                         type: 'reject' as const,
-                        count: selectedRequests.length,
+                        count: decisionableRequests.length,
                         testId: 'pending-requests-reject-btn',
                         onPress: () => setPendingAction('reject'),
                       },
                       {
                         type: 'approve' as const,
-                        count: selectedRequests.length,
+                        count: decisionableRequests.length,
                         testId: 'pending-requests-approve-btn',
                         onPress: () => setPendingAction('approve'),
                       },
@@ -723,6 +746,27 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
           )}
         </ReviewActionConfirmModal>
       )}
+      <Modal
+        destroyOnClose
+        footer={null}
+        open={actionFailures.length > 0}
+        title={t('label.failed-count', { count: actionFailures.length })}
+        onCancel={() => setActionFailures([])}>
+        <Alert
+          showIcon
+          message={t('message.partial-action-failure')}
+          type="warning"
+        />
+        <ul className="m-t-md" data-testid="pending-requests-failure-details">
+          {actionFailures.map((failure) => (
+            <li key={`${failure.id}:${failure.code ?? ''}`}>
+              <strong>{failure.id}</strong>
+              {failure.code ? ` · ${failure.code}` : ''}
+              {failure.message ? ` · ${failure.message}` : ''}
+            </li>
+          ))}
+        </ul>
+      </Modal>
     </div>
   );
 };

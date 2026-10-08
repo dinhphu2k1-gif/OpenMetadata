@@ -50,44 +50,66 @@ public final class TechnicalChangeRequestService {
               final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
               final TechnicalRecord active = TechnicalRecordService.requireRecord(dao, recordId);
               final TechnicalRecordChangeRequest existing = requireRequest(dao, recordId);
-              requireRequestRevision(existing, expectedRevision);
-              if (!existing.isDraft() && !existing.isRejected()) {
-                throw invalidTransition("Only a Draft or Rejected change can be submitted");
-              }
-              requireCurrentBase(active, existing);
-              if (existing.isUpdate()) {
-                final TechnicalRecordValues proposed = validator.validate(values(existing));
-                records.requireAssignableCde(proposed(active, proposed), version);
-              }
-              final long now = System.currentTimeMillis();
-              final boolean resubmit = existing.isRejected();
-              final TechnicalRecordChangeRequest submitted =
-                  existing.toBuilder()
-                      .status(TechnicalRecordChangeRequest.STATUS_IN_REVIEW)
-                      .revision(existing.revision() + 1)
-                      .updatedAt(now)
-                      .updatedBy(actor)
-                      .submittedAt(now)
-                      .submittedBy(actor)
-                      .reviewedAt(null)
-                      .reviewedBy(null)
-                      .reviewComment(null)
-                      .build();
-              update(dao, submitted, expectedRevision);
-              audit(
-                  dao,
-                  resubmit
-                      ? TechnicalRecordAudit.RESUBMIT_CHANGE
-                      : TechnicalRecordAudit.SUBMIT_CHANGE,
-                  active,
-                  submitted,
-                  version,
-                  actor);
-              TechnicalOutbox.enqueueIndex(dao, active.id());
-              return submitted;
+              return submit(dao, version, active, existing, expectedRevision, actor);
             });
     TechnicalOutbox.flush();
     return result;
+  }
+
+  /** Creates and submits a DELETE request in one transaction, leaving the Approved row effective. */
+  public TechnicalRecordChangeRequest requestDeletion(
+      UUID recordId, long expectedRecordRevision, String actor) {
+    final TechnicalRecordChangeRequest result =
+        records.write(
+            false,
+            (handle, version) -> {
+              final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
+              final TechnicalRecord active = TechnicalRecordService.requireRecord(dao, recordId);
+              if (dao.findChangeRequestForUpdate(active.id()) != null) {
+                throw TechnicalDictionaryErrors.conflict(
+                    TechnicalDictionaryErrors.CHANGE_REQUEST_EXISTS,
+                    "The record already has a change request");
+              }
+              final TechnicalRecordChangeRequest draft =
+                  saveDraft(
+                      dao,
+                      version,
+                      active,
+                      expectedRecordRevision,
+                      TechnicalRecordChangeRequest.OPERATION_DELETE,
+                      null,
+                      actor);
+              return submit(dao, version, active, draft, draft.revision(), actor);
+            });
+    TechnicalOutbox.flush();
+    return result;
+  }
+
+  /** Withdraws an In Review request. Only the submitting maker can withdraw it. */
+  public void withdraw(UUID recordId, long expectedRevision, String actor) {
+    records.write(
+        false,
+        (handle, version) -> {
+          final TechnicalDictionaryDAO dao = handle.attach(TechnicalDictionaryDAO.class);
+          final TechnicalRecord active = TechnicalRecordService.requireRecord(dao, recordId);
+          final TechnicalRecordChangeRequest existing = requireRequestForUpdate(dao, recordId);
+          requireRequestRevision(existing, expectedRevision);
+          if (!existing.isInReview()) {
+            throw invalidTransition("Only a change in review can be withdrawn");
+          }
+          if (!Objects.equals(existing.submittedBy(), actor)) {
+            throw TechnicalDictionaryErrors.forbidden(
+                TechnicalDictionaryErrors.SELF_APPROVAL_FORBIDDEN,
+                "Only the submitter can withdraw this change request");
+          }
+          if (dao.deleteChangeRequest(active.id(), expectedRevision) != 1) {
+            throw stale();
+          }
+          audit(dao, TechnicalRecordAudit.WITHDRAW_CHANGE, active, existing, version, actor);
+          TechnicalOutbox.enqueueIndex(dao, active.id());
+          return null;
+        });
+    TechnicalOutbox.flush();
   }
 
   public TechnicalRecordChangeRequest reject(UUID recordId, long expectedRevision, String actor) {
@@ -348,6 +370,54 @@ public final class TechnicalChangeRequestService {
     final TechnicalRecord active =
         TechnicalRecordService.requireRecord(dao(), UUID.fromString(request.recordId()));
     return proposed(active, values(request));
+  }
+
+  /** Variant used by request pages that load Approved rows in one query. */
+  public TechnicalRecord proposedRecord(
+      TechnicalRecordChangeRequest request, TechnicalRecord active) {
+    return request.isDelete() ? null : proposed(active, values(request));
+  }
+
+  private TechnicalRecordChangeRequest submit(
+      TechnicalDictionaryDAO dao,
+      String version,
+      TechnicalRecord active,
+      TechnicalRecordChangeRequest existing,
+      long expectedRevision,
+      String actor) {
+    requireRequestRevision(existing, expectedRevision);
+    if (!existing.isDraft() && !existing.isRejected()) {
+      throw invalidTransition("Only a Draft or Rejected change can be submitted");
+    }
+    requireCurrentBase(active, existing);
+    if (existing.isUpdate()) {
+      final TechnicalRecordValues proposed = validator.validate(values(existing));
+      records.requireAssignableCde(proposed(active, proposed), version);
+    }
+    final long now = System.currentTimeMillis();
+    final boolean resubmit = existing.isRejected();
+    final TechnicalRecordChangeRequest submitted =
+        existing.toBuilder()
+            .status(TechnicalRecordChangeRequest.STATUS_IN_REVIEW)
+            .revision(existing.revision() + 1)
+            .updatedAt(now)
+            .updatedBy(actor)
+            .submittedAt(now)
+            .submittedBy(actor)
+            .reviewedAt(null)
+            .reviewedBy(null)
+            .reviewComment(null)
+            .build();
+    update(dao, submitted, expectedRevision);
+    audit(
+        dao,
+        resubmit ? TechnicalRecordAudit.RESUBMIT_CHANGE : TechnicalRecordAudit.SUBMIT_CHANGE,
+        active,
+        submitted,
+        version,
+        actor);
+    TechnicalOutbox.enqueueIndex(dao, active.id());
+    return submitted;
   }
 
   private static String normalizeOperation(String operation) {

@@ -27,6 +27,11 @@ import {
 } from '../../../rest/glossaryAPI';
 import { getUserByName } from '../../../rest/userAPI';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
+import { isDataQualityGlossary } from '../../../constants/Glossary.contant';
+import {
+  getGovernedTermDetailPath,
+  getScopedGovernedTermFqn,
+} from '../../../utils/routing/cdeRoutingHelper';
 import {
   PendingRequest,
   PendingRequestChangeDetail,
@@ -43,6 +48,7 @@ import {
   renderCDEQualityRule,
   renderCDEReferences,
 } from '../GlossaryTermTab/CDEGlossaryTableColumns';
+import { DQ_TAG_CLASSIFICATIONS } from '../GlossaryTermTab/DQGlossaryTableColumns';
 
 export interface GlossaryPendingRequestsScope {
   glossaryId: string;
@@ -92,9 +98,7 @@ const tagsFor = (term: GlossaryTerm, classification: string) =>
   );
 const withFallback = (value: ReactNode) => value || NO_DATA_PLACEHOLDER;
 const isEmptyValue = (value: unknown) =>
-  value == null ||
-  value === '' ||
-  (Array.isArray(value) && value.length === 0);
+  value == null || value === '' || (Array.isArray(value) && value.length === 0);
 
 const resolveUsers = async (
   names: string[]
@@ -126,18 +130,20 @@ const resolveUsers = async (
 
 export const useGlossaryPendingRequestsAdapter = ({
   glossaryId,
+  glossaryName,
   businessVersion,
 }: GlossaryPendingRequestsScope): PendingRequestsAdapter => {
   const { t } = useTranslation();
   const { currentUser } = useApplicationStore();
   const currentUserName = currentUser?.name;
+  const isDataQuality = isDataQualityGlossary(glossaryName);
 
   return useMemo<PendingRequestsAdapter>(() => {
     const workingRecords = new Map<string, WorkingRecord>();
     const publishedRecords = new Map<string, GlossaryTerm | undefined>();
     let baseItemsPromise: Promise<PendingRequest[]> | undefined;
 
-    const descriptors = (): FieldDescriptor[] => [
+    const cdeDescriptors = (): FieldDescriptor[] => [
       {
         keys: ['displayName'],
         label: t('cde.business-term-name'),
@@ -266,6 +272,87 @@ export const useGlossaryPendingRequestsAdapter = ({
       },
     ];
 
+    const dqExtension = (term: GlossaryTerm) =>
+      (term.extension ?? {}) as Record<string, unknown>;
+    const renderPlain = (value: unknown) => {
+      if (Array.isArray(value)) {
+        return value.map(String).join(', ') || NO_DATA_PLACEHOLDER;
+      }
+      if (value && typeof value === 'object') {
+        return JSON.stringify(value);
+      }
+
+      return value == null || value === ''
+        ? NO_DATA_PLACEHOLDER
+        : String(value);
+    };
+    const extensionDescriptor = (
+      key: string,
+      label: string
+    ): FieldDescriptor => ({
+      keys: [`extension.${key}`],
+      label,
+      raw: (term) => dqExtension(term)[key],
+      render: (term) => renderPlain(dqExtension(term)[key]),
+    });
+    const dqTagDescriptor = (
+      classification: string,
+      label: string
+    ): FieldDescriptor => ({
+      keys: ['tags', classification],
+      label,
+      raw: (term) => tagsFor(term, classification),
+      render: (term) =>
+        renderCDEClassificationTags(term.tags, classification, 'source'),
+    });
+    const dqDescriptors = (): FieldDescriptor[] => [
+      extensionDescriptor('ruleCode', t('dq.rule-code')),
+      {
+        keys: ['displayName'],
+        label: t('dq.rule-name'),
+        raw: (term) => term.displayName,
+        render: (term) => term.displayName || term.name || NO_DATA_PLACEHOLDER,
+      },
+      {
+        keys: ['relatedTerms', 'extension.cdeCode', 'extension.cdeName'],
+        label: t('dq.cde-link'),
+        raw: (term) => term.relatedTerms ?? [dqExtension(term).cdeCode],
+        render: (term) =>
+          renderPlain(
+            term.relatedTerms?.map(
+              (relation) => relation.term?.displayName ?? relation.term?.name
+            ) ??
+              dqExtension(term).cdeName ??
+              dqExtension(term).cdeCode
+          ),
+      },
+      dqTagDescriptor(DQ_TAG_CLASSIFICATIONS.dimension, t('dq.dimension')),
+      {
+        keys: ['description'],
+        label: t('dq.business-rule'),
+        raw: (term) => term.description,
+        render: (term) => renderCDEMarkdown(term.description),
+      },
+      extensionDescriptor('ruleExplanation', t('dq.rule-explanation')),
+      extensionDescriptor('otherConstraints', t('dq.other-constraints')),
+      dqTagDescriptor(
+        DQ_TAG_CLASSIFICATIONS.targetPopulation,
+        t('dq.target-population')
+      ),
+      dqTagDescriptor(DQ_TAG_CLASSIFICATIONS.method, t('dq.method')),
+      dqTagDescriptor(DQ_TAG_CLASSIFICATIONS.frequency, t('dq.frequency')),
+      extensionDescriptor('qualityThreshold', t('dq.quality-threshold')),
+      extensionDescriptor(
+        'relatedRegulatoryDocuments',
+        t('cde.related-regulatory-documents')
+      ),
+      extensionDescriptor('testDefinitions', t('label.test-case-plural')),
+      extensionDescriptor('testDeclarations', t('label.test-case-plural')),
+      extensionDescriptor('schedule', t('label.schedule')),
+    ];
+    const descriptors = () =>
+      isDataQuality ? dqDescriptors() : cdeDescriptors();
+
     const loadPublished = async (record: WorkingRecord) => {
       const id = recordId(record);
       if (publishedRecords.has(id)) {
@@ -350,14 +437,18 @@ export const useGlossaryPendingRequestsAdapter = ({
       }
       const source =
         request.type === 'delete' && published ? published : working;
-      const createDeleteLabels = new Set([
-        t('cde.business-group'),
-        t('cde.data-source'),
-        t('cde.data-classification'),
-        t('cde.personal-data'),
-        t('cde.data-owner'),
-        t('cde.business-meaning'),
-      ]);
+      const createDeleteLabels = new Set(
+        isDataQuality
+          ? descriptors().map(({ label }) => label)
+          : [
+              t('cde.business-group'),
+              t('cde.data-source'),
+              t('cde.data-classification'),
+              t('cde.personal-data'),
+              t('cde.data-owner'),
+              t('cde.business-meaning'),
+            ]
+      );
 
       return {
         fields: descriptors()
@@ -446,9 +537,34 @@ export const useGlossaryPendingRequestsAdapter = ({
             record.entityStatus === EntityStatus.InReview ||
             Boolean(record.pendingDeletion),
           groups: record.domains,
-          detailPath: record.fullyQualifiedName
-            ? getGlossaryPath(record.fullyQualifiedName)
+          filterValues: isDataQuality
+            ? {
+                cde: (record.relatedTerms ?? []).flatMap((relation) =>
+                  relation.term?.id ? [relation.term.id] : []
+                ),
+                dimension: tagsFor(
+                  record,
+                  DQ_TAG_CLASSIFICATIONS.dimension
+                ).map(({ tagFQN }) => tagFQN),
+                method: tagsFor(record, DQ_TAG_CLASSIFICATIONS.method).map(
+                  ({ tagFQN }) => tagFQN
+                ),
+              }
             : undefined,
+          detailPath: record.fullyQualifiedName
+            ? getGovernedTermDetailPath({
+                fqn: getScopedGovernedTermFqn(
+                  record.fullyQualifiedName,
+                  businessVersion
+                ),
+                businessVersion:
+                  record.businessVersion ??
+                  (record.version == null ? '1.0' : String(record.version)),
+                parentBusinessVersion: businessVersion,
+                termId: recordId(record),
+                isWorkingDraft: true,
+              })
+            : getGlossaryPath(glossaryName),
         };
       });
     };
@@ -486,6 +602,16 @@ export const useGlossaryPendingRequestsAdapter = ({
             item.groups?.some((group) => groupValues.includes(group.id))
           );
         }
+        for (const key of ['cde', 'dimension', 'method']) {
+          const selected = filters?.[key] ?? [];
+          if (selected.length) {
+            items = items.filter((item) =>
+              item.filterValues?.[key]?.some((value) =>
+                selected.includes(value)
+              )
+            );
+          }
+        }
         const start = (page - 1) * pageSize;
 
         return {
@@ -518,6 +644,38 @@ export const useGlossaryPendingRequestsAdapter = ({
             groups.set(group.id, referenceValue(group))
           );
         });
+        if (isDataQuality) {
+          const moduleFilters = [
+            ['cde', t('dq.cde-link')],
+            ['dimension', t('dq.dimension')],
+            ['method', t('dq.method')],
+          ] as const;
+
+          return [
+            {
+              key: 'requester',
+              label: t('label.requested-by'),
+              options: [...requesters].map(([value, label]) => ({
+                value,
+                label,
+              })),
+            },
+            ...moduleFilters.map(([key, label]) => {
+              const values = new Set(
+                items.flatMap((item) => item.filterValues?.[key] ?? [])
+              );
+
+              return {
+                key,
+                label,
+                options: [...values].sort().map((value) => ({
+                  value,
+                  label: value.split('.').pop() ?? value,
+                })),
+              };
+            }),
+          ];
+        }
 
         return [
           {
@@ -541,7 +699,9 @@ export const useGlossaryPendingRequestsAdapter = ({
 
         return deletions.length
           ? {
-              message: t('message.pending-delete-approval-warning'),
+              message: isDataQuality
+                ? t('dq.deletion-approve-confirm')
+                : t('message.pending-delete-approval-warning'),
               items: deletions.map(({ code, name }) => `${code} · ${name}`),
             }
           : undefined;
@@ -567,5 +727,12 @@ export const useGlossaryPendingRequestsAdapter = ({
         };
       },
     };
-  }, [glossaryId, businessVersion, currentUserName, t]);
+  }, [
+    glossaryId,
+    glossaryName,
+    businessVersion,
+    currentUserName,
+    isDataQuality,
+    t,
+  ]);
 };

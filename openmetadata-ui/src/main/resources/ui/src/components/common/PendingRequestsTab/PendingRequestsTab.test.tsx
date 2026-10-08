@@ -114,9 +114,7 @@ describe('PendingRequestsTab', () => {
 
     await waitFor(() => expect(adapter.fetchRequests).toHaveBeenCalledTimes(1));
 
-    rerender(
-      <PendingRequestsTab canDecide adapter={adapter} refreshKey={1} />
-    );
+    rerender(<PendingRequestsTab canDecide adapter={adapter} refreshKey={1} />);
 
     await waitFor(() => expect(adapter.fetchRequests).toHaveBeenCalledTimes(2));
   });
@@ -141,6 +139,29 @@ describe('PendingRequestsTab', () => {
       { succeeded: 2, failures: [] },
       'approve'
     );
+  });
+
+  it('shows item code and message for a partial failure', async () => {
+    const adapter = buildAdapter();
+    (adapter.applyAction as jest.Mock).mockResolvedValue({
+      succeeded: 1,
+      failures: [
+        { id: requests[1].id, code: 'STALE_REVISION', message: 'Reload' },
+      ],
+    });
+    render(<PendingRequestsTab canDecide adapter={adapter} />);
+    await screen.findByText('CDE1');
+
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(await screen.findByTestId('pending-requests-approve-btn'));
+    fireEvent.click(screen.getByTestId('confirm'));
+
+    const details = await screen.findByTestId(
+      'pending-requests-failure-details'
+    );
+
+    expect(details).toHaveTextContent('STALE_REVISION');
+    expect(details).toHaveTextContent('Reload');
   });
 
   it('filters the adapter query with the selected request type', async () => {
@@ -189,9 +210,9 @@ describe('PendingRequestsTab', () => {
     const row = code.closest('tr');
 
     expect(cell).toContainElement(screen.getAllByTestId('expand-icon')[0]);
-    expect(row?.querySelector('td:first-child input[type="checkbox"]')).not.toBe(
-      null
-    );
+    expect(
+      row?.querySelector('td:first-child input[type="checkbox"]')
+    ).not.toBe(null);
   });
 
   it('expands add and delete requests too, each with an expand icon', async () => {
@@ -221,6 +242,7 @@ describe('PendingRequestsTab', () => {
 
     expect(await screen.findByText('Owner')).toBeInTheDocument();
     expect(adapter.fetchChangeDetail).toHaveBeenCalledTimes(1);
+
     screen
       .getAllByRole('checkbox')
       .forEach((checkbox) => expect(checkbox).not.toBeChecked());
@@ -284,9 +306,7 @@ describe('PendingRequestsTab', () => {
       'pending-requests-detail__empty'
     );
     expect(screen.getByText('Service')).toBeInTheDocument();
-    expect(
-      screen.getByText('message.changed-field-count')
-    ).toBeInTheDocument();
+    expect(screen.getByText('message.changed-field-count')).toBeInTheDocument();
   });
 
   it('lists only the fields with a value and sums up the empty ones', async () => {
@@ -302,9 +322,7 @@ describe('PendingRequestsTab', () => {
 
     expect(await screen.findByText('Owner')).toBeInTheDocument();
     expect(screen.queryByText('Source')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('message.empty-field-summary')
-    ).toBeInTheDocument();
+    expect(screen.getByText('message.empty-field-summary')).toBeInTheDocument();
   });
 
   it('shows a placeholder for an empty business term name', async () => {
@@ -418,6 +436,32 @@ describe('PendingRequestsTab', () => {
     await waitFor(() =>
       expect(adapter.applyAction).toHaveBeenCalledWith('withdraw', [own])
     );
+  });
+
+  it('enforces a module maker-checker decision restriction per request', async () => {
+    const adapter = buildAdapter();
+    const own: PendingRequest = {
+      ...requests[0],
+      canDecide: false,
+      canWithdraw: true,
+    };
+    const other: PendingRequest = { ...requests[1], canDecide: true };
+    (adapter.fetchRequests as jest.Mock).mockResolvedValue({
+      items: [own, other],
+      total: 2,
+    });
+    render(<PendingRequestsTab canDecide adapter={adapter} />);
+    await screen.findByText('CDE1');
+
+    const rowCheckboxes = screen.getAllByRole('checkbox').slice(1);
+    fireEvent.click(rowCheckboxes[0]);
+
+    expect(
+      screen.queryByTestId('pending-requests-approve-btn')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('pending-requests-withdraw-btn')
+    ).toBeInTheDocument();
   });
 
   it('withdraws only the own requests when an approver selects others too', async () => {

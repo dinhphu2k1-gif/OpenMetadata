@@ -41,10 +41,16 @@ export interface PendingRequest {
   selectable?: boolean;
   /** True when the current user submitted the request and it is still In Review, so they can withdraw it. */
   canWithdraw?: boolean;
+  /** Module-level maker-checker may make this row non-reviewable for the current user. */
+  canDecide?: boolean;
+  /** Optional explanation shown by module UIs when a row cannot be selected for a decision. */
+  disabledReason?: string;
   /** Revision the approver saw, sent back so a stale decision is refused by the server. */
   revision?: number;
   /** Module-owned grouping references used by optional filters. */
   groups?: EntityReference[];
+  /** Module-specific scalar filter values kept opaque to the shared tab. */
+  filterValues?: Record<string, string[]>;
 }
 
 export interface PendingRequestChangeDetail {
