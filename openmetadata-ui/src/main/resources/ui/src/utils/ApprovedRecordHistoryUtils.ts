@@ -17,6 +17,7 @@ import {
 } from '../components/common/ApprovedRecordHistory/ApprovedRecordHistory.interface';
 import { GlossaryTermCorrectionHistoryEntry } from '../rest/glossaryAPI';
 import { TechnicalCorrectionEntry } from '../rest/technicalDictionaryAPI';
+import { t } from './i18next/LocalUtil';
 
 const COMMON_LABEL_KEYS: Record<string, string> = {
   description: 'label.description',
@@ -67,12 +68,70 @@ const SCOPE_LABEL_KEYS: Record<
   },
 };
 
+const LONG_TEXT_FIELDS = new Set([
+  'description',
+  'extension.entityRelationship',
+  'extension.relatedRegulatoryDocuments',
+  'extension.ruleExplanation',
+  'extension.otherConstraints',
+]);
+
 /** Translation key of a changed field; an unknown field falls back to its name. */
 export const getApprovedRecordFieldLabelKey = (
   scope: ApprovedRecordHistoryScope,
   field: string
 ): string =>
   SCOPE_LABEL_KEYS[scope][field] ?? COMMON_LABEL_KEYS[field] ?? field;
+
+export const isLongTextApprovedRecordField = (field: string): boolean =>
+  LONG_TEXT_FIELDS.has(field);
+
+const formatDataQualityRuleValue = (value: unknown): string => {
+  const normalizedValue = String(value).trim().toLowerCase();
+
+  if (['y', 'true', 'yes'].includes(normalizedValue)) {
+    return t('label.yes');
+  }
+
+  if (['n', 'false', 'no'].includes(normalizedValue)) {
+    return t('label.no');
+  }
+
+  return String(value);
+};
+
+/** Formats a correction value for display in the history timeline. */
+export const formatApprovedRecordValue = (
+  field: string,
+  value?: string | null
+): string | undefined => {
+  if (value == null || value.trim() === '') {
+    return undefined;
+  }
+
+  let values: unknown[] = [value];
+
+  try {
+    const parsedValue = JSON.parse(value);
+    if (Array.isArray(parsedValue)) {
+      values = parsedValue;
+    }
+  } catch {
+    // Keep non-JSON values unchanged.
+  }
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  return values
+    .map((item) =>
+      field === 'extension.dataQualityRules'
+        ? formatDataQualityRuleValue(item)
+        : String(item)
+    )
+    .join(', ');
+};
 
 export const fromGlossaryCorrection = (
   entry: GlossaryTermCorrectionHistoryEntry

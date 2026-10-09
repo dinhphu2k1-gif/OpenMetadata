@@ -1,0 +1,103 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+@import (reference) '../../../styles/variables.less';
+
+.approved-record-history-drawer {
+  .ant-drawer-header,
+  .ant-drawer-body {
+    padding: @padding-md;
+  }
+
+  .approved-record-history-entry {
+    display: flex;
+  }
+
+  .approved-record-history-content {
+    flex: 1;
+    min-width: 0;
+    padding-bottom: @padding-lg;
+  }
+
+  .approved-record-history-entry:last-child .approved-record-history-content {
+    padding-bottom: 0;
+  }
+
+  .approved-record-changes {
+    display: grid;
+    row-gap: @margin-xs;
+    padding: @padding-sm;
+    border: 1px solid @border-color;
+    border-radius: @border-rad-xs;
+    background: @grey-1;
+  }
+
+  .approved-record-history-toggle {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .approved-record-history-summary {
+    min-width: 0;
+  }
+
+  .approved-record-history-meta {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+
+    .assignee-item {
+      color: inherit;
+    }
+  }
+
+  .approved-record-change {
+    display: grid;
+    // The design requires a stable label column; OM has no 140px width token.
+    grid-template-columns: 140px minmax(0, 1fr);
+    column-gap: @margin-sm;
+  }
+
+  .approved-record-field-label {
+    font-weight: 500;
+  }
+
+  .approved-record-change-values {
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    .diff-added,
+    .diff-removed {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .approved-record-change-arrow {
+    flex-shrink: 0;
+    margin-top: @margin-xss;
+  }
+
+  .approved-record-empty-value {
+    color: @grey-7;
+  }
+
+  .approved-record-long-text-toggle {
+    height: auto;
+    margin-top: @margin-xss;
+  }
+}
