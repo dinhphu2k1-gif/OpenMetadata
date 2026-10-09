@@ -70,6 +70,10 @@ import {
   validateAuthFields,
 } from '../../../utils/AuthProvider.util';
 import {
+  clearPrefetchedPermissions,
+  prefetchLoggedInUserPermissions,
+} from '../../../utils/PermissionPrefetch';
+import {
   clearOidcToken,
   getOidcToken,
   getRefreshToken,
@@ -77,6 +81,7 @@ import {
 import { showErrorToast, showInfoToast } from '../../../utils/ToastUtils';
 import { checkIfUpdateRequired } from '../../../utils/UserDataUtils';
 import { resetWebAnalyticSession } from '../../../utils/WebAnalyticsUtils';
+import { preloadAuthenticatedChunks } from '../../AppRouter/AppRouter';
 import Loader from '../../common/Loader/Loader';
 import {
   LazyAuth0Authenticator,
@@ -203,6 +208,7 @@ export const AuthProvider = ({
   // Handler to perform logout within application
   const onLogoutHandler = useCallback(async () => {
     clearTimeout(timeoutId);
+    clearPrefetchedPermissions();
 
     // Let SSO complete the logout process
     await authenticatorRef.current?.invokeLogout();
@@ -260,6 +266,7 @@ export const AuthProvider = ({
   }, []);
 
   const resetUserDetails = (forceLogout = false) => {
+    clearPrefetchedPermissions();
     setCurrentUser({} as User);
     clearOidcToken();
     setIsAuthenticated(false);
@@ -276,6 +283,8 @@ export const AuthProvider = ({
 
   const getLoggedInUserDetails = async () => {
     setApplicationLoading(true);
+    preloadAuthenticatedChunks();
+    prefetchLoggedInUserPermissions();
     try {
       const res = await getLoggedInUser({ fields: userAPIQueryFields });
       if (res) {
@@ -417,6 +426,8 @@ export const AuthProvider = ({
           clientType,
         });
 
+        preloadAuthenticatedChunks();
+        prefetchLoggedInUserPermissions();
         const res = await getLoggedInUser({ fields });
         if (res) {
           const userDetails = await checkIfUpdateRequired(res, newUser);
@@ -430,6 +441,7 @@ export const AuthProvider = ({
         const err = error as AxiosError;
         if (err?.response?.status === 404) {
           if (authConfig?.enableSelfSignup) {
+            clearPrefetchedPermissions();
             setNewUserProfile(user.profile);
             setCurrentUser({} as User);
             setIsSigningUp(true);
@@ -741,9 +753,9 @@ export const AuthProvider = ({
   };
 
   useEffect(() => {
+    initializeAxiosInterceptors();
     fetchAuthConfig();
     startTokenExpiryTimer();
-    initializeAxiosInterceptors();
 
     return cleanup;
   }, []);

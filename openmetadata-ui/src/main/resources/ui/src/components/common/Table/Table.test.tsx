@@ -25,7 +25,7 @@ jest.mock('../../../utils/CustomizeColumnUtils', () => ({
   getReorderedColumns: jest.fn().mockImplementation((_, columns) => columns),
 }));
 
-jest.mock('../../../utils/TableUtils', () => ({
+jest.mock('../../../utils/TableExpandableUtils', () => ({
   getTableExpandableConfig: jest.fn(),
 }));
 

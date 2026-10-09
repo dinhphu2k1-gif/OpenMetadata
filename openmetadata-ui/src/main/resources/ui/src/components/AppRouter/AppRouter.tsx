@@ -21,17 +21,27 @@ import applicationRoutesClass from '../../utils/ApplicationRoutesClassBase';
 import Loader from '../common/Loader/Loader';
 import withSuspenseFallback from './withSuspenseFallback';
 
-const AuthenticatedApp = withSuspenseFallback(
-  lazy(() => import('./AuthenticatedApp'))
-);
+export const loadAuthenticatedApp = () => import('./AuthenticatedApp');
 
-const AuthenticatedRoutes = withSuspenseFallback(
-  lazy(() =>
-    import('./AuthenticatedRoutes').then((m) => ({
-      default: m.AuthenticatedRoutes,
-    }))
-  )
-);
+export const loadAuthenticatedRoutes = () =>
+  import('./AuthenticatedRoutes').then((module) => ({
+    default: module.AuthenticatedRoutes,
+  }));
+
+let authenticatedChunksPreloaded = false;
+
+export const preloadAuthenticatedChunks = () => {
+  if (authenticatedChunksPreloaded) {
+    return;
+  }
+
+  authenticatedChunksPreloaded = true;
+  void Promise.allSettled([loadAuthenticatedApp(), loadAuthenticatedRoutes()]);
+};
+
+const AuthenticatedApp = withSuspenseFallback(lazy(loadAuthenticatedApp));
+
+const AuthenticatedRoutes = withSuspenseFallback(lazy(loadAuthenticatedRoutes));
 
 // Lazy-load infrequently-visited unauthenticated pages
 const AccessNotAllowedPage = withSuspenseFallback(

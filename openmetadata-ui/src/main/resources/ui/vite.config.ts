@@ -171,6 +171,16 @@ export default defineConfig(({ mode }) => {
           '**/*.mock.*',
         ],
       },
+      warmup: {
+        clientFiles: [
+          './src/index.tsx',
+          './src/AppRoot.tsx',
+          './src/components/AppRouter/AuthenticatedRoutes.tsx',
+          './src/components/AppRouter/AuthenticatedAppRouter.tsx',
+          './src/pages/Glossary/GlossaryPage/GlossaryPage.component.tsx',
+          './src/components/Glossary/GlossaryV1.component.tsx',
+        ],
+      },
       fs: {
         strict: false,
       },

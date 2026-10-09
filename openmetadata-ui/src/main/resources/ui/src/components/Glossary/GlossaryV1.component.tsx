@@ -19,6 +19,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { withActivityFeed } from '../../components/AppRouter/withActivityFeed';
 import { PAGE_SIZE_LARGE } from '../../constants/constants';
+import {
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../constants/Glossary.contant';
 import { usePermissionProvider } from '../../context/PermissionProvider/PermissionProvider';
 import {
   OperationPermission,
@@ -43,13 +47,9 @@ import {
   ListGlossaryTermsParams,
   updateGlossaryTermWorkingVersion,
 } from '../../rest/glossaryAPI';
-import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
 import { getBusinessVersion } from '../../utils/BusinessVersionUtils';
+import { getEntityDeleteMessage } from '../../utils/EntityDisplayUtils';
 import { updateGlossaryTermByFqn } from '../../utils/GlossaryUtils';
-import {
-  isDataDictionaryGlossary,
-  isDataQualityGlossary,
-} from '../../constants/Glossary.contant';
 import { DEFAULT_ENTITY_PERMISSION } from '../../utils/PermissionsUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { getCdeDetailPath } from '../../utils/routing/cdeRoutingHelper';
@@ -455,18 +455,16 @@ const GlossaryV1 = ({
 
         return permission;
       } else {
-        const permission = await permissionFetch();
+        const [permission, workflowPermission] = await Promise.all([
+          permissionFetch(),
+          workflowPermissionFetch(selectedData.id).catch(() => undefined),
+        ]);
         let isConsumer = true;
         let canEditWorking = false;
-        try {
-          const workflowPermission = await workflowPermissionFetch(
-            selectedData.id
-          );
+        if (workflowPermission) {
           isConsumer =
             workflowPermission.isConsumer ?? !workflowPermission.canViewWorking;
           canEditWorking = workflowPermission.canEditWorking;
-        } catch {
-          // Fail closed: mutation controls stay hidden when workflow authorization is unknown.
         }
 
         const isImmutableApprovedTerm =

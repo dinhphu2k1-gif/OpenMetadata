@@ -20,6 +20,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -33,6 +34,10 @@ import {
   getResourcePermission,
 } from '../../rest/permissionAPI';
 import { setUrlPathnameExpiryAfterRoute } from '../../utils/AuthProvider.util';
+import {
+  consumePrefetchedPermissions,
+  LoggedInUserPermissionsPromise,
+} from '../../utils/PermissionPrefetch';
 import {
   getOperationPermissions,
   getUIPermission,
@@ -67,6 +72,7 @@ const PermissionProvider: FC<PermissionProviderProps> = ({ children }) => {
   const cookieStorage = new CookieStorage();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const shouldConsumePrefetch = useRef(true);
 
   const [entitiesPermission, setEntitiesPermission] =
     useState<EntityPermissionMap>({} as EntityPermissionMap);
@@ -86,18 +92,32 @@ const PermissionProvider: FC<PermissionProviderProps> = ({ children }) => {
   /**
    * Fetch permission for logged in user
    */
-  const fetchLoggedInUserPermissions = useCallback(async () => {
-    try {
-      const response = await getLoggedInUserPermissions();
-      setPermissions(getUIPermission(response.data || []));
-      redirectToStoredPath();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [redirectToStoredPath]);
+  const fetchLoggedInUserPermissions = useCallback(
+    async (prefetchedPermissions?: LoggedInUserPermissionsPromise) => {
+      try {
+        let response;
+
+        try {
+          response = await (prefetchedPermissions ??
+            getLoggedInUserPermissions());
+        } catch (error) {
+          if (!prefetchedPermissions) {
+            throw error;
+          }
+          response = await getLoggedInUserPermissions();
+        }
+
+        setPermissions(getUIPermission(response.data || []));
+        redirectToStoredPath();
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [redirectToStoredPath]
+  );
 
   const fetchEntityPermission = useCallback(
     async (resource: ResourceEntity, entityId: string) => {
@@ -170,8 +190,13 @@ const PermissionProvider: FC<PermissionProviderProps> = ({ children }) => {
      * Only fetch permissions if current user is present
      */
     if (!isEmpty(currentUser)) {
-      fetchLoggedInUserPermissions();
+      const prefetchedPermissions = shouldConsumePrefetch.current
+        ? consumePrefetchedPermissions()
+        : undefined;
+      shouldConsumePrefetch.current = false;
+      fetchLoggedInUserPermissions(prefetchedPermissions);
     } else {
+      shouldConsumePrefetch.current = true;
       setLoading(false);
     }
     if (isEmpty(currentUser)) {

@@ -17,12 +17,14 @@ import { useApplicationsProvider } from '../components/Settings/Applications/App
 import { AppPlugin } from '../components/Settings/Applications/plugins/AppPlugin';
 import { NavigationItem } from '../generated/system/ui/uiCustomization';
 import { filterHiddenNavigationItems } from '../utils/CustomizaNavigation/CustomizeNavigation';
+import { useApplicationStore } from './useApplicationStore';
 import { useCustomPages } from './useCustomPages';
 import { useSidebarItems } from './useSidebarItems';
 
 const mockUseCustomPages = useCustomPages as jest.MockedFunction<
   typeof useCustomPages
 >;
+const mockUseApplicationStore = useApplicationStore as unknown as jest.Mock;
 const mockUseApplicationsProvider =
   useApplicationsProvider as jest.MockedFunction<
     typeof useApplicationsProvider
@@ -31,6 +33,10 @@ const mockFilterHiddenNavigationItems =
   filterHiddenNavigationItems as jest.MockedFunction<
     typeof filterHiddenNavigationItems
   >;
+
+jest.mock('./useApplicationStore', () => ({
+  useApplicationStore: jest.fn(),
+}));
 
 jest.mock('./useCustomPages', () => ({
   useCustomPages: jest.fn(),
@@ -126,6 +132,7 @@ describe('useSidebarItems', () => {
       navigation: mockNavigationItems,
       customizedPage: null,
       isLoading: false,
+      isNavigationResolved: true,
     });
     mockUseApplicationsProvider.mockReturnValue({
       plugins: [],
@@ -133,6 +140,10 @@ describe('useSidebarItems', () => {
       extensionRegistry: {} as never,
     });
     mockFilterHiddenNavigationItems.mockReturnValue(mockSidebarItems);
+    mockUseApplicationStore.mockReturnValue({
+      currentUser: { id: 'user-id' },
+      selectedPersona: { fullyQualifiedName: 'DataProposer' },
+    });
   });
 
   it('should return filtered sidebar items with navigation and empty plugins', () => {
@@ -168,6 +179,7 @@ describe('useSidebarItems', () => {
       navigation: null,
       customizedPage: null,
       isLoading: false,
+      isNavigationResolved: true,
     });
 
     const { result } = renderHook(() => useSidebarItems());
@@ -209,6 +221,7 @@ describe('useSidebarItems', () => {
       navigation: newNavigationItems,
       customizedPage: null,
       isLoading: false,
+      isNavigationResolved: true,
     });
 
     rerender();
@@ -256,6 +269,7 @@ describe('useSidebarItems', () => {
       navigation: [],
       customizedPage: null,
       isLoading: false,
+      isNavigationResolved: true,
     });
 
     const { result } = renderHook(() => useSidebarItems());
@@ -303,5 +317,31 @@ describe('useSidebarItems', () => {
       multiplePlugins
     );
     expect(result.current).toEqual(mockSidebarItems);
+  });
+
+  it('should not fall back to every tab before the logged-in user is loaded', () => {
+    mockUseApplicationStore.mockReturnValue({
+      currentUser: {},
+      selectedPersona: undefined,
+    });
+
+    const { result } = renderHook(() => useSidebarItems());
+
+    expect(result.current).toEqual([]);
+    expect(mockFilterHiddenNavigationItems).not.toHaveBeenCalled();
+  });
+
+  it('should not fall back to every tab while persona navigation is unresolved', () => {
+    mockUseCustomPages.mockReturnValue({
+      navigation: null,
+      customizedPage: null,
+      isLoading: true,
+      isNavigationResolved: false,
+    });
+
+    const { result } = renderHook(() => useSidebarItems());
+
+    expect(result.current).toEqual([]);
+    expect(mockFilterHiddenNavigationItems).not.toHaveBeenCalled();
   });
 });

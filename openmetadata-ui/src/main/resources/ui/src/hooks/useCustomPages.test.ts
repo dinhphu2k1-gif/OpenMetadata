@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { renderHook } from '@testing-library/react-hooks';
+import { act, renderHook } from '@testing-library/react-hooks';
 import { Document } from '../generated/entity/docStore/document';
 import { PageType } from '../generated/system/ui/page';
 import { getDocumentByFQN } from '../rest/DocStoreAPI';
@@ -180,5 +180,61 @@ describe('useCustomPages', () => {
       content: 'New Content',
     });
     expect(result.current.navigation).toEqual([{ name: 'New Navigation' }]);
+  });
+
+  it('should keep navigation unresolved when the document request fails transiently', async () => {
+    mockGetDocumentByFQN.mockRejectedValue({ response: { status: 500 } });
+
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useCustomPages('Navigation')
+    );
+
+    await waitForNextUpdate();
+
+    expect(result.current.isNavigationResolved).toBe(false);
+  });
+
+  it('should resolve navigation when the persona has no customization document', async () => {
+    mockGetDocumentByFQN.mockRejectedValue({ response: { status: 404 } });
+
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useCustomPages('Navigation')
+    );
+
+    await waitForNextUpdate();
+
+    expect(result.current.isNavigationResolved).toBe(true);
+    expect(result.current.navigation).toEqual([]);
+  });
+
+  it('should ignore a late failure from a previous persona request', async () => {
+    let rejectStaleRequest: (reason: unknown) => void = jest.fn();
+    mockGetDocumentByFQN
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectStaleRequest = reject;
+          })
+      )
+      .mockResolvedValueOnce(mockDocument);
+
+    const { result, waitForNextUpdate, rerender } = renderHook(
+      ({ selectedPersona }) => {
+        mockUseApplicationStore.mockReturnValue({ selectedPersona });
+
+        return useCustomPages('Navigation');
+      },
+      { initialProps: { selectedPersona: { fullyQualifiedName: 'old' } } }
+    );
+
+    rerender({ selectedPersona: { fullyQualifiedName: 'test-persona' } });
+    await waitForNextUpdate();
+
+    await act(async () => {
+      rejectStaleRequest({ response: { status: 500 } });
+    });
+
+    expect(result.current.navigation).toEqual(mockNavigation);
+    expect(result.current.isNavigationResolved).toBe(true);
   });
 });

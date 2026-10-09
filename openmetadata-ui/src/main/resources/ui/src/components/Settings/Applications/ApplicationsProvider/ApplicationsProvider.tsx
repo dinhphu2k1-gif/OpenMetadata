@@ -25,7 +25,6 @@ import { EntityReference } from '../../../../generated/entity/type';
 import { useApplicationStore } from '../../../../hooks/useApplicationStore';
 import { getInstalledApplicationList } from '../../../../rest/applicationAPI';
 import { ExtensionPointRegistry } from '../../../../utils/ExtensionPointRegistry';
-import Loader from '../../../common/Loader/Loader';
 import applicationsClassBase from '../AppDetails/ApplicationsClassBase';
 import type { AppPlugin } from '../plugins/AppPlugin';
 import { ApplicationsContextType } from './ApplicationsProvider.interface';
@@ -38,9 +37,6 @@ export const ApplicationsProvider = ({ children }: { children: ReactNode }) => {
   const { permissions } = usePermissionProvider();
   const { setApplicationsName } = useApplicationStore();
 
-  // Create extension registry (singleton for the app lifecycle)
-  const [extensionRegistry] = useState(() => new ExtensionPointRegistry());
-
   const fetchApplicationList = useCallback(async () => {
     try {
       setLoading(true);
@@ -52,7 +48,8 @@ export const ApplicationsProvider = ({ children }: { children: ReactNode }) => {
       );
       setApplicationsName(applicationsNameList);
     } catch {
-      // do not handle error
+      setApplications([]);
+      setApplicationsName([]);
     } finally {
       setLoading(false);
     }
@@ -80,28 +77,32 @@ export const ApplicationsProvider = ({ children }: { children: ReactNode }) => {
       .filter(Boolean) as AppPlugin[];
   }, [applications]);
 
-  // Let plugins contribute to extension points
-  useEffect(() => {
+  const extensionRegistry = useMemo(() => {
+    const registry = new ExtensionPointRegistry();
+
     installedPluginInstances.forEach((plugin) => {
       try {
-        plugin.contributeExtensions?.(extensionRegistry);
+        plugin.contributeExtensions?.(registry);
       } catch {
         // Silently ignore errors during plugin contribution
       }
     });
-  }, [installedPluginInstances, extensionRegistry]);
+
+    return registry;
+  }, [installedPluginInstances]);
 
   const appContext = useMemo(() => {
     return {
       applications,
       plugins: installedPluginInstances,
       extensionRegistry,
+      isApplicationsLoading: loading,
     };
-  }, [applications, installedPluginInstances, extensionRegistry]);
+  }, [applications, installedPluginInstances, extensionRegistry, loading]);
 
   return (
     <ApplicationsContext.Provider value={appContext}>
-      {loading ? <Loader /> : children}
+      {children}
     </ApplicationsContext.Provider>
   );
 };

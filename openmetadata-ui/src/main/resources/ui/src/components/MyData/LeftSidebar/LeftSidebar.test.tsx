@@ -16,7 +16,9 @@ import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import LeftSidebar from './LeftSidebar.component';
 
 jest.mock('../../../hooks/useApplicationStore', () => ({
-  useApplicationStore: jest.fn().mockReturnValue({ selectedPersona: undefined }),
+  useApplicationStore: jest
+    .fn()
+    .mockReturnValue({ selectedPersona: undefined }),
 }));
 
 jest.mock(
@@ -29,6 +31,7 @@ jest.mock(
 describe('LeftSidebar', () => {
   it('renders sidebar links correctly for default / admin user without restricted persona', () => {
     (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { id: 'admin-id' },
       selectedPersona: undefined,
     });
     render(
@@ -48,6 +51,7 @@ describe('LeftSidebar', () => {
 
   it('hides settings link for non-admin persona', () => {
     (useApplicationStore as unknown as jest.Mock).mockReturnValue({
+      currentUser: { id: 'consumer-id' },
       selectedPersona: { name: 'DataConsumerPersona' },
     });
     render(
@@ -61,7 +65,9 @@ describe('LeftSidebar', () => {
     expect(screen.getByTestId('observability')).toBeInTheDocument();
     expect(screen.getByTestId('data-marketplace-section')).toBeInTheDocument();
     expect(screen.getByTestId('governance')).toBeInTheDocument();
-    expect(screen.queryByTestId('app-bar-item-settings')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('app-bar-item-settings')
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('app-bar-item-logout')).toBeInTheDocument();
   });
 });

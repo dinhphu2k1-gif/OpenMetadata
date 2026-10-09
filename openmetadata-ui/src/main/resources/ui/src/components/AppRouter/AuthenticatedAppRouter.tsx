@@ -25,6 +25,7 @@ import { checkPermission, userPermissions } from '../../utils/PermissionsUtils';
 import { useApplicationsProvider } from '../Settings/Applications/ApplicationsProvider/ApplicationsProvider';
 import { RoutePosition } from '../Settings/Applications/plugins/AppPlugin';
 import AdminProtectedRoute from './AdminProtectedRoute';
+import ApplicationsRouteLoadingGuard from './ApplicationsRouteLoadingGuard';
 import withSuspenseFallback from './withSuspenseFallback';
 
 // Previously statically imported — lazify so they stay out of the main chunk
@@ -340,7 +341,7 @@ const ColumnBulkOperationsPage = withSuspenseFallback(
 const AuthenticatedAppRouter: FunctionComponent = () => {
   const { permissions } = usePermissionProvider();
   const { t } = useTranslation();
-  const { plugins } = useApplicationsProvider();
+  const { isApplicationsLoading, plugins } = useApplicationsProvider();
 
   // Get all plugin routes that should be in AUTHENTICATED_ROUTE position
   const pluginRoutes = useMemo(() => {
@@ -361,6 +362,10 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
       checkPermission(Operation.Create, ResourceEntity.BOT, permissions),
     [permissions]
   );
+
+  if (isApplicationsLoading) {
+    return <ApplicationsRouteLoadingGuard />;
+  }
 
   return (
     <Routes>

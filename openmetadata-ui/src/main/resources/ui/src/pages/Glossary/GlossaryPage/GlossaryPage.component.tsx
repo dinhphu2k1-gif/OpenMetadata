@@ -35,9 +35,9 @@ import {
   pagingObject,
   ROUTES,
 } from '../../../constants/constants';
+import { isDataQualityGlossary } from '../../../constants/Glossary.contant';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { observerOptions } from '../../../constants/Mydata.constants';
-import { isDataQualityGlossary } from '../../../constants/Glossary.contant';
 import { useAsyncDeleteProvider } from '../../../context/AsyncDeleteProvider/AsyncDeleteProvider';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
@@ -60,19 +60,20 @@ import { useElementInView } from '../../../hooks/useElementInView';
 import { useFqn } from '../../../hooks/useFqn';
 import {
   getGlossariesList,
-  getLatestPublishedGlossary,
-  getGlossaryVersion,
-  getGlossaryVersionPermissions,
-  getGlossaryWorkingVersion,
-  getPublishedGlossaryTerm,
   getGlossaryTermByFQN,
   getGlossaryTerms,
   getGlossaryTermsById,
   getGlossaryTermWorkingVersion,
-  updateGlossaryTermWorkingVersion,
-  updateGlossaryWorkingVersion,
+  getGlossaryVersion,
+  getGlossaryVersionPermissions,
+  getGlossaryWorkingVersion,
+  getLatestPublishedGlossary,
+  getPublishedGlossaryTerm,
+  invalidateGlossaryVersionPermissions,
   updateGlossaryTermVotes,
+  updateGlossaryTermWorkingVersion,
   updateGlossaryVotes,
+  updateGlossaryWorkingVersion,
 } from '../../../rest/glossaryAPI';
 import {
   compareBusinessVersions,
@@ -82,14 +83,14 @@ import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import { getGlossaryPath } from '../../../utils/RouterUtils';
-import { showErrorToast } from '../../../utils/ToastUtils';
-import { useRequiredParams } from '../../../utils/useRequiredParams';
 import {
   getCdeDetailPath,
   getGovernedTermDetailPath,
   getScopedGovernedTermFqn,
   parseCdeRoute,
 } from '../../../utils/routing/cdeRoutingHelper';
+import { showErrorToast } from '../../../utils/ToastUtils';
+import { useRequiredParams } from '../../../utils/useRequiredParams';
 import GlossaryLeftPanel from '../GlossaryLeftPanel/GlossaryLeftPanel.component';
 
 const GlossaryPage = () => {
@@ -193,6 +194,9 @@ const GlossaryPage = () => {
       let allGlossaries: Glossary[] = [];
       let nextPage = paging.after;
       let isGlossaryFound = false;
+      const routeGlossaryFqn = glossaryFqn
+        ? Fqn.split(glossaryFqn)[0]
+        : undefined;
       setInitialised(false);
       setIsLoading(true);
 
@@ -213,9 +217,11 @@ const GlossaryPage = () => {
 
         allGlossaries = [...allGlossaries, ...data];
 
-        if (glossaryFqn) {
+        if (routeGlossaryFqn) {
           isGlossaryFound = allGlossaries.some(
-            (item) => item.fullyQualifiedName === glossaryFqn
+            (item) =>
+              item.fullyQualifiedName &&
+              Fqn.split(item.fullyQualifiedName)[0] === routeGlossaryFqn
           );
         } else {
           isGlossaryFound = true; // limit to first 50 records only if no glossaryFqn
@@ -480,17 +486,74 @@ const GlossaryPage = () => {
       return;
     }
     try {
-      // Search results already carry the stable term id. Prefer it because a
-      // working CDE may be visible in the search index before the generic FQN
-      // endpoint can resolve that working identity for the current user.
-      const current = termId
-        ? await getGlossaryTermsById(termId, { fields: termFields })
-        : await getGlossaryTermByFQN(glossaryFqn, {
-            fields: termFields,
-          });
-
       const reqParentVer = getBusinessVersion(parentBusinessVersion, '');
       const reqCdeVer = getBusinessVersion(businessVersion, '');
+
+      if (termId) {
+        const [currentResult, workingResult, publishedResult] =
+          await Promise.allSettled([
+            getGlossaryTermsById(termId),
+            getGlossaryTermWorkingVersion(termId, reqParentVer),
+            getPublishedGlossaryTerm(termId, reqCdeVer, reqParentVer),
+          ]);
+
+        if (currentResult.status === 'rejected') {
+          throw currentResult.reason;
+        }
+
+        let workingFallback: GlossaryTerm | undefined;
+        if (workingResult.status === 'fulfilled') {
+          const workingVersion = getBusinessVersion(
+            workingResult.value.businessVersion,
+            ''
+          );
+          if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
+            if (isWorkingDraft) {
+              setIsTermHistorical(false);
+              setActiveGlossary(workingResult.value as ModifiedGlossary);
+
+              return;
+            }
+            workingFallback = workingResult.value;
+          }
+        } else {
+          const status = (workingResult.reason as AxiosError)?.response?.status;
+          if (
+            status !== ClientErrors.FORBIDDEN &&
+            status !== ClientErrors.NOT_FOUND
+          ) {
+            throw workingResult.reason;
+          }
+        }
+
+        if (publishedResult.status === 'fulfilled') {
+          if (
+            compareBusinessVersions(
+              getBusinessVersion(publishedResult.value.businessVersion, ''),
+              reqCdeVer
+            ) !== 0
+          ) {
+            navigate(ROUTES.NOT_FOUND, { replace: true });
+
+            return;
+          }
+          setIsTermHistorical(
+            publishedResult.value.entityStatus === EntityStatus.Archived
+          );
+          setActiveGlossary(publishedResult.value as ModifiedGlossary);
+        } else if (workingFallback) {
+          setIsTermHistorical(false);
+          setActiveGlossary(workingFallback as ModifiedGlossary);
+        } else {
+          navigate(ROUTES.NOT_FOUND, { replace: true });
+        }
+
+        return;
+      }
+
+      const current = await getGlossaryTermByFQN(glossaryFqn, {
+        fields: termFields,
+      });
 
       let workingFallback: GlossaryTerm | undefined;
       try {
@@ -576,121 +639,159 @@ const GlossaryPage = () => {
     termId,
     glossaries,
     isWorkingDraft,
-    location.search,
     navigate,
   ]);
 
   useEffect(() => {
-    setIsRightPanelLoading(true);
-    if (glossaries.length) {
-      if (!isGlossaryActive) {
+    if (!isGlossaryActive && !isDataQualityGlossary(glossaryFqn)) {
+      setIsRightPanelLoading(true);
+      fetchGlossaryTermDetails();
+    }
+  }, [
+    businessVersion,
+    glossaryFqn,
+    parentBusinessVersion,
+    termId,
+    isWorkingDraft,
+    isGlossaryActive,
+  ]);
+
+  useEffect(() => {
+    if (!isGlossaryActive && isDataQualityGlossary(glossaryFqn)) {
+      setIsRightPanelLoading(true);
+      if (glossaries.length) {
         fetchGlossaryTermDetails();
       } else {
-        const foundGlossary = glossaries.find(
-          (glossary) => glossary.fullyQualifiedName === glossaryFqn
-        );
-        if (!foundGlossary && glossaryFqn) {
-          setIsRightPanelLoading(false);
-          navigate(ROUTES.FORBIDDEN, { replace: true });
+        setIsRightPanelLoading(false);
+      }
+    }
+  }, [
+    businessVersion,
+    glossaryFqn,
+    glossaryNavigationKey,
+    parentBusinessVersion,
+    termId,
+    isWorkingDraft,
+    isGlossaryActive,
+  ]);
 
-          return;
-        }
+  useEffect(() => {
+    if (!isGlossaryActive) {
+      return;
+    }
 
-        const current = foundGlossary || glossaries[0];
-        if (businessVersion && current) {
-          setIsRightPanelLoading(true);
-          getGlossaryVersionPermissions(current.id)
-            .then(async (capabilities) => {
-              if (capabilities.canViewWorking) {
-                try {
-                  const working = await getGlossaryWorkingVersion(current.id);
-                  if (
-                    compareBusinessVersions(
-                      getBusinessVersion(working.businessVersion, ''),
-                      getBusinessVersion(businessVersion, '')
-                    ) === 0
-                  ) {
-                    setIsGlossaryHistorical(false);
-                    setActiveGlossary(working);
+    let isStale = false;
+    const cancel = () => {
+      isStale = true;
+    };
+    setIsRightPanelLoading(true);
+    if (glossaries.length) {
+      const foundGlossary = glossaries.find(
+        (glossary) => glossary.fullyQualifiedName === glossaryFqn
+      );
+      if (!foundGlossary && glossaryFqn) {
+        setIsRightPanelLoading(false);
+        navigate(ROUTES.FORBIDDEN, { replace: true });
 
-                    return;
-                  }
-                } catch (error) {
-                  if (
-                    (error as AxiosError)?.response?.status !==
-                    ClientErrors.NOT_FOUND
-                  ) {
-                    throw error;
-                  }
-                }
-              }
+        return;
+      }
 
-              const snapshot = await getGlossaryVersion(
-                current.id,
-                businessVersion
-              );
-              // Authorization for the exact published business version is enforced by
-              // GET /glossaries/{id}/published/{businessVersion}. Consumers are allowed
-              // to read Archived snapshots, so mutation capabilities such as
-              // canViewWorking/canArchive must not be used as a second read gate here.
-              // A business-version deep link can still point at the current
-              // Approved head. Only an Archived Dictionary is historical and
-              // must suppress live workflow actions such as Create New Version.
-              setIsGlossaryHistorical(
-                snapshot.entityStatus === EntityStatus.Archived
-              );
-              setActiveGlossary(snapshot);
-            })
-            .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
-            .finally(() => setIsRightPanelLoading(false));
-
-          return;
-        }
-
-        setIsGlossaryHistorical(false);
+      const current = foundGlossary || glossaries[0];
+      if (businessVersion && current) {
         setIsRightPanelLoading(true);
         getGlossaryVersionPermissions(current.id)
           .then(async (capabilities) => {
-            if (!capabilities.canViewWorking) {
-              return current;
-            }
+            if (capabilities.canViewWorking) {
+              try {
+                const working = await getGlossaryWorkingVersion(current.id);
+                if (
+                  compareBusinessVersions(
+                    getBusinessVersion(working.businessVersion, ''),
+                    getBusinessVersion(businessVersion, '')
+                  ) === 0
+                ) {
+                  if (!isStale) {
+                    setIsGlossaryHistorical(false);
+                    setActiveGlossary(working);
+                  }
 
-            try {
-              return await getGlossaryWorkingVersion(current.id);
-            } catch (error) {
-              // Approving a Data Dictionary consumes its working record. The
-              // default route must then resolve the published head instead of
-              // treating the expected working 404 as a missing dictionary.
-              if (
-                (error as AxiosError)?.response?.status ===
-                ClientErrors.NOT_FOUND
-              ) {
-                return getLatestPublishedGlossary(current.id);
+                  return;
+                }
+              } catch (error) {
+                if (
+                  (error as AxiosError)?.response?.status !==
+                  ClientErrors.NOT_FOUND
+                ) {
+                  throw error;
+                }
               }
-
-              throw error;
             }
-          })
-          .then((resolved) => setActiveGlossary(resolved))
-          .catch(() => navigate(ROUTES.NOT_FOUND, { replace: true }))
-          .finally(() => setIsRightPanelLoading(false));
 
-        if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
-          navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
-            replace: true,
-          });
-        }
+            const snapshot = await getGlossaryVersion(
+              current.id,
+              businessVersion
+            );
+            // Authorization for the exact published business version is enforced by
+            // GET /glossaries/{id}/published/{businessVersion}. Consumers are allowed
+            // to read Archived snapshots, so mutation capabilities such as
+            // canViewWorking/canArchive must not be used as a second read gate here.
+            // A business-version deep link can still point at the current
+            // Approved head. Only an Archived Dictionary is historical and
+            // must suppress live workflow actions such as Create New Version.
+            if (isStale) {
+              return;
+            }
+            setIsGlossaryHistorical(
+              snapshot.entityStatus === EntityStatus.Archived
+            );
+            setActiveGlossary(snapshot);
+          })
+          .catch(
+            () => !isStale && navigate(ROUTES.NOT_FOUND, { replace: true })
+          )
+          .finally(() => !isStale && setIsRightPanelLoading(false));
+
+        return cancel;
+      }
+
+      setIsGlossaryHistorical(false);
+      setIsRightPanelLoading(true);
+      getGlossaryVersionPermissions(current.id)
+        .then(async (capabilities) => {
+          if (!capabilities.canViewWorking) {
+            return current;
+          }
+
+          try {
+            return await getGlossaryWorkingVersion(current.id);
+          } catch (error) {
+            // Approving a Data Dictionary consumes its working record. The
+            // default route must then resolve the published head instead of
+            // treating the expected working 404 as a missing dictionary.
+            if (
+              (error as AxiosError)?.response?.status === ClientErrors.NOT_FOUND
+            ) {
+              return getLatestPublishedGlossary(current.id);
+            }
+
+            throw error;
+          }
+        })
+        .then((resolved) => !isStale && setActiveGlossary(resolved))
+        .catch(() => !isStale && navigate(ROUTES.NOT_FOUND, { replace: true }))
+        .finally(() => !isStale && setIsRightPanelLoading(false));
+
+      if (isEmpty(glossaryFqn) && glossaries[0].fullyQualifiedName) {
+        navigate(getGlossaryPath(glossaries[0].fullyQualifiedName), {
+          replace: true,
+        });
       }
     } else {
       setIsRightPanelLoading(false);
     }
-  }, [
-    businessVersion,
-    isGlossaryActive,
-    glossaryFqn,
-    glossaryNavigationKey,
-    isWorkingDraft,
-  ]);
+
+    return cancel;
+  }, [businessVersion, isGlossaryActive, glossaryFqn, glossaryNavigationKey]);
 
   const updateGlossary = useCallback(
     async (updatedData: Glossary) => {
@@ -789,6 +890,7 @@ const GlossaryPage = () => {
           isRecursiveDelete: true,
           onDeleteFailure: fetchGlossaryList,
         });
+        invalidateGlossaryVersionPermissions(id);
 
         // check updated glossary list after deletion
         const updatedGlossaries = glossaries.filter((item) => item.id !== id);
@@ -937,7 +1039,7 @@ const GlossaryPage = () => {
     []
   );
 
-  if (isLoading) {
+  if (isLoading && isGlossaryActive) {
     return <Loader />;
   }
 
@@ -955,7 +1057,7 @@ const GlossaryPage = () => {
     );
   }
 
-  if (glossaries.length === 0 && !isLoading) {
+  if (isGlossaryActive && glossaries.length === 0 && !isLoading) {
     return (
       <div className="full-height">
         <ErrorPlaceHolder

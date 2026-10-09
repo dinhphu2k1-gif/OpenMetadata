@@ -139,11 +139,19 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @PathParam("id") UUID id) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
+    GovernedGlossaryProfileRegistry.require(glossary);
+    WorkingVersionRecord working;
+    try {
+      working = versioningService.getWorking(GlossaryVersioningService.GLOSSARY, id);
+    } catch (NotFoundException noWorkingVersion) {
+      GlossaryAuthorizationResolver.requireViewWorking(
+          capabilitiesForAuthorizationGlossary(securityContext, glossary));
+      throw noWorkingVersion;
+    }
     GlossaryAuthorizationResolver.Capabilities capabilities =
-        capabilities(securityContext, glossary);
+        withoutCreateVersion(capabilitiesForWorking(securityContext, working));
     GlossaryAuthorizationResolver.requireViewWorking(capabilities);
-    return GlossaryVersionResponses.working(
-        versioningService.getWorking(GlossaryVersioningService.GLOSSARY, id));
+    return GlossaryVersionResponses.working(working);
   }
 
   @GET
@@ -448,10 +456,21 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
       @PathParam("id") UUID id) {
     Glossary glossary =
         getInternal(uriInfo, securityContext, id, "owners,reviewers", Include.NON_DELETED, null);
-    Map<String, Boolean> permissions = capabilities(securityContext, glossary).asMap();
+    GlossaryAuthorizationResolver.Capabilities capabilities =
+        capabilities(securityContext, glossary);
+    return versionPermissions(capabilities);
+  }
+
+  static Map<String, Boolean> versionPermissions(
+      GlossaryAuthorizationResolver.Capabilities capabilities) {
+    Map<String, Boolean> permissions = capabilities.asMap();
     permissions.put("canImportCdeDrafts", permissions.get("canEditWorking"));
-    permissions.put("isConsumer", isConsumer(securityContext, glossary));
+    permissions.put("isConsumer", isConsumer(capabilities));
     return permissions;
+  }
+
+  private static boolean isConsumer(GlossaryAuthorizationResolver.Capabilities capabilities) {
+    return capabilities.canViewPublished() && !capabilities.canViewWorking();
   }
 
   private GlossaryAuthorizationResolver.Capabilities capabilities(
@@ -749,7 +768,7 @@ public class GlossaryResource extends EntityResource<Glossary, GlossaryRepositor
             false);
     GlossaryAuthorizationResolver.Capabilities effective =
         capabilities(securityContext, authorizationGlossary);
-    return effective.canViewPublished() && !effective.canViewWorking();
+    return isConsumer(effective);
   }
 
   private boolean isConsumer(SecurityContext securityContext, UUID id) {

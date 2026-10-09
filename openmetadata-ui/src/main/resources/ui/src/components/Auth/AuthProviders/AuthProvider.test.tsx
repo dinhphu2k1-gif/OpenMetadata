@@ -10,12 +10,23 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AxiosResponse } from 'axios';
 import { act } from 'react-test-renderer';
 import { AuthProvider as AuthProviderProps } from '../../../generated/configuration/authenticationConfiguration';
 import axiosClient from '../../../rest';
+import { getLoggedInUserPermissions } from '../../../rest/permissionAPI';
+import { getLoggedInUser } from '../../../rest/userAPI';
 import TokenService from '../../../utils/Auth/TokenService/TokenServiceUtil';
+import {
+  clearPrefetchedPermissions,
+  consumePrefetchedPermissions,
+  prefetchLoggedInUserPermissions,
+} from '../../../utils/PermissionPrefetch';
+import {
+  clearOidcToken,
+  getOidcToken,
+} from '../../../utils/SwTokenStorageUtils';
 import AuthProvider, { useAuthProvider } from './AuthProvider';
 
 const localStorageMock = {
@@ -36,7 +47,7 @@ jest.mock('../../../hooks/useCustomLocation/useCustomLocation', () => {
 });
 
 jest.mock('react-router-dom', () => ({
-  useNavigate: jest.fn(),
+  useNavigate: jest.fn().mockReturnValue(jest.fn()),
 }));
 
 jest.mock('../../../rest/miscAPI', () => ({
@@ -52,6 +63,26 @@ jest.mock('../../../rest/userAPI', () => ({
   getLoggedInUser: jest.fn().mockImplementation(() => Promise.resolve()),
   updateUser: jest.fn().mockImplementation(() => Promise.resolve()),
 }));
+
+jest.mock('../../../rest/permissionAPI', () => ({
+  getLoggedInUserPermissions: jest
+    .fn()
+    .mockResolvedValue({ data: [], paging: { total: 0 } }),
+}));
+
+jest.mock('../../../utils/SwTokenStorageUtils', () => ({
+  clearOidcToken: jest.fn().mockResolvedValue(undefined),
+  getOidcToken: jest.fn().mockResolvedValue(undefined),
+  getRefreshToken: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../AppRouter/AppRouter', () => ({
+  preloadAuthenticatedChunks: jest.fn(),
+}));
+
+const mockPreloadAuthenticatedChunks = jest.requireMock(
+  '../../AppRouter/AppRouter'
+).preloadAuthenticatedChunks as jest.Mock;
 
 jest.mock('../../../utils/ToastUtils', () => ({
   showErrorToast: jest.fn(),
@@ -115,6 +146,24 @@ jest.mock('../../../hooks/useApplicationStore', () => ({
 }));
 
 describe('Test auth provider', () => {
+  beforeEach(() => {
+    clearPrefetchedPermissions();
+    jest.clearAllMocks();
+    (
+      getOidcToken as jest.MockedFunction<typeof getOidcToken>
+    ).mockResolvedValue(undefined as unknown as string);
+    (
+      getLoggedInUserPermissions as jest.MockedFunction<
+        typeof getLoggedInUserPermissions
+      >
+    ).mockResolvedValue({ data: [], paging: { total: 0 } });
+    (
+      getLoggedInUser as jest.MockedFunction<typeof getLoggedInUser>
+    ).mockResolvedValue(
+      undefined as unknown as Awaited<ReturnType<typeof getLoggedInUser>>
+    );
+  });
+
   it('Logout handler should call the "updateUserDetails" method', async () => {
     const ConsumerComponent = () => {
       const { onLogoutHandler } = useAuthProvider();
@@ -187,6 +236,72 @@ describe('Test auth provider', () => {
     const loginButton = getByTestId('login-button');
 
     expect(loginButton).toBeInTheDocument();
+  });
+
+  it('starts user and permission requests in parallel when a token exists', async () => {
+    let resolveUser!: (
+      user: Awaited<ReturnType<typeof getLoggedInUser>>
+    ) => void;
+    const userPromise = new Promise<
+      Awaited<ReturnType<typeof getLoggedInUser>>
+    >((resolve) => {
+      resolveUser = resolve;
+    });
+    (
+      getOidcToken as jest.MockedFunction<typeof getOidcToken>
+    ).mockResolvedValue('token');
+    (
+      getLoggedInUser as jest.MockedFunction<typeof getLoggedInUser>
+    ).mockReturnValue(userPromise);
+
+    render(
+      <AuthProvider childComponentType={() => null}>
+        <div>Children</div>
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(getLoggedInUser).toHaveBeenCalled();
+      expect(getLoggedInUserPermissions).toHaveBeenCalled();
+    });
+
+    expect(mockPreloadAuthenticatedChunks).toHaveBeenCalled();
+
+    await act(async () => {
+      resolveUser({ id: 'user-id', name: 'test-user', email: 'test@test.com' });
+      await userPromise;
+    });
+  });
+
+  it('clears prefetched permissions on logout and reset', async () => {
+    const ConsumerComponent = () => {
+      const { handleSuccessfulLogout, onLogoutHandler } = useAuthProvider();
+
+      return (
+        <>
+          <button data-testid="logout" onClick={onLogoutHandler} />
+          <button data-testid="reset" onClick={handleSuccessfulLogout} />
+        </>
+      );
+    };
+
+    render(
+      <AuthProvider childComponentType={ConsumerComponent}>
+        <ConsumerComponent />
+      </AuthProvider>
+    );
+
+    prefetchLoggedInUserPermissions();
+    fireEvent.click(await screen.findByTestId('logout'));
+
+    expect(consumePrefetchedPermissions()).toBeUndefined();
+
+    await waitFor(() => expect(clearOidcToken).toHaveBeenCalled());
+
+    prefetchLoggedInUserPermissions();
+    fireEvent.click(screen.getByTestId('reset'));
+
+    expect(consumePrefetchedPermissions()).toBeUndefined();
   });
 });
 

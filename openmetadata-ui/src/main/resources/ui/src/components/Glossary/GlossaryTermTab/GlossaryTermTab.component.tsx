@@ -691,6 +691,16 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   const termsWorkflowKeyRef = useRef('');
   const termsRequestGenerationRef = useRef(0);
   const searchInputValueRef = useRef('');
+
+  // Terms live in the shared glossary store. The page unmounts this tab while
+  // switching glossaries, so an in-flight request from the previous glossary
+  // must be invalidated or it overwrites the newly-selected glossary's rows.
+  useEffect(
+    () => () => {
+      termsRequestGenerationRef.current += 1;
+    },
+    []
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [isExpandingAll, setIsExpandingAll] = useState(false);
   const [toggleExpandBtn, setToggleExpandBtn] = useState(false);

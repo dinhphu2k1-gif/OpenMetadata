@@ -13,7 +13,6 @@
 
 import Icon, { SearchOutlined } from '@ant-design/icons';
 import { Space, Tooltip, Typography } from 'antd';
-import { ExpandableConfig } from 'antd/lib/table/interface';
 import classNames from 'classnames';
 import { uniqBy } from 'lodash';
 import { Fragment, type CSSProperties } from 'react';
@@ -58,15 +57,12 @@ import { ReactComponent as IconUnknown } from '../assets/svg/data-type-icon/unkn
 import { ReactComponent as IconVarchar } from '../assets/svg/data-type-icon/varchar.svg';
 import { ReactComponent as IconVariant } from '../assets/svg/data-type-icon/variant.svg';
 import { ReactComponent as IconXML } from '../assets/svg/data-type-icon/xml.svg';
-import { ReactComponent as IconDrag } from '../assets/svg/drag.svg';
 import { ReactComponent as IconForeignKeyLineThrough } from '../assets/svg/foreign-key-line-through.svg';
 import { ReactComponent as IconForeignKey } from '../assets/svg/foreign-key.svg';
 import { ReactComponent as GlossaryIcon } from '../assets/svg/glossary.svg';
 import { ReactComponent as APICollectionIcon } from '../assets/svg/ic-api-collection-default.svg';
 import { ReactComponent as APIEndpointIcon } from '../assets/svg/ic-api-endpoint-default.svg';
 import { ReactComponent as APIServiceIcon } from '../assets/svg/ic-api-service-default.svg';
-import { ReactComponent as IconDown } from '../assets/svg/ic-arrow-down.svg';
-import { ReactComponent as IconRight } from '../assets/svg/ic-arrow-right.svg';
 import { ReactComponent as IconTestCase } from '../assets/svg/ic-checklist.svg';
 import { ReactComponent as ColumnIcon } from '../assets/svg/ic-column.svg';
 import { ReactComponent as DashboardIcon } from '../assets/svg/ic-dashboard.svg';
@@ -124,6 +120,8 @@ import ConstraintIcon from '../pages/TableDetailsPageV1/TableConstraints/Constra
 import { t } from './i18next/LocalUtil';
 import searchClassBase from './SearchClassBase';
 import serviceUtilClassBase from './ServiceUtilClassBase';
+
+export { getTableExpandableConfig } from './TableExpandableUtils';
 
 export const getConstraintIcon = ({
   constraint = '',
@@ -402,38 +400,6 @@ export const getServiceIcon = (source: {
     );
   }
 };
-
-export function getTableExpandableConfig<T>(
-  isDraggable?: boolean,
-  expandIconClass?: string
-): ExpandableConfig<T> {
-  const expandableConfig: ExpandableConfig<T> = {
-    expandIcon: ({ expanded, onExpand, expandable, record }) =>
-      expandable ? (
-        <>
-          {isDraggable && <IconDrag className="drag-icon" />}
-          <Icon
-            className={classNames(
-              'table-expand-icon vertical-baseline',
-              expandIconClass
-            )}
-            component={expanded ? IconDown : IconRight}
-            data-testid="expand-icon"
-            onClick={(e) => onExpand(record, e)}
-          />
-        </>
-      ) : (
-        isDraggable && (
-          <>
-            <IconDrag className="drag-icon" />
-            <span className="expand-cell-empty-icon-container" />
-          </>
-        )
-      ),
-  };
-
-  return expandableConfig;
-}
 
 export const prepareConstraintIcon = ({
   columnName,

@@ -17,6 +17,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as IconDown } from '../../assets/svg/ic-arrow-down.svg';
 import { ReactComponent as IconRight } from '../../assets/svg/ic-arrow-right.svg';
+import Loader from '../../components/common/Loader/Loader';
 import { NavigationBlocker } from '../../components/common/NavigationBlocker/NavigationBlocker';
 import { CustomizablePageHeader } from '../../components/MyData/CustomizableComponents/CustomizablePageHeader/CustomizablePageHeader';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
@@ -34,11 +35,15 @@ interface Props {
   onSave: (navigationList: NavigationItem[]) => Promise<void>;
 }
 
-export const SettingsNavigationPage = ({ onSave }: Props) => {
+const SettingsNavigationContent = ({
+  onSave,
+  plugins,
+}: Props & {
+  plugins: ReturnType<typeof useApplicationsProvider>['plugins'];
+}) => {
   const { t } = useTranslation();
   const { getNavigation } = useCustomizeStore();
   const currentNavigation = getNavigation();
-  const { plugins = [] } = useApplicationsProvider();
 
   const [hiddenKeys, setHiddenKeys] = useState<string[]>(
     getHiddenKeysFromNavigationItems(currentNavigation, plugins)
@@ -178,4 +183,14 @@ export const SettingsNavigationPage = ({ onSave }: Props) => {
       </PageLayoutV1>
     </NavigationBlocker>
   );
+};
+
+export const SettingsNavigationPage = ({ onSave }: Props) => {
+  const { isApplicationsLoading, plugins = [] } = useApplicationsProvider();
+
+  if (isApplicationsLoading) {
+    return <Loader />;
+  }
+
+  return <SettingsNavigationContent plugins={plugins} onSave={onSave} />;
 };

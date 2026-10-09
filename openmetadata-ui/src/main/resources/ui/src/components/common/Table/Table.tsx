@@ -40,7 +40,7 @@ import {
   getCustomizeColumnDetails,
   getReorderedColumns,
 } from '../../../utils/CustomizeColumnUtils';
-import { getTableExpandableConfig } from '../../../utils/TableUtils';
+import { getTableExpandableConfig } from '../../../utils/TableExpandableUtils';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import Loader from '../Loader/Loader';
 import NextPrevious from '../NextPrevious/NextPrevious';

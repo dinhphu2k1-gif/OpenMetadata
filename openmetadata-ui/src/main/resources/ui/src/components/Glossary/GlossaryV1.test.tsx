@@ -11,14 +11,30 @@
  *  limitations under the License.
  */
 
-import { findByText, queryByText, render } from '@testing-library/react';
+import {
+  findByText,
+  queryByText,
+  render,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import {
   mockedGlossaries,
   mockedGlossaryTerms,
 } from '../../mocks/Glossary.mock';
+import {
+  getGlossaryTermVersionPermissions,
+  getGlossaryVersionPermissions,
+} from '../../rest/glossaryAPI';
+import GlossaryDetails from './GlossaryDetails/GlossaryDetails.component';
 import GlossaryV1 from './GlossaryV1.component';
 import { GlossaryV1Props } from './GlossaryV1.interfaces';
+
+const mockGetGlossaryVersionPermissions =
+  getGlossaryVersionPermissions as jest.Mock;
+const mockGetGlossaryTermVersionPermissions =
+  getGlossaryTermVersionPermissions as jest.Mock;
+const mockGlossaryDetails = GlossaryDetails as jest.Mock;
 
 const params = {
   glossaryName: 'GlossaryName',
@@ -70,6 +86,18 @@ jest.mock('../../utils/PermissionsUtils', () => ({
     EditDisplayName: true,
     EditCustomFields: true,
   },
+}));
+
+jest.mock('../../rest/glossaryAPI', () => ({
+  ...jest.requireActual('../../rest/glossaryAPI'),
+  addGlossaryTerm: jest.fn(),
+  getFirstLevelGlossaryTermsPaginated: jest
+    .fn()
+    .mockResolvedValue({ data: [], paging: {} }),
+  getGlossaryTermVersionPermissions: jest.fn(),
+  getGlossaryTermWorkingVersion: jest.fn(),
+  getGlossaryVersionPermissions: jest.fn(),
+  updateGlossaryTermWorkingVersion: jest.fn(),
 }));
 
 jest.mock('react-router-dom', () => ({
@@ -146,6 +174,18 @@ const mockProps: GlossaryV1Props = {
 };
 
 describe('Test Glossary component', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetGlossaryVersionPermissions.mockResolvedValue({
+      canEditWorking: true,
+      canViewWorking: true,
+    });
+    mockGetGlossaryTermVersionPermissions.mockResolvedValue({
+      canEditWorking: true,
+      canViewWorking: true,
+    });
+  });
+
   it('Should render Glossary-details', async () => {
     const { container } = render(<GlossaryV1 {...mockProps} />, {
       wrapper: MemoryRouter,
@@ -189,5 +229,24 @@ describe('Test Glossary component', () => {
 
     expect(glossaryTerm).toBeInTheDocument();
     expect(glossaryDetails).not.toBeInTheDocument();
+  });
+
+  it('hides mutation controls when workflow permissions fail', async () => {
+    mockGetGlossaryVersionPermissions.mockRejectedValueOnce(
+      new Error('workflow permission failure')
+    );
+
+    render(<GlossaryV1 {...mockProps} />, { wrapper: MemoryRouter });
+
+    await waitFor(() => expect(mockGlossaryDetails).toHaveBeenCalled());
+    const permissions = mockGlossaryDetails.mock.calls.at(-1)?.[0].permissions;
+
+    expect(permissions).toEqual(
+      expect.objectContaining({
+        Delete: false,
+        EditAll: false,
+        EditOwners: false,
+      })
+    );
   });
 });

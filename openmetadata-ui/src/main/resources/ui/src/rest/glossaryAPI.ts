@@ -22,10 +22,10 @@ import { DATA_QUALITY_GLOSSARY_NAME } from '../constants/Glossary.contant';
 import { TabSpecificField } from '../enums/entity.enum';
 import { SearchIndex } from '../enums/search.enum';
 import { AddGlossaryToAssetsRequest } from '../generated/api/addGlossaryToAssetsRequest';
-import { CreateGlossary } from '../generated/api/data/createGlossary';
-import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
 import { CDEDraftUpdateRequest as CdeDraftUpdateRequest } from '../generated/api/data/cdeDraftUpdateRequest';
 import { CDEWorkflowTransitionRequest as CdeWorkflowTransitionRequest } from '../generated/api/data/cdeWorkflowTransitionRequest';
+import { CreateGlossary } from '../generated/api/data/createGlossary';
+import { CreateGlossaryTerm } from '../generated/api/data/createGlossaryTerm';
 import { GlossaryWorkflowTransitionRequest } from '../generated/api/data/glossaryWorkflowTransitionRequest';
 import { MoveGlossaryTermRequest } from '../generated/api/tests/moveGlossaryTermRequest';
 import { GlossaryTermRelationType } from '../generated/configuration/glossaryTermRelationSettings';
@@ -36,11 +36,11 @@ import { ChangeEvent } from '../generated/type/changeEvent';
 import { EntityHistory } from '../generated/type/entityHistory';
 import { Include } from '../generated/type/include';
 import { ListParams, ListParamsWithOffset } from '../interface/API.interface';
-import { getEncodedFqn } from '../utils/StringUtils';
 import {
   normalizeCdeParentBusinessVersion,
   parseCdeRoute,
 } from '../utils/routing/cdeRoutingHelper';
+import { getEncodedFqn } from '../utils/StringUtils';
 import APIClient from './index';
 
 export type ListGlossaryTermsParams = ListParamsWithOffset & {
@@ -75,6 +75,102 @@ export interface DataDictionaryExcelExport {
 }
 
 const BASE_URL = '/glossaries';
+const PERMISSION_CACHE_MAX_SIZE = 100;
+const PERMISSION_CACHE_TTL_MS = 30_000;
+
+interface PermissionCacheEntry {
+  expiresAt: number;
+  id: string;
+  promise: Promise<GlossaryVersionPermissions>;
+}
+
+const glossaryPermissionCache: PermissionCacheEntry[] = [];
+const glossaryTermPermissionCache: PermissionCacheEntry[] = [];
+const glossaryWorkingRequests: Array<{
+  id: string;
+  promise: Promise<Glossary>;
+}> = [];
+const glossaryTermWorkingRequests: Array<{
+  id: string;
+  promise: Promise<GlossaryTerm>;
+}> = [];
+
+const removeCachedRequest = <
+  T extends { id: string; promise: Promise<unknown> }
+>(
+  cache: T[],
+  id: string,
+  promise?: Promise<unknown>
+) => {
+  const index = cache.findIndex(
+    (entry) => entry.id === id && (!promise || entry.promise === promise)
+  );
+  if (index >= 0) {
+    cache.splice(index, 1);
+  }
+};
+
+const addBoundedEntry = <T>(cache: T[], entry: T) => {
+  if (cache.length >= PERMISSION_CACHE_MAX_SIZE) {
+    cache.shift();
+  }
+  cache.push(entry);
+};
+
+const getCachedPermissions = (
+  cache: PermissionCacheEntry[],
+  id: string,
+  fetchPermissions: () => Promise<GlossaryVersionPermissions>
+) => {
+  const now = Date.now();
+  const cached = cache.find((entry) => entry.id === id);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+  if (cached) {
+    removeCachedRequest(cache, id, cached.promise);
+  }
+
+  const promise = fetchPermissions()
+    .then((permissions) => {
+      const activeEntry = cache.find(
+        (entry) => entry.id === id && entry.promise === promise
+      );
+      if (activeEntry) {
+        activeEntry.expiresAt = Date.now() + PERMISSION_CACHE_TTL_MS;
+      }
+
+      return permissions;
+    })
+    .catch((error: unknown) => {
+      removeCachedRequest(cache, id, promise);
+
+      throw error;
+    });
+  addBoundedEntry(cache, {
+    expiresAt: Number.POSITIVE_INFINITY,
+    id,
+    promise,
+  });
+
+  return promise;
+};
+
+export const invalidateGlossaryVersionPermissions = (id?: string) => {
+  if (id) {
+    removeCachedRequest(glossaryPermissionCache, id);
+  } else {
+    glossaryPermissionCache.splice(0);
+  }
+};
+
+export const invalidateGlossaryTermVersionPermissions = (id?: string) => {
+  if (id) {
+    removeCachedRequest(glossaryTermPermissionCache, id);
+  } else {
+    glossaryTermPermissionCache.splice(0);
+  }
+};
 
 const parentScopeFromRoute = () => {
   const scope = parseCdeRoute({
@@ -208,10 +304,20 @@ export const getLatestPublishedGlossary = async (id: string) => {
   return response.data;
 };
 
-export const getGlossaryWorkingVersion = async (id: string) => {
-  const response = await APIClient.get<Glossary>(`/glossaries/${id}/working`);
+export const getGlossaryWorkingVersion = (id: string) => {
+  const activeRequest = glossaryWorkingRequests.find(
+    (request) => request.id === id
+  );
+  if (activeRequest) {
+    return activeRequest.promise;
+  }
 
-  return response.data;
+  const promise = APIClient.get<Glossary>(`/glossaries/${id}/working`)
+    .then((response) => response.data)
+    .finally(() => removeCachedRequest(glossaryWorkingRequests, id, promise));
+  addBoundedEntry(glossaryWorkingRequests, { id, promise });
+
+  return promise;
 };
 
 export const updateGlossaryWorkingVersion = async (
@@ -236,6 +342,8 @@ export const updateGlossaryWorkingVersion = async (
       headers: { 'Content-Type': 'application/json' },
     }
   );
+
+  invalidateGlossaryVersionPermissions(id);
 
   return response.data;
 };
@@ -279,13 +387,14 @@ export const getGlossaryPublishPreview = async (
   return response.data;
 };
 
-export const getGlossaryVersionPermissions = async (id: string) => {
-  const response = await APIClient.get<GlossaryVersionPermissions>(
-    `/glossaries/${id}/permissions`
-  );
+export const getGlossaryVersionPermissions = (id: string) =>
+  getCachedPermissions(glossaryPermissionCache, id, async () => {
+    const response = await APIClient.get<GlossaryVersionPermissions>(
+      `/glossaries/${id}/permissions`
+    );
 
-  return response.data;
-};
+    return response.data;
+  });
 
 export const transitionGlossaryWorkflow = async (
   id: string,
@@ -305,6 +414,8 @@ export const transitionGlossaryWorkflow = async (
     GlossaryWorkflowRequest,
     AxiosResponse<Glossary>
   >(`/glossaries/${id}/${path}`, request);
+
+  invalidateGlossaryVersionPermissions(id);
 
   return response.data;
 };
@@ -373,6 +484,8 @@ export const commitCdeImport = async (importSessionId: string) => {
     `/glossaryTerms/import/${importSessionId}/commit`
   );
 
+  invalidateGlossaryTermVersionPermissions();
+
   return response.data;
 };
 
@@ -436,22 +549,31 @@ export const getPublishedGlossaryTerm = async (
   return response.data;
 };
 
-export const getGlossaryTermWorkingVersion = async (
+export const getGlossaryTermWorkingVersion = (
   id: string,
   parentBusinessVersion?: string
 ) => {
-  const response = await APIClient.get<GlossaryTerm>(
-    `/glossaryTerms/${id}/working`,
-    {
-      params: {
-        parentBusinessVersion:
-          normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
-          parentScopeFromRoute(),
-      },
-    }
+  const normalizedParentBusinessVersion =
+    normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
+    parentScopeFromRoute();
+  const requestId = `${id}:${normalizedParentBusinessVersion}`;
+  const activeRequest = glossaryTermWorkingRequests.find(
+    (request) => request.id === requestId
   );
+  if (activeRequest) {
+    return activeRequest.promise;
+  }
 
-  return response.data;
+  const promise = APIClient.get<GlossaryTerm>(`/glossaryTerms/${id}/working`, {
+    params: { parentBusinessVersion: normalizedParentBusinessVersion },
+  })
+    .then((response) => response.data)
+    .finally(() =>
+      removeCachedRequest(glossaryTermWorkingRequests, requestId, promise)
+    );
+  addBoundedEntry(glossaryTermWorkingRequests, { id: requestId, promise });
+
+  return promise;
 };
 
 export const createGlossaryTermWorkingVersion = async (
@@ -468,6 +590,8 @@ export const createGlossaryTermWorkingVersion = async (
       normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
       parentBusinessVersion,
   });
+
+  invalidateGlossaryTermVersionPermissions(id);
 
   return response.data;
 };
@@ -488,6 +612,8 @@ export const discardGlossaryTermWorkingVersion = async (
         parentBusinessVersion,
     },
   });
+
+  invalidateGlossaryTermVersionPermissions(id);
 
   return response.data;
 };
@@ -511,6 +637,8 @@ export const createGlossaryTermCorrection = async (
     }
   );
 
+  invalidateGlossaryTermVersionPermissions(id);
+
   return response.data;
 };
 
@@ -529,6 +657,8 @@ export const requestGlossaryTermDeletion = async (
       },
     }
   );
+
+  invalidateGlossaryTermVersionPermissions(id);
 
   return response.data;
 };
@@ -594,6 +724,8 @@ export const bulkGlossaryTermWorkflow = async (
       normalizeCdeParentBusinessVersion(request.parentBusinessVersion) ??
       request.parentBusinessVersion,
   });
+
+  request.termIds.forEach((id) => invalidateGlossaryTermVersionPermissions(id));
 
   return response.data;
 };
@@ -674,16 +806,19 @@ export const updateGlossaryTermWorkingVersion = async (
     headers: { 'Content-Type': 'application/json' },
   });
 
-  return response.data;
-};
-
-export const getGlossaryTermVersionPermissions = async (id: string) => {
-  const response = await APIClient.get<GlossaryVersionPermissions>(
-    `/glossaryTerms/${id}/permissions`
-  );
+  invalidateGlossaryTermVersionPermissions(id);
 
   return response.data;
 };
+
+export const getGlossaryTermVersionPermissions = (id: string) =>
+  getCachedPermissions(glossaryTermPermissionCache, id, async () => {
+    const response = await APIClient.get<GlossaryVersionPermissions>(
+      `/glossaryTerms/${id}/permissions`
+    );
+
+    return response.data;
+  });
 
 export async function transitionGlossaryTermWorkflow(
   id: string,
@@ -728,6 +863,8 @@ export async function transitionGlossaryTermWorkflow(
             parentBusinessVersion: resolvedParentBusinessVersion,
           },
   });
+
+  invalidateGlossaryTermVersionPermissions(id);
 
   return response.data;
 }

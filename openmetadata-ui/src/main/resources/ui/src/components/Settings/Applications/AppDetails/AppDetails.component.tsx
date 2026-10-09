@@ -98,7 +98,7 @@ const AppDetails = () => {
     isSaveLoading: false,
   });
   const { getResourceLimit } = useLimitStore();
-  const { plugins } = useApplicationsProvider();
+  const { isApplicationsLoading, plugins } = useApplicationsProvider();
   const isRuntimeDisabled = appData?.enabled === false && !appData.deleted;
   const runtimeDisabledReason =
     isRuntimeDisabled && isCacheWarmupApplication(appData?.name)
@@ -499,7 +499,7 @@ const AppDetails = () => {
     fetchAppDetails();
   }, [fqn]);
 
-  if (loadingState.isFetchLoading) {
+  if (loadingState.isFetchLoading || isApplicationsLoading) {
     return <Loader />;
   }
 

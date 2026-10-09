@@ -18,23 +18,35 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { AxiosError } from 'axios';
 import ResizableLeftPanels from '../../../components/common/ResizablePanels/ResizableLeftPanels';
 import * as useGlossaryStoreModule from '../../../components/Glossary/useGlossary.store';
+import { ROUTES } from '../../../constants/constants';
+import { Glossary } from '../../../generated/entity/data/glossary';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { MOCK_GLOSSARY } from '../../../mocks/Glossary.mock';
 import {
   getGlossariesList,
   getGlossaryTermByFQN,
+  getGlossaryTermsById,
+  getGlossaryTermWorkingVersion,
   getGlossaryWorkingVersion,
+  getPublishedGlossaryTerm,
   updateGlossaryTermWorkingVersion,
   updateGlossaryWorkingVersion,
 } from '../../../rest/glossaryAPI';
 import GlossaryPage from './GlossaryPage.component';
 
 const mockNavigate = jest.fn();
-const mockLocationPathname = '/mock-path';
+let mockFqn = 'Business Glossary';
+let mockLocationPathname = '/mock-path';
+let mockLocationSearch = '';
 
 jest.mock('../../../hooks/useFqn', () => ({
-  useFqn: jest.fn().mockReturnValue({ fqn: 'Business Glossary' }),
+  useFqn: jest.fn().mockImplementation(() => ({ fqn: mockFqn })),
 }));
 
 jest.mock('react-router-dom', () => ({
@@ -43,6 +55,7 @@ jest.mock('react-router-dom', () => ({
   }),
   useLocation: jest.fn().mockImplementation(() => ({
     pathname: mockLocationPathname,
+    search: mockLocationSearch,
   })),
   useNavigate: jest.fn().mockImplementation(() => mockNavigate),
 }));
@@ -97,12 +110,14 @@ jest.mock('../../../context/AsyncDeleteProvider/AsyncDeleteProvider', () => ({
 const mockSetGlossaries = jest.fn();
 const mockSetActiveGlossary = jest.fn();
 const mockUpdateActiveGlossary = jest.fn();
+let mockGlossaries = [MOCK_GLOSSARY];
+let mockActiveGlossary: typeof MOCK_GLOSSARY | GlossaryTerm = MOCK_GLOSSARY;
 
 jest.mock('../../../components/Glossary/useGlossary.store', () => ({
   useGlossaryStore: jest.fn(() => ({
-    glossaries: [MOCK_GLOSSARY],
+    glossaries: mockGlossaries,
     setGlossaries: mockSetGlossaries,
-    activeGlossary: MOCK_GLOSSARY,
+    activeGlossary: mockActiveGlossary,
     setActiveGlossary: mockSetActiveGlossary,
     updateActiveGlossary: mockUpdateActiveGlossary,
   })),
@@ -112,6 +127,7 @@ jest.mock('../../../components/Glossary/GlossaryV1.component', () => {
   return jest.fn().mockImplementation((props) => (
     <div>
       <p> Glossary.component</p>
+      <p data-testid="historical-state">{String(props.isVersionsView)}</p>
       <button
         data-testid="handleGlossaryTermUpdate"
         onClick={() => props.onGlossaryTermUpdate(MOCK_GLOSSARY)}>
@@ -161,12 +177,18 @@ jest.mock('../GlossaryLeftPanel/GlossaryLeftPanel.component', () => {
     ));
 });
 
+jest.mock(
+  '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder',
+  () => jest.fn().mockReturnValue(<div data-testid="error-placeholder" />)
+);
+
 jest.mock('../../../rest/glossaryAPI', () => ({
   deleteGlossary: jest.fn().mockImplementation(() => Promise.resolve()),
   deleteGlossaryTerm: jest.fn().mockImplementation(() => Promise.resolve()),
   getGlossaryTermByFQN: jest
     .fn()
-    .mockImplementation(() => Promise.resolve({ data: MOCK_GLOSSARY })),
+    .mockImplementation(() => Promise.resolve(MOCK_GLOSSARY)),
+  getGlossaryTermsById: jest.fn().mockResolvedValue(MOCK_GLOSSARY),
   getGlossariesList: jest.fn().mockImplementation(() =>
     Promise.resolve({
       data: [MOCK_GLOSSARY],
@@ -184,9 +206,11 @@ jest.mock('../../../rest/glossaryAPI', () => ({
   getGlossaryWorkingVersion: jest
     .fn()
     .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  invalidateGlossaryVersionPermissions: jest.fn(),
   getGlossaryTermWorkingVersion: jest
     .fn()
     .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 1 }),
+  getPublishedGlossaryTerm: jest.fn().mockResolvedValue(MOCK_GLOSSARY),
   updateGlossaryWorkingVersion: jest
     .fn()
     .mockResolvedValue({ ...MOCK_GLOSSARY, workingRevision: 2 }),
@@ -217,6 +241,37 @@ jest.mock('../../../components/common/ResizablePanels/ResizablePanels', () =>
 
 const mockProps = {
   pageTitle: 'glossary',
+};
+
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, reject, resolve };
+};
+
+const createApiError = (status: number) =>
+  ({ response: { status } } as AxiosError);
+
+const createCde = (overrides: Partial<GlossaryTerm> = {}): GlossaryTerm =>
+  ({
+    ...MOCK_GLOSSARY,
+    id: 'term-id',
+    businessVersion: '1.0',
+    parentBusinessVersion: '1',
+    fullyQualifiedName: 'Data Dictionary.CDE1@v1',
+    ...overrides,
+  } as GlossaryTerm);
+
+const setCdeRoute = (search = '') => {
+  mockFqn = 'Data Dictionary.CDE1@v1';
+  mockLocationPathname = '/glossary/Data%20Dictionary.CDE1%40v1';
+  mockLocationSearch =
+    search || '?businessVersion=1.0&parentBusinessVersion=1&termId=term-id';
 };
 
 describe('Test GlossaryComponent page', () => {
@@ -293,9 +348,7 @@ describe('Test GlossaryComponent page', () => {
     (
       useGlossaryStoreModule.useGlossaryStore as unknown as jest.Mock
     ).mockImplementation(() => ({
-      glossaries: [
-        { ...routeGlossary, description: 'Updated description' },
-      ],
+      glossaries: [{ ...routeGlossary, description: 'Updated description' }],
       setGlossaries: mockSetGlossaries,
       activeGlossary: {
         ...routeGlossary,
@@ -510,5 +563,261 @@ describe('Test GlossaryComponent page', () => {
       }),
       expect.anything()
     );
+  });
+
+  describe('CDE route loading', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      setCdeRoute();
+      mockGlossaries = [];
+      mockActiveGlossary = createCde();
+      (
+        useGlossaryStoreModule.useGlossaryStore as unknown as jest.Mock
+      ).mockImplementation(() => ({
+        glossaries: mockGlossaries,
+        setGlossaries: mockSetGlossaries,
+        activeGlossary: mockActiveGlossary,
+        setActiveGlossary: mockSetActiveGlossary,
+        updateActiveGlossary: mockUpdateActiveGlossary,
+      }));
+      (getGlossariesList as jest.Mock).mockResolvedValue({
+        data: [],
+        paging: { total: 0 },
+      });
+      (getGlossaryTermsById as jest.Mock).mockResolvedValue(createCde());
+      (getGlossaryTermByFQN as jest.Mock).mockResolvedValue(createCde());
+      (getGlossaryTermWorkingVersion as jest.Mock).mockResolvedValue(
+        createCde()
+      );
+      (getPublishedGlossaryTerm as jest.Mock).mockResolvedValue(createCde());
+    });
+
+    it('starts id, working, and published requests before any resolves', async () => {
+      const currentRequest = createDeferred<GlossaryTerm>();
+      const workingRequest = createDeferred<GlossaryTerm>();
+      const publishedRequest = createDeferred<GlossaryTerm>();
+      (getGlossaryTermsById as jest.Mock).mockReturnValue(
+        currentRequest.promise
+      );
+      (getGlossaryTermWorkingVersion as jest.Mock).mockReturnValue(
+        workingRequest.promise
+      );
+      (getPublishedGlossaryTerm as jest.Mock).mockReturnValue(
+        publishedRequest.promise
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() => {
+        expect(getGlossaryTermsById).toHaveBeenCalledWith('term-id');
+        expect(getGlossaryTermWorkingVersion).toHaveBeenCalledWith(
+          'term-id',
+          '1'
+        );
+        expect(getPublishedGlossaryTerm).toHaveBeenCalledWith(
+          'term-id',
+          '1.0',
+          '1'
+        );
+      });
+
+      expect(mockSetActiveGlossary).not.toHaveBeenCalled();
+
+      await act(async () => {
+        currentRequest.resolve(createCde());
+        workingRequest.reject(createApiError(404));
+        publishedRequest.resolve(
+          createCde({ entityStatus: EntityStatus.Archived })
+        );
+        await Promise.allSettled([
+          currentRequest.promise,
+          workingRequest.promise,
+          publishedRequest.promise,
+        ]);
+      });
+
+      await waitFor(() =>
+        expect(mockSetActiveGlossary).toHaveBeenCalledWith(
+          expect.objectContaining({ entityStatus: EntityStatus.Archived })
+        )
+      );
+
+      expect(screen.getByTestId('historical-state')).toHaveTextContent('true');
+    });
+
+    it('uses a matching working version for a working-draft route', async () => {
+      setCdeRoute(
+        '?businessVersion=1.0&parentBusinessVersion=1&termId=term-id&view=working'
+      );
+      const working = createCde({
+        description: 'working',
+        entityStatus: EntityStatus.Draft,
+      });
+      (getGlossaryTermWorkingVersion as jest.Mock).mockResolvedValue(working);
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() =>
+        expect(mockSetActiveGlossary).toHaveBeenCalledWith(working)
+      );
+
+      expect(screen.getByTestId('historical-state')).toHaveTextContent('false');
+    });
+
+    it('uses a matching working version when published lookup fails', async () => {
+      const working = createCde({ description: 'working fallback' });
+      (getGlossaryTermWorkingVersion as jest.Mock).mockResolvedValue(working);
+      (getPublishedGlossaryTerm as jest.Mock).mockRejectedValue(
+        createApiError(404)
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() =>
+        expect(mockSetActiveGlossary).toHaveBeenCalledWith(working)
+      );
+    });
+
+    it('navigates to not found when the published version does not match', async () => {
+      (getGlossaryTermWorkingVersion as jest.Mock).mockRejectedValue(
+        createApiError(404)
+      );
+      (getPublishedGlossaryTerm as jest.Mock).mockResolvedValue(
+        createCde({ businessVersion: '2.0' })
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith(ROUTES.NOT_FOUND, {
+          replace: true,
+        })
+      );
+    });
+
+    it.each([
+      [403, ROUTES.FORBIDDEN],
+      [404, ROUTES.NOT_FOUND],
+    ])('maps an id request %s to the expected route', async (status, route) => {
+      (getGlossaryTermsById as jest.Mock).mockRejectedValue(
+        createApiError(status)
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith(route, { replace: true })
+      );
+    });
+
+    it('navigates to not found when the working request fails unexpectedly', async () => {
+      (getGlossaryTermWorkingVersion as jest.Mock).mockRejectedValue(
+        createApiError(500)
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalledWith(ROUTES.NOT_FOUND, {
+          replace: true,
+        })
+      );
+    });
+
+    it('keeps FQN resolution sequential when termId is absent', async () => {
+      setCdeRoute('?businessVersion=1.0&parentBusinessVersion=1');
+      const currentRequest = createDeferred<GlossaryTerm>();
+      const workingRequest = createDeferred<GlossaryTerm>();
+      (getGlossaryTermByFQN as jest.Mock).mockReturnValue(
+        currentRequest.promise
+      );
+      (getGlossaryTermWorkingVersion as jest.Mock).mockReturnValue(
+        workingRequest.promise
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() => expect(getGlossaryTermByFQN).toHaveBeenCalled());
+
+      expect(getGlossaryTermWorkingVersion).not.toHaveBeenCalled();
+      expect(getPublishedGlossaryTerm).not.toHaveBeenCalled();
+
+      await act(async () => {
+        currentRequest.resolve(createCde());
+        await currentRequest.promise;
+      });
+      await waitFor(() =>
+        expect(getGlossaryTermWorkingVersion).toHaveBeenCalled()
+      );
+
+      expect(getPublishedGlossaryTerm).not.toHaveBeenCalled();
+
+      await act(async () => {
+        workingRequest.resolve(createCde());
+        await workingRequest.promise;
+      });
+      await waitFor(() => expect(getPublishedGlossaryTerm).toHaveBeenCalled());
+    });
+
+    it('loads term details before the glossary list and does not refetch', async () => {
+      const glossaryListRequest = createDeferred<{
+        data: Glossary[];
+        paging: { total: number };
+      }>();
+      (getGlossariesList as jest.Mock).mockReturnValue(
+        glossaryListRequest.promise
+      );
+      (getGlossaryTermWorkingVersion as jest.Mock).mockRejectedValue(
+        createApiError(404)
+      );
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() => expect(getGlossaryTermsById).toHaveBeenCalled());
+
+      expect(screen.queryByTestId('error-placeholder')).not.toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(mockSetActiveGlossary).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'term-id' })
+        )
+      );
+
+      expect(
+        await screen.findByText(/Glossary.component/i)
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        glossaryListRequest.resolve({ data: [], paging: { total: 0 } });
+        await glossaryListRequest.promise;
+      });
+
+      expect(getGlossaryTermsById).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('error-placeholder')).not.toBeInTheDocument();
+    });
+
+    it('stops listing after the page containing the route glossary', async () => {
+      (getGlossariesList as jest.Mock)
+        .mockResolvedValueOnce({
+          data: [
+            {
+              ...MOCK_GLOSSARY,
+              fullyQualifiedName: 'Data Dictionary',
+              name: 'Data Dictionary',
+            },
+          ],
+          paging: { after: 'next-page', total: 2 },
+        })
+        .mockResolvedValueOnce({
+          data: [{ ...MOCK_GLOSSARY, fullyQualifiedName: 'Other Glossary' }],
+          paging: { total: 2 },
+        });
+
+      render(<GlossaryPage {...mockProps} />);
+
+      await waitFor(() => expect(mockSetGlossaries).toHaveBeenCalled());
+
+      expect(getGlossariesList).toHaveBeenCalledTimes(1);
+    });
   });
 });

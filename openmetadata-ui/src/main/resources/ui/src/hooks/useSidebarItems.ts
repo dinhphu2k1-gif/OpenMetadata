@@ -21,17 +21,29 @@ import { useApplicationStore } from './useApplicationStore';
 import { useCustomPages } from './useCustomPages';
 
 export const useSidebarItems = () => {
-  const { navigation } = useCustomPages('Navigation');
+  const { navigation, isNavigationResolved } = useCustomPages('Navigation');
   const { plugins = [] } = useApplicationsProvider();
-  const { selectedPersona } = useApplicationStore();
+  const { currentUser, selectedPersona } = useApplicationStore();
 
   const sideBarItems = useMemo(() => {
+    // Empty navigation means "show every tab", so it must not be rendered
+    // before the logged-in user's persona navigation is known.
+    if (!currentUser?.id || !isNavigationResolved) {
+      return [];
+    }
+
     const items = filterHiddenNavigationItems(navigation, plugins);
 
     return isBasicConsumerPersona(selectedPersona)
       ? hideBasicConsumerMarketplaceOverview(items)
       : items;
-  }, [navigation, plugins, selectedPersona]);
+  }, [
+    currentUser?.id,
+    isNavigationResolved,
+    navigation,
+    plugins,
+    selectedPersona,
+  ]);
 
   return sideBarItems;
 };
