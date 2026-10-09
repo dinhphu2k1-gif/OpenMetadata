@@ -19,14 +19,16 @@ import {
 } from '@testing-library/react';
 import { EntityType } from '../../../enums/entity.enum';
 import { Glossary } from '../../../generated/entity/data/glossary';
-import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import {
   mockedGlossaryTerms,
   MOCK_GLOSSARY,
 } from '../../../mocks/Glossary.mock';
 import { mockUserData } from '../../../mocks/MyDataPage.mock';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
-import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
 import {
   createGlossaryTermCorrection,
   getGlossaryTermsVersionsList,
@@ -35,12 +37,59 @@ import {
   getGlossaryWorkingVersion,
   transitionGlossaryTermWorkflow,
 } from '../../../rest/glossaryAPI';
-import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
+import { DEFAULT_ENTITY_PERMISSION } from '../../../utils/PermissionsUtils';
+import type { WorkflowActionBarProps } from '../../common/WorkflowActionBar/WorkflowActionBar.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
+import { QueryVoteType } from '../../Database/TableQueries/TableQueries.interface';
 import GlossaryHeader, {
   getCreatedDraftSearch,
   suggestNextVersion,
 } from './GlossaryHeader.component';
+
+jest.mock(
+  '../../../components/common/WorkflowActionBar/WorkflowActionBar.component',
+  () =>
+    jest
+      .fn()
+      .mockImplementation(
+        ({
+          onHistory,
+          historyTestId,
+          secondary = [],
+          primary,
+          menu = [],
+          menuTestId = 'manage-button',
+        }: WorkflowActionBarProps) => (
+          <div data-testid="workflow-action-bar">
+            {onHistory && (
+              <button data-testid={historyTestId} onClick={onHistory} />
+            )}
+            {secondary.map((action) => (
+              <button
+                data-testid={action.testId}
+                key={action.key}
+                onClick={action.onClick}>
+                {action.label}
+              </button>
+            ))}
+            {primary && (
+              <button data-testid={primary.testId} onClick={primary.onClick}>
+                {primary.label}
+              </button>
+            )}
+            {menu.length > 0 && <button data-testid={menuTestId} />}
+            {menu.map((item) => (
+              <button
+                data-testid={item.testId}
+                key={item.key}
+                onClick={item.onClick}>
+                {item.name}
+              </button>
+            ))}
+          </div>
+        )
+      )
+);
 
 const mockGlossaryTermPermission = {
   All: true,
@@ -251,7 +300,8 @@ jest.mock('../../../rest/glossaryAPI', () => ({
         ...mockedGlossaryTerms[0],
         entityStatus: statuses[action as keyof typeof statuses],
         businessVersion:
-          request.businessVersion ?? mockedGlossaryTerms[0].businessVersion,
+          request.businessVersion ??
+          (mockedGlossaryTerms[0] as GlossaryTerm).businessVersion,
       });
     }),
   transitionGlossaryWorkflow: jest.fn(),
@@ -316,8 +366,12 @@ describe('GlossaryHeader component', () => {
     fireEvent.click(screen.getByTestId('version-button'));
 
     await waitFor(() => {
-      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
-      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 2.*label\.approved/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 1.*label\.archived/i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -363,8 +417,12 @@ describe('GlossaryHeader component', () => {
     fireEvent.click(await screen.findByTestId('version-button'));
 
     await waitFor(() => {
-      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
-      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 2.*label\.approved/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 1.*label\.archived/i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -409,8 +467,12 @@ describe('GlossaryHeader component', () => {
       expect(
         screen.getByText(/label\.version: 3.*label\.in-review/i)
       ).toBeInTheDocument();
-      expect(screen.getByText(/label\.version: 2.*label\.approved/i)).toBeInTheDocument();
-      expect(screen.getByText(/label\.version: 1.*label\.archived/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 2.*label\.approved/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/label\.version: 1.*label\.archived/i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -706,9 +768,9 @@ describe('GlossaryHeader component', () => {
       );
 
       await waitFor(() =>
-        expect(
-          Boolean(screen.queryByTestId('correction-history-button'))
-        ).toBe(isVisible)
+        expect(Boolean(screen.queryByTestId('correction-history-button'))).toBe(
+          isVisible
+        )
       );
     }
   );
@@ -772,10 +834,10 @@ describe('GlossaryHeader component', () => {
       />
     );
 
-    expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
+    const submitButton = await screen.findByText('label.submit-for-review');
 
     await act(async () => {
-      fireEvent.click(screen.getByText('label.submit-for-review'));
+      fireEvent.click(submitButton);
     });
 
     // ConfirmationModal should be visible
@@ -823,11 +885,12 @@ describe('GlossaryHeader component', () => {
       />
     );
 
-    expect(screen.getByText('label.approve')).toBeInTheDocument();
+    const approveButton = await screen.findByText('label.approve');
+
     expect(screen.getByText('label.reject')).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(screen.getByText('label.approve'));
+      fireEvent.click(approveButton);
     });
 
     expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
@@ -868,8 +931,10 @@ describe('GlossaryHeader component', () => {
       />
     );
 
+    const rejectButton = await screen.findByText('label.reject');
+
     await act(async () => {
-      fireEvent.click(screen.getByText('label.reject'));
+      fireEvent.click(rejectButton);
     });
 
     expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
@@ -943,10 +1008,10 @@ describe('GlossaryHeader component', () => {
       />
     );
 
-    expect(screen.getByText('label.submit-for-review')).toBeInTheDocument();
+    const submitButton = await screen.findByText('label.submit-for-review');
 
     await act(async () => {
-      fireEvent.click(screen.getByText('label.submit-for-review'));
+      fireEvent.click(submitButton);
     });
 
     expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
@@ -1021,7 +1086,7 @@ describe('GlossaryHeader component', () => {
       expect(
         getCreatedDraftSearch(
           '?businessVersion=1.0&parentBusinessVersion=2.3',
-          '1.1',
+          '1.1'
         )
       ).toBe('businessVersion=1.1&parentBusinessVersion=2.3');
     });
@@ -1064,19 +1129,18 @@ describe('GlossaryHeader component', () => {
         />
       );
 
-      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+      const createDraftButton = await screen.findByText('label.create-draft');
+
       expect(
         screen.getByTestId('cde-header-release-version-type')
       ).toHaveTextContent('Bản chính');
-      expect(
-        screen.getByTestId('cde-header-release-version-type')
-      ).toHaveClass(
+      expect(screen.getByTestId('cde-header-release-version-type')).toHaveClass(
         'cde-header-release-version-type',
         'cde-value-pill-release-version-main'
       );
 
       await act(async () => {
-        fireEvent.click(screen.getByText('label.create-draft'));
+        fireEvent.click(createDraftButton);
       });
 
       expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
@@ -1089,11 +1153,13 @@ describe('GlossaryHeader component', () => {
         fireEvent.click(screen.getAllByText('label.create-draft')[1]);
       });
 
-      expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
-        expect.objectContaining({
-          entityStatus: EntityStatus.Draft,
-          businessVersion: '1.1',
-        })
+      await waitFor(() =>
+        expect(mockOnWorkflowTransition).toHaveBeenCalledWith(
+          expect.objectContaining({
+            entityStatus: EntityStatus.Draft,
+            businessVersion: '1.1',
+          })
+        )
       );
     });
 
@@ -1132,7 +1198,7 @@ describe('GlossaryHeader component', () => {
         />
       );
 
-      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+      expect(await screen.findByText('label.create-draft')).toBeInTheDocument();
     });
 
     it('should NOT show "Tạo bản nháp" for Data Steward role', async () => {
@@ -1248,10 +1314,10 @@ describe('GlossaryHeader component', () => {
       expect(versionBtn).toBeInTheDocument();
       expect(versionBtn).toHaveTextContent('label.version: 1.0');
 
-      expect(screen.getByText('label.create-draft')).toBeInTheDocument();
+      const createDraftButton = await screen.findByText('label.create-draft');
 
       await act(async () => {
-        fireEvent.click(screen.getByText('label.create-draft'));
+        fireEvent.click(createDraftButton);
       });
 
       expect(screen.getByTestId('cde-create-draft-modal')).toBeInTheDocument();
@@ -1357,6 +1423,7 @@ describe('GlossaryHeader component', () => {
     await waitFor(() =>
       expect(screen.getByText('label.version: 1.0')).toBeInTheDocument()
     );
+
     expect(screen.getByText('label.version: 1.1')).toBeInTheDocument();
   });
 

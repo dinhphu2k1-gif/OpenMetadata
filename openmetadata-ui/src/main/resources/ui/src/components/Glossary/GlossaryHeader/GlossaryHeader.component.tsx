@@ -23,10 +23,10 @@ import {
 } from 'antd';
 import ButtonGroup from 'antd/lib/button/button-group';
 import { ItemType } from 'antd/lib/menu/hooks/useItems';
-import { MenuInfo } from 'rc-menu/lib/interface';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
 import { cloneDeep, isEmpty, toString } from 'lodash';
+import { MenuInfo } from 'rc-menu/lib/interface';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -41,17 +41,27 @@ import { ReactComponent as VersionIcon } from '../../../assets/svg/ic-version.sv
 import { ReactComponent as IconDropdown } from '../../../assets/svg/menu.svg';
 import { ReactComponent as StyleIcon } from '../../../assets/svg/style.svg';
 import { ManageButtonItemLabel } from '../../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
+import WorkflowActionBar from '../../../components/common/WorkflowActionBar/WorkflowActionBar.component';
+import type {
+  WorkflowAction,
+  WorkflowMenuItem,
+} from '../../../components/common/WorkflowActionBar/WorkflowActionBar.interface';
 import { useEntityExportModalProvider } from '../../../components/Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { EntityHeader } from '../../../components/Entity/EntityHeader/EntityHeader.component';
 import ConfirmationModal from '../../../components/Modals/ConfirmationModal/ConfirmationModal';
-import ApprovedRecordHistoryModal from '../../common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
-import ReviewActionConfirmModal from '../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
-import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 import EntityDeleteModal from '../../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
-import { DE_ACTIVE_COLOR } from '../../../constants/constants';
+import {
+  API_RES_MAX_SIZE,
+  DE_ACTIVE_COLOR,
+} from '../../../constants/constants';
 import { ExportTypes } from '../../../constants/Export.constants';
+import {
+  CDE_GLOSSARY_TERM_FIELDS,
+  isDataDictionaryGlossary,
+  isDataQualityGlossary,
+} from '../../../constants/Glossary.contant';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import { ResourceEntity } from '../../../context/PermissionProvider/PermissionProvider.interface';
@@ -66,26 +76,22 @@ import { Style } from '../../../generated/type/tagLabel';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useFqn } from '../../../hooks/useFqn';
 import {
-  isDataDictionaryGlossary,
-  isDataQualityGlossary,
-} from '../../../constants/Glossary.contant';
-import {
-  exportDataDictionaryVersion,
-  exportGlossaryInCSVFormat,
   createGlossaryTermCorrection,
-  getGlossaryTermCorrectionHistory,
   createGlossaryTermWorkingVersion,
   discardGlossaryTermWorkingVersion,
+  exportDataDictionaryVersion,
+  exportGlossaryInCSVFormat,
   getGlossariesById,
-  getGlossaryTermVersionPermissions,
+  getGlossaryTermCorrectionHistory,
   getGlossaryTerms,
   getGlossaryTermsById,
-  getGlossaryTermWorkingVersion,
-  getGlossaryTermsVersionsList,
   getGlossaryTermsVersion,
-  getGlossaryVersionsList,
+  getGlossaryTermsVersionsList,
+  getGlossaryTermVersionPermissions,
+  getGlossaryTermWorkingVersion,
   getGlossaryVersion,
   getGlossaryVersionPermissions,
+  getGlossaryVersionsList,
   getGlossaryWorkingVersion,
   GlossaryVersionPermissions,
   GlossaryWorkflowAction,
@@ -93,18 +99,24 @@ import {
   transitionGlossaryTermWorkflow,
   transitionGlossaryWorkflow,
 } from '../../../rest/glossaryAPI';
-import { API_RES_MAX_SIZE } from '../../../constants/constants';
-import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
+import ApprovedRecordHistoryModal from '../../common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
+import ReviewActionConfirmModal from '../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import { exportDQToExcel } from '../DQImportExport/DQImportExport.utils';
+import DQApprovePreview from '../DQRuleTests/DQApprovePreview.component';
 
-import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
+import { fromGlossaryCorrection } from '../../../utils/ApprovedRecordHistoryUtils';
 import {
   compareBusinessVersions,
   getBusinessVersion,
 } from '../../../utils/BusinessVersionUtils';
-import { fromGlossaryCorrection } from '../../../utils/ApprovedRecordHistoryUtils';
 import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUtils';
+import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
+import {
+  getEntityStatusClass,
+  getEntityStatusLabel,
+} from '../../../utils/EntityStatusUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import {
@@ -112,22 +124,17 @@ import {
   getGlossaryTermsVersionsPath,
   getGlossaryVersionsPath,
 } from '../../../utils/RouterUtils';
-import { getEntityName } from '../../../utils/EntityNameUtils';
-import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
-import { useRequiredParams } from '../../../utils/useRequiredParams';
-import {
-  getEntityStatusClass,
-  getEntityStatusLabel,
-} from '../../../utils/EntityStatusUtils';
 import {
   getCdeDetailPath,
   getGovernedTermDetailPath,
   getScopedGovernedTermFqn,
   parseCdeRoute,
 } from '../../../utils/routing/cdeRoutingHelper';
+import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
+import { useRequiredParams } from '../../../utils/useRequiredParams';
+import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
-import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import GovernedEntityHeaderBadges from '../GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
 
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
@@ -1242,7 +1249,7 @@ const GlossaryHeader = ({
         Number(selectedData.workingRevision),
         getParentBusinessVersion()
       );
-      showSuccessToast(t('cde.deletion-cancelled'));
+      showSuccessToast(t(`${deletionTextScope}.deletion-cancelled`));
       navigate(getGlossaryPath(selectedData.glossary?.fullyQualifiedName));
     } catch (error) {
       handleWorkflowError(error);
@@ -1736,7 +1743,7 @@ const GlossaryHeader = ({
     canCreateGlossaryTerm,
   ]);
 
-  const openCreateDraftModal = () => {
+  const openCreateDraftModal = useCallback(() => {
     const currentVer = businessVersion ?? (isGlossary ? '1' : '1.0');
     const cleanVer = String(currentVer)
       .trim()
@@ -1744,7 +1751,7 @@ const GlossaryHeader = ({
     setDraftVersion(suggestNextVersion(cleanVer, isGlossary));
     setDraftVersionError('');
     setIsCreateDraftModalOpen(true);
-  };
+  }, [businessVersion, isGlossary]);
 
   const handledDraftRequest = useRef(createDraftRequest);
   useEffect(() => {
@@ -1880,6 +1887,193 @@ const GlossaryHeader = ({
     canRenderMutationActions,
   ]);
 
+  const openCorrectionHistory = useCallback(
+    () => setIsCorrectionHistoryOpen(true),
+    []
+  );
+  const openApproveModal = useCallback(() => setIsApproveModalOpen(true), []);
+  const openRejectModal = useCallback(() => setIsRejectModalOpen(true), []);
+  const openSubmitForReviewModal = useCallback(
+    () => setIsSubmitForReviewModalOpen(true),
+    []
+  );
+  const openCorrectionModal = useCallback(
+    () => setIsCorrectionModalOpen(true),
+    []
+  );
+  const openDeletionRequestModal = useCallback(
+    () => setIsDeletionRequestModalOpen(true),
+    []
+  );
+  const openRenameModal = useCallback(() => setIsNameEditing(true), []);
+  const openDeleteModal = useCallback(() => setIsDelete(true), []);
+
+  const governedWorkflowActions = useMemo(() => {
+    const secondary: WorkflowAction[] = [];
+    const primaryCandidates: WorkflowAction[] = [];
+
+    if (isVersionView || !canRenderMutationActions) {
+      return { secondary, primary: undefined };
+    }
+
+    if (canApproveOrReject && workflowPermissions?.canReject) {
+      secondary.push({
+        key: 'reject',
+        label: t('label.reject'),
+        onClick: openRejectModal,
+        disabled: isRejecting,
+        danger: true,
+      });
+    }
+    if (canWithdraw) {
+      secondary.push({
+        key: 'withdraw',
+        label: t('label.withdraw-request'),
+        onClick: handleWithdraw,
+        testId: 'withdraw-request-button',
+        loading: isWithdrawing,
+      });
+    }
+    if (canCreateCorrection) {
+      secondary.push({
+        key: 'correction',
+        label: t('label.correct-version'),
+        onClick: openCorrectionModal,
+        testId: 'create-correction-button',
+      });
+    }
+    if (canCancelDeletion) {
+      secondary.push({
+        key: 'cancel-deletion',
+        label: t(`${deletionTextScope}.deletion-cancel`),
+        onClick: handleCancelDeletion,
+        testId: 'cancel-cde-deletion-button',
+        loading: isCancellingDeletion,
+      });
+    }
+    if (canApproveOrReject && canApprove) {
+      primaryCandidates.push({
+        key: 'approve',
+        label: t('label.approve'),
+        onClick: openApproveModal,
+        disabled: isApproving,
+        variant: 'approve',
+      });
+    }
+    if (canSubmitForReview && glossaryTermStatus !== EntityStatus.InReview) {
+      primaryCandidates.push({
+        key: 'submit',
+        label: t('label.submit-for-review'),
+        onClick: openSubmitForReviewModal,
+        disabled: isSubmittingForReview,
+      });
+    }
+    if (canReopen) {
+      primaryCandidates.push({
+        key: 'reopen',
+        label: t('label.edit-again'),
+        onClick: handleReopen,
+        loading: isReopening,
+      });
+    }
+    if (canCreateDraft && glossaryTermStatus === EntityStatus.Approved) {
+      primaryCandidates.push({
+        key: 'create-draft',
+        label: t('label.create-draft'),
+        onClick: openCreateDraftModal,
+      });
+    }
+
+    return {
+      secondary: [...secondary, ...primaryCandidates.slice(1)],
+      primary: primaryCandidates[0],
+    };
+  }, [
+    isVersionView,
+    canRenderMutationActions,
+    canApproveOrReject,
+    workflowPermissions,
+    isRejecting,
+    canWithdraw,
+    handleWithdraw,
+    isWithdrawing,
+    canCreateCorrection,
+    canCancelDeletion,
+    deletionTextScope,
+    handleCancelDeletion,
+    isCancellingDeletion,
+    canApprove,
+    isApproving,
+    canSubmitForReview,
+    glossaryTermStatus,
+    isSubmittingForReview,
+    canReopen,
+    handleReopen,
+    isReopening,
+    canCreateDraft,
+    openCreateDraftModal,
+    openApproveModal,
+    openCorrectionModal,
+    openRejectModal,
+    openSubmitForReviewModal,
+    t,
+  ]);
+
+  const governedWorkflowMenu = useMemo(() => {
+    if (isVersionView || !canRenderMutationActions) {
+      return [];
+    }
+
+    const items: WorkflowMenuItem[] = [];
+
+    if (editDisplayNamePermission && !isImmutableApprovedTerm) {
+      items.push({
+        key: 'rename-button',
+        name: t('label.edit-glossary-display-name'),
+        description: t('message.update-displayName-entity', {
+          entity: t('label.glossary-term'),
+        }),
+        icon: EditIcon,
+        onClick: openRenameModal,
+        testId: 'rename-button',
+      });
+    }
+    if (canShowDelete) {
+      items.push({
+        key: 'delete-button',
+        name: t('label.delete'),
+        description: t('message.workflow-delete-draft-description'),
+        icon: IconDelete,
+        onClick: openDeleteModal,
+        testId: 'delete-button',
+        danger: true,
+      });
+    } else if (canRequestDeletion) {
+      items.push({
+        key: 'request-deletion',
+        name: t('label.delete-with-ellipsis'),
+        description: t('message.workflow-request-deletion-description'),
+        icon: IconDelete,
+        onClick: openDeletionRequestModal,
+        testId: 'request-cde-deletion-button',
+        danger: true,
+      });
+    }
+
+    return items;
+  }, [
+    isVersionView,
+    canRenderMutationActions,
+    editDisplayNamePermission,
+    isImmutableApprovedTerm,
+    canShowDelete,
+    canRequestDeletion,
+    openDeleteModal,
+    openDeletionRequestModal,
+    openRenameModal,
+    t,
+  ]);
+
   /**
    * To create breadcrumb from the fqn
    * @param fqn fqn of glossary or glossary term
@@ -1981,82 +2175,97 @@ const GlossaryHeader = ({
           />
         </div>
         <div className="flex items-center">
-          <div className="d-flex gap-3 justify-end items-center">
-            {canViewCorrectionHistory && (
-              <Button
-                className="m-l-xs"
-                data-testid="correction-history-button"
-                onClick={() => setIsCorrectionHistoryOpen(true)}>
-                {t('label.correction-history')}
-              </Button>
-            )}
-            {!isVersionView && approvalActionButtons}
-            {!isVersionView && createButtons}
-
-            <ButtonGroup className="spaced" size="small">
-              {!isCustomManaged && !isGlossary && selectedData?.version && (
-                <Tooltip
-                  title={t(
-                    `label.${
-                      isVersionView
-                        ? 'exit-version-history'
-                        : 'version-plural-history'
-                    }`
-                  )}>
-                  <Button
-                    className={classNames('', {
-                      'text-primary border-primary': version,
-                    })}
-                    data-testid="version-button"
-                    icon={<Icon component={VersionIcon} />}
-                    onClick={handleVersionClick}>
-                    <Typography.Text
-                      className={classNames('', {
-                        'text-primary': version,
-                      })}>
-                      {toString(selectedData.version)}
-                    </Typography.Text>
-                  </Button>
-                </Tooltip>
-              )}
-
-              {visibleManageButtonContent.length > 0 && (
-                <Dropdown
-                  align={{ targetOffset: [-12, 0] }}
+          {isCustomManagedTerm ? (
+            <WorkflowActionBar
+              historyTestId="correction-history-button"
+              menu={governedWorkflowMenu}
+              menuTitle={t('label.manage-entity', {
+                entity: t('label.glossary-term'),
+              })}
+              primary={governedWorkflowActions.primary}
+              secondary={governedWorkflowActions.secondary}
+              onHistory={
+                canViewCorrectionHistory ? openCorrectionHistory : undefined
+              }
+            />
+          ) : (
+            <div className="d-flex gap-3 justify-end items-center">
+              {canViewCorrectionHistory && (
+                <Button
                   className="m-l-xs"
-                  menu={{
-                    items: visibleManageButtonContent,
-                  }}
-                  open={showActions}
-                  overlayClassName="glossary-manage-dropdown-list-container"
-                  overlayStyle={{ width: '350px' }}
-                  placement="bottomRight"
-                  trigger={['click']}
-                  onOpenChange={setShowActions}>
-                  <Tooltip
-                    placement="topRight"
-                    title={t('label.manage-entity', {
-                      entity: isGlossary
-                        ? t('label.glossary')
-                        : t('label.glossary-term'),
-                    })}>
-                    <Button
-                      className="glossary-manage-dropdown-button"
-                      data-testid="manage-button"
-                      icon={
-                        <IconDropdown
-                          className="vertical-align-inherit manage-dropdown-icon"
-                          height={16}
-                          width={16}
-                        />
-                      }
-                      onClick={() => setShowActions(true)}
-                    />
-                  </Tooltip>
-                </Dropdown>
+                  data-testid="correction-history-button"
+                  onClick={openCorrectionHistory}>
+                  {t('label.correction-history')}
+                </Button>
               )}
-            </ButtonGroup>
-          </div>
+              {!isVersionView && approvalActionButtons}
+              {!isVersionView && createButtons}
+
+              <ButtonGroup className="spaced" size="small">
+                {!isCustomManaged && !isGlossary && selectedData?.version && (
+                  <Tooltip
+                    title={t(
+                      `label.${
+                        isVersionView
+                          ? 'exit-version-history'
+                          : 'version-plural-history'
+                      }`
+                    )}>
+                    <Button
+                      className={classNames('', {
+                        'text-primary border-primary': version,
+                      })}
+                      data-testid="version-button"
+                      icon={<Icon component={VersionIcon} />}
+                      onClick={handleVersionClick}>
+                      <Typography.Text
+                        className={classNames('', {
+                          'text-primary': version,
+                        })}>
+                        {toString(selectedData.version)}
+                      </Typography.Text>
+                    </Button>
+                  </Tooltip>
+                )}
+
+                {visibleManageButtonContent.length > 0 && (
+                  <Dropdown
+                    align={{ targetOffset: [-12, 0] }}
+                    className="m-l-xs"
+                    menu={{
+                      items: visibleManageButtonContent,
+                    }}
+                    open={showActions}
+                    overlayClassName="glossary-manage-dropdown-list-container"
+                    overlayStyle={{ width: '350px' }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                    onOpenChange={setShowActions}>
+                    <Tooltip
+                      placement="topRight"
+                      title={t('label.manage-entity', {
+                        entity: isGlossary
+                          ? t('label.glossary')
+                          : t('label.glossary-term'),
+                      })}>
+                      <Button
+                        className="glossary-manage-dropdown-button"
+                        data-testid="manage-button"
+                        icon={
+                          <IconDropdown
+                            className="vertical-align-inherit manage-dropdown-icon"
+                            height={16}
+                            width={16}
+                          />
+                        }
+                        onClick={() => setShowActions(true)}
+                      />
+                    </Tooltip>
+                  </Dropdown>
+                )}
+              </ButtonGroup>
+            </div>
+          )}
         </div>
       </div>
       {!isGlossary &&
@@ -2134,7 +2343,10 @@ const GlossaryHeader = ({
           load={loadCorrectionHistory}
           open={isCorrectionHistoryOpen}
           scope={isDQGlossaryTerm ? 'dq' : 'cde'}
-          subtitle={getBusinessVersion(businessVersion ?? undefined, '')}
+          subtitle={`${t('label.version')} ${getBusinessVersion(
+            businessVersion ?? undefined,
+            ''
+          )}`}
           onClose={() => setIsCorrectionHistoryOpen(false)}
         />
       )}

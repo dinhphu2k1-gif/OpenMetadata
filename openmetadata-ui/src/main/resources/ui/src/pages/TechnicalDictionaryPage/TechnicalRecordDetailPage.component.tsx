@@ -11,34 +11,44 @@
  *  limitations under the License.
  */
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Form, InputNumber, Result } from 'antd';
+import { Button, Form, InputNumber, Result } from 'antd';
 import { AxiosError } from 'axios';
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg';
 import { ReactComponent as IconDelete } from '../../assets/svg/ic-delete.svg';
-import { ReactComponent as IconDropdown } from '../../assets/svg/menu.svg';
-import { EditIconButton } from '../../components/common/IconButtons/EditIconButton';
+import ApprovedRecordHistoryModal from '../../components/common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
 import { CopyToClipboardButton } from '../../components/common/CopyToClipboardButton/CopyToClipboardButton';
-import { ManageButtonItemLabel } from '../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
+import { EditIconButton } from '../../components/common/IconButtons/EditIconButton';
 import Loader from '../../components/common/Loader/Loader';
 import ReviewActionConfirmModal from '../../components/common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
+import { TagSelectableList } from '../../components/common/TagSelectableList/TagSelectableList.component';
 import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
-import { renderDictionaryPastelTag } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
+import { UserTeamSelectableList } from '../../components/common/UserTeamSelectableList/UserTeamSelectableList.component';
+import WorkflowActionBar from '../../components/common/WorkflowActionBar/WorkflowActionBar.component';
+import type {
+  WorkflowAction,
+  WorkflowMenuItem,
+} from '../../components/common/WorkflowActionBar/WorkflowActionBar.interface';
+import CDESelectableList from '../../components/Glossary/CDESelectableList/CDESelectableList.component';
 import {
   GovernedGlossaryField as Field,
   GovernedGlossarySection as Section,
 } from '../../components/Glossary/GlossaryTerms/GovernedGlossaryDetailLayout';
-import ApprovedRecordHistoryModal from '../../components/common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
-import CDESelectableList from '../../components/Glossary/CDESelectableList/CDESelectableList.component';
-import { TagSelectableList } from '../../components/common/TagSelectableList/TagSelectableList.component';
-import { UserTeamSelectableList } from '../../components/common/UserTeamSelectableList/UserTeamSelectableList.component';
-import TagsViewer from '../../components/Tag/TagsViewer/TagsViewer';
-import { DisplayType } from '../../components/Tag/TagsViewer/TagsViewer.interface';
+import { renderDictionaryPastelTag } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
 import ConfirmationModal from '../../components/Modals/ConfirmationModal/ConfirmationModal';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
+import TagsViewer from '../../components/Tag/TagsViewer/TagsViewer';
+import { DisplayType } from '../../components/Tag/TagsViewer/TagsViewer.interface';
 import { ROUTES } from '../../constants/constants';
 import {
   TECHNICAL_CLASSIFICATIONS,
@@ -77,6 +87,7 @@ import { fromTechnicalCorrection } from '../../utils/ApprovedRecordHistoryUtils'
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
+import './technicalDictionary.less';
 import {
   canReviewTechnicalRecord,
   toTechnicalDictionaryRow,
@@ -85,11 +96,10 @@ import {
 import {
   CHANGE_ACTIONS,
   RECORD_ACTIONS,
-  TECHNICAL_REVIEW_ACTIONS,
   TechnicalReviewAction,
+  TECHNICAL_REVIEW_ACTIONS,
 } from './technicalReviewActions';
 import TechnicalVersionBadges from './TechnicalVersionBadges.component';
-import './technicalDictionary.less';
 
 const toOwnerInputs = (
   owners: TechnicalDictionaryRow['systemOwners']
@@ -108,6 +118,11 @@ const VIEW_PARAM = 'view';
 const WORKING_VIEW = 'working';
 const REVISION_CONFLICT = 'TD_RECORD_REVISION_CONFLICT';
 const CHANGE_REQUEST_STALE = 'TD_CHANGE_REQUEST_STALE';
+const DELETE_BODY_KEYS: Record<DeleteKind, string> = {
+  request: 'message.technical-request-delete-confirm',
+  change: 'message.technical-cancel-change-confirm',
+  declaration: 'message.technical-declaration-delete-confirm',
+};
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed';
 type DeleteKind = 'request' | 'declaration' | 'change';
@@ -501,6 +516,125 @@ const TechnicalRecordDetailPage = () => {
     }
   }, [viewedVersion]);
 
+  const canWork = Boolean(row && capabilities.canEdit && !viewedVersion);
+  const canViewHistory = Boolean(
+    row && !viewedVersion && row.status === 'Approved'
+  );
+  const isChange = Boolean(row?.hasPendingChange);
+  const isOpenDraft = row?.status === 'Draft' || row?.status === 'Rejected';
+  const isDeleteChange = row?.changeOperation === 'DELETE';
+  const canCreateChange = Boolean(
+    row && canWork && row.status === 'Approved' && !isChange
+  );
+  const canSubmitNow = Boolean(row && canWork && row.status === 'Draft');
+  const canReviewNow = Boolean(
+    row &&
+      !viewedVersion &&
+      canReviewTechnicalRecord(row, capabilities.canApprove, currentUser?.name)
+  );
+  const deleteOption: { kind: DeleteKind; labelKey: string } | undefined =
+    !row || !canWork
+      ? undefined
+      : row.status === 'Approved' && !isChange
+      ? { kind: 'request', labelKey: 'label.technical-request-delete' }
+      : isChange && isOpenDraft
+      ? { kind: 'change', labelKey: 'label.technical-cancel-change' }
+      : isOpenDraft
+      ? { kind: 'declaration', labelKey: 'label.delete-declaration' }
+      : undefined;
+  const deleteOptionKind = deleteOption?.kind;
+  const openHistory = useCallback(() => setIsHistoryOpen(true), []);
+  const openRejectReview = useCallback(() => setReview('reject'), []);
+  const openApproveReview = useCallback(() => setReview('approve'), []);
+  const openSubmitReview = useCallback(() => setReview('submit'), []);
+  const openDeleteConfirmation = useCallback(() => {
+    if (deleteOptionKind) {
+      setDeleteKind(deleteOptionKind);
+    }
+  }, [deleteOptionKind]);
+  const technicalWorkflowActions = useMemo(() => {
+    const secondary: WorkflowAction[] = [];
+    const primaryCandidates: WorkflowAction[] = [];
+
+    if (canReviewNow) {
+      secondary.push({
+        key: 'reject',
+        label: t('label.reject'),
+        onClick: openRejectReview,
+        testId: 'technical-record-reject',
+        danger: true,
+      });
+      primaryCandidates.push({
+        key: 'approve',
+        label: t('label.approve'),
+        onClick: openApproveReview,
+        testId: 'technical-record-approve',
+        variant: 'approve',
+      });
+    }
+    if (canCreateChange) {
+      secondary.push({
+        key: 'create-change',
+        label: t('label.technical-create-change-draft'),
+        onClick: createChangeDraft,
+        testId: 'technical-record-create-change',
+        loading: isBusy,
+      });
+    }
+    if (viewedVersion) {
+      secondary.push({
+        key: 'download',
+        label: t('label.technical-download-snapshot', {
+          version: viewedVersion,
+        }),
+        onClick: handleDownload,
+        testId: 'technical-record-download',
+      });
+    }
+    if (canSubmitNow) {
+      primaryCandidates.push({
+        key: 'submit',
+        label: t('label.submit-for-review'),
+        onClick: openSubmitReview,
+        testId: 'technical-record-submit',
+      });
+    }
+
+    return {
+      secondary: [...secondary, ...primaryCandidates.slice(1)],
+      primary: primaryCandidates[0],
+    };
+  }, [
+    canCreateChange,
+    canReviewNow,
+    canSubmitNow,
+    createChangeDraft,
+    handleDownload,
+    isBusy,
+    openApproveReview,
+    openRejectReview,
+    openSubmitReview,
+    t,
+    viewedVersion,
+  ]);
+  const technicalWorkflowMenu = useMemo<WorkflowMenuItem[]>(
+    () =>
+      deleteOption
+        ? [
+            {
+              key: 'delete',
+              name: t(deleteOption.labelKey),
+              description: t(DELETE_BODY_KEYS[deleteOption.kind]),
+              icon: IconDelete,
+              onClick: openDeleteConfirmation,
+              testId: 'delete-button',
+              danger: true,
+            },
+          ]
+        : [],
+    [deleteOption, openDeleteConfirmation, t]
+  );
+
   if (state === 'loading' || isContextLoading) {
     return <Loader />;
   }
@@ -527,27 +661,7 @@ const TechnicalRecordDetailPage = () => {
     );
   }
 
-  const canWork = capabilities.canEdit && !viewedVersion;
-  const canViewHistory = !viewedVersion && row.status === 'Approved';
-  const isChange = Boolean(row.hasPendingChange);
-  const isOpenDraft = row.status === 'Draft' || row.status === 'Rejected';
-  const isDeleteChange = row.changeOperation === 'DELETE';
   const canEditNow = canWork && !isDeleteChange && isOpenDraft;
-  const canCreateChange = canWork && row.status === 'Approved' && !isChange;
-  const canSubmitNow = canWork && row.status === 'Draft';
-  const canReviewNow =
-    !viewedVersion &&
-    canReviewTechnicalRecord(row, capabilities.canApprove, currentUser?.name);
-  const deleteOption: { kind: DeleteKind; labelKey: string } | undefined =
-    !canWork
-      ? undefined
-      : row.status === 'Approved' && !isChange
-      ? { kind: 'request', labelKey: 'label.technical-request-delete' }
-      : isChange && isOpenDraft
-      ? { kind: 'change', labelKey: 'label.technical-cancel-change' }
-      : isOpenDraft
-      ? { kind: 'declaration', labelKey: 'label.delete-declaration' }
-      : undefined;
 
   const placeholder = (
     <span className="text-grey-muted">{t('cde.not-set')}</span>
@@ -614,11 +728,6 @@ const TechnicalRecordDetailPage = () => {
       ) : undefined
     );
   };
-  const deleteBodyKey = {
-    request: 'message.technical-request-delete-confirm',
-    change: 'message.technical-cancel-change-confirm',
-    declaration: 'message.technical-declaration-delete-confirm',
-  };
 
   return (
     <PageLayoutV1
@@ -671,100 +780,14 @@ const TechnicalRecordDetailPage = () => {
                 </div>
               </div>
             </div>
-            <div className="d-flex items-center gap-2">
-              {viewedVersion && (
-                <Button
-                  data-testid="technical-record-download"
-                  onClick={handleDownload}>
-                  {t('label.technical-download-snapshot', {
-                    version: viewedVersion,
-                  })}
-                </Button>
-              )}
-              {canViewHistory && (
-                <Button
-                  data-testid="correction-history-button"
-                  onClick={() => setIsHistoryOpen(true)}>
-                  {t('label.correction-history')}
-                </Button>
-              )}
-              {canReviewNow && (
-                <>
-                  <Button
-                    danger
-                    data-testid="technical-record-reject"
-                    onClick={() => setReview('reject')}>
-                    {t('label.reject')}
-                  </Button>
-                  <Button
-                    data-testid="technical-record-approve"
-                    style={{
-                      backgroundColor: '#10b981',
-                      borderColor: '#10b981',
-                      color: '#fff',
-                    }}
-                    type="primary"
-                    onClick={() => setReview('approve')}>
-                    {t('label.approve')}
-                  </Button>
-                </>
-              )}
-              {canCreateChange && (
-                <Button
-                  data-testid="technical-record-create-change"
-                  loading={isBusy}
-                  onClick={createChangeDraft}>
-                  {t('label.technical-create-change-draft')}
-                </Button>
-              )}
-              {canSubmitNow && (
-                <Button
-                  data-testid="technical-record-submit"
-                  type="primary"
-                  onClick={() => setReview('submit')}>
-                  {t('label.submit-for-review')}
-                </Button>
-              )}
-              {deleteOption && (
-                <Dropdown
-                  menu={{
-                    items: [
-                      {
-                        key: 'delete',
-                        label: (
-                          <ManageButtonItemLabel
-                            description={t(deleteBodyKey[deleteOption.kind])}
-                            icon={IconDelete}
-                            id="delete-button"
-                            name={t(deleteOption.labelKey)}
-                          />
-                        ),
-                        onClick: (event) => {
-                          event.domEvent.stopPropagation();
-                          setDeleteKind(deleteOption.kind);
-                        },
-                      },
-                    ],
-                  }}
-                  overlayClassName="glossary-manage-dropdown-list-container"
-                  overlayStyle={{ width: '350px' }}
-                  placement="bottomRight"
-                  trigger={['click']}>
-                  <Button
-                    aria-label={t('label.more-actions')}
-                    className="glossary-manage-dropdown-button"
-                    data-testid="technical-record-more-actions"
-                    icon={
-                      <IconDropdown
-                        className="vertical-align-inherit manage-dropdown-icon"
-                        height={16}
-                        width={16}
-                      />
-                    }
-                  />
-                </Dropdown>
-              )}
-            </div>
+            <WorkflowActionBar
+              historyTestId="correction-history-button"
+              menu={technicalWorkflowMenu}
+              menuTestId="technical-record-more-actions"
+              primary={technicalWorkflowActions.primary}
+              secondary={technicalWorkflowActions.secondary}
+              onHistory={canViewHistory ? openHistory : undefined}
+            />
           </div>
         </div>
 
@@ -989,7 +1012,7 @@ const TechnicalRecordDetailPage = () => {
         </div>
 
         <ConfirmationModal
-          bodyText={deleteKind ? t(deleteBodyKey[deleteKind]) : ''}
+          bodyText={deleteKind ? t(DELETE_BODY_KEYS[deleteKind]) : ''}
           cancelText={t('label.cancel')}
           confirmText={t(
             deleteKind === 'request'

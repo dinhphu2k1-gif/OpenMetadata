@@ -11,6 +11,7 @@
  *  limitations under the License.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { WorkflowActionBarProps } from '../../components/common/WorkflowActionBar/WorkflowActionBar.interface';
 import {
   approveTechnicalChangeRequest,
   getTechnicalChangeRequest,
@@ -25,6 +26,51 @@ import TechnicalRecordDetailPage from './TechnicalRecordDetailPage.component';
 
 let mockSearch = '';
 const mockCapabilities = { canEdit: true, canApprove: true };
+
+jest.mock(
+  '../../components/common/WorkflowActionBar/WorkflowActionBar.component',
+  () =>
+    jest
+      .fn()
+      .mockImplementation(
+        ({
+          onHistory,
+          historyTestId,
+          secondary = [],
+          primary,
+          menu = [],
+          menuTestId = 'manage-button',
+        }: WorkflowActionBarProps) => (
+          <div data-testid="workflow-action-bar">
+            {onHistory && (
+              <button data-testid={historyTestId} onClick={onHistory} />
+            )}
+            {secondary.map((action) => (
+              <button
+                data-testid={action.testId}
+                key={action.key}
+                onClick={action.onClick}>
+                {action.label}
+              </button>
+            ))}
+            {primary && (
+              <button data-testid={primary.testId} onClick={primary.onClick}>
+                {primary.label}
+              </button>
+            )}
+            {menu.length > 0 && <button data-testid={menuTestId} />}
+            {menu.map((item) => (
+              <button
+                data-testid={item.testId}
+                key={item.key}
+                onClick={item.onClick}>
+                {item.name}
+              </button>
+            ))}
+          </div>
+        )
+      )
+);
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
