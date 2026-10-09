@@ -124,6 +124,24 @@ const DELETE_BODY_KEYS: Record<DeleteKind, string> = {
   declaration: 'message.technical-declaration-delete-confirm',
 };
 
+const DELETE_MENU_KEYS: Record<
+  DeleteKind,
+  { name: string; description: string }
+> = {
+  request: {
+    name: 'label.delete',
+    description: 'message.workflow-request-deletion-description',
+  },
+  change: {
+    name: 'label.technical-cancel-change',
+    description: 'message.technical-cancel-change-confirm',
+  },
+  declaration: {
+    name: 'label.delete',
+    description: 'message.workflow-delete-draft-description',
+  },
+};
+
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed';
 type DeleteKind = 'request' | 'declaration' | 'change';
 type TagField =
@@ -623,8 +641,8 @@ const TechnicalRecordDetailPage = () => {
         ? [
             {
               key: 'delete',
-              name: t(deleteOption.labelKey),
-              description: t(DELETE_BODY_KEYS[deleteOption.kind]),
+              name: t(DELETE_MENU_KEYS[deleteOption.kind].name),
+              description: t(DELETE_MENU_KEYS[deleteOption.kind].description),
               icon: IconDelete,
               onClick: openDeleteConfirmation,
               testId: 'delete-button',

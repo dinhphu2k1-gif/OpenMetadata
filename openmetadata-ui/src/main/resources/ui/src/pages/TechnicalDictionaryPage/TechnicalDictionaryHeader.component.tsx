@@ -10,19 +10,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { PlusOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Space, Tooltip } from 'antd';
-import { MenuProps } from 'antd/lib/menu';
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg';
 import { ReactComponent as ExportIcon } from '../../assets/svg/ic-export.svg';
 import { ReactComponent as ImportIcon } from '../../assets/svg/ic-import.svg';
 import { ReactComponent as RefreshIcon } from '../../assets/svg/ic-refresh.svg';
-import { ReactComponent as VersionIcon } from '../../assets/svg/ic-version.svg';
-import { ReactComponent as IconDropdown } from '../../assets/svg/menu.svg';
 import { CopyToClipboardButton } from '../../components/common/CopyToClipboardButton/CopyToClipboardButton';
-import { ManageButtonItemLabel } from '../../components/common/ManageButtonContentItem/ManageButtonContentItem.component';
+import WorkflowActionBar from '../../components/common/WorkflowActionBar/WorkflowActionBar.component';
+import type {
+  WorkflowAction,
+  WorkflowMenuItem,
+} from '../../components/common/WorkflowActionBar/WorkflowActionBar.interface';
 import { TECHNICAL_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import { TechnicalDictionaryCapabilities } from './technicalDictionary.interface';
 import TechnicalVersionBadges from './TechnicalVersionBadges.component';
@@ -39,7 +38,6 @@ interface TechnicalDictionaryHeaderProps {
   onAddColumn: () => void;
   onExport: () => void;
   onImport: () => void;
-  onOpenSnapshots: () => void;
   onRebuildIndex: () => void;
 }
 
@@ -52,79 +50,70 @@ const TechnicalDictionaryHeader = ({
   onAddColumn,
   onExport,
   onImport,
-  onOpenSnapshots,
   onRebuildIndex,
 }: TechnicalDictionaryHeaderProps) => {
   const { t } = useTranslation();
 
-  const [showActions, setShowActions] = useState(false);
   const isSnapshot = Boolean(snapshotVersion);
 
-  const menuItem = (
-    key: string,
-    name: string,
-    description: string,
-    icon: typeof ExportIcon,
-    onClick: () => void
-  ) => ({
-    key,
-    label: (
-      <ManageButtonItemLabel
-        description={description}
-        icon={icon}
-        id={key}
-        name={name}
-      />
-    ),
-    onClick: (event: { domEvent: { stopPropagation: () => void } }) => {
-      event.domEvent.stopPropagation();
-      setShowActions(false);
-      onClick();
-    },
-  });
+  const primary = useMemo<WorkflowAction | undefined>(
+    () =>
+      capabilities.canEdit && dataDictionaryVersion && !isSnapshot
+        ? {
+            key: 'add-column',
+            label: t('label.add-column'),
+            onClick: onAddColumn,
+            testId: 'technical-dictionary-add-column',
+          }
+        : undefined,
+    [capabilities.canEdit, dataDictionaryVersion, isSnapshot, onAddColumn, t]
+  );
 
-  const moreMenuItems: MenuProps['items'] = [
-    ...(capabilities.canExport && dataDictionaryVersion
-      ? [
-          menuItem(
-            'export',
-            t('label.export'),
-            t('message.technical-export-help'),
-            ExportIcon,
-            onExport
-          ),
-        ]
-      : []),
-    ...(capabilities.canImport && dataDictionaryVersion
-      ? [
-          menuItem(
-            'import',
-            t('label.import-cde-mapping'),
-            t('message.technical-import-help'),
-            ImportIcon,
-            onImport
-          ),
-        ]
-      : []),
-    menuItem(
-      'snapshots',
-      t('label.technical-previous-snapshots'),
-      t('message.technical-snapshots-help'),
-      VersionIcon,
-      onOpenSnapshots
-    ),
-    ...(isAdmin
-      ? [
-          menuItem(
-            'rebuild-index',
-            t('label.technical-rebuild-index'),
-            t('message.technical-rebuild-index-help'),
-            RefreshIcon,
-            onRebuildIndex
-          ),
-        ]
-      : []),
-  ];
+  const menu = useMemo<WorkflowMenuItem[]>(() => {
+    const items: WorkflowMenuItem[] = [];
+
+    if (capabilities.canExport && dataDictionaryVersion) {
+      items.push({
+        key: 'export',
+        name: t('cde.export-excel'),
+        description: t('message.technical-export-help'),
+        icon: ExportIcon,
+        onClick: onExport,
+        testId: 'export',
+      });
+    }
+    if (capabilities.canImport && dataDictionaryVersion) {
+      items.push({
+        key: 'import',
+        name: t('cde.import-excel'),
+        description: t('message.technical-import-help'),
+        icon: ImportIcon,
+        onClick: onImport,
+        testId: 'import',
+      });
+    }
+    if (isAdmin) {
+      items.push({
+        key: 'rebuild-index',
+        name: t('label.technical-rebuild-index'),
+        description: t('message.technical-rebuild-index-help'),
+        icon: RefreshIcon,
+        onClick: onRebuildIndex,
+        testId: 'rebuild-index',
+      });
+    }
+
+    return items;
+  }, [
+    capabilities.canExport,
+    capabilities.canImport,
+    dataDictionaryVersion,
+    isAdmin,
+    onExport,
+    onImport,
+    onRebuildIndex,
+    t,
+  ]);
 
   return (
     <div className="tech-dict-page-header">
@@ -158,41 +147,11 @@ const TechnicalDictionaryHeader = ({
             </div>
           </div>
         </div>
-        <Space>
-          {capabilities.canEdit && dataDictionaryVersion && !isSnapshot && (
-            <Button
-              data-testid="technical-dictionary-add-column"
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={onAddColumn}>
-              {t('label.add-column')}
-            </Button>
-          )}
-          <Dropdown
-            align={{ targetOffset: [-12, 0] }}
-            menu={{ items: moreMenuItems }}
-            open={showActions}
-            overlayClassName="glossary-manage-dropdown-list-container"
-            overlayStyle={{ width: '350px' }}
-            placement="bottomRight"
-            trigger={['click']}
-            onOpenChange={setShowActions}>
-            <Tooltip placement="topRight" title={t('label.more-actions')}>
-              <Button
-                aria-label={t('label.more-actions')}
-                className="glossary-manage-dropdown-button"
-                data-testid="technical-dictionary-more-actions"
-                icon={
-                  <IconDropdown
-                    className="vertical-align-inherit manage-dropdown-icon"
-                    height={16}
-                    width={16}
-                  />
-                }
-              />
-            </Tooltip>
-          </Dropdown>
-        </Space>
+        <WorkflowActionBar
+          menu={menu}
+          menuTestId="technical-dictionary-more-actions"
+          primary={primary}
+        />
       </div>
     </div>
   );

@@ -78,8 +78,8 @@ const MenuItemContent = ({ item }: { item: WorkflowMenuItem }) => {
         <span
           className={
             item.danger
-              ? 'tw:text-sm tw:font-semibold tw:text-error-primary'
-              : 'tw:text-sm tw:font-semibold tw:text-secondary'
+              ? 'tw:text-sm tw:font-medium tw:text-error-primary'
+              : 'tw:text-sm tw:font-medium tw:text-primary'
           }>
           {item.name}
         </span>
@@ -87,8 +87,8 @@ const MenuItemContent = ({ item }: { item: WorkflowMenuItem }) => {
           <span
             className={
               item.danger
-                ? 'tw:text-xs tw:text-error-primary'
-                : 'tw:text-xs tw:text-tertiary'
+                ? 'tw:text-xs tw:font-normal tw:text-error-primary'
+                : 'tw:text-xs tw:font-normal tw:text-tertiary'
             }>
             {item.description}
           </span>
@@ -119,20 +119,8 @@ const WorkflowActionBar = ({
     };
   }, [menu]);
   const hasMenu = menu.length > 0;
-  const visibleGroupCount = [
-    Boolean(onHistory),
-    secondary.length > 0,
-    Boolean(primary),
-    hasMenu,
-  ].filter(Boolean).length;
-  let renderedGroupCount = 0;
-  const renderDivider = () => {
-    renderedGroupCount += 1;
-
-    return renderedGroupCount < visibleGroupCount ? (
-      <Divider className="tw:my-1" orientation="vertical" />
-    ) : null;
-  };
+  const hasActionsAfterHistory =
+    secondary.length > 0 || Boolean(primary) || hasMenu;
   const handleMenuAction = useCallback(
     (key: Key) => menuItemsByKey.get(String(key))?.onClick(),
     [menuItemsByKey]
@@ -159,27 +147,21 @@ const WorkflowActionBar = ({
               onClick={onHistory}
             />
           </Tooltip>
-          {renderDivider()}
+          {hasActionsAfterHistory && (
+            <Divider className="tw:my-1" orientation="vertical" />
+          )}
         </>
       )}
 
       {secondary.length > 0 && (
-        <>
-          <div className="tw:flex tw:items-center tw:gap-2">
-            {secondary.map((action) => (
-              <ActionButton action={action} key={action.key} />
-            ))}
-          </div>
-          {renderDivider()}
-        </>
+        <div className="tw:flex tw:items-center tw:gap-2">
+          {secondary.map((action) => (
+            <ActionButton action={action} key={action.key} />
+          ))}
+        </div>
       )}
 
-      {primary && (
-        <>
-          <ActionButton primary action={primary} />
-          {renderDivider()}
-        </>
-      )}
+      {primary && <ActionButton primary action={primary} />}
 
       {hasMenu && (
         <Dropdown.Root>

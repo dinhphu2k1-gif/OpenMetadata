@@ -58,7 +58,6 @@ import {
   TECHNICAL_REVIEW_ACTIONS,
   TechnicalReviewAction,
 } from './technicalReviewActions';
-import TechnicalSnapshotsModal from './TechnicalSnapshotsModal.component';
 import { useTechnicalPendingRequestsAdapter } from './useTechnicalPendingRequestsAdapter';
 import '../../components/Glossary/glossaryV1.less';
 import './technicalDictionary.less';
@@ -162,7 +161,6 @@ const TechnicalDictionaryPage = ({
   });
   const snapshotVersion = records.snapshotVersion;
   const [addColumnOpen, setAddColumnOpen] = useState(false);
-  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([]);
   const [review, setReview] = useState<PendingReview>();
@@ -443,14 +441,6 @@ const TechnicalDictionaryPage = ({
         open={isBulkResultOpen}
         onClose={() => setIsBulkResultOpen(false)}
       />
-      <TechnicalSnapshotsModal
-        open={snapshotsOpen}
-        onClose={() => setSnapshotsOpen(false)}
-        onView={(version) => {
-          setSnapshotsOpen(false);
-          records.viewSnapshot(version);
-        }}
-      />
     </div>
   );
 
@@ -482,7 +472,6 @@ const TechnicalDictionaryPage = ({
           onAddColumn={() => setAddColumnOpen(true)}
           onExport={handleExport}
           onImport={() => navigate(ROUTES.TECHNICAL_DICTIONARY_IMPORT)}
-          onOpenSnapshots={() => setSnapshotsOpen(true)}
           onRebuildIndex={handleRebuildIndex}
           onSelectVersion={records.viewSnapshot}
         />

@@ -1916,6 +1916,15 @@ const GlossaryHeader = ({
       return { secondary, primary: undefined };
     }
 
+    if (isCustomManagedGlossary && canCreateGlossaryTerm) {
+      primaryCandidates.push({
+        key: 'add-term',
+        label: t('label.add-entity', { entity: t('label.term-lowercase') }),
+        onClick: handleAddGlossaryTermClick,
+        testId: 'add-new-tag-button-header',
+      });
+    }
+
     if (canApproveOrReject && workflowPermissions?.canReject) {
       secondary.push({
         key: 'reject',
@@ -1991,6 +2000,9 @@ const GlossaryHeader = ({
   }, [
     isVersionView,
     canRenderMutationActions,
+    isCustomManagedGlossary,
+    canCreateGlossaryTerm,
+    handleAddGlossaryTermClick,
     canApproveOrReject,
     workflowPermissions,
     isRejecting,
@@ -2051,7 +2063,7 @@ const GlossaryHeader = ({
     } else if (canRequestDeletion) {
       items.push({
         key: 'request-deletion',
-        name: t('label.delete-with-ellipsis'),
+        name: t('label.delete'),
         description: t('message.workflow-request-deletion-description'),
         icon: IconDelete,
         onClick: openDeletionRequestModal,
@@ -2070,6 +2082,64 @@ const GlossaryHeader = ({
     canRequestDeletion,
     openDeleteModal,
     openDeletionRequestModal,
+    openRenameModal,
+    t,
+  ]);
+
+  const handleGovernedGlossaryExport = useCallback(
+    () => (isDQGlossary ? handleDQExportClick() : handleCDEExportClick()),
+    [isDQGlossary, handleDQExportClick, handleCDEExportClick]
+  );
+
+  const governedGlossaryMenu = useMemo(() => {
+    const visibleKeys = new Set(
+      visibleManageButtonContent.map((item) => String(item?.key ?? ''))
+    );
+    const items: WorkflowMenuItem[] = [];
+
+    if (visibleKeys.has('export-button')) {
+      items.push({
+        key: 'export-button',
+        name: isDQGlossary ? t('dq.export-excel') : t('cde.export-excel'),
+        description: t('message.export-entity-help', {
+          entity: t('label.glossary-term-lowercase-plural'),
+        }),
+        icon: ExportIcon,
+        onClick: handleGovernedGlossaryExport,
+        testId: 'export-button',
+      });
+    }
+    if (visibleKeys.has('import-button')) {
+      items.push({
+        key: 'import-button',
+        name: isDQGlossary ? t('dq.import-excel') : t('cde.import-excel'),
+        description: t('message.import-entity-help', {
+          entity: t('label.glossary-term-lowercase'),
+        }),
+        icon: ImportIcon,
+        onClick: handleGlossaryImport,
+        testId: 'import-button',
+      });
+    }
+    if (visibleKeys.has('rename-button')) {
+      items.push({
+        key: 'rename-button',
+        name: t('label.rename'),
+        description: t('message.rename-entity', {
+          entity: t('label.glossary'),
+        }),
+        icon: EditIcon,
+        onClick: openRenameModal,
+        testId: 'rename-button',
+      });
+    }
+
+    return items;
+  }, [
+    visibleManageButtonContent,
+    isDQGlossary,
+    handleGovernedGlossaryExport,
+    handleGlossaryImport,
     openRenameModal,
     t,
   ]);
@@ -2175,12 +2245,18 @@ const GlossaryHeader = ({
           />
         </div>
         <div className="flex items-center">
-          {isCustomManagedTerm ? (
+          {isCustomManagedTerm || isCustomManagedGlossary ? (
             <WorkflowActionBar
               historyTestId="correction-history-button"
-              menu={governedWorkflowMenu}
+              menu={
+                isCustomManagedGlossary
+                  ? governedGlossaryMenu
+                  : governedWorkflowMenu
+              }
               menuTitle={t('label.manage-entity', {
-                entity: t('label.glossary-term'),
+                entity: isCustomManagedGlossary
+                  ? t('label.glossary')
+                  : t('label.glossary-term'),
               })}
               primary={governedWorkflowActions.primary}
               secondary={governedWorkflowActions.secondary}

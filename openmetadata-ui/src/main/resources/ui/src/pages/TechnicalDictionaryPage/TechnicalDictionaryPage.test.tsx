@@ -311,7 +311,6 @@ jest.mock('./TechnicalRecordModal.component', () => ({
       </div>
     ) : null,
 }));
-jest.mock('./TechnicalSnapshotsModal.component', () => () => null);
 jest.mock('./TechnicalDictionaryToolbar.component', () => () => null);
 jest.mock('./TechnicalAddColumnModal.component', () => () => null);
 jest.mock(
