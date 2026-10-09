@@ -4,7 +4,7 @@
 
 ## Trạng thái thực hiện (cập nhật 2026-10-04)
 
-Mã nguồn T1–T5 đã được viết trên branch `feat/dq-rule-test-execution`. **Chưa chạy trên môi trường thật**: chưa có
+Mã nguồn T1–T5 đã được gộp vào `main` (commit `f6f36f0a5c8`, 2026-10-05); sửa lỗi lịch tại `dd61210ed5b`, xóa Rule gỡ testcase tại `b9a2421e757` (thiết kế §15). **Chưa chạy trên môi trường thật**: chưa có
 kiểm thử tích hợp, E2E. Đã chạy được: unit test backend (74 test), Jest cho các component mới (13 test) và biên
 dịch. Ingestion không sửa: khai báo `SQL` dùng validator gốc (DQT-13, 2026-10-04), nên Airflow dùng image gốc.
 

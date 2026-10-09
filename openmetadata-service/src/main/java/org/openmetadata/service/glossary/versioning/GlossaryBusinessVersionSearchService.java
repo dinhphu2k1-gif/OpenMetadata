@@ -138,7 +138,8 @@ public class GlossaryBusinessVersionSearchService {
   private static boolean matchesQuery(Map<String, Object> row, String q) {
     final String needle = searchable(q);
     return searchable(row.get("name")).contains(needle)
-        || searchable(row.get("displayName")).contains(needle);
+        || searchable(row.get("displayName")).contains(needle)
+        || searchable(row.get("description")).contains(needle);
   }
 
   private static boolean matches(Map<String, Object> row, Criteria criteria) {

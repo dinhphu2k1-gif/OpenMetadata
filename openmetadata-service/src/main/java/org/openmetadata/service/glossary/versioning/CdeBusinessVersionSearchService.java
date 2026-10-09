@@ -130,7 +130,8 @@ public class CdeBusinessVersionSearchService {
     if (criteria.q() != null) {
       String needle = searchable(criteria.q());
       if (!searchable(row.get("name")).contains(needle)
-          && !searchable(row.get("displayName")).contains(needle)) {
+          && !searchable(row.get("displayName")).contains(needle)
+          && !searchable(row.get("description")).contains(needle)) {
         return false;
       }
     }

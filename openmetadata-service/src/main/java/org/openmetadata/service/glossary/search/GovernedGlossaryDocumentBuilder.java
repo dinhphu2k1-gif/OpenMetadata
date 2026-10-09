@@ -99,6 +99,9 @@ public final class GovernedGlossaryDocumentBuilder {
         GovernedGlossaryIndexFields.DISPLAY_NAME_SEARCH,
         GovernedGlossaryText.normalize(row.get(GovernedGlossaryIndexFields.DISPLAY_NAME)));
     document.put(
+        GovernedGlossaryIndexFields.DESCRIPTION_SEARCH,
+        GovernedGlossaryText.normalize(row.get(GovernedGlossaryIndexFields.DESCRIPTION)));
+    document.put(
         GovernedGlossaryIndexFields.BUSINESS_VERSION_SORT,
         versionSort(row.get(GovernedGlossaryIndexFields.BUSINESS_VERSION)));
     document.put(GovernedGlossaryIndexFields.REVISION_MARKER, revisionMarker(row));

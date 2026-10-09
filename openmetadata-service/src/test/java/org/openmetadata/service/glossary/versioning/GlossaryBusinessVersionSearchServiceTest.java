@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.ws.rs.BadRequestException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -51,6 +52,22 @@ class GlossaryBusinessVersionSearchServiceTest {
         "Approved",
         ((List<?>) response.get("data"))
             .stream().map(Map.class::cast).findFirst().orElseThrow().get("entityStatus"));
+  }
+
+  @Test
+  void searchMatchesDescriptionIgnoringAccents() {
+    GlossaryBusinessVersionSearchService service = new GlossaryBusinessVersionSearchService();
+    Map<String, Object> described = new HashMap<>(row("CDE1", "1.0", "Approved"));
+    described.put("description", "Số định danh của Khách hàng");
+
+    Map<String, Object> response =
+        service.search(
+            criteria("khach hang", List.of(), 10, 0),
+            List.of(described, row("CDE2", "1.0", "Approved")),
+            false,
+            false);
+
+    assertEquals(1, ((Map<?, ?>) response.get("paging")).get("total"));
   }
 
   @Test

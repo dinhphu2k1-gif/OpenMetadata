@@ -4,24 +4,28 @@
 >
 > Baseline kiến trúc: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md). Database là nguồn sự thật cho list/detail/workflow; search engine chỉ là projection phục vụ discovery, không quyết định trạng thái nghiệp vụ.
 
-## Hiện trạng triển khai (cập nhật 2026-10-01)
+## Hiện trạng triển khai (cập nhật 2026-10-08)
 
-> Mục này mô tả code hiện có, đối chiếu bằng đọc mã nguồn; chưa build và chưa chạy test. Các mục còn lại của tài liệu vẫn là thiết kế đích.
+> Đối chiếu mã nguồn tại commit `b9a2421e757`. Các mục còn lại là thiết kế đích; khác biệt ghi ở bảng dưới. Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
 
 | Hạng mục | Hiện trạng |
 | --- | --- |
-| Profile registry | Đã có `GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY`. Chưa có feature flag bật/tắt DQ. |
-| Bootstrap | `DataQualityBootstrap` tạo glossary hệ thống `Data Quality` (displayName `Chất lượng dữ liệu`), mode `BUSINESS_WORKFLOW`, working Draft `1`. |
-| Tạo DQ Rule | `GlossaryTermResource` kiểm tra: là con trực tiếp của glossary DQ, đúng 1 CDE canonical, có `name` làm mã quy tắc. Workflow Draft/Submit/Reject/Reopen/Approve dùng chung endpoint `/working/*` với CDE. |
-| List/search/flat list | Dùng chung `GlossaryFlatListService`; chưa có service read model riêng cho DQ (so với `CdeFlatListService`/`CdeBusinessVersionSearchService`). |
-| Export | **Chưa có.** `GET /glossaryTerms/export` trả 400 `Export is not supported for this glossary profile` cho DQ. |
-| Import | Chưa có template/preview/commit nguyên tử ở backend (các endpoint `/glossaryTerms/import/*` hiện là của CDE). UI `DQImportPage` đọc và kiểm tra Excel ở client rồi chuyển từng dòng thành payload tạo term; không nguyên tử. |
-| UI | Có `DQGlossaryTermForm`, `DQGlossaryTableColumns`, `DQGlossaryTermOverview`/`Summary`, `DQImportExport`. |
-| Assets, tìm ngược CDE→DQ, audit | Chưa thấy triển khai. |
-| Migration/cutover, hardening, dọn code trùng | Chưa thực hiện. |
-| Test | Chỉ có test UI (`DQGlossaryTermForm.test.tsx`, `DQImportExport.utils.test.ts`, `DQImportPage.test.tsx`). Chưa có test backend hoặc integration test riêng cho DQ. |
+| Profile registry | `GovernedGlossaryProfileRegistry.Profile.DATA_QUALITY`. Không có feature flag. |
+| Bootstrap | `DataQualityBootstrap` tạo glossary hệ thống `Data Quality` (displayName `Chất lượng dữ liệu`). Classification `DataQualityDimension`, `DataQualityTargetPopulation`, `DataQualityMethod`, `DataQualityFrequency` seed cố định từ `json/data/tags/*.json` (`provider: system`). |
+| Version catalog | Catalog DQ đi theo Data Dictionary: khi DD `N+1` được phê duyệt, DQ Rule Approved của scope `N` bị archive; nếu catalog DQ đang ở `N` và không có working thì catalog `N` bị archive và catalog `N+1` mở dạng Draft rỗng (`advanceDataQualityCatalog`). Rule phải tạo lại trong scope mới (§5.1). |
+| Tạo/sửa DQ Rule | Con trực tiếp của glossary DQ, đúng 1 CDE canonical, `name` là mã quy tắc. Workflow, Sửa phiên bản, hủy bản nháp dùng chung endpoint `/working/*` với CDE. |
+| Xóa DQ Rule Approved | Đề nghị xóa (`POST .../working/deletion`) vào `In Review` ngay; duyệt thì archive Rule và đưa reconcile vào `dq_test_outbox` để ngừng testcase managed, vô hiệu hóa pipeline (§5.6). |
+| Rút lại yêu cầu | `POST .../working/withdraw`, bulk `withdraw` (§5.6). |
+| Tab Yêu cầu | `PendingRequestsTab` + `useDataQualityPendingRequestsAdapter` (§8.9). |
+| List/search | Mặc định đọc `governed_glossary_search_index`; dự phòng DB qua `GlossaryFlatListService`/`GlossaryBusinessVersionSearchService` khi index lỗi (xem [Kiến trúc hiện tại §5](./agribank-metadata-architecture.md)). Tìm theo mã, tên, mô tả. Term DQ ẩn tab Tài sản. |
+| Kiểm thử theo Rule | Đã có: [Thiết kế Kiểm thử theo Quy tắc CLDL](./dq-rule-test-execution-design.md). |
+| Export | **Chưa có.** `GET /glossaryTerms/export` trả 400 `Export is not supported for this glossary profile`. |
+| Import | Chưa có template/preview/commit nguyên tử ở backend. `DQImportPage` đọc, kiểm tra Excel ở client rồi tạo từng Rule; không nguyên tử (`GAP-DQ-01`). |
+| UI | `DQGlossaryTermForm` (dùng `ClassificationSelect`, `CDESelectableField`), `DQGlossaryTableColumns`, `DQGlossaryTermOverview`/`Summary`, `DQImportExport`, `DQRuleTests`. |
+| Assets, audit riêng DQ | Chưa triển khai. |
+| Test | Unit test backend cho deletion/bulk/kiểm thử; test UI cho form, import. Chưa có integration test riêng DQ. |
 
-Khác biệt giữa thiết kế và hiện trạng cần được xử lý hoặc chấp nhận có chủ đích: §6.3 Import/export (export bị chặn, import phía client), §10 read model riêng, §11 audit, §12 migration.
+Khác biệt có chủ đích hoặc còn mở: §6.3 Import/export, §10 read model riêng, §11 audit, §12 migration.
 
 ## 1. Mục tiêu và nguyên tắc
 
@@ -37,7 +41,7 @@ Khác biệt giữa thiết kế và hiện trạng cần được xử lý ho�
 
 1. **Không nhân bản màn hình CDE.** DQ là một cấu hình/profile của cùng feature shell.
 2. **Không hard-code bằng display name.** Backend nhận diện profile từ glossary identity/name bất biến; frontend dùng `profileKey` do backend trả về.
-3. **Không dùng Elasticsearch làm nguồn workflow.** Search có thể chậm hơn transaction; mọi mutation và list nghiệp vụ phải resolve lại từ database.
+3. **Không dùng Elasticsearch làm nguồn workflow.** Search có thể chậm hơn transaction; mọi mutation phải resolve lại từ database. (Chỉ màn hình danh sách đọc index, có dự phòng DB; workflow, chi tiết và tab Yêu cầu đọc DB.)
 4. **Không có dual write không kiểm soát.** Quan hệ CDE có một nguồn sự thật; các nhãn snapshot chỉ để hiển thị lịch sử.
 5. **Published snapshot chỉ đổi qua Sửa phiên bản.** Sửa quy tắc đã Approved bằng cách tạo working business version kế tiếp, hoặc dùng luồng Sửa phiên bản ([thiết kế CDE §5.6](./cde-glossary-ui-design.md)) để ghi đè chính version đó, lưu nội dung cũ vào lịch sử. Không có hủy duyệt.
 6. **Authorization tại backend.** Ẩn nút ở frontend không thay thế kiểm tra quyền trên API.
@@ -197,9 +201,13 @@ stateDiagram-v2
   InReview --> Approved: Approve
   InReview --> Rejected: Reject
   Rejected --> Draft: Reopen
+  InReview --> Draft: Withdraw (người gửi)
   Approved --> Draft: Create next minor version
-  Approved --> Archived: Successor catalog cutover
+  Approved --> Archived: Data Dictionary kế tiếp được phê duyệt
+  Approved --> Archived: Đề nghị xóa được phê duyệt
 ```
+
+Catalog DQ dùng cùng số version với Data Dictionary. Approve DD `N+1` archive mọi DQ Rule Approved của scope `N` (Rule gắn với CDE của scope `N` nên không còn hiệu lực), và nếu catalog DQ đang Approved ở `N` và không có working thì archive catalog `N`, mở catalog `N+1` Draft rỗng. Không có sao chép Rule sang scope mới.
 
 Khi phê duyệt DQ catalog, backend phê duyệt nguyên tử toàn bộ DQ Rule working trong đúng
 `parentBusinessVersion` rồi mới publish catalog và manifest. Trạng thái riêng trước đó của Rule
@@ -325,6 +333,15 @@ Custom Properties của `glossaryTerm` có phạm vi toàn entity type, không r
 - UI chỉ render allowlist của profile; generic Glossary không tự động hiện field DQ.
 - Backend từ chối extension key ngoài allowlist khi ghi working DQ Rule, nhưng giữ nguyên các key hệ thống được profile cho phép.
 - Bootstrap property phải idempotent và kiểm tra cả name, type, displayName; cùng name khác type là lỗi vận hành, không tự overwrite.
+
+### 5.6. Đề nghị xóa, rút lại, hủy bản nháp
+
+Dùng chung cơ chế CDE ([Thiết kế CDE §5.7–5.8](./cde-glossary-ui-design.md)):
+
+- **Đề nghị xóa** Rule Approved: `POST /glossaryTerms/{id}/working/deletion?parentBusinessVersion=N`, working `pendingDeletion` vào `In Review` ngay. Rule và kiểm thử vẫn chạy tới khi được duyệt.
+- **Phê duyệt xóa**: archive mọi snapshot Approved của Rule trong scope, bỏ published head; trong cùng transaction ghi reconcile vào `dq_test_outbox` để gỡ testcase managed và vô hiệu hóa pipeline. Lịch sử Rule và kết quả kiểm thử được giữ.
+- **Rút lại** (người gửi, `In Review`): `POST .../working/withdraw`; đề nghị xóa bị hủy, loại khác về `Draft`.
+- **Hủy bản nháp** (`Draft`/`Rejected`): `DELETE .../working?expectedRevision=n`.
 
 ## 6. REST contract
 
@@ -470,12 +487,12 @@ Nhiều tag trong một cell dùng delimiter được khai báo trong metadata s
 
 UI không suy quyền từ tên role, owner, reviewer hoặc release level. Nó chỉ dùng capability backend:
 
-- `canViewPublished`, `canViewWorking`
-- `canCreate`, `canEdit`, `canDelete`
-- `canCreateVersion`
-- `canSubmit`, `canApprove`, `canReject`, `canReopen`
-- `canImport`, `canExport`
-- `canManageAssets`
+- `canViewPublished`, `canViewWorking`, `isConsumer`
+- `canEditWorking` (lưu nháp, hủy bản nháp, reopen, import)
+- `canCreateVersion` (tạo Rule/version, Sửa phiên bản; cùng `canSubmit` để đề nghị xóa)
+- `canSubmit`, `canApprove`, `canReject`
+- Rút lại yêu cầu: không có capability riêng; UI hiện khi `submittedBy` là người dùng hiện tại, backend kiểm tra lại
+- Kiểm thử: `canEdit`, `canRun`, `canView` từ `GET /glossaryTerms/dataQuality/config`
 
 Consumer-only được xác định bằng `canViewPublished=true && canViewWorking=false`, giống CDE. Trong lúc permission đang load, UI không render action để tránh flash nút trái quyền.
 
@@ -485,16 +502,18 @@ Vì yêu cầu là kế thừa mô hình CDE, target không cho client tự sử
 
 ### 7.3. Ma trận thao tác mặc định
 
-| Thao tác | Admin | Data Steward/Approver | Data Proposer | Consumer-only |
-| --- | --- | --- | --- | --- |
-| Xem Approved/Archived | Có | Có | Có | Có |
-| Xem working | Có | Theo policy | Theo policy | Không |
-| Tạo/sửa Draft | Có | Không mặc định | Có | Không |
-| Submit | Có | Không mặc định | Có | Không |
-| Approve/Reject | Có | Có theo policy | Không | Không |
-| Import | Có | Không mặc định | Theo policy | Không |
-| Export | Có | Có | Có | Có, chỉ published |
-| Gắn Assets | Theo policy | Theo policy | Theo policy | Không |
+| Thao tác | `DataProposer` | `DataSteward` | `DataConsumer` / `BasicConsumer` |
+| --- | --- | --- | --- |
+| Xem Approved/Archived | Có | Có | Có |
+| Xem working, tab Yêu cầu | Có | Có | Không |
+| Tạo/sửa Draft, Sửa phiên bản, hủy bản nháp | Có | Không | Không |
+| Submit, đề nghị xóa, rút lại yêu cầu của mình | Có | Không | Không |
+| Approve/Reject (không duyệt yêu cầu của chính mình) | Không | Có | Không |
+| Khai báo kiểm thử, lịch, Chạy ngay | Có (`canEdit`/`canRun`) | Không | Không |
+| Import | Có | Không | Không |
+| Export | Chưa có (`GAP-DQ-01`) | Chưa có | Chưa có |
+
+`Admin` dùng OpenMetadata UI để quản trị (reconcile kiểm thử là Admin-only) và không mặc nhiên có `W`/`A`. Các role nghiệp vụ dùng Portal ([Kiến trúc triển khai tách Portal](./public-admin-split-deployment-architecture.md)).
 
 ## 8. Thiết kế UI/UX
 
@@ -607,7 +626,8 @@ Tổng cộng header và Overview phải phủ đủ đúng 19 trường, không
 ### 8.6. Bulk action
 
 - Checkbox chỉ xuất hiện khi actor có capability phù hợp.
-- Chỉ cho Submit các row Draft; Approve/Reject các row InReview. Không có bulk hủy duyệt.
+- Chỉ cho Submit các row Draft; Approve/Reject các row InReview; Withdraw các row InReview do chính người dùng gửi. Không có bulk hủy duyệt.
+- Bảng dùng `BulkSelectionBar`, xác nhận bằng `ReviewActionConfirmModal`; gọi `POST /glossaryTerms/bulk/{submit|approve|reject|withdraw}`.
 - Modal preview nhóm row hợp lệ/không hợp lệ và lý do.
 - Backend xử lý từng row có optimistic lock, trả kết quả chi tiết; UI không báo thành công toàn bộ nếu chỉ một phần thành công.
 
@@ -619,6 +639,10 @@ Luồng ba bước: tải/chọn file → validate/preview → commit.
 - Không cho commit nếu còn error; warning cần xác nhận.
 - Rời modal không tự commit; session hết TTL phải preview lại.
 - Sau commit, refresh DB list và thông báo số row; reindex có thể hoàn tất sau mà không làm mất row khỏi list.
+
+### 8.9. Tab Yêu cầu
+
+Trang catalog Chất lượng dữ liệu có tab **Yêu cầu** như Data Dictionary ([Thiết kế CDE §6.4](./cde-glossary-ui-design.md)), dùng `PendingRequestsTab` với `useDataQualityPendingRequestsAdapter`. Loại yêu cầu: Thêm mới, Sửa, Xóa. Phê duyệt đề nghị xóa hiện cảnh báo: Rule bị loại khỏi phiên bản hiệu lực, testcase managed ngừng và pipeline bị vô hiệu hóa; lịch sử Rule và kết quả kiểm thử vẫn giữ.
 
 ### 8.8. Accessibility và responsive
 
@@ -694,7 +718,9 @@ Migration phải idempotent, có dry-run, marker, rollback theo toàn glossary v
 | ADR-DQ-10 | Hai trường ngày dùng contract CDE | Đồng nhất format, validation và import/export |
 | ADR-DQ-11 | CDE selector hiển thị mỗi CDE identity một option, lấy từ Data Dictionary scope cùng số version `N` với catalog DQ, khi scope đó đang active. Relation chỉ lưu `termId`, không lưu `versionContext`, và bao trùm mọi version `N.x` của CDE (§5.4) | Người dùng liên kết với thành tố dữ liệu chứ không với một lần sửa của nó; không phải gán lại khi CDE lên version minor; ngăn relation tới CDE chưa từng Approved và không chọn chéo scope |
 | ADR-DQ-12 | Archive không rewrite relation DQ lịch sử | Bảo toàn audit, khả năng truy vết và tính bất biến của snapshot |
-| ADR-DQ-13 | Relation DQ→CDE lưu version context | `termId` dùng chung giữa các version nên không đủ để khôi phục lựa chọn |
+| ADR-DQ-13 | ~~Relation DQ→CDE lưu version context~~ — **Thay thế bởi ADR-DQ-11**: relation chỉ lưu `termId`, client không gửi `versionContext` | Khớp mã nguồn và đặc tả API §4.1 |
+| ADR-DQ-14 | Catalog DQ dùng cùng số version với Data Dictionary; cutover DD archive Rule của scope cũ | Rule gắn CDE của một scope nên hết hiệu lực khi scope đó bị thay |
+| ADR-DQ-15 | Xóa Rule Approved qua đề nghị xóa có phê duyệt, không xóa trực tiếp | Giữ maker-checker; gỡ testcase managed trong cùng transaction qua outbox |
 
 ## 14. Tiêu chí chấp nhận cấp tính năng
 

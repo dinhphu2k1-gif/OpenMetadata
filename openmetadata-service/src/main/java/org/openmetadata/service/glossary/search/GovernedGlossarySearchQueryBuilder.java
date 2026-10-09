@@ -111,7 +111,8 @@ public final class GovernedGlossarySearchQueryBuilder {
             SHOULD,
             List.of(
                 wildcard(GovernedGlossaryIndexFields.NAME_SEARCH, pattern),
-                wildcard(GovernedGlossaryIndexFields.DISPLAY_NAME_SEARCH, pattern)),
+                wildcard(GovernedGlossaryIndexFields.DISPLAY_NAME_SEARCH, pattern),
+                wildcard(GovernedGlossaryIndexFields.DESCRIPTION_SEARCH, pattern)),
             "minimum_should_match",
             1));
   }
@@ -166,6 +167,7 @@ public final class GovernedGlossarySearchQueryBuilder {
         GovernedGlossaryIndexFields.GLOSSARY_ID,
         GovernedGlossaryIndexFields.NAME_SEARCH,
         GovernedGlossaryIndexFields.DISPLAY_NAME_SEARCH,
+        GovernedGlossaryIndexFields.DESCRIPTION_SEARCH,
         GovernedGlossaryIndexFields.BUSINESS_VERSION_SORT,
         GovernedGlossaryIndexFields.REVISION_MARKER,
         GovernedGlossaryIndexFields.OWNER_IDS,

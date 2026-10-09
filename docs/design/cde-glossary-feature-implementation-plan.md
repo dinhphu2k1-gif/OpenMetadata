@@ -1,8 +1,12 @@
 # Kế hoạch triển khai Từ điển dữ liệu dùng chung theo từng chức năng
 
-## Trạng thái thực hiện (cập nhật 2026-10-01)
+## Trạng thái thực hiện (cập nhật 2026-10-08)
 
 Đối chiếu bằng đọc mã nguồn, chưa build/test trong lần cập nhật này.
+
+- Mới (2026-10-07/08): đề nghị xóa CDE Approved (`POST /glossaryTerms/{id}/working/deletion`, `CdeDeletionGuard`, `GlossaryTermDeletion`), hủy bản nháp (`DELETE .../working`), rút lại yêu cầu (`POST .../working/withdraw`, bulk `withdraw`), tab **Yêu cầu** (`PendingRequestsTab`). Thiết kế: [CDE §5.7, §5.8, §6.4](./cde-glossary-ui-design.md). Có unit test (`GlossaryTermDeletionTest`, `GovernedBulkWorkflowServiceTest`, `PendingRequestsTab.test.tsx`); chưa integration test.
+- Đã gỡ route archive trực tiếp `.../published/latest/archive`; F16 "Archive/delete" nay là đề nghị xóa có phê duyệt.
+- Vai trò theo ma trận mới: `DataProposer` (`W`), `DataSteward` (`A`), `DataConsumer`/`BasicConsumer` (`R`) dùng Portal; `Admin` dùng OM UI ([Kiến trúc hiện tại](./agribank-metadata-architecture.md)).
 
 - F00–F07, F09–F16: đã có trong code (`GlossaryVersioningService`, `GovernedBulkWorkflowService`, `CdeFlatListService`, `CdeBusinessVersionSearchService`, `CdeImportService`, `CdeExcelExporter`; endpoint `/working/*`, `/published/*`, `/bulk/{action}`, `/import/*`, `/export`). Chưa kiểm chứng đầy đủ bằng test.
 - F17: đã có `CdeReleaseVersionType`, thuộc tính Cấp phát hành ở backend, form/bảng/import UI.
@@ -690,11 +694,13 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 - GlossaryTerm thường vẫn giữ tab hiện hữu.
 - Assets có pagination, empty và error states.
 
-### F16 — Archive/delete, audit và vận hành
+### F16 — Xóa có phê duyệt, rút lại yêu cầu, audit và vận hành
 
 **Phạm vi**
 
-- Delete thủ công chỉ cho Draft/Rejected theo policy; cutover F09 được phép xóa toàn bộ CDE predecessor non-Approved sau cảnh báo/xác nhận ở bước Approve.
+- Hủy bản nháp (`DELETE .../working`) chỉ cho Draft/Rejected với `canEditWorking`; cutover F09 được phép xóa toàn bộ CDE predecessor non-Approved sau cảnh báo/xác nhận ở bước Approve.
+- Xóa CDE Approved qua **đề nghị xóa** có phê duyệt (thiết kế §5.7): `POST .../working/deletion` tạo working `pendingDeletion` ở `In Review`; `CdeDeletionGuard` chặn khi còn record Từ điển kỹ thuật, DQ Rule, CDE khác tham chiếu hoặc asset gắn tag; duyệt thì archive snapshot của CDE trong scope và bỏ published head.
+- Người gửi rút lại yêu cầu `In Review` (thiết kế §5.8); tab **Yêu cầu** (§6.4) tập trung duyệt/rút lại hàng loạt.
 - Không có thao tác hủy duyệt/thu hồi thủ công cho Data Dictionary, CDE hay DQ Rule (đã gỡ endpoint `.../published/latest/archive` và nút trên UI). Sửa nội dung một version Approved dùng luồng Sửa phiên bản (thiết kế §5.6).
 - Archive predecessor Data Dictionary và Approved CDE cùng scope là system transition bắt buộc của F09, không phải lựa chọn thủ công. Snapshot/archive manifest vẫn còn để audit và không được restore thành active khi đã có successor.
 - Mọi archive/delete/approve CDE phải lấy publication lock theo thứ tự F05/F09 để không race với cutover.
@@ -705,6 +711,7 @@ F01 chỉ bổ sung ràng buộc published-only dành cho **Consumer-only**. Cá
 **Test/DoD**
 
 - Test quyền và modal xác nhận cleanup/archive khi Approve successor.
+- Test đề nghị xóa: bị chặn khi còn tham chiếu, Consumer vẫn thấy CDE tới khi duyệt, rút lại hủy đề nghị, bulk approve gồm đề nghị xóa.
 - Test race mutation CDE với cutover chứng minh tuyến tính hóa đúng; mutation scope predecessor sau cutover bị từ chối.
 - Archived scope không active/restore được nhưng vẫn truy vết theo chính sách audit.
 - Diễn tập rollback bản triển khai và restore; không làm mất snapshot.

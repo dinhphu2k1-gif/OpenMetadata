@@ -2,6 +2,7 @@
 
 > Trạng thái tài liệu: **Đã chốt**, cập nhật quyết định phê duyệt bản ghi mới ngày 2026-10-05; duyệt hàng loạt, từ chối không cần lý do và bản nháp ngày 2026-10-06.
 > Giao diện (§11), chủ quản dữ liệu (TD-D11) và hiện trạng triển khai (§16) đã được đối chiếu lại với code ngày 2026-10-06.
+> Cập nhật 2026-10-08 (commit `b9a2421e757`): đề nghị xóa gửi duyệt ngay, rút lại yêu cầu (§7.5), tab **Yêu cầu** và `GET /technical/requests` (§11.7). Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
 > Đây là tài liệu thiết kế duy nhất của Từ điển kỹ thuật (TD).
 >
 > Tài liệu hợp nhất ba tài liệu trước đây và thay thế chúng:
@@ -344,7 +345,16 @@ proposal đã đổi sau preview. Cutover DD ghi
 `RESET_CHANGE`, xóa proposal trước khi xóa record để không để lại dữ liệu mồ côi.
 
 Trên giao diện (§11.3): **Sửa phiên bản** tạo đề xuất `UPDATE` ở `Draft` sao chép giá trị đã duyệt rồi mở `view=working` để sửa từng trường;
-**Đề nghị xóa** tạo đề xuất `DELETE`; **Hủy bản nháp thay đổi** gọi `DELETE /change-request`. Danh sách hiển thị bản đã duyệt và bản đề xuất thành hai dòng (§5.3, §11.2).
+**Đề nghị xóa** gọi `POST /records/{id}/deletion-request`: tạo đề xuất `DELETE` và gửi duyệt (`InReview`) trong cùng transaction, không có bước Draft; bản ghi Approved và tag trên Column giữ hiệu lực tới khi duyệt. Phê duyệt xóa bản ghi, gỡ tag CDE/phân loại được quản lý trên Column và có thể kích hoạt reconcile kiểm thử DQ; audit vẫn giữ. **Hủy bản nháp thay đổi** gọi `DELETE /change-request`. Danh sách hiển thị bản đã duyệt và bản đề xuất thành hai dòng (§5.3, §11.2).
+
+### 7.5. Rút lại yêu cầu
+
+Chỉ người gửi, chỉ khi yêu cầu đang `InReview`:
+
+- Bản ghi mới: `POST /records/{id}/withdraw` (body `{"expectedRevision": n}`) đưa về `Draft`, giữ nội dung.
+- Đề xuất sửa/xóa: `POST /records/{id}/change-request/withdraw` xóa đề xuất, ghi audit `WITHDRAW_CHANGE`; bản Approved không đổi.
+
+Người khác gọi trả `403`; sai trạng thái trả `409 TD_INVALID_STATUS_TRANSITION`.
 
 ## 8. Column nguồn thay đổi
 
@@ -403,13 +413,12 @@ Lỗi ở bất kỳ bước nào làm rollback toàn bộ phê duyệt DD. Kh�
 | Capability | Ý nghĩa | Nguồn |
 | --- | --- | --- |
 | `canView` | Xem danh sách, trang chi tiết, bản chụp. Lịch sử thay đổi chỉ gồm các sự kiện đã có hiệu lực với Consumer (§5.1) | Policy `ViewAll`/`ViewBasic` trên glossary `Technical Dictionary` |
-| `canEdit` | Khai báo (bản nháp), sửa, gửi duyệt, gửi duyệt lại, xóa bản ghi | Policy `EditAll` hoặc `EditGlossaryTerms` trên glossary `Technical Dictionary` |
+| `canEdit` | Khai báo (bản nháp), sửa, gửi duyệt, gửi duyệt lại, xóa bản nháp, đề nghị sửa/xóa, rút lại yêu cầu của mình | Policy `EditAll` hoặc `EditGlossaryTerms` trên glossary `Technical Dictionary` |
 | `canApprove` | Phê duyệt hoặc từ chối bản ghi mới | `DATA_STEWARD`, Admin hoặc policy `ApproveWorking`; vẫn phải khác người tạo |
 | `canImport` | Import | Bằng `canEdit` |
 | `canExport` | Export danh sách và bản chụp | Theo quyền Export chung (API spec §2.1) |
 
-- Mọi người xem thấy cùng một dữ liệu, trừ bản nháp chỉ hiện với người có `canEdit` hoặc `canApprove`. Mặc định `canEdit` cấp cho `DATA_PROPOSER`, `DATA_STEWARD` và `Admin`;
-  `canApprove` cấp cho `DATA_STEWARD` và `Admin`. Kiểm tra maker-checker áp dụng độc lập với role: actor có
+- Mọi người xem thấy cùng một dữ liệu, trừ bản nháp và tab **Yêu cầu** chỉ hiện với người có `canEdit` hoặc `canApprove`. Runtime hiện tại: `canEdit` theo policy (thực tế gồm `DataProposer`, `DataSteward`, `Admin`); `canApprove` cấp cho `DataSteward` và `Admin`. Ma trận nghiệp vụ chuẩn chỉ cho `DataProposer` có `W`, `DataSteward` có `A`, `DataConsumer` có `R`, `BasicConsumer` không truy cập; khoảng cách theo dõi ở `GAP-TD-02` của [đặc tả API](../api/openmetadata-governed-api-specification.md). Các role nghiệp vụ dùng Portal; `Admin` dùng OM UI. Kiểm tra maker-checker áp dụng độc lập với role: actor có
   cả hai quyền vẫn không được duyệt bản ghi do chính mình tạo.
 - Quyền ghi luôn được kiểm tra lại trên Postgres; nút Sửa trên UI không phải căn cứ cho phép ghi.
 - `GET /v1/glossaryTerms/technical/context` trả các capability gồm `canApprove`, DD đang gắn và `resetAt`.
@@ -579,6 +588,14 @@ Khai báo Column đã có bản ghi: `TD_COLUMN_ALREADY_DECLARED`, modal báo v�
   ghi với ✓ hoặc ✕ kèm thông báo lỗi của máy chủ, cuộn được, nút **Đóng**); bản ghi lỗi giữ nguyên trạng thái trước đó (`Draft` hoặc `In Review`). Lỗi của
   cả yêu cầu (ví dụ không có quyền) hiện toast lỗi và giữ nguyên lựa chọn.
 
+### 11.7. Tab Yêu cầu
+
+Trang Từ điển kỹ thuật có hai tab: **Bản ghi** (bảng §11.2) và **Yêu cầu** kèm số yêu cầu chờ. Tab Yêu cầu hiện khi có `canEdit` hoặc `canApprove` và dùng component chung `PendingRequestsTab` (như Từ điển dữ liệu dùng chung, Chất lượng dữ liệu) với adapter `useTechnicalPendingRequestsAdapter`.
+
+- **Nguồn:** `GET /v1/glossaryTerms/technical/requests?q=&types=&requesters=&sourceServices=&cdeTermIds=&limit=&offset=` (`canView`; `limit` 1..100). Server đọc một lần mọi bản ghi mới `In Review` và đề xuất `In Review` từ Postgres, không truy vấn từng yêu cầu.
+- **Loại yêu cầu:** `Thêm mới` (bản ghi mới), `Sửa` (đề xuất `UPDATE`, mở rộng dòng hiện **Hiện hành / Đề xuất** từng trường), `Xóa` (đề xuất `DELETE`, cảnh báo gỡ mapping trên Column).
+- **Thao tác:** `canApprove` phê duyệt/từ chối (không với yêu cầu của chính mình); người gửi **Rút lại**. Bản ghi mới đi qua `/records/bulk/*`, đề xuất đi qua `/change-request/{approve|reject|withdraw}` từng dòng; kết quả gộp theo thứ tự đã chọn, lỗi từng phần hiện theo dòng.
+
 ## 12. Import và Export
 
 ### 12.1. Export
@@ -653,6 +670,10 @@ DELETE /v1/glossaryTerms/technical/records/{id}/change-request?expectedRevision=
 POST   /v1/glossaryTerms/technical/records/{id}/change-request/submit
 POST   /v1/glossaryTerms/technical/records/{id}/change-request/approve
 POST   /v1/glossaryTerms/technical/records/{id}/change-request/reject
+POST   /v1/glossaryTerms/technical/records/{id}/change-request/withdraw  # người gửi; xóa đề xuất InReview
+POST   /v1/glossaryTerms/technical/records/{id}/deletion-request  # canEdit; tạo DELETE và gửi duyệt nguyên tử
+POST   /v1/glossaryTerms/technical/records/{id}/withdraw        # người gửi; bản ghi mới InReview -> Draft
+GET    /v1/glossaryTerms/technical/requests?q=&types=&requesters=&sourceServices=&cdeTermIds=&limit=&offset=   # tab Yêu cầu
 POST   /v1/glossaryTerms/technical/records/{id}/submit          # canEdit; Draft -> In Review, body có expectedRevision
 POST   /v1/glossaryTerms/technical/records/{id}/approve         # body có expectedRevision
 POST   /v1/glossaryTerms/technical/records/{id}/reject          # body có expectedRevision; không cần lý do
@@ -787,7 +808,7 @@ Luồng maker-checker tại §7.3 đã được bổ sung: bản ghi mới/impor
 capability và endpoint submit/approve/reject (từng bản ghi và hàng loạt, từ chối không cần lý do), bản nháp ẩn với Consumer, chặn tự duyệt, audit đầy đủ, lọc trạng thái trên index và UI duyệt từng bản ghi hoặc hàng loạt. Chỉ dữ liệu
 `Approved` được projection, xuất hiện trong tab Tài sản và được tính là đã gán CDE.
 
-Đề xuất sửa/xóa bản ghi `Approved` (§7.4), trang chi tiết và xem bản chụp (§11.1, §11.3), Chủ quản dữ liệu nhiều Team/User (TD-D11) và hiển thị hai dòng cho bản ghi đang có đề xuất (§5.3) đã có ở cả backend và giao diện.
+Đề nghị xóa gửi duyệt nguyên tử, rút lại yêu cầu (§7.5) và tab Yêu cầu (§11.7) đã có ở backend và giao diện (commit `b9a2421e757`, 2026-10-08). Đề xuất sửa/xóa bản ghi `Approved` (§7.4), trang chi tiết và xem bản chụp (§11.1, §11.3), Chủ quản dữ liệu nhiều Team/User (TD-D11) và hiển thị hai dòng cho bản ghi đang có đề xuất (§5.3) đã có ở cả backend và giao diện.
 
 Khác biệt so với mô tả ở trên:
 

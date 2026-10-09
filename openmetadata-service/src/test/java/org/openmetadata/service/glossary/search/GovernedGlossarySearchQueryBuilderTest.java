@@ -82,6 +82,21 @@ class GovernedGlossarySearchQueryBuilderTest {
     assertTrue(serialized.contains("\\\\?"));
   }
 
+  @Test
+  void textSearchCoversCodeNameAndDescription() {
+    final String serialized =
+        json(request(
+                criteria("Khách hàng", List.of(), List.of(), List.of()),
+                capabilities(true, false, false),
+                false))
+            .toString();
+
+    assertTrue(serialized.contains("\"nameSearch\""));
+    assertTrue(serialized.contains("\"displayNameSearch\""));
+    assertTrue(serialized.contains("\"descriptionSearch\""));
+    assertTrue(serialized.contains("*khach hang*"));
+  }
+
   private static GovernedGlossarySearchRequest request(
       final Criteria criteria, final Capabilities capabilities, final boolean consumer) {
     final ScopeAccess access =

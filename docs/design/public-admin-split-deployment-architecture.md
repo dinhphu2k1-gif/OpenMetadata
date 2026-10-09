@@ -3,7 +3,7 @@
 > Trạng thái: **Thiết kế sửa đổi 2026-10-05. Mã nguồn đã sửa theo thiết kế này (§7), đã chạy test đơn vị, chưa chạy thử trên DEV.**
 > Chưa chạy: luồng đề xuất → duyệt trên Portal, deploy pipeline qua outbox với Airflow thật, chặn non-Admin trên OM, SSO, image Docker (§8).
 > Baseline: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md),
-> [API governed](../api/openmetadata-governed-api-specification.md).
+> [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md), [API governed](../api/openmetadata-governed-api-specification.md).
 
 ## 1. Yêu cầu
 

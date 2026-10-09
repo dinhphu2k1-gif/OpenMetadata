@@ -118,6 +118,7 @@ import org.openmetadata.service.exception.CatalogExceptionMessage;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.DataDictionaryResolver;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
+import org.openmetadata.service.glossary.search.GovernedGlossaryOutbox;
 import org.openmetadata.service.glossary.versioning.CdeImportService.PlannedRow;
 import org.openmetadata.service.glossary.versioning.CdeReleaseVersionType;
 import org.openmetadata.service.jdbi3.CollectionDAO.EntityRelationshipRecord;
@@ -265,10 +266,15 @@ public class GlossaryTermRepository extends EntityRepository<GlossaryTerm> {
                       JsonUtils.pojoToJson(payload),
                       now,
                       actor);
+                  GovernedGlossaryOutbox.enqueue(
+                      handle.attach(GovernedGlossarySearchDAO.class),
+                      term.getGlossary().getId(),
+                      parentBusinessVersion);
                   return versions.findWorking(GLOSSARY_TERM, term.getId(), parentBusinessVersion);
                 });
     postCreate(identity);
     writeThroughCache(identity, false);
+    GovernedGlossaryOutbox.flush();
     return working;
   }
 

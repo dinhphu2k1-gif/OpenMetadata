@@ -19,16 +19,16 @@ class GovernedGlossarySearchSettingsTest {
   }
 
   @Test
-  void listReadsStayOnTheDatabaseUnlessEnabled() {
+  void listReadsUseTheIndexUnlessDisabled() {
     assumeTrue(System.getenv(GovernedGlossarySearchSettings.ENVIRONMENT_KEY) == null);
 
-    assertFalse(GovernedGlossarySearchSettings.readFromIndex());
+    assertTrue(GovernedGlossarySearchSettings.readFromIndex());
   }
 
   @Test
-  void listReadsUseTheIndexWhenEnabled() {
-    System.setProperty(GovernedGlossarySearchSettings.PROPERTY_KEY, "true");
+  void listReadsStayOnTheDatabaseWhenDisabled() {
+    System.setProperty(GovernedGlossarySearchSettings.PROPERTY_KEY, "false");
 
-    assertTrue(GovernedGlossarySearchSettings.readFromIndex());
+    assertFalse(GovernedGlossarySearchSettings.readFromIndex());
   }
 }

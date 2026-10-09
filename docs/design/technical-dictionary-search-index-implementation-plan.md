@@ -1,5 +1,7 @@
 # Plan triển khai lịch sử — Từ điển kỹ thuật: bản ghi theo khai báo, đọc qua index riêng
 
+> **Lịch sử (2026-10-08):** kế hoạch này không còn phản ánh hệ thống hiện tại (maker-checker, đề xuất sửa/xóa, rút lại, tab Yêu cầu). Nguồn hiện hành: [Thiết kế Từ điển kỹ thuật](./technical-dictionary-design.md) §16 và [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
+
 > **Cảnh báo:** Tài liệu này ghi lại một hướng triển khai cũ và không còn là kế hoạch đích. Quyết định
 > ngày 2026-10-05 yêu cầu mọi bản ghi mới phải qua phê duyệt maker-checker; nhiều phần bên dưới vẫn mô tả
 > mô hình Draft/published hoặc luồng không phiên bản cũ. Khi triển khai tiếp, phải lập plan mới từ

@@ -17,6 +17,7 @@
       "displayName": {"type": "keyword"},
       "nameSearch": {"type": "keyword"},
       "displayNameSearch": {"type": "keyword"},
+      "descriptionSearch": {"type": "keyword", "ignore_above": 8000},
       "businessVersion": {"type": "keyword"},
       "businessVersionSort": {"type": "keyword"},
       "entityStatus": {"type": "keyword"},

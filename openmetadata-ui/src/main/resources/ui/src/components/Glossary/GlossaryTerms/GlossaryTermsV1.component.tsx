@@ -414,7 +414,8 @@ const GlossaryTermsV1 = ({
     if (
       (isCDEGlossaryTerm || isDQGlossaryTerm) &&
       activeTab &&
-      CDE_RESTRICTED_TABS.has(activeTab)
+      (CDE_RESTRICTED_TABS.has(activeTab) ||
+        (isDQGlossaryTerm && activeTab === EntityTabs.ASSETS))
     ) {
       activeTabHandler(EntityTabs.OVERVIEW);
     }
@@ -556,7 +557,9 @@ const GlossaryTermsV1 = ({
       } as (typeof dqTabs)[number];
 
       return withResultTab(dqTabs, resultTab).filter(
-        (tab) => !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs)
+        (tab) =>
+          !CDE_RESTRICTED_TABS.has(tab.key as EntityTabs) &&
+          tab.key !== EntityTabs.ASSETS
       );
     }
 

@@ -1,22 +1,22 @@
 # Kế hoạch triển khai Chất lượng dữ liệu theo từng chức năng
 
-## Trạng thái thực hiện (cập nhật 2026-10-01)
+## Trạng thái thực hiện (cập nhật 2026-10-08)
 
-Đối chiếu bằng đọc mã nguồn, chưa build/test. Chi tiết khác biệt ở mục "Hiện trạng triển khai" của [thiết kế DQ](./dq-glossary-ui-design.md).
+Đối chiếu mã nguồn tại commit `b9a2421e757`, chưa chạy integration test. Chi tiết khác biệt ở mục "Hiện trạng triển khai" của [thiết kế DQ](./dq-glossary-ui-design.md).
 
 | Chức năng | Trạng thái |
 | --- | --- |
 | DQ00 | Một phần: chưa có feature flag; chưa thấy characterization test riêng |
 | DQ01 | Đã có profile `DATA_QUALITY` trong `GovernedGlossaryProfileRegistry` |
 | DQ02 | Một phần: component UI DQ riêng (`DQGlossary*`) đã có; mức dùng chung shell cần rà lại |
-| DQ03 | Đã có `DataQualityBootstrap` |
+| DQ03 | Đã có `DataQualityBootstrap`; classification DQ seed cố định từ `json/data/tags/*.json` |
 | DQ04–DQ05 | Một phần: dùng `GlossaryFlatListService` chung, cột DQ ở UI; chưa có read model DQ riêng |
 | DQ06 | Một phần: overview/summary UI; ràng buộc đúng 1 CDE ở backend |
 | DQ07 | **Chưa làm** (export DQ trả 400) |
-| DQ08–DQ09 | Một phần: tạo Draft và workflow dùng chung; bulk cho DQ chưa kiểm chứng |
-| DQ10–DQ11 | Chưa kiểm chứng |
+| DQ08–DQ09 | Đã có: tạo Draft, workflow, bulk `submit/approve/reject/withdraw` dùng chung; rút lại yêu cầu; tab Yêu cầu (`useDataQualityPendingRequestsAdapter`) |
+| DQ10–DQ11 | Đã có trong code: minor version, Sửa phiên bản; catalog DQ cutover theo Data Dictionary (`advanceDataQualityCatalog`, archive Rule scope cũ). Chưa integration test |
 | DQ12 | Chưa làm đúng thiết kế: import chạy ở client, không nguyên tử |
-| DQ13–DQ16 | Chưa làm |
+| DQ13–DQ16 | Chưa làm. Ngoài kế hoạch đã có: đề nghị xóa Rule Approved (gỡ testcase managed qua `dq_test_outbox`), kiểm thử theo Rule ([kế hoạch riêng](./dq-rule-test-execution-implementation-plan.md)) |
 
 
 ## 1. Tài liệu nguồn và mục tiêu bàn giao

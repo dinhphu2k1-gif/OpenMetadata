@@ -23,6 +23,7 @@ class GovernedGlossaryDocumentBuilderTest {
             Map.entry("recordType", "working"),
             Map.entry("name", "Điểm tín dụng"),
             Map.entry("displayName", "ĐIỂM TÍN DỤNG"),
+            Map.entry("description", "Điểm đánh giá Khách hàng"),
             Map.entry("businessVersion", "12.10"),
             Map.entry("workingRevision", 7L),
             Map.entry("owners", List.of(Map.of("id", "owner-1"))),
@@ -33,6 +34,7 @@ class GovernedGlossaryDocumentBuilderTest {
 
     assertEquals("diem tin dung", document.get("nameSearch"));
     assertEquals("diem tin dung", document.get("displayNameSearch"));
+    assertEquals("diem danh gia khach hang", document.get("descriptionSearch"));
     assertEquals(List.of("owner-1"), document.get("ownerIds"));
     assertEquals(List.of("domain-1"), document.get("domainIds"));
     assertEquals(List.of("DataSource.Core"), document.get("dataSourceTags"));

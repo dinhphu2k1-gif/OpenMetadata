@@ -12,6 +12,8 @@ public final class GovernedGlossaryIndexFields {
   public static final String CLASSIFICATION_TAGS = "classificationTags";
   public static final String CREATED_BY = "createdBy";
   public static final String DATA_SOURCE_TAGS = "dataSourceTags";
+  public static final String DESCRIPTION = "description";
+  public static final String DESCRIPTION_SEARCH = "descriptionSearch";
   public static final String DISPLAY_NAME = "displayName";
   public static final String DISPLAY_NAME_SEARCH = "displayNameSearch";
   public static final String DOMAIN_IDS = "domainIds";

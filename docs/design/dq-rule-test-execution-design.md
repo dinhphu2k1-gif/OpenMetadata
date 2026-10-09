@@ -2,7 +2,8 @@
 
 > Trạng thái tài liệu: **Đang triển khai** (2026-10-01; 2026-10-03: một Rule có nhiều khai báo kiểm thử, kết quả xác
 > minh T0 ở §11; **2026-10-05: lịch chạy và pipeline theo từng khai báo kiểm thử, giao diện tab Kiểm thử mới**, §5.3, §9).
-> Chạy thử trên DEV chưa hoàn tất; xem §13.
+> **2026-10-08:** xóa Rule có phê duyệt, catalog DQ cutover cùng Data Dictionary, sửa lỗi mất lịch khi cấp `key`; §15.
+> Chạy thử trên DEV chưa hoàn tất; xem §13. Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
 >
 > Tài liệu này mở rộng [Thiết kế Chất lượng dữ liệu](./dq-glossary-ui-design.md) (DQ). Phần “Không tự động tạo
 > `TestCase` từ DQ Rule; đây là integration phase riêng” ở §2.2 của tài liệu đó chính là phạm vi của tài liệu này.
@@ -327,8 +328,8 @@ dụng (DQT-03), khai báo mới không bao giờ khôi phục nhầm testcase c
 | TD khai báo/sửa/xóa bản ghi, đổi CDE, `sourceStatus` đổi (TD §6.2, §8) | Column đó, với mọi khai báo của mọi Rule của CDE cũ và mới |
 | Import TD commit | Các Column bị ảnh hưởng, theo lô |
 | Ingest đổi kiểu dữ liệu Column | Column đó (có thể chuyển `ACTIVE` ↔ `NOT_APPLICABLE` theo từng khai báo) |
-| Cutover Data Dictionary `N → N+1` (TD §9) | Retire **toàn bộ** binding scope `N` |
-| Cutover Data Quality `N → N+1` | Retire toàn bộ binding của Rule scope `N` |
+| Cutover Data Dictionary `N → N+1` (TD §9) | Retire **toàn bộ** binding scope `N`. Cùng transaction này archive DQ Rule Approved scope `N` và chuyển catalog DQ sang `N+1` (DQ §5.1), nên không còn cutover DQ riêng |
+| Đề nghị xóa DQ Rule được phê duyệt (DQ §5.6) | `RECONCILE_RULE` ghi trong cùng transaction archive: retire mọi testcase của Rule, vô hiệu hóa pipeline; giữ kết quả lịch sử |
 | Rule được Approve với lịch của khai báo đổi | Cập nhật `scheduleInterval` của pipeline khai báo đó (một phần của `RECONCILE_RULE`), không đụng testcase. `SYNC_PIPELINE` còn lại chỉ để xử lý dòng cũ và chạy reconcile Rule |
 | Admin gọi reconcile toàn bộ | Toàn bộ tập mong muốn |
 
@@ -725,3 +726,11 @@ Thay đổi và phát hiện khi chạy thử trên DEV (chưa nghiệm thu):
 - **Còn mở**: khóa ô Phép kiểm tra ở form khi khai báo đã từng được duyệt (hiện chỉ khóa khi `minor > 0`, lỗi báo muộn ở bước Gửi
   duyệt); banner "đang sửa bản nháp" ở tab Kiểm thử; kiểm thử tích hợp và E2E.
 
+## 15. Ghi chú hiện thực (2026-10-08)
+
+- **Lịch bị mất khi cấp `key`** (commit `dd61210ed5b`): `DqTestSpecKeys.assign` dựng lại khai báo mới nhưng không chép `scheduleCron`, `scheduleTimezone`, nên khai báo mới tạo luôn "không đặt lịch". Đã chép hai trường; có test `aNewDeclarationKeepsItsSchedule`. UI `DQRuleTests.utils` chuẩn hóa cron chọn nhanh/tùy chỉnh.
+- **Pipeline cập nhật thiếu `service`**: `DqPipelineGateway.updatePipeline` gán lại `service` từ suite trước khi lưu/deploy, vì pipeline đọc không kèm field không có quan hệ này.
+- **Xóa Rule** (DQ §5.6): phê duyệt đề nghị xóa ghi `RECONCILE_RULE` vào `dq_test_outbox` trong cùng transaction archive (`GlossaryTermDeletion`), để testcase managed và pipeline không thể còn hoạt động khi Rule đã hết hiệu lực.
+- **Cutover**: phê duyệt Data Dictionary `N+1` archive Rule scope `N` và mở catalog DQ `N+1` (`advanceDataQualityCatalog`); retire binding qua `DqTestOutbox.onGlossaryPublished` từ `TechnicalCutover`.
+- **Portal**: không drain outbox, không gọi Airflow; mọi thay đổi pipeline do OM server xử lý (worker 60 giây).
+- **Còn mở**: kiểm thử tích hợp luồng xóa Rule → retire testcase trên Airflow thật.

@@ -1,5 +1,7 @@
 # Thiết kế luồng Từ điển dữ liệu dùng chung (CDE Glossary) và Thành tố dữ liệu dùng chung (CDE) theo Version, Workflow và Role
 
+> Cập nhật 2026-10-08 theo mã nguồn hiện tại (commit `b9a2421e757`): vai trò `DataProposer`/`DataSteward`/`DataConsumer`/`BasicConsumer`, đề nghị xóa CDE đã phê duyệt (§5.7), rút lại yêu cầu (§5.8), tab **Yêu cầu** (§6.4). Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
+>
 > Baseline kiến trúc: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md). Mọi list/detail/workflow của Glossary và GlossaryTerm coi database là nguồn sự thật; search engine chỉ phục vụ global discovery và truy vấn tài sản liên quan, không làm nguồn trạng thái cho bảng CDE.
 
 ## 1. Mục tiêu
@@ -75,66 +77,67 @@ stateDiagram-v2
     InReview --> Approved: Phê duyệt
     InReview --> Rejected: Từ chối
     Rejected --> Draft: Chỉnh sửa lại
+    InReview --> Draft: Người gửi rút lại
     Approved --> Archived: Data Dictionary kế tiếp được phê duyệt
+    Approved --> Archived: Đề nghị xóa được phê duyệt
     Approved --> Approved: Bổ sung/phê duyệt CDE cùng scope
 ```
 
 Quy tắc:
 
-- `Draft`: được chỉnh sửa bởi Proposer và các Role có quyền quản trị.
-- `InReview`: khóa các trường nghiệp vụ; chỉ cho phép Reviewer/Steward phê duyệt hoặc từ chối.
+- `Draft`: được chỉnh sửa bởi người có `canEditWorking` (mặc định `DataProposer`).
+- `InReview`: khóa các trường nghiệp vụ; người có `canApprove`/`canReject` (mặc định `DataSteward`) phê duyệt hoặc từ chối; người gửi được rút lại (§5.8). Người gửi không được tự duyệt.
 - `Rejected`: không hiển thị cho Consumer; người soạn thảo có thể đưa về Draft để sửa.
 - `Approved`: Data Dictionary mới nhất đang hoạt động. Khi phê duyệt catalog, backend phê duyệt
   nguyên tử toàn bộ CDE working trong đúng scope rồi mới publish catalog; Consumer thấy toàn bộ
   các bản ghi đó. Việc tạo/duyệt thêm CDE sau đó không đổi trạng thái Data Dictionary.
-- `Archived`: Data Dictionary cũ và các CDE Approved của nó sau khi successor được Approved; chỉ đọc, không nhận thêm mutation. CDE non-Approved của predecessor bị xóa tại cutover.
+- `Archived`: Data Dictionary cũ và các CDE Approved của nó sau khi successor được Approved, hoặc CDE có đề nghị xóa được phê duyệt (§5.7); chỉ đọc, không nhận thêm mutation. CDE non-Approved của predecessor bị xóa tại cutover.
 - Không coi thiếu `entityStatus` là Approved. Phương án triển khai mới không hỗ trợ dữ liệu thiếu trạng thái; môi trường phải được khởi tạo lại với dữ liệu tuân thủ schema mới.
 
 ## 4. Role và phạm vi trách nhiệm
 
 ### 4.1. Các Role nghiệp vụ
 
-| Role | Trách nhiệm chính |
-| --- | --- |
-| Admin | Quản trị toàn bộ, xử lý ngoại lệ và cấu hình hệ thống. |
-| Organization | Role hệ thống có quyền theo policy; không mặc định là Consumer. |
-| Data Steward | Theo policy mặc định: kiểm soát chất lượng; phê duyệt, từ chối và hủy phê duyệt, không tạo hoặc chỉnh sửa nội dung. Capability thực tế luôn lấy từ policy hiệu lực. |
-| Reviewer | Người được policy hiệu lực cấp quyền duyệt; không được suy ra từ `releaseLevel` và không được gán thủ công qua trường Reviewers trên UI CDE. |
-| Data Proposer | Tạo Draft, chỉnh sửa và gửi duyệt. |
-| Data Consumer | Khai thác nội dung đã được phê duyệt. |
-| Basic Consumer | Chỉ đọc nội dung đã được phê duyệt với tập chức năng tối thiểu. |
+| Vai trò nghiệp vụ | Role OpenMetadata | Giao diện | Quyền trên Từ điển dữ liệu dùng chung |
+| --- | --- | --- | --- |
+| Người đề xuất | `DataProposer` | Portal | `R`, `W`: tạo/sửa Draft, tạo version, Sửa phiên bản, đề nghị xóa, gửi duyệt, rút lại yêu cầu của mình, import |
+| Người phê duyệt | `DataSteward` | Portal | `R`, `A`: xem working/In Review, phê duyệt, từ chối |
+| Người dùng TT QLDL | `DataConsumer` | Portal | `R`: chỉ bản Approved/Archived |
+| Người dùng TSC/CN | `BasicConsumer` | Portal | `R`: chỉ bản Approved/Archived |
+| Quản trị | `Admin` | OpenMetadata UI | Quản trị hệ thống; không mặc nhiên có `W`/`A` theo ma trận nghiệp vụ |
 
-Quyền thực tế phải được backend xác định từ Role, policy và quyền trên entity, hoàn toàn độc lập với `releaseLevel`. Frontend chỉ dùng kết quả quyền từ backend để điều khiển giao diện.
+Maker–Checker: tài khoản có `A` không đồng thời có `W` trên cùng phân hệ; người gửi yêu cầu không được tự duyệt. `releaseLevel`, owner hay trường `reviewers` không cấp quyền. Ma trận chuẩn nằm ở [Đặc tả API governed §2.1.5](../api/openmetadata-governed-api-specification.md).
 
-Trong tài liệu này, **Consumer-only** không được suy ra chỉ từ việc người dùng có role `BASIC_CONSUMER` hoặc `DATA_CONSUMER`. Một người dùng chỉ được xem là Consumer-only đối với Data Dictionary/CDE khi quyền hiệu lực của họ có `canViewPublished = true` và `canViewWorking = false`. Admin, Data Steward, Data Proposer, owner hoặc người được policy cấp quyền xem working không bị áp dụng quy tắc chỉ-hiển-thị-Approved, kể cả khi họ đồng thời mang role Consumer.
+Backend tính capability từ policy hiệu lực (`GET /glossaryTerms/{id}/permissions`, `GET /glossaries/{id}/permissions`); frontend chỉ dùng capability. **Consumer-only** là người có `canViewPublished = true` và `canViewWorking = false` (`isConsumer = true`), không suy từ tên role.
 
 ### 4.2. Ma trận nội dung được nhìn thấy
 
-| Nội dung | Admin | Data Steward | Người có quyền duyệt | Data Proposer | Data Consumer | Basic Consumer |
-| --- | --- | --- | --- | --- | --- | --- |
-| Glossary Draft | Có | Có trong phạm vi quản lý | Có khi được gán duyệt | Có khi là owner/người tạo hoặc có quyền edit | Không | Không |
-| Glossary In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
-| Glossary Approved mới nhất | Có | Có | Có | Có | Có | Có |
-| Data Dictionary Archived | Có | Có | Có khi có quyền audit | Có khi có quyền lịch sử | Có, chỉ đọc | Có, chỉ đọc |
-| CDE Draft/Rejected | Có | Có trong phạm vi quản lý | Có khi liên quan phiên duyệt | Có khi được phép chỉnh sửa | Không | Không |
-| CDE In Review | Có | Có | Có khi được gán duyệt | Có, chỉ đọc | Không | Không |
-| CDE Approved | Có | Có | Có | Có | Có | Có |
-| Import | Có | Không | Không | Theo policy | Không | Không |
-| Export | Có | Có | Có | Có | Có | Có |
+| Nội dung | `DataProposer` | `DataSteward` | `DataConsumer` / `BasicConsumer` |
+| --- | --- | --- | --- |
+| Data Dictionary/CDE Draft, Rejected | Có | Có (chỉ đọc) | Không |
+| Data Dictionary/CDE In Review | Có (chỉ đọc) | Có | Không |
+| Approved đang hiệu lực | Có | Có | Có |
+| Archived | Có, chỉ đọc | Có, chỉ đọc | Có, chỉ đọc |
+| Tab **Yêu cầu** (§6.4) | Có, chỉ rút lại yêu cầu của mình | Có, phê duyệt/từ chối | Không |
+| Export | Có | Có | Có, chỉ dữ liệu published |
+| Import | Có | Không | Không |
 
 ### 4.3. Ma trận thao tác
 
-| Thao tác | Admin | Data Steward | Reviewer | Data Proposer | Data Consumer | Basic Consumer |
-| --- | --- | --- | --- | --- | --- | --- |
-| Tạo Glossary/CDE | Có | Không mặc định | Không | Có | Không | Không |
-| Tạo business version mới | Có | Không mặc định | Không | Có | Không | Không |
-| Chỉnh sửa Draft | Có | Không mặc định | Không | Có | Không | Không |
-| Gửi duyệt | Có | Không mặc định | Không | Có | Không | Không |
-| Approve/Reject | Có | Có | Có khi được gán | Không | Không | Không |
-| Sửa phiên bản Approved (tạo bản nháp sửa) | Có | Không mặc định | Không | Có | Không | Không |
-| Hủy duyệt / thu hồi Approved | Không | Không | Không | Không | Không | Không |
-| Xóa | Có | Không | Không | Theo policy với Draft | Không | Không |
-| Xem/chọn version | Có | Có | Có | Có | Active Approved và Archived | Active Approved và Archived |
+| Thao tác | Capability | `DataProposer` | `DataSteward` | Consumer |
+| --- | --- | --- | --- | --- |
+| Tạo Data Dictionary version/CDE | `canCreateVersion` | Có | Không | Không |
+| Lưu Draft, hủy bản nháp | `canEditWorking` | Có | Không | Không |
+| Gửi duyệt | `canSubmit` | Có | Không | Không |
+| Rút lại yêu cầu `In Review` | người gửi | Có | Không | Không |
+| Phê duyệt / Từ chối | `canApprove` / `canReject` | Không | Có (không duyệt yêu cầu của chính mình) | Không |
+| Chỉnh sửa lại bản Rejected | `canEditWorking` | Có | Không | Không |
+| Sửa phiên bản Approved (§5.6) | `canCreateVersion` | Có | Không | Không |
+| Đề nghị xóa CDE Approved (§5.7) | `canCreateVersion` + `canSubmit` | Có | Không | Không |
+| Hủy duyệt / archive trực tiếp | — | Không có chức năng | Không có chức năng | Không |
+| Xem/chọn version | `canViewPublished` | Mọi version | Mọi version | Approved và Archived |
+
+Runtime vẫn có `reject`/`reopen`; ma trận nghiệp vụ nguồn chỉ quy định `W`/`A` nên quyền từ chối/mở lại được ghi nhận ở `GAP-RBAC-01` của đặc tả API.
 
 ## 5. Thiết kế version của Từ điển dữ liệu dùng chung và CDE
 
@@ -163,7 +166,7 @@ Data Dictionary Approved mới nhất là bản đang hoạt động. Danh sách
 
 Quy tắc:
 
-- Data Dictionary `N` chỉ query CDE có `parentBusinessVersion = N` và `businessVersion = N.MINOR`. Consumer chỉ thấy Approved; Manager thấy đủ trạng thái theo quyền. Không fallback sang `N-1.x` khi scope `N` chưa có CDE Approved.
+- Data Dictionary `N` chỉ query CDE có `parentBusinessVersion = N` và `businessVersion = N.MINOR`. Consumer chỉ thấy Approved; người có `canViewWorking` thấy đủ trạng thái. Không fallback sang `N-1.x` khi scope `N` chưa có CDE Approved.
 - Sau khi Dictionary `N` Approved, người dùng vẫn có thể bổ sung và xử lý CDE `N.x`. CDE `N.x` vừa Approved xuất hiện ngay cho Consumer; Data Dictionary vẫn giữ status Approved và không cần publish lại.
 - Tạo Dictionary `N+1` hoặc CDE `N+1.x` không thay đổi Dictionary `N` và CDE `N.x`. Dictionary `N+1` tuyệt đối không kế thừa content/membership từ `N`.
 - Khi Dictionary `N+1` Approved, hệ thống đóng băng final Approved `N.x` vào archive manifest, archive Dictionary `N` cùng các snapshot đó và xóa CDE `N.x` Draft/InReview/Rejected. Dictionary `N` từ đó chỉ đọc và không nhận CDE mới.
@@ -205,7 +208,7 @@ Quy tắc:
 - Mỗi CDE identity chỉ thuộc đúng một `parentBusinessVersion` và có tối đa một working version. Hai bản ghi cùng mã ở scope `N` và `N+1` là hai identity khác nhau, vì vậy có thể có working độc lập; mọi lookup/mutation phải mang scope Data Dictionary cha.
 - Chỉnh sửa và lưu nháp nhiều lần (Save Draft) chỉ cập nhật đè trực tiếp (in-place update) lên bản Draft hiện hành, **không tạo `businessVersion` mới** và không tạo thêm published snapshot ngầm nhằm tối ưu dung lượng lưu trữ (tránh storage bloating).
 - Snapshot Approved của CDE chỉ bị thay đổi qua luồng Sửa phiên bản (§5.6). Tạo version mới không làm thay đổi nội dung các published snapshot đã có.
-- Không có thao tác hủy duyệt (revoke) cho CDE, DQ Rule hay Data Dictionary; endpoint `POST .../published/latest/archive` đã bị gỡ. Snapshot CDE chỉ chuyển sang Archived khi Data Dictionary cha được cutover.
+- Không có thao tác hủy duyệt (revoke) cho CDE, DQ Rule hay Data Dictionary; endpoint `POST .../published/latest/archive` đã bị gỡ. Snapshot CDE chỉ chuyển sang Archived khi Data Dictionary cha được cutover hoặc khi đề nghị xóa CDE được phê duyệt (§5.7).
 
 ### 5.5. Tạo business version mới của CDE
 
@@ -234,6 +237,22 @@ Khi tạo CDE version mới trong Data Dictionary `N`:
 **Màn hình Lịch sử sửa đổi:** trên trang chi tiết CDE/DQ Rule, khi đang xem một version Approved hoặc Archived (không phải bản nháp), header có nút **Lịch sử sửa đổi** (hiện cho mọi người xem được version đó). Nút mở modal "Lịch sử sửa đổi của phiên bản X" gọi `GET .../published/{businessVersion}/history`, liệt kê các nội dung đã bị thay thế, mới nhất trước và mở sẵn mục đầu. Mỗi mục có tiêu đề "Bị thay thế lúc … bởi …"; phần mở gồm "Được phê duyệt lúc … bởi …", Tên hiển thị, Mô tả và 12 ký tự đầu của `contentHash`. Version chưa từng sửa hiển thị trạng thái trống "Phiên bản này chưa từng được sửa." Modal chỉ đọc, hiện chưa so sánh chi tiết từng trường.
 
 Bảng lịch sử `glossary_business_snapshot_history`: `historyId`, `snapshotId`, `entityType`, `entityId`, `glossaryId`, `parentBusinessVersion`, `businessVersion`, `nativeVersion`, `publicationSequence`, `payload`, `contentHash`, `publishedAt`, `publishedBy`, `supersededAt`, `supersededBy`. Mỗi lần sửa được duyệt thêm đúng một dòng; dòng lịch sử không bao giờ bị sửa hoặc xóa.
+
+### 5.7. Đề nghị xóa CDE đã phê duyệt
+
+Áp dụng cho CDE và DQ Rule (`GlossaryTermDeletion`). Data Dictionary không xóa được; chỉ thay bằng version `N+1`.
+
+1. Trên CDE Approved (không Archived, chưa có working), người có `canCreateVersion` và `canSubmit` bấm **Đề nghị xóa**. Modal xác nhận: "Đề nghị xóa được gửi duyệt ngay. CDE đã phê duyệt vẫn có hiệu lực cho tới khi đề nghị được phê duyệt."
+2. `POST /glossaryTerms/{id}/working/deletion?parentBusinessVersion=N` tạo working mang cờ `pendingDeletion = true`, `businessVersion` bằng Approved mới nhất của scope, và chuyển ngay sang `In Review` trong cùng transaction. Không có Draft trung gian.
+3. Trong thời gian chờ, Consumer vẫn thấy CDE Approved. Trang chi tiết bản đề nghị hiện banner "Đây là đề nghị xóa…", tag **Đề nghị xóa**; bảng CDE hiện dòng đề nghị cạnh dòng Approved.
+4. Backend kiểm tra `CdeDeletionGuard` lúc tạo, gửi và duyệt: CDE không được còn record Từ điển kỹ thuật, DQ Rule, CDE khác tham chiếu (`relatedTerms`) hay asset gắn tag. Vi phạm trả `400` liệt kê nguồn tham chiếu.
+5. **Phê duyệt**: archive mọi snapshot Approved của CDE trong scope, bỏ published head, giữ lịch sử phê duyệt; CDE biến mất khỏi Data Dictionary đang hiệu lực. **Từ chối**: bản đề nghị về `Rejected`, có thể **Hủy đề nghị xóa** (`DELETE .../working`). **Rút lại**: hủy hẳn đề nghị (§5.8).
+6. Duyệt hàng loạt nhận cả đề nghị xóa; UI hiện danh sách CDE sẽ bị xóa trong hộp xác nhận.
+
+### 5.8. Rút lại yêu cầu và hủy bản nháp
+
+- **Rút lại** (`POST /glossaryTerms/{id}/working/withdraw?parentBusinessVersion=N`, body `{"expectedRevision": n}`): chỉ người gửi (`submittedBy`), chỉ khi `In Review`. Yêu cầu tạo/sửa về `Draft` giữ nguyên nội dung; đề nghị xóa bị hủy (response `{"withdrawn": true, "discarded": true}`). Bản Approved không đổi. Có bản hàng loạt `POST /glossaryTerms/bulk/withdraw`.
+- **Hủy bản nháp** (`DELETE /glossaryTerms/{id}/working?parentBusinessVersion=N&expectedRevision=n`): `canEditWorking`, chỉ `Draft`/`Rejected`. CDE chưa từng phát hành thì xóa luôn identity (`termDeleted: true`); đã có Approved thì bản Approved giữ nguyên.
 
 ## 6. Luồng màn hình Glossary
 
@@ -273,11 +292,13 @@ Toàn bộ thông tin chi tiết về phiên bản, trạng thái, mô tả và 
 
 Bố cục góc phải Header: `[ Bộ chọn Version ]  [ Nút trực diện ]  [ Menu ba chấm (...) ]`
 
+Bên dưới Header, trang Data Dictionary có hai tab: **Thành tố dữ liệu** (bảng CDE, §6.3) và **Yêu cầu** kèm số yêu cầu đang chờ (§6.4). Tab Yêu cầu ẩn với Consumer-only.
+
 | Trạng thái Glossary đang xem | Nút hiển thị trực diện trên Header (Role Quản trị) | Tùy chọn trong Menu ba chấm `...` | Role Khai thác (Consumer) |
 | :--- | :--- | :--- | :--- |
 | **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` theo capability | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **In Review** | • `Phê duyệt` (Steward/Reviewer - Xanh lá)<br>• `Từ chối` (Steward/Reviewer - Đỏ)<br>• `Chờ duyệt` (Proposer - Read-only) | • `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Rejected** | • `Chỉnh sửa lại` (Proposer - đưa về Draft) | • `Xóa bản nháp` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Chờ duyệt` (`DataProposer` - Read-only) | • `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Approved (Đang hoạt động)** | • `Tạo phiên bản mới`<br>• thao tác CDE theo capability | • `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` | Chỉ đọc; thấy live Approved CDE cùng scope. |
 | **Archived** | Không có nút mutation. | • `Xuất dữ liệu (Export)` | Được chọn/xem lại, chỉ đọc và được Export; không có mutation hoặc Import. |
 
@@ -294,7 +315,7 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
    - Không áp dụng cơ chế phân cấp chính/con hay thụt lề `↳`.
    - Mọi CDE là con trực tiếp của Data Dictionary; backend từ chối `parent` trỏ tới một CDE khác.
    - Các dòng có cùng mã CDE được xếp cạnh nhau, sắp xếp theo thứ tự phiên bản mới nhất ở trên để người dùng dễ theo dõi.
-   - Mỗi lần mở bảng chỉ hiển thị một `parentBusinessVersion` đang được chọn. Một response không ghép CDE của Dictionary active, working hoặc historical khác scope; Manager chuyển scope bằng Data Dictionary version selector.
+   - Mỗi lần mở bảng chỉ hiển thị một `parentBusinessVersion` đang được chọn. Một response không ghép CDE của Dictionary active, working hoặc historical khác scope; người dùng chuyển scope bằng Data Dictionary version selector.
 2. **Quyền xem theo capability hiệu lực (Người dùng tự do tra cứu theo quyền):**
    - **Data Consumer:** Trong Data Dictionary active `N`, chỉ thấy CDE `N.x` Approved. Khi chủ động chọn Data Dictionary Archived, chỉ thấy các published CDE snapshots thuộc frozen manifest của đúng scope đó. Không thấy Draft/InReview/Rejected/working hoặc CDE thuộc scope khác.
    - **Người có quyền working:** Trong scope đang chọn, nhìn thấy published và working rows theo capability hiệu lực. Không suy quyền từ tên role; ownership, reviewer assignment và policy có thể thay đổi quyền trên từng CDE.
@@ -309,7 +330,7 @@ Bảng danh sách thể hiện tập hợp các Thành tố dữ liệu dùng ch
      - *Các tiêu chí trạng thái:* `Tất cả`, `Draft`, `In Review`, `Rejected`, `Approved`; `Archived` chỉ có trong chế độ lịch sử/audit.
      - *Quy tắc phân quyền:* 
        - Với **Role Khai thác (Consumer):** Hệ thống tự động khóa cứng (hard-lock) duy nhất trạng thái `Đã phê duyệt (Approved)`.
-       - Với **Nhóm Quản trị (Admin / Steward / Proposer):** Mặc định chọn tất cả, người dùng có thể tick/bỏ tick để lọc riêng bản nháp, bản chờ duyệt hoặc bản đã phê duyệt.
+       - Với **người có `canViewWorking` (`DataProposer`, `DataSteward`):** Mặc định chọn tất cả, người dùng có thể tick/bỏ tick để lọc riêng bản nháp, bản chờ duyệt hoặc bản đã phê duyệt.
    - **4 Bộ lọc Chuyên biệt cho CDE (CDE Specific Filter Dropdowns):**
      - **(1) Khối / Miền nghiệp vụ (Business Group / Domain):** Dropdown đa chọn nạp động danh sách Miền từ hệ thống (ví dụ: *Khối Bán lẻ, Khối Khách hàng doanh nghiệp, Khối Quản trị rủi ro, Khối Tài chính kế toán,...*). UI hiển thị display name nhưng gửi `domainIds`; backend lọc theo UUID ổn định.
      - **(2) Hệ thống nguồn (Data Source):** Dropdown đa chọn nạp danh sách các tag thuộc phân loại `DataSource` (ví dụ: *Core Banking, LOS, CRM, DWH, ERP, ECM,...*). UI gửi tag FQN và backend lọc theo `dataSourceTagFqns`.
@@ -334,8 +355,18 @@ Giả sử hai identity độc lập cùng có mã nghiệp vụ `CDE1`:
 | Ngữ cảnh xem | Các dòng hiển thị trên bảng (Ngang hàng) | Quy tắc |
 | :--- | :--- | :--- |
 | **Data Consumer trong Dictionary 1** | • **`CDE1`** - Version `1.1` `[Approved]`<br>• **`CDE1`** - Version `1.0` `[Approved]` | Chỉ Approved `1.x`; không thấy `2.x` hoặc non-Approved. |
-| **Manager trong Dictionary 1** | • **`CDE1` (identity A)** - Version `1.2` `[Rejected]`<br>• **`CDE1` (identity A)** - Version `1.1` `[Approved]`<br>• **`CDE1` (identity A)** - Version `1.0` `[Approved]` | Chỉ identity và version thuộc scope `1`. |
-| **Manager chuyển sang Dictionary 2** | • **`CDE1` (identity B)** - Version `2.1` `[Draft]`<br>• **`CDE1` (identity B)** - Version `2.0` `[Approved]` | Request riêng cho scope `2`; không chứa row `1.x`. |
+| **`DataProposer`/`DataSteward` trong Dictionary 1** | • **`CDE1` (identity A)** - Version `1.2` `[Rejected]`<br>• **`CDE1` (identity A)** - Version `1.1` `[Approved]`<br>• **`CDE1` (identity A)** - Version `1.0` `[Approved]` | Chỉ identity và version thuộc scope `1`. |
+| **`DataProposer`/`DataSteward` chuyển sang Dictionary 2** | • **`CDE1` (identity B)** - Version `2.1` `[Draft]`<br>• **`CDE1` (identity B)** - Version `2.0` `[Approved]` | Request riêng cho scope `2`; không chứa row `1.x`. |
+
+### 6.4. Tab Yêu cầu
+
+Tab dùng component chung `PendingRequestsTab` (cũng dùng cho DQ và Từ điển kỹ thuật) với adapter `useGlossaryPendingRequestsAdapter`.
+
+- **Nguồn dữ liệu:** working records `Draft` và `In Review` của scope đang mở qua `GET /glossaryTerms/search` (`getGlossaryWorkingRecords`), đọc từ DB. Đếm số yêu cầu bằng `usePendingRequestsCount`.
+- **Hiển thị:** người có `canViewWorking` (không phải Consumer-only). Thao tác Phê duyệt/Từ chối chỉ hiện khi có `canApprove`/`canReject`; nếu không, banner "Bạn không có quyền phê duyệt hoặc từ chối yêu cầu…".
+- **Cột:** Mã, Tên, Phiên bản, **Loại yêu cầu** (`Thêm mới` – CDE chưa có Approved; `Sửa` – có Approved trong scope; `Xóa` – `pendingDeletion`), Nội dung thay đổi (số trường thay đổi), Người đề xuất, Gửi lúc. Lọc theo từ khóa mã/tên và loại yêu cầu; phân trang.
+- **Mở rộng dòng:** với `Sửa` hiện so sánh **Hiện hành / Đề xuất** từng trường thay đổi; với `Thêm mới` hiện thông tin đề xuất và các trường còn trống; với `Xóa` hiện cảnh báo "CDE sẽ bị loại khỏi phiên bản hiệu lực".
+- **Chọn hàng loạt:** chỉ dòng `In Review` chọn được để quyết định; dòng `Draft` chỉ để theo dõi. `BulkSelectionBar` hiện **Phê duyệt**, **Từ chối**, và **Rút lại (n)** cho các dòng do chính người dùng gửi. Xác nhận qua `ReviewActionConfirmModal`; gọi `POST /glossaryTerms/bulk/{approve|reject|withdraw}` với `termIds` và `expectedRevision` đã thấy. Kết quả từng phần được báo theo dòng; không báo thành công toàn bộ khi có dòng lỗi.
 
 ## 7. Luồng màn hình Thành tố dữ liệu dùng chung (CDE)
 
@@ -362,7 +393,7 @@ Màn hình chi tiết CDE trong phân hệ Từ điển dữ liệu dùng chung 
     - Phần nguyên của CDE `businessVersion` phải bằng `parentBusinessVersion`. Với parent active, backend kiểm tra scoped read model; với parent Archived, kiểm tra archive manifest. Không khớp trả `404`.
   - **Phân quyền trong danh sách Dropdown:**
     - *Consumer:* Trong dropdown chỉ hiển thị các bản `Approved`. Nếu tự ý gõ param URL trỏ tới bản `Draft`/`In Review`/`Rejected`, hệ thống chặn truy cập (trả `404 Not Found`), hiển thị màn hình báo lỗi và tuyệt đối không hiển thị bất kỳ nút action nào.
-    - *Nhóm Quản trị (Admin, Steward, Proposer):* Chọn được tất cả các phiên bản đang có (`Draft`, `In Review`, `Rejected`, `Approved`).
+    - *Người có `canViewWorking` (`DataProposer`, `DataSteward`):* Chọn được tất cả các phiên bản đang có (`Draft`, `In Review`, `Rejected`, `Approved`).
 - **Badge trạng thái (Status Badge):**
   - `[ Draft ]`: Bản nháp đang soạn thảo.
   - `[ In Review ]`: Đang chờ duyệt (khóa không cho chỉnh sửa).
@@ -376,9 +407,10 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 | Trạng thái CDE đang xem | Nút hiển thị trực diện trên Header (Role Quản trị) | Tùy chọn trong Menu ba chấm `...` | Role Khai thác (Consumer) |
 | :--- | :--- | :--- | :--- |
 | **Draft** | • `Lưu nháp` (Secondary)<br>• `Gửi duyệt` (Primary) | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận) | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **In Review** | • `Phê duyệt` (Steward/Reviewer - Xanh lá)<br>• `Từ chối` (Steward/Reviewer - Đỏ)<br>• `Chờ duyệt` (Proposer - Read-only) | *(Không có)* | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Rejected** | • `Chỉnh sửa lại` (Proposer - đưa về Draft) | • `Xóa CDE` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Approved** | • `Tạo phiên bản mới` (Primary) | • `Xem lịch sử thay đổi` | Toàn bộ chỉ đọc (Read-only); không hiển thị nút chỉnh sửa. |
+| **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Rút lại yêu cầu` (chỉ người gửi)<br>• `Chờ duyệt` (`DataProposer` khác - Read-only) | *(Không có)* | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` / `Hủy đề nghị xóa` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Approved** | • `Tạo phiên bản mới` (Primary)<br>• `Sửa phiên bản` | • `Lịch sử sửa đổi`<br>• `Đề nghị xóa` (Chữ đỏ, §5.7) |
+| **Đề nghị xóa (In Review)** | • `Phê duyệt` / `Từ chối` (`DataSteward`)<br>• `Rút lại yêu cầu` (người gửi) | *(Không có)* | Không truy cập bản đề nghị; tiếp tục thấy bản Approved tới khi đề nghị được duyệt. |
 
 #### 2. Khu vực thông tin nghiệp vụ và Custom Properties của CDE (Overview Panel):
 - **Thông tin cơ bản chuẩn OpenMetadata:**
@@ -421,9 +453,12 @@ Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực d
 | Gửi duyệt | Hiển thị validation và modal xác nhận | Khóa form, badge In Review, hiện reviewer/assignee. |
 | Approve Data Dictionary mới | Modal hiển thị CDE scope mới và cảnh báo archive/xóa predecessor | Bản mới Approved active; bản cũ + CDE Approved cũ Archived; CDE cũ non-Approved bị xóa. |
 | Reject | Xác nhận thao tác, không nhập lý do | Badge Rejected và hiển thị người từ chối. |
+| Rút lại yêu cầu | Modal xác nhận | Yêu cầu tạo/sửa về Draft giữ nội dung; đề nghị xóa bị hủy; bản Approved không đổi. |
+| Đề nghị xóa CDE | Modal xác nhận, cảnh báo CDE vẫn hiệu lực tới khi duyệt | Đề nghị ở In Review, xuất hiện ở tab Yêu cầu; `400` nếu CDE còn bị tham chiếu. |
+| Phê duyệt đề nghị xóa | Modal cảnh báo CDE bị loại khỏi phiên bản hiệu lực | CDE Archived trong scope, biến mất khỏi bảng của Consumer; lịch sử giữ nguyên. |
 | Tạo version kế tiếp | Hiển thị số nguyên `N+1` bắt buộc | Tạo Draft trắng; không đổi trạng thái bản active/CDE hiện tại và không kế thừa dữ liệu. |
 | Chọn version lịch sử | Với Data Dictionary, cập nhật `?businessVersion=...`; với CDE, bắt buộc cập nhật đầy đủ `?businessVersion=...&parentBusinessVersion=...`, loading riêng cho nội dung | Nạp dữ liệu snapshot theo đúng cặp version đã chọn, toàn bộ trường chỉ đọc (Read-only), ẩn các nút Thêm/Sửa. |
-| Import | Tải template/chọn XLSX, preview summary và lỗi từng dòng trước khi ghi; cảnh báo nếu có CDE In Review sẽ bị hủy duyệt | Commit nguyên tử: tạo/cập nhật working Draft; CDE In Review/Rejected bị ghi đè sẽ về Draft; không tự động submit/Approved. |
+| Import | Tải template/chọn XLSX, preview summary và lỗi từng dòng trước khi ghi; cảnh báo nếu có CDE In Review sẽ bị đưa về Draft | Commit nguyên tử: tạo/cập nhật working Draft; CDE In Review/Rejected bị ghi đè sẽ về Draft; không tự động submit/Approved. |
 | Export | Bấm chọn Export trong menu dấu ba chấm (...) | Gọi API cho đúng Data Dictionary version đang mở và tự tải file Excel `.xlsx` khi hoàn tất; không mở modal/job/progress, không yêu cầu bấm tải lần hai và không áp dụng search/filter/page hiện tại. |
 
 Các request mutation cần có optimistic locking. Nếu entity đã thay đổi từ lúc người dùng mở màn hình, UI hiển thị thông báo conflict và yêu cầu tải lại, không âm thầm ghi đè.
@@ -475,6 +510,11 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 | **Lưu nháp in-place (CDE)** | `PATCH /v1/glossaryTerms/{id}/working?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `updateGlossaryTermWorkingVersion(id, parentVersion, rev, data)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Chuyển trạng thái Workflow (CDE)** | `POST /v1/glossaryTerms/{id}/working/{action}?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `transitionGlossaryTermWorkflow(id, parentVersion, action, req)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Kiểm tra quyền phiên bản** | `GET /v1/glossaryTerms/{id}/permissions?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `getGlossaryTermVersionPermissions(id, parentVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Rút lại yêu cầu (CDE)** | `POST /v1/glossaryTerms/{id}/working/withdraw?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `transitionGlossaryTermWorkflow(id, parentVersion, 'withdraw', req)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Hủy bản nháp (CDE)** | `DELETE /v1/glossaryTerms/{id}/working?parentBusinessVersion={N}&expectedRevision={n}` | `GlossaryTermResource.java` | `discardGlossaryTermWorkingVersion(...)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Đề nghị xóa CDE Approved** | `POST /v1/glossaryTerms/{id}/working/deletion?parentBusinessVersion={N}` | `GlossaryTermResource.java` | `requestGlossaryTermDeletion(id, parentVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Workflow hàng loạt / tab Yêu cầu** | `POST /v1/glossaryTerms/bulk/{submit\|approve\|reject\|withdraw}` | `GlossaryTermResource.java`, `GovernedBulkWorkflowService.java` | `bulkGlossaryTermWorkflow(action, body)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
+| **Danh sách yêu cầu (tab Yêu cầu)** | `GET /v1/glossaryTerms/search?statuses=Draft,In Review` (flat read model DB) | `GlossaryTermResource.java` | `getGlossaryWorkingRecords(params)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 | **Xuất Data Dictionary version ra Excel** | `GET /v1/glossaryTerms/export?glossary={id}&parentBusinessVersion={N}` | `GlossaryTermResource.java` | `exportDataDictionaryVersion(glossaryId, parentVersion)` | [glossaryAPI.ts](file:///home/dinhphu/Documents/Agribank-Metadata/OpenMetadata/openmetadata-ui/src/main/resources/ui/src/rest/glossaryAPI.ts) |
 
 ---
@@ -519,7 +559,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Gọi: `transitionGlossaryWorkflow(id, 'approve', { expectedRevision })`
   * Endpoint backend: `POST /v1/glossaries/{id}/working/approve`
   * *Hành vi:* Cutover nguyên tử: archive predecessor và Approved CDE cùng tiền tố, xóa predecessor CDE Draft/InReview/Rejected, rồi activate Data Dictionary mới. Không copy/fallback CDE predecessor.
-  * Data Dictionary mới chỉ hiển thị CDE cùng tiền tố; Approved hiện cho Consumer, các status khác chỉ hiện cho Manager và tiếp tục được xử lý sau cutover.
+  * Data Dictionary mới chỉ hiển thị CDE cùng tiền tố; Approved hiện cho Consumer, các status khác chỉ hiện cho người có `canViewWorking` và tiếp tục được xử lý sau cutover.
 * **Xem trước nội dung sẽ phát hành:**
   * Gọi: `getGlossaryPublishPreview(id, { limit, after })`.
   * Endpoint backend: `GET /v1/glossaries/{id}/working/publish-preview?limit={n}&after={cursor}`.
@@ -546,7 +586,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 
 #### 6. Nhập CDE vào Draft (Import):
 * **Scope hỗ trợ:** Import vào đúng Data Dictionary `Approved` active `N` hoặc Data Dictionary working `Draft` `N+1` đang mở, định danh bằng `glossaryId + parentBusinessVersion`. Không import vào Data Dictionary `InReview`, `Rejected` hoặc `Archived`; không sửa business payload/revision của Data Dictionary hay CDE snapshot `Approved`/`Archived`.
-* **Capability:** Backend trả `canImportCdeDrafts` từ policy hiệu lực, ownership và scope; không hard-code tên role. Mặc định Admin có quyền, Data Proposer theo policy, Data Steward/Reviewer/Consumer-only không có. Action Import chỉ xuất hiện ở Header của Dictionary `Approved` active hoặc `Draft` khi capability này bằng true.
+* **Capability:** Backend trả `canImportCdeDrafts` bằng `canEditWorking` của Data Dictionary/CDE; không hard-code tên role. Mặc định chỉ `DataProposer` có quyền; `DataSteward` và Consumer-only không có. Action Import chỉ xuất hiện ở Header của Dictionary `Approved` active hoặc `Draft` khi capability này bằng true.
 * **Template:** `GET /v1/glossaryTerms/import/template` tải workbook `.xlsx` riêng cho import. Template có một sheet dữ liệu với 14 cột editable: `Mã CDE`, `Khối/Miền nghiệp vụ`, `Tên thuật ngữ nghiệp vụ`, `Hệ thống nguồn`, `Ý nghĩa nghiệp vụ`, `Mối quan hệ với thực thể`, `Chủ sở hữu dữ liệu`, `Phân loại dữ liệu`, `Dữ liệu cá nhân`, `Văn bản quy định liên quan`, `Quy định chất lượng dữ liệu`, `Cấp phát hành`, `Ngày hiệu lực`, `Ngày hết hiệu lực`. `Cấp phát hành` bắt buộc và chỉ nhận đúng `Tổng Giám đốc` hoặc `TTQLDL`, sau đó normalize thành `CEO`/`TTQLDL`. Import không nhận các cột server-owned `Phiên bản`, `Loại phiên bản phát hành`, `Trạng thái` hoặc `Người xem xét`/reviewer. File Export F13 không phải import template vì có thể chứa nhiều version của cùng mã; client không gửi UUID, FQN kỹ thuật, revision hoặc raw `extension`.
 * **Header mapping:** Trang Import đọc dữ liệu theo tên header thay vì vị trí. DataGrid Import không hiển thị hoặc duy trì field `Phiên bản`/`Loại phiên bản phát hành`/`Trạng thái`. Nếu chọn file Export F13, UI bỏ qua `Phiên bản` và `Loại phiên bản phát hành`; backend tự gán lại loại theo version đích, còn `Cấp phát hành` và hai cột ngày vẫn được đọc đúng. UI dựng lại workbook 14 cột trước khi preview. Thiếu bất kỳ header import bắt buộc nào thì từ chối file; nhiều version cùng mã trong file Export vẫn bị xem là duplicate.
 * **Chính sách mã đã tồn tại:** Trước preview, người dùng chọn một trong hai radio: `SKIP_EXISTING` — **Bỏ qua bản ghi trùng** (mặc định), hoặc `OVERWRITE_EXISTING` — **Cập nhật ghi đè bản ghi**. Chính sách chỉ áp dụng cho mã đã tồn tại trong đúng Dictionary scope; duplicate giữa các dòng trong workbook vẫn là lỗi chặn. Đổi lựa chọn sau preview bắt buộc hủy kết quả/session hiện tại và preview lại.
@@ -607,7 +647,7 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
 * Version không tồn tại, prefix không khớp parent, hoặc actor không có quyền xem active/archive scope trả `404` và không lộ payload. Archived luôn chỉ đọc.
 
 #### 2. Bộ chọn Business Version của CDE:
-* Selector được scope bởi `parentBusinessVersion`: Consumer thấy published rows của active scope và archived published rows khi xem Data Dictionary Archived; Manager thấy working/published đúng scope. Không trộn `1.x` vào selector của Dictionary `2`.
+* Selector được scope bởi `parentBusinessVersion`: Consumer thấy published rows của active scope và archived published rows khi xem Data Dictionary Archived; người có `canViewWorking` thấy working/published đúng scope. Không trộn `1.x` vào selector của Dictionary `2`.
 * Badge và selector dùng `businessVersion` của CDE; breadcrumb và URL dùng đồng thời `businessVersion` của CDE và `parentBusinessVersion` của Data Dictionary cha. Không dùng `version`, `nativeVersion` hoặc `publicationSequence` làm alias.
 * Danh sách sắp xếp giảm dần theo từng đoạn số, vì vậy `1.10` đứng trước `1.2`.
 
@@ -652,6 +692,22 @@ Hệ thống OpenMetadata áp dụng cơ chế định tuyến phân cấp nghi�
   * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/reopen?parentBusinessVersion={N}`
   * *Request Body:* `{ "expectedRevision": 1 }`, lấy từ `workingRevision` của working representation gần nhất.
   * *Hành vi:* Chuyển từ `Rejected` về lại `Draft` để Proposer tiếp tục hoàn thiện.
+* **Rút lại yêu cầu (§5.8):**
+  * Gọi: `transitionGlossaryTermWorkflow(id, 'withdraw', { expectedRevision })`
+  * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/withdraw?parentBusinessVersion={N}`
+  * *Hành vi:* Chỉ người gửi, chỉ `In Review`. Tạo/sửa về `Draft`; đề nghị xóa bị hủy, trả `{"withdrawn": true, "discarded": true}`.
+* **Hủy bản nháp (§5.8):**
+  * Gọi: `discardGlossaryTermWorkingVersion(id, parentBusinessVersion, expectedRevision)`
+  * Endpoint backend: `DELETE /v1/glossaryTerms/{id}/working?parentBusinessVersion={N}&expectedRevision={n}`
+  * *Hành vi:* Chỉ `Draft`/`Rejected`; trả `{discarded, termDeleted}`.
+* **Đề nghị xóa CDE Approved (§5.7):**
+  * Gọi: `requestGlossaryTermDeletion(id, parentBusinessVersion)`
+  * Endpoint backend: `POST /v1/glossaryTerms/{id}/working/deletion?parentBusinessVersion={N}` (không body)
+  * *Hành vi:* Tạo working `pendingDeletion` và gửi duyệt ngay (`In Review`); `400` nếu còn tham chiếu (`CdeDeletionGuard`), `409` nếu đã có working.
+* **Workflow hàng loạt (bảng CDE và tab Yêu cầu):**
+  * Gọi: `bulkGlossaryTermWorkflow(action, body)`
+  * Endpoint backend: `POST /v1/glossaryTerms/bulk/{submit|approve|reject|withdraw}`
+  * *Body:* `glossaryId`, `parentBusinessVersion`, `termIds` và/hoặc `criteria`, `dryRun`, `offset`, `limit` (mặc định 500, tối đa 1.000). Mỗi CDE chạy transaction riêng; response `matched`, `eligible`, `attempted`, `succeeded`, `failedCount`, `failures`, `remaining`.
 
 ---
 

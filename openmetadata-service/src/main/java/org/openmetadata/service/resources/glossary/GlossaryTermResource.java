@@ -2415,11 +2415,24 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
           .entity(GlossaryVersionResponses.working(working))
           .build();
     } catch (org.jdbi.v3.core.statement.UnableToExecuteStatementException exception) {
+      if (!isDuplicateKeyViolation(exception)) {
+        throw exception;
+      }
       throw new jakarta.ws.rs.ClientErrorException(
           "A governed glossary term with this technical name already exists",
           Response.Status.CONFLICT,
           exception);
     }
+  }
+
+  private static boolean isDuplicateKeyViolation(Exception exception) {
+    final boolean duplicate;
+    if (exception.getCause() instanceof java.sql.SQLException sqlException) {
+      duplicate = sqlException.getErrorCode() == 1062 || "23505".equals(sqlException.getSQLState());
+    } else {
+      duplicate = false;
+    }
+    return duplicate;
   }
 
   private static void requireDirectDataQualityCreate(CreateGlossaryTerm create) {
