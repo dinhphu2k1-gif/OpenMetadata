@@ -327,7 +327,7 @@ const DQGlossaryTermForm = ({
       <GlossaryTermFormSection
         className="cde-form-section-management"
         title={t('cde.management-information', 'Thông tin quản lý')}>
-        <Form.Item label={t('dq.cde-code', 'Mã CDE liên kết')}>
+        <Form.Item required label={t('dq.cde-code', 'Mã CDE liên kết')}>
           <CDESelectableField
             dataDictionaryVersion={
               glossaryTerm?.parentBusinessVersion ?? parentBusinessVersion

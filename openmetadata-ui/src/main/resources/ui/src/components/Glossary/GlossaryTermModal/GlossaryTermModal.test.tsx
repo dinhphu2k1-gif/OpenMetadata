@@ -141,9 +141,10 @@ describe('GlossaryTermModal', () => {
 
     expect(await screen.findByTestId('dq-term-form')).toBeInTheDocument();
     expect(screen.getByText('dq.data-quality')).toBeInTheDocument();
+    expect(screen.getByText('label.add-entity:label.rule')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
-        name: 'label.create-entity:label.term',
+        name: 'label.create-entity:label.rule',
       })
     ).toBeInTheDocument();
 

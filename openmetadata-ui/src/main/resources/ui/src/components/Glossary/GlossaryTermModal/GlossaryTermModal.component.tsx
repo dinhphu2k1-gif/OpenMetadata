@@ -66,7 +66,7 @@ const GlossaryTermModal: FC<Props> = ({
             {editMode
               ? t('label.edit-entity', { entity: t('dq.rule', 'Quy tắc CLDL') })
               : t('label.add-entity', {
-                  entity: t('label.term'),
+                  entity: t('label.rule'),
                 })}
           </div>
           <div className="cde-glossary-modal-subtitle">
@@ -210,7 +210,11 @@ const GlossaryTermModal: FC<Props> = ({
           isLoading={saving}
           key="save-btn"
           onPress={form.submit}>
-          {isCustomModal && !editMode
+          {isDQGlossary && !editMode
+            ? t('label.create-entity', {
+                entity: t('label.rule'),
+              })
+            : isCustomModal && !editMode
             ? t('label.create-entity', {
                 entity: t('label.term'),
               })

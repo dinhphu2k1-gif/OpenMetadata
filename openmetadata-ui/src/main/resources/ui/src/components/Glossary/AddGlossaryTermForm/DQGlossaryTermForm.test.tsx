@@ -200,6 +200,14 @@ describe('DQGlossaryTermForm', () => {
     expect(screen.queryByText('Người kiểm duyệt')).not.toBeInTheDocument();
   });
 
+  it('marks Mã CDE as required', () => {
+    render(<FormWrapper />);
+
+    expect(screen.getByText('dq.cde-code').closest('label')).toHaveClass(
+      'ant-form-item-required'
+    );
+  });
+
   it('populates fields in edit mode from glossaryTerm', () => {
     render(<FormWrapper editMode glossaryTerm={mockGlossaryTerm} />);
 

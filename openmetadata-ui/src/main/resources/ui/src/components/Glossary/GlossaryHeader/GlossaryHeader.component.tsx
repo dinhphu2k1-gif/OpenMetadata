@@ -1919,7 +1919,9 @@ const GlossaryHeader = ({
     if (isCustomManagedGlossary && canCreateGlossaryTerm) {
       primaryCandidates.push({
         key: 'add-term',
-        label: t('label.add-entity', { entity: t('label.term-lowercase') }),
+        label: t('label.add-entity', {
+          entity: isDQGlossary ? t('label.rule') : t('label.term-lowercase'),
+        }),
         onClick: handleAddGlossaryTermClick,
         testId: 'add-new-tag-button-header',
       });
@@ -2001,6 +2003,7 @@ const GlossaryHeader = ({
     isVersionView,
     canRenderMutationActions,
     isCustomManagedGlossary,
+    isDQGlossary,
     canCreateGlossaryTerm,
     handleAddGlossaryTermClick,
     canApproveOrReject,
