@@ -36,11 +36,6 @@ const ActionButton = ({
   primary?: boolean;
 }) => (
   <Button
-    className={
-      primary && action.variant === 'approve'
-        ? 'tw:bg-success-solid tw:text-white tw:ring-transparent tw:hover:bg-success-solid'
-        : undefined
-    }
     color={
       primary
         ? 'primary'

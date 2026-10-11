@@ -587,7 +587,6 @@ const TechnicalRecordDetailPage = () => {
         label: t('label.approve'),
         onClick: openApproveReview,
         testId: 'technical-record-approve',
-        variant: 'approve',
       });
     }
     if (canCreateChange) {

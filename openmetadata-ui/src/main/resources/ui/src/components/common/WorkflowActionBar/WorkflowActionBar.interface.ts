@@ -21,7 +21,6 @@ export interface WorkflowAction {
   loading?: boolean;
   disabled?: boolean;
   danger?: boolean;
-  variant?: 'default' | 'approve';
 }
 
 export interface WorkflowMenuItem {

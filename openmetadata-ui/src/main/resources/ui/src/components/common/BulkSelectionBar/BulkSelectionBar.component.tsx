@@ -10,14 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import {
-  CheckOutlined,
-  CloseOutlined,
-  SendOutlined,
-  UndoOutlined,
-} from '@ant-design/icons';
 import { Button } from '@openmetadata/ui-core-components';
-import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import './bulk-selection-bar.less';
 import {
@@ -42,13 +35,6 @@ const ACTION_LABEL_KEYS: Record<BulkSelectionActionType, string> = {
   approve: 'label.bulk-action-approve',
   reject: 'label.bulk-action-reject',
   withdraw: 'label.bulk-action-withdraw',
-};
-
-const ACTION_ICONS: Record<BulkSelectionActionType, ReactNode> = {
-  submit: <SendOutlined />,
-  approve: <CheckOutlined />,
-  reject: <CloseOutlined />,
-  withdraw: <UndoOutlined />,
 };
 
 const ACTION_ORDER: BulkSelectionActionType[] = [
@@ -128,7 +114,6 @@ const BulkSelectionBar = ({
         <Button
           color={buttonColor(action.type, hasApprove)}
           data-testid={action.testId}
-          iconLeading={ACTION_ICONS[action.type]}
           key={action.type}
           size="sm"
           onPress={action.onPress}>

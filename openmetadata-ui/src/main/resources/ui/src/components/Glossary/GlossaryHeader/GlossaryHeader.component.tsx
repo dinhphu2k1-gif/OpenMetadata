@@ -1968,7 +1968,6 @@ const GlossaryHeader = ({
         label: t('label.approve'),
         onClick: openApproveModal,
         disabled: isApproving,
-        variant: 'approve',
       });
     }
     if (canSubmitForReview && glossaryTermStatus !== EntityStatus.InReview) {
