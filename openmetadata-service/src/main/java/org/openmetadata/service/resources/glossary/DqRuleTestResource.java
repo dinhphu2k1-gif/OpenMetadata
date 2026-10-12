@@ -194,6 +194,34 @@ public class DqRuleTestResource {
   }
 
   @GET
+  @Path("/domains/{domainId}/results")
+  @Operation(
+      operationId = "getDqDomainResults",
+      summary = "Results of the Rules of a Domain and its subdomains")
+  public Map<String, Object> domainResults(
+      @Context SecurityContext securityContext,
+      @PathParam("domainId") UUID domainId,
+      @QueryParam("ruleId") String ruleId,
+      @QueryParam("result") String result,
+      @DefaultValue("0") @QueryParam("offset") int offset,
+      @DefaultValue(DEFAULT_LIMIT) @QueryParam("limit") int limit) {
+    access.requireView(securityContext);
+    return DqResultService.domainResults(
+        domainId.toString(), ruleId, result, tableViewer(securityContext), offset, limit);
+  }
+
+  @GET
+  @Path("/domains/{domainId}/trend")
+  @Operation(operationId = "getDqDomainTrend", summary = "Daily pass rate of a Domain")
+  public Map<String, Object> domainTrend(
+      @Context SecurityContext securityContext,
+      @PathParam("domainId") UUID domainId,
+      @DefaultValue("30") @QueryParam("days") int days) {
+    access.requireView(securityContext);
+    return DqTrendService.domainTrend(domainId.toString(), days);
+  }
+
+  @GET
   @Path("/testCases/{testCaseId}/managedBy")
   @Operation(
       operationId = "getDqManagedTestCase",

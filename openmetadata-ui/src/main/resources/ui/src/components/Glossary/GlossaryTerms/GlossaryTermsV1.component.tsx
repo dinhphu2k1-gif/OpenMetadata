@@ -77,7 +77,7 @@ import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import { useGlossaryStore } from '../useGlossary.store';
 import CDEGlossaryTermOverview from './CDEGlossaryTermOverview';
 import { useDqTestConfig } from '../../../hooks/useDqTestConfig';
-import DQCdeTestResults from '../DQRuleTests/DQCdeTestResults.component';
+import DQScopeTestResults from '../DQRuleTests/DQScopeTestResults.component';
 import DQRuleTestResults from '../DQRuleTests/DQRuleTestResults.component';
 import DQTestSpecsCard from '../DQRuleTests/DQTestSpecsCard.component';
 import { useDqTestSpecEditor } from '../DQRuleTests/useDqTestSpecEditor';
@@ -604,9 +604,9 @@ const GlossaryTermsV1 = ({
         ),
         key: EntityTabs.DATA_OBSERVABILITY,
         children: (
-          <DQCdeTestResults
+          <DQScopeTestResults
             capabilities={dqTestConfig?.capabilities}
-            cdeId={glossaryTerm.id}
+            scope={{ type: 'cde', id: glossaryTerm.id }}
           />
         ),
       } as (typeof cdeTabs)[number];

@@ -14,9 +14,9 @@
 import { createElement } from 'react';
 import TabsLabel from '../../components/common/TabsLabel/TabsLabel.component';
 import { TabProps } from '../../components/common/TabsLabel/TabsLabel.interface';
-import DataQualityDashboard from '../../components/DataQuality/DataQualityDashboard/DataQualityDashboard.component';
 import { DataProductsTabRef } from '../../components/Domain/DomainTabs/DataProductsTab/DataProductsTab.interface';
 import { EntityDetailsObjectInterface } from '../../components/Explore/ExplorePage.interface';
+import DQDomainTestResults from '../../components/Glossary/DQRuleTests/DQDomainTestResults.component';
 import { AssetsTabRef } from '../../components/Glossary/GlossaryTerms/tabs/AssetsTabs.component';
 import {
   DESCRIPTION_WIDGET,
@@ -101,15 +101,11 @@ class DomainClassBase {
     const dqTab: TabProps = {
       label: createElement(TabsLabel, {
         id: EntityTabs.DATA_OBSERVABILITY,
-        name: i18n.t('label.data-observability'),
+        name: i18n.t('label.data-quality'),
       }),
       key: EntityTabs.DATA_OBSERVABILITY,
-      children: createElement(DataQualityDashboard, {
-        isGovernanceView: true,
-        className: 'data-quality-governance-tab-wrapper',
-        initialFilters: domainDetailsPageProps.domain.fullyQualifiedName
-          ? { domainFqn: domainDetailsPageProps.domain.fullyQualifiedName }
-          : undefined,
+      children: createElement(DQDomainTestResults, {
+        domainId: domainDetailsPageProps.domain.id,
       }),
     };
 
@@ -128,7 +124,10 @@ class DomainClassBase {
     ].map((tab: EntityTabs) => ({
       id: tab,
       name: tab,
-      displayName: getTabLabelFromId(tab),
+      displayName:
+        tab === EntityTabs.DATA_OBSERVABILITY
+          ? i18n.t('label.data-quality')
+          : getTabLabelFromId(tab),
       layout: this.getDefaultLayout(tab),
       editable: tab === EntityTabs.DOCUMENTATION,
     }));

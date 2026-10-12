@@ -196,11 +196,16 @@
       "archived-banner": "Quy tắc đã ngừng áp dụng. Kết quả chỉ để tra cứu.",
       "cde": {
         "by-dimension": "Theo tiêu chí",
+        "empty-description": "Chưa có quy tắc CLDL nào có kiểm thử được áp dụng. Quy tắc sẽ hiển thị tại đây khi kiểm thử được phê duyệt và áp dụng lên cột của CDE liên kết.",
+        "empty-title": "Chưa có quy tắc CLDL nào có kiểm thử",
+        "no-dimension": "Chưa phân loại",
+        "no-test-cases": "Không có testcase phù hợp.",
         "rules": "{{count}} quy tắc",
         "rules-table": "Quy tắc",
         "rules-with-tests": "{{count}} có kiểm thử",
         "test-cases": "{{count}} testcase",
-        "test-cases-table": "Testcase"
+        "test-cases-table": "Testcase",
+        "trend-subtitle": "Tỷ lệ dòng dữ liệu đạt theo ngày của tất cả quy tắc"
       },
       "column": {
         "at": "Thời điểm chạy",

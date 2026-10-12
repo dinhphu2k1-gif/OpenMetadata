@@ -45,7 +45,14 @@ public final class DqTrendService {
   }
 
   public static Map<String, Object> cdeTrend(String cdeId, int days) {
-    final List<RuleState> states = DqResultService.ruleStatesOfCde(cdeId);
+    return trendOf(DqResultService.ruleStatesOfCde(cdeId), days);
+  }
+
+  public static Map<String, Object> domainTrend(String domainId, int days) {
+    return trendOf(DqDomainScope.ruleStates(domainId), days);
+  }
+
+  private static Map<String, Object> trendOf(List<RuleState> states, int days) {
     final List<BindingRow> bindings = new ArrayList<>();
     states.forEach(
         state ->

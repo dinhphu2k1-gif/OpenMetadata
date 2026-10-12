@@ -34,14 +34,15 @@ import { ReactComponent as AllTestsIcon } from '../../../assets/svg/all-activity
 import { ReactComponent as ChecklistIcon } from '../../../assets/svg/ic-checklist.svg';
 import { ReactComponent as PlayIcon } from '../../../assets/svg/ic-play.svg';
 import {
+  BLUE_2,
   GREEN_3,
   GREY_200,
   RED_3,
   YELLOW_2,
 } from '../../../constants/Color.constants';
 import {
-  getDqCdeResults,
-  getDqCdeTrend,
+  getDqScopeResults,
+  getDqScopeTrend,
   runDqRuleTests,
 } from '../../../rest/dqRuleTestAPI';
 import {
@@ -64,25 +65,34 @@ import {
   DQ_TREND_PERIODS,
 } from './DQRuleTests.constants';
 import {
-  DQCdeResults,
-  DQCdeRuleRow,
+  DQScopeResults,
+  DQScopeRuleRow,
+  DQResultScope,
   DQTestCapabilities,
   DQTestCaseRow,
   DQTrend,
 } from './DQRuleTests.interface';
+import './dq-rule-test-results.less';
 import DQOutcomeTag from './DQOutcomeTag.component';
+import DQResultsEmptyState from './DQResultsEmptyState.component';
 import DQScheduleLabel from './DQScheduleLabel.component';
 import { localizeDqMessage, normalizeDqThreshold } from './DQRuleTests.utils';
 import DQTrendChart from './DQTrendChart.component';
 
-interface DQCdeTestResultsProps {
-  cdeId: string;
+const percentLabel = (part: number, total: number) =>
+  total > 0 ? calculatePercentage(part, total, 1, true) : '--';
+
+interface DQScopeTestResultsProps {
+  scope: DQResultScope;
   capabilities?: DQTestCapabilities;
 }
 
-const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
+const DQScopeTestResults = ({
+  scope,
+  capabilities,
+}: DQScopeTestResultsProps) => {
   const { t } = useTranslation();
-  const [results, setResults] = useState<DQCdeResults>();
+  const [results, setResults] = useState<DQScopeResults>();
   const [trend, setTrend] = useState<DQTrend>();
   const [isLoading, setIsLoading] = useState(true);
   const [ruleFilter, setRuleFilter] = useState<string>();
@@ -93,13 +103,13 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
   const load = useCallback(async () => {
     try {
       const [resultData, trendData] = await Promise.all([
-        getDqCdeResults(cdeId, {
+        getDqScopeResults(scope, {
           ruleId: ruleFilter,
           result: outcomeFilter,
           offset: (page - 1) * DQ_RESULT_PAGE_SIZE,
           limit: DQ_RESULT_PAGE_SIZE,
         }),
-        getDqCdeTrend(cdeId, trendDays),
+        getDqScopeTrend(scope, trendDays),
       ]);
       setResults(resultData);
       setTrend(trendData);
@@ -108,14 +118,14 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
     } finally {
       setIsLoading(false);
     }
-  }, [cdeId, ruleFilter, outcomeFilter, page, trendDays]);
+  }, [scope.type, scope.id, ruleFilter, outcomeFilter, page, trendDays]);
 
   useEffect(() => {
     setIsLoading(true);
     load();
   }, [load]);
 
-  const runRule = (rule: DQCdeRuleRow) =>
+  const runRule = (rule: DQScopeRuleRow) =>
     Modal.confirm({
       title: t('dq.test.run-confirm', {
         specs: rule.specs,
@@ -140,7 +150,17 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
     return null;
   }
 
-  const ruleColumns: ColumnsType<DQCdeRuleRow> = [
+  if (results.summary.rules === 0) {
+    return (
+      <DQResultsEmptyState
+        description={t('dq.test.cde.empty-description')}
+        testId="dq-scope-results-empty"
+        title={t('dq.test.cde.empty-title')}
+      />
+    );
+  }
+
+  const ruleColumns: ColumnsType<DQScopeRuleRow> = [
     {
       title: t('dq.rule-code'),
       render: (_, rule) =>
@@ -288,8 +308,9 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
 
   const { summary } = results;
   const byStatus = summary.rulesByStatus;
-  const rulesWithResult = summary.rulesWithTests;
   const passedRules = byStatus.PASSED ?? 0;
+  const rulesWithResult =
+    passedRules + (byStatus.FAILED ?? 0) + (byStatus.ABORTED ?? 0);
 
   return (
     <div
@@ -317,18 +338,18 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
               },
               {
                 name: t('dq.test.status.no-result'),
-                value: (byStatus.NO_RESULT ?? 0) + (byStatus.NOT_DECLARED ?? 0),
+                value: byStatus.NO_RESULT ?? 0,
                 color: GREY_200,
+              },
+              {
+                name: t('dq.test.status.not-declared'),
+                value: byStatus.NOT_DECLARED ?? 0,
+                color: BLUE_2,
               },
             ]}
             iconData={{ icon: <ChecklistIcon /> }}
             paddingAngle={2}
-            percentage={calculatePercentage(
-              passedRules,
-              rulesWithResult,
-              1,
-              true
-            )}
+            percentage={percentLabel(passedRules, rulesWithResult)}
             title={t('dq.test.cde.rules-table')}
             value={summary.rules}
           />
@@ -350,11 +371,9 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
             ]}
             iconData={{ icon: <AllTestsIcon /> }}
             paddingAngle={2}
-            percentage={calculatePercentage(
+            percentage={percentLabel(
               summary.passedTestCases,
-              summary.testCases,
-              1,
-              true
+              summary.testCases
             )}
             title={t('dq.test.summary-test-cases')}
             value={summary.testCases}
@@ -377,9 +396,9 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
             </Typography.Paragraph>
             <div className="dq-spec-summary-list">
               {results.dimensions.map((dimension) => {
-                const name = (dimension.dimension ?? '--')
-                  .split('.')
-                  .slice(-1)[0];
+                const name =
+                  dimension.dimension?.split('.').slice(-1)[0] ??
+                  t('dq.test.cde.no-dimension');
 
                 return (
                   <div
@@ -423,15 +442,22 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
           <div>
             <div>{t('dq.test.trend-title')}</div>
             <Typography.Text className="dq-card-subtitle">
-              {t('dq.test.trend-subtitle')}
+              {t('dq.test.cde.trend-subtitle')}
             </Typography.Text>
           </div>
         }>
         <DQTrendChart trend={trend} />
       </Card>
 
-      <Card size="small" title={t('dq.test.cde.rules-table')}>
-        <Table<DQCdeRuleRow>
+      <Card
+        size="small"
+        title={
+          <Space size={8}>
+            {t('dq.test.cde.rules-table')}
+            <span className="dq-count-badge">{results.rules.length}</span>
+          </Space>
+        }>
+        <Table<DQScopeRuleRow>
           columns={ruleColumns}
           dataSource={results.rules}
           pagination={false}
@@ -495,6 +521,7 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
           columns={testColumns}
           dataSource={results.testCases}
           loading={isLoading}
+          locale={{ emptyText: t('dq.test.cde.no-test-cases') }}
           pagination={{
             current: page,
             pageSize: DQ_RESULT_PAGE_SIZE,
@@ -512,4 +539,4 @@ const DQCdeTestResults = ({ cdeId, capabilities }: DQCdeTestResultsProps) => {
   );
 };
 
-export default DQCdeTestResults;
+export default DQScopeTestResults;

@@ -29,7 +29,7 @@ import {
 } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
 import { AxiosError } from 'axios';
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ReactComponent as AllTestsIcon } from '../../../assets/svg/all-activity-v2.svg';
@@ -43,7 +43,6 @@ import {
   RED_3,
   YELLOW_2,
 } from '../../../constants/Color.constants';
-import { ERROR_PLACEHOLDER_TYPE, SIZE } from '../../../enums/common.enum';
 import {
   getDqRuleLatestRun,
   getDqRuleResults,
@@ -57,12 +56,12 @@ import {
 } from '../../../utils/NumberUtils';
 import { getTestCaseDetailPagePath } from '../../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
-import ErrorPlaceHolder from '../../common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import Loader from '../../common/Loader/Loader';
 import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { StatusType } from '../../common/StatusBadge/StatusBadge.interface';
 import SummaryPieChartCard from '../../DataQuality/SummaryPannel/SummaryPieChartCard/SummaryPieChartCard.component';
 import DQOutcomeTag from './DQOutcomeTag.component';
+import DQResultsEmptyState from './DQResultsEmptyState.component';
 import './dq-rule-test-results.less';
 import {
   DQ_PIPELINE_STATE_BADGE,
@@ -119,44 +118,6 @@ const percentOf = (threshold?: string | null) => {
 
   return match ? Number(match[1]) : undefined;
 };
-
-interface DQResultsEmptyStateProps {
-  testId: string;
-  title: string;
-  description: string;
-  steps?: string[];
-  action?: ReactNode;
-}
-
-const DQResultsEmptyState = ({
-  testId,
-  title,
-  description,
-  steps,
-  action,
-}: DQResultsEmptyStateProps) => (
-  <div className="dq-results-empty" data-testid={testId}>
-    <ErrorPlaceHolder size={SIZE.MEDIUM} type={ERROR_PLACEHOLDER_TYPE.CUSTOM}>
-      <Typography.Title className="m-t-sm m-b-xs" level={5}>
-        {title}
-      </Typography.Title>
-      <Typography.Paragraph className="dq-results-empty-description">
-        {description}
-      </Typography.Paragraph>
-      {steps && (
-        <ol className="dq-results-empty-steps">
-          {steps.map((step, index) => (
-            <li key={step}>
-              <span className="dq-results-empty-step-index">{index + 1}</span>
-              {step}
-            </li>
-          ))}
-        </ol>
-      )}
-      {action}
-    </ErrorPlaceHolder>
-  </div>
-);
 
 const DQRowStateBadge = ({ state }: { state: string }) => {
   const { t } = useTranslation();

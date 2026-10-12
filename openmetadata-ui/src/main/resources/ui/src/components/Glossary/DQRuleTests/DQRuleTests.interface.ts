@@ -169,7 +169,7 @@ export interface DQRuleResults {
   paging: DQPaging;
 }
 
-export interface DQCdeRuleRow extends DQRuleSummary {
+export interface DQScopeRuleRow extends DQRuleSummary {
   status: DQRuleStatus;
   cron: string | null;
   specs: number;
@@ -177,8 +177,14 @@ export interface DQCdeRuleRow extends DQRuleSummary {
   summary: DQSummary;
 }
 
-export interface DQCdeResults {
-  cdeTermId: string;
+export interface DQResultScope {
+  type: 'cde' | 'domain';
+  id: string;
+}
+
+export interface DQScopeResults {
+  cdeTermId?: string;
+  domainId?: string;
   summary: {
     rules: number;
     rulesWithTests: number;
@@ -193,7 +199,7 @@ export interface DQCdeResults {
     passedRules: number;
     passRate: number;
   }[];
-  rules: DQCdeRuleRow[];
+  rules: DQScopeRuleRow[];
   testCases: DQTestCaseRow[];
   hiddenTestCases: number;
   paging: DQPaging;

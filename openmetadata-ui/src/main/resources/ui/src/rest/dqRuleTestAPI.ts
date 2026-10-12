@@ -12,11 +12,12 @@
  */
 
 import {
-  DQCdeResults,
+  DQScopeResults,
   DQLatestRun,
   DQLibraryDefinition,
   DQManagedBy,
   DQPreview,
+  DQResultScope,
   DQRuleResults,
   DQTestConfig,
   DQTrend,
@@ -114,8 +115,11 @@ export const getDqRuleLatestRun = async (ruleId: string) => {
   return response.data;
 };
 
-export const getDqCdeResults = async (
-  cdeId: string,
+const scopePath = (scope: DQResultScope) =>
+  `${BASE_URL}/${scope.type === 'domain' ? 'domains' : 'cdes'}/${scope.id}`;
+
+export const getDqScopeResults = async (
+  scope: DQResultScope,
   params?: {
     ruleId?: string;
     result?: string;
@@ -123,19 +127,18 @@ export const getDqCdeResults = async (
     limit?: number;
   }
 ) => {
-  const response = await APIClient.get<DQCdeResults>(
-    `${BASE_URL}/cdes/${cdeId}/results`,
+  const response = await APIClient.get<DQScopeResults>(
+    `${scopePath(scope)}/results`,
     { params }
   );
 
   return response.data;
 };
 
-export const getDqCdeTrend = async (cdeId: string, days?: number) => {
-  const response = await APIClient.get<DQTrend>(
-    `${BASE_URL}/cdes/${cdeId}/trend`,
-    { params: { days } }
-  );
+export const getDqScopeTrend = async (scope: DQResultScope, days?: number) => {
+  const response = await APIClient.get<DQTrend>(`${scopePath(scope)}/trend`, {
+    params: { days },
+  });
 
   return response.data;
 };

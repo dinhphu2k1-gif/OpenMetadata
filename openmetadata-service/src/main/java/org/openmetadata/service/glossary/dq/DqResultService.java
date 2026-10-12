@@ -57,6 +57,14 @@ public final class DqResultService {
       TestCaseResult result,
       boolean stale) {}
 
+  /** Filters and page of the testcases of a results read. */
+  record ResultQuery(
+      String ruleFilter,
+      String outcomeFilter,
+      Predicate<String> canViewTable,
+      int offset,
+      int limit) {}
+
   record RuleState(
       RuleExecRow row,
       DqRuleContext context,
@@ -84,7 +92,34 @@ public final class DqResultService {
       Predicate<String> canViewTable,
       int offset,
       int limit) {
-    final List<RuleState> states = ruleStatesOfCde(cdeId);
+    final Map<String, Object> body = new LinkedHashMap<>();
+    body.put("cdeTermId", cdeId);
+    aggregate(
+        ruleStatesOfCde(cdeId),
+        new ResultQuery(ruleFilter, outcomeFilter, canViewTable, offset, limit),
+        body);
+    return body;
+  }
+
+  /** Results of the Rules of a Domain or of its subdomains, shaped like the results of a CDE. */
+  public static Map<String, Object> domainResults(
+      String domainId,
+      String ruleFilter,
+      String outcomeFilter,
+      Predicate<String> canViewTable,
+      int offset,
+      int limit) {
+    final Map<String, Object> body = new LinkedHashMap<>();
+    body.put("domainId", domainId);
+    aggregate(
+        DqDomainScope.ruleStates(domainId),
+        new ResultQuery(ruleFilter, outcomeFilter, canViewTable, offset, limit),
+        body);
+    return body;
+  }
+
+  private static void aggregate(
+      List<RuleState> states, ResultQuery query, Map<String, Object> body) {
     final List<Map<String, Object>> rules = new ArrayList<>();
     final List<Evaluated> all = new ArrayList<>();
     for (RuleState state : states) {
@@ -93,16 +128,20 @@ public final class DqResultService {
     }
     final List<Evaluated> filtered =
         all.stream()
-            .filter(item -> ruleFilter == null || item.binding().ruleTermId().equals(ruleFilter))
-            .filter(item -> outcomeFilter == null || item.outcome().name().equals(outcomeFilter))
+            .filter(
+                item ->
+                    query.ruleFilter() == null
+                        || item.binding().ruleTermId().equals(query.ruleFilter()))
+            .filter(
+                item ->
+                    query.outcomeFilter() == null
+                        || item.outcome().name().equals(query.outcomeFilter()))
             .toList();
-    final Map<String, Object> body = new LinkedHashMap<>();
-    body.put("cdeTermId", cdeId);
     body.put("summary", cdeSummary(states, all));
     body.put("dimensions", dimensions(states));
     body.put("rules", rules);
-    body.put("testCases", page(filtered, canViewTable, offset, limit, body));
-    return body;
+    body.put(
+        "testCases", page(filtered, query.canViewTable(), query.offset(), query.limit(), body));
   }
 
   /**

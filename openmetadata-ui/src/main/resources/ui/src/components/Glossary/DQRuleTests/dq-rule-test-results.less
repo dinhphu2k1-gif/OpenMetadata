@@ -298,3 +298,15 @@
   margin-right: @size-xs;
   vertical-align: -2px;
 }
+
+// The gutter of the summary row overhangs the tab by half a gutter on each side.
+.dq-domain-test-results {
+  overflow-x: clip;
+}
+
+// The tabs of a Domain scroll inside a fixed height; this one grows with the page instead, so the
+// page keeps a single vertical scrollbar.
+.domain-details-page-tabs .ant-tabs.tabs-new .ant-tabs-tabpane:has(> .dq-domain-test-results) {
+  height: auto;
+  overflow-y: visible;
+}

@@ -30,7 +30,7 @@ jest.mock('../DomainUtils', () => ({
 }));
 
 jest.mock(
-  '../../components/DataQuality/DataQualityDashboard/DataQualityDashboard.component',
+  '../../components/Glossary/DQRuleTests/DQDomainTestResults.component',
   () => ({ __esModule: true, default: () => null })
 );
 
@@ -45,7 +45,7 @@ jest.mock('../i18next/LocalUtil', () => ({
 }));
 
 const mockProps = {
-  domain: { fullyQualifiedName: 'Finance' },
+  domain: { id: 'domain-id', fullyQualifiedName: 'Finance' },
   isVersionsView: false,
 } as unknown as DomainDetailPageTabProps;
 
@@ -72,48 +72,25 @@ describe('DomainClassBase', () => {
       expect(dqTab).toBeUndefined();
     });
 
-    it('DQ tab passes isGovernanceView as true', () => {
-      const tabs = instance.getDomainDetailPageTabs(mockProps);
-      const dqTab = tabs.at(-1);
-      const childProps = (dqTab?.children as ReturnType<typeof createElement>)
-        .props;
-
-      expect(childProps.isGovernanceView).toBe(true);
-    });
-
-    it('DQ tab passes domain.fullyQualifiedName as initialFilters.domainFqn', () => {
+    it('DQ tab shows the Data Quality Rule results of the domain', () => {
       const tabs = instance.getDomainDetailPageTabs(mockProps);
       const childProps = (
         tabs.at(-1)?.children as ReturnType<typeof createElement>
-      ).props;
+      ).props as { domainId?: string };
 
-      expect(childProps.initialFilters?.domainFqn).toBe('Finance');
-    });
-
-    it('DQ tab passes undefined initialFilters when domain.fullyQualifiedName is absent', () => {
-      const props = {
-        ...mockProps,
-        domain: { fullyQualifiedName: undefined },
-      } as unknown as DomainDetailPageTabProps;
-      const tabs = instance.getDomainDetailPageTabs(props);
-      const childProps = (
-        tabs.at(-1)?.children as ReturnType<typeof createElement>
-      ).props;
-
-      expect(childProps.initialFilters).toBeUndefined();
-    });
-
-    it('DQ tab passes className as data-quality-governance-tab-wrapper', () => {
-      const tabs = instance.getDomainDetailPageTabs(mockProps);
-      const childProps = (
-        tabs.at(-1)?.children as ReturnType<typeof createElement>
-      ).props;
-
-      expect(childProps.className).toBe('data-quality-governance-tab-wrapper');
+      expect(childProps.domainId).toBe('domain-id');
     });
   });
 
   describe('getDomainDetailPageTabsIds', () => {
+    it('names the DATA_OBSERVABILITY tab Data Quality', () => {
+      const dqTab = instance
+        .getDomainDetailPageTabsIds()
+        .find((tab) => tab.id === EntityTabs.DATA_OBSERVABILITY);
+
+      expect(dqTab?.displayName).toBe('label.data-quality');
+    });
+
     it('includes DATA_OBSERVABILITY tab ID', () => {
       const tabs = instance.getDomainDetailPageTabsIds();
       const dqTab = tabs.find((t) => t.id === EntityTabs.DATA_OBSERVABILITY);

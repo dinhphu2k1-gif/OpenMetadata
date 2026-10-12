@@ -196,11 +196,16 @@
       "archived-banner": "This rule is no longer in effect. Results are for reference only.",
       "cde": {
         "by-dimension": "By criteria",
+        "empty-description": "No Data Quality Rule with applied tests belongs here yet. Rules appear once their tests are approved and applied to the columns of the linked CDE.",
+        "empty-title": "No Data Quality Rule with tests yet",
+        "no-dimension": "Uncategorized",
+        "no-test-cases": "No test case matches.",
         "rules": "{{count}} rule(s)",
         "rules-table": "Rules",
         "rules-with-tests": "{{count}} with tests",
         "test-cases": "{{count}} test case(s)",
-        "test-cases-table": "Test cases"
+        "test-cases-table": "Test cases",
+        "trend-subtitle": "Share of passing rows per day across all rules"
       },
       "column": {
         "at": "Run at",
