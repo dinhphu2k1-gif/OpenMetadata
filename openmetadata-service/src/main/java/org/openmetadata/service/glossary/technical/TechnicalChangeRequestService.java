@@ -7,8 +7,11 @@ package org.openmetadata.service.glossary.technical;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jdbi.v3.core.Handle;
 import org.openmetadata.schema.utils.JsonUtils;
+import org.openmetadata.service.glossary.notification.GovernedReviewNotifier;
+import org.openmetadata.service.glossary.notification.ReviewDecision;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 
 /** Maker-checker lifecycle for proposed updates and deletions of Approved records. */
@@ -53,6 +56,7 @@ public final class TechnicalChangeRequestService {
               return submit(dao, version, active, existing, expectedRevision, actor);
             });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestSubmitted(actor);
     return result;
   }
 
@@ -82,6 +86,7 @@ public final class TechnicalChangeRequestService {
               return submit(dao, version, active, draft, draft.revision(), actor);
             });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestSubmitted(actor);
     return result;
   }
 
@@ -110,9 +115,11 @@ public final class TechnicalChangeRequestService {
           return null;
         });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestDecided(actor);
   }
 
   public TechnicalRecordChangeRequest reject(UUID recordId, long expectedRevision, String actor) {
+    final AtomicReference<ReviewDecision> decision = new AtomicReference<>();
     final TechnicalRecordChangeRequest result =
         records.write(
             false,
@@ -121,6 +128,9 @@ public final class TechnicalChangeRequestService {
               final TechnicalRecord active = TechnicalRecordService.requireRecord(dao, recordId);
               final TechnicalRecordChangeRequest existing = requireRequest(dao, recordId);
               requireReviewable(existing, expectedRevision, actor);
+              decision.set(
+                  ReviewDecision.rejected(
+                      existing.submittedBy(), active.columnFqn(), recordRef(active)));
               final long now = System.currentTimeMillis();
               final TechnicalRecordChangeRequest rejected =
                   existing.toBuilder()
@@ -138,11 +148,13 @@ public final class TechnicalChangeRequestService {
               return rejected;
             });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestReviewed(actor, decision.get());
     return result;
   }
 
   /** Applies a proposal atomically and returns the resulting Approved record, or null for delete. */
   public TechnicalRecord approve(UUID recordId, long expectedRevision, String actor) {
+    final AtomicReference<ReviewDecision> decision = new AtomicReference<>();
     final TechnicalRecord result =
         records.write(
             true,
@@ -156,6 +168,9 @@ public final class TechnicalChangeRequestService {
               }
               final TechnicalRecordChangeRequest existing = requireRequestForUpdate(dao, recordId);
               requireReviewable(existing, expectedRevision, actor);
+              decision.set(
+                  ReviewDecision.approved(
+                      existing.submittedBy(), active.columnFqn(), recordRef(active)));
               requireCurrentBase(active, existing);
 
               final TechnicalRecord approved;
@@ -214,6 +229,7 @@ public final class TechnicalChangeRequestService {
               return approved;
             });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestReviewed(actor, decision.get());
     return result;
   }
 
@@ -509,5 +525,9 @@ public final class TechnicalChangeRequestService {
 
   private static TechnicalDictionaryDAO dao() {
     return org.openmetadata.service.Entity.getJdbi().onDemand(TechnicalDictionaryDAO.class);
+  }
+
+  private static ReviewDecision.RecordRef recordRef(TechnicalRecord record) {
+    return new ReviewDecision.RecordRef(record.id(), record.columnFqn(), null, null);
   }
 }

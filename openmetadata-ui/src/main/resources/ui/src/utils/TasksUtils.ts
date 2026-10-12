@@ -90,6 +90,10 @@ import { getEntityName } from './EntityNameUtils';
 import entityUtilClassBase from './EntityUtilClassBase';
 import { getEntityFQN, getEntityType } from './FeedUtils';
 import { getGlossaryBreadcrumbs } from './GlossaryUtils';
+import {
+  getGovernedReviewTaskPath,
+  isGovernedReviewTask,
+} from './GovernedReviewTaskUtils';
 import { t } from './i18next/LocalUtil';
 import { defaultFields as MlModelFields } from './MlModelDetailsUtils';
 import { defaultFields as PipelineFields } from './PipelineDetailsUtils';
@@ -199,7 +203,9 @@ export const getTaskDetailPath = (task: Thread) => {
   const entityFqn = getEntityFQN(task.about) ?? '';
   const entityType = getEntityType(task.about) ?? '';
 
-  if (entityType === EntityType.TEST_CASE) {
+  if (isGovernedReviewTask(task)) {
+    return getGovernedReviewTaskPath(task);
+  } else if (entityType === EntityType.TEST_CASE) {
     return getTestCaseDetailPagePath(entityFqn, TestCasePageTabs.ISSUES);
   } else if (entityType === EntityType.USER) {
     return getUserPath(

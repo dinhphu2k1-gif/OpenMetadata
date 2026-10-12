@@ -15,7 +15,7 @@
 
 .user-layout-scroll {
   height: @profile-entity-details-tab-height;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 
 .summary-panel-container {
@@ -30,7 +30,8 @@
 
 .profile-section {
   height: @profile-page-sidebar;
-  overflow-y: scroll;
+  overflow-x: hidden;
+  overflow-y: auto;
 
   .profile-section-user-details-card {
     padding: 20px;
@@ -45,6 +46,11 @@
       position: absolute;
       top: 10px;
       right: 10px;
+
+      rect {
+        fill: @primary-color;
+        stroke: @primary-color;
+      }
     }
 
     .profile-details-title {
@@ -239,7 +245,7 @@
 .profile-edit-cancel {
   width: 30px;
   height: 30px;
-  background: '#0950C5' !important;
+  background: @primary-color !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -262,7 +268,7 @@
 .persona-profile-edit-cancel.ant-btn-icon-only.ant-btn-sm {
   width: 30px;
   height: 30px;
-  background: #0950c5;
+  background: @primary-color;
   position: absolute;
   bottom: 0;
   display: flex;
@@ -273,7 +279,7 @@
 .persona-profile-edit-save.ant-btn-icon-only.ant-btn-sm {
   width: 30px;
   height: 30px;
-  background: #0950c5;
+  background: @primary-color;
   position: absolute;
   bottom: 0;
   right: 38px;

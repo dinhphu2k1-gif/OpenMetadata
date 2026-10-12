@@ -100,6 +100,12 @@ const TechnicalRecordDetailPage = withSuspenseFallback(
   )
 );
 
+const NotificationsPage = withSuspenseFallback(
+  React.lazy(
+    () => import('../../pages/NotificationsPage/NotificationsPage.component')
+  )
+);
+
 const TechnicalDictionaryPage = withSuspenseFallback(
   React.lazy(
     () =>
@@ -816,6 +822,7 @@ const AuthenticatedAppRouter: FunctionComponent = () => {
         element={<TechnicalDictionaryPage />}
         path={ROUTES.TECHNICAL_DICTIONARY}
       />
+      <Route element={<NotificationsPage />} path={ROUTES.NOTIFICATIONS} />
       <Route element={<SettingsRouter />} path="/settings/*" />
       <Route element={<DomainRouter />} path="/domain/*" />
       <Route

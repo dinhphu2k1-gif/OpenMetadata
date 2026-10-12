@@ -12,6 +12,7 @@
  */
 
 import { List, Space, Typography } from 'antd';
+import classNames from 'classnames';
 import { FC, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -25,10 +26,12 @@ import { getEntityLinkFromType } from '../../utils/EntityBreadcrumbUtils';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { entityDisplayName, prepareFeedLink } from '../../utils/FeedUtils';
 import Fqn from '../../utils/Fqn';
+import { getGovernedReviewNotice } from '../../utils/GovernedReviewTaskUtils';
 import { getTaskDetailPath } from '../../utils/TasksUtils';
 import { ActivityFeedTabs } from '../ActivityFeed/ActivityFeedTab/ActivityFeedTab.interface';
 import ProfilePicture from '../common/ProfilePicture/ProfilePicture';
 import { SourceType } from '../SearchedData/SearchedData.interface';
+import GovernedReviewNotificationCard from './GovernedReviewNotificationCard.component';
 import { NotificationFeedProp } from './NotificationFeedCard.interface';
 
 const NotificationFeedCard: FC<NotificationFeedProp> = ({
@@ -39,6 +42,7 @@ const NotificationFeedCard: FC<NotificationFeedProp> = ({
   feedType,
   task,
   isConversationFeed = false,
+  isUnread = false,
 }) => {
   const { t } = useTranslation();
   const { task: taskDetails } = task ?? {};
@@ -112,9 +116,25 @@ const NotificationFeedCard: FC<NotificationFeedProp> = ({
       : entityDisplayName(entityType, entityFQN);
   }, [task, entityType, entityFQN]);
 
+  const governedNotice = getGovernedReviewNotice(task);
+
+  if (governedNotice) {
+    return (
+      <GovernedReviewNotificationCard
+        createdBy={createdBy}
+        isUnread={isUnread}
+        notice={governedNotice}
+        thread={task}
+        timestamp={timestamp}
+      />
+    );
+  }
+
   return (
     <Link
-      className="no-underline"
+      className={classNames('no-underline', {
+        'notification-item-unread': isUnread,
+      })}
       to={
         isConversationFeed
           ? prepareFeedLink(entityType, entityFQN, ActivityFeedTabs.ALL)

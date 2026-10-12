@@ -3419,6 +3419,78 @@ public interface CollectionDAO {
         @Define("condition") String condition,
         @BindMap Map<String, String> params);
 
+    /**
+     * One user's notifications: tasks assigned to them or their teams, and threads that mention
+     * them or their teams, newest first. {@code since} keeps only threads created after it.
+     */
+    @ConnectionAwareSqlQuery(
+        value =
+            "SELECT json FROM thread_entity "
+                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND to_tsvector('simple', taskAssigneesIds) @@ to_tsquery('simple', :userTeamJsonPostgres)) OR "
+                + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
+                + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
+                + "AND toType='THREAD' AND relation = :relation) "
+                + "AND (:decisionsOnly = 0 OR json #>> '{feedInfo,entitySpecificInfo,entity,governedReview,kind}' = 'DECISION'))) "
+                + "ORDER BY createdAt DESC, id LIMIT :limit OFFSET :offset",
+        connectionType = POSTGRES)
+    @ConnectionAwareSqlQuery(
+        value =
+            "SELECT json FROM thread_entity "
+                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND MATCH(taskAssigneesIds) AGAINST (:userTeamJsonMysql IN BOOLEAN MODE)) OR "
+                + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
+                + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
+                + "AND toType='THREAD' AND relation = :relation) "
+                + "AND (:decisionsOnly = 0 OR JSON_UNQUOTE(JSON_EXTRACT(json, '$.feedInfo.entitySpecificInfo.entity.governedReview.kind')) = 'DECISION'))) "
+                + "ORDER BY createdAt DESC, id LIMIT :limit OFFSET :offset",
+        connectionType = MYSQL)
+    List<String> listNotifications(
+        @Bind("userName") String userName,
+        @BindList("teamNames") List<String> teamNames,
+        @Bind("relation") int relation,
+        @Bind("userTeamJsonPostgres") String userTeamJsonPostgres,
+        @Bind("userTeamJsonMysql") String userTeamJsonMysql,
+        @Bind("includeTasks") int includeTasks,
+        @Bind("openOnly") int openOnly,
+        @Bind("includeMentions") int includeMentions,
+        @Bind("decisionsOnly") int decisionsOnly,
+        @Bind("since") long since,
+        @Bind("limit") int limit,
+        @Bind("offset") int offset);
+
+    @ConnectionAwareSqlQuery(
+        value =
+            "SELECT count(id) FROM thread_entity "
+                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND to_tsvector('simple', taskAssigneesIds) @@ to_tsquery('simple', :userTeamJsonPostgres)) OR "
+                + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
+                + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
+                + "AND toType='THREAD' AND relation = :relation) "
+                + "AND (:decisionsOnly = 0 OR json #>> '{feedInfo,entitySpecificInfo,entity,governedReview,kind}' = 'DECISION'))) ",
+        connectionType = POSTGRES)
+    @ConnectionAwareSqlQuery(
+        value =
+            "SELECT count(id) FROM thread_entity "
+                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND MATCH(taskAssigneesIds) AGAINST (:userTeamJsonMysql IN BOOLEAN MODE)) OR "
+                + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
+                + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
+                + "AND toType='THREAD' AND relation = :relation) "
+                + "AND (:decisionsOnly = 0 OR JSON_UNQUOTE(JSON_EXTRACT(json, '$.feedInfo.entitySpecificInfo.entity.governedReview.kind')) = 'DECISION'))) ",
+        connectionType = MYSQL)
+    int countNotifications(
+        @Bind("userName") String userName,
+        @BindList("teamNames") List<String> teamNames,
+        @Bind("relation") int relation,
+        @Bind("userTeamJsonPostgres") String userTeamJsonPostgres,
+        @Bind("userTeamJsonMysql") String userTeamJsonMysql,
+        @Bind("includeTasks") int includeTasks,
+        @Bind("openOnly") int openOnly,
+        @Bind("includeMentions") int includeMentions,
+        @Bind("decisionsOnly") int decisionsOnly,
+        @Bind("since") long since);
+
     @SqlQuery(
         "SELECT json FROM thread_entity <condition> "
             + "AND MD5(id) in (SELECT fromFQNHash FROM field_relationship WHERE "

@@ -226,6 +226,7 @@ export const ROUTES = {
   GLOSSARY: '/glossary',
   ADD_GLOSSARY: '/glossary/add',
   DATA_DICTIONARY: '/glossary/Data%20Dictionary',
+  NOTIFICATIONS: '/notifications',
   TECHNICAL_DICTIONARY: '/technical-dictionary',
   TECHNICAL_DICTIONARY_IMPORT: '/technical-dictionary/import',
   TECHNICAL_DICTIONARY_DETAILS: '/technical-dictionary/:termId',

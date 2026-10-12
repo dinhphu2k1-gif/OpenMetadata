@@ -328,7 +328,8 @@ describe('TechnicalRecordModal review', () => {
   it('keeps the edit action next to Close for a user who may edit', () => {
     renderMode('review', 'In Review', { onEdit: jest.fn() });
 
-    expect(footerOf().children[0]).toContainElement(
+    expect(footerOf().children[0]).toHaveTextContent('label.close');
+    expect(footerOf().children[1]).toBe(
       screen.getByTestId('technical-record-edit')
     );
   });

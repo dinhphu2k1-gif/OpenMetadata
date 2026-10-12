@@ -91,12 +91,17 @@ jest.mock('../../hooks/useDomainStore', () => ({
 }));
 
 jest.mock('../NotificationBox/NotificationBox.component', () => {
-  return jest.fn().mockImplementation(({ onTabChange }) => (
-    <div data-testid="tab-change" onClick={onTabChange}>
-      tab change
-    </div>
-  ));
+  return jest
+    .fn()
+    .mockImplementation(() => (
+      <div data-testid="notification-box">notification box</div>
+    ));
 });
+
+jest.mock('../NotificationBox/NotificationSeen', () => ({
+  hasUnseenNotification: jest.fn().mockResolvedValue(false),
+  markNotificationsSeen: jest.fn(),
+}));
 
 jest.mock(
   '../Settings/Users/UserProfileIcon/UserProfileIcon.component',

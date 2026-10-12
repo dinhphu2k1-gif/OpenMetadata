@@ -45,6 +45,7 @@ import org.openmetadata.schema.type.MetadataOperation;
 import org.openmetadata.schema.type.TagLabel;
 import org.openmetadata.schema.type.TagLabel.TagSource;
 import org.openmetadata.sdk.client.OpenMetadataClient;
+import org.openmetadata.sdk.exceptions.InvalidRequestException;
 import org.openmetadata.sdk.services.classification.ClassificationService;
 import org.openmetadata.sdk.services.classification.TagService;
 import org.openmetadata.sdk.services.domains.DomainService;
@@ -184,10 +185,12 @@ public final class SharedEntities {
     this.GLOSSARY2 = glossary2;
     this.GLOSSARY1_TERM1 = glossary1Term1;
     this.GLOSSARY1_TERM1_LABEL =
-        new TagLabel()
-            .withTagFQN(glossary1Term1.getFullyQualifiedName())
-            .withSource(TagSource.GLOSSARY)
-            .withLabelType(TagLabel.LabelType.MANUAL);
+        glossary1Term1 == null
+            ? null
+            : new TagLabel()
+                .withTagFQN(glossary1Term1.getFullyQualifiedName())
+                .withSource(TagSource.GLOSSARY)
+                .withLabelType(TagLabel.LabelType.MANUAL);
 
     this.MYSQL_SERVICE = mysqlService;
     this.MYSQL_REFERENCE = mysqlService.getEntityReference();
@@ -407,20 +410,35 @@ public final class SharedEntities {
     return tagService.create(createTag);
   }
 
+  /**
+   * This fork only allows its governed glossaries, so creating a free-form one is rejected. The
+   * suite must still start; tests that need the shared glossaries see {@code null} and fail on
+   * their own instead of taking every other test down with them.
+   */
   private static Glossary createGlossary(GlossaryService glossaryService, String name) {
-    CreateGlossary createGlossary =
-        new CreateGlossary().withName(name).withDescription("Shared test glossary");
-    return glossaryService.create(createGlossary);
+    Glossary glossary = null;
+    try {
+      glossary =
+          glossaryService.create(
+              new CreateGlossary().withName(name).withDescription("Shared test glossary"));
+    } catch (InvalidRequestException exception) {
+      LOG.warn("Shared glossary {} was not created: {}", name, exception.getMessage());
+    }
+    return glossary;
   }
 
   private static GlossaryTerm createGlossaryTerm(
       GlossaryTermService glossaryTermService, Glossary glossary, String name) {
-    CreateGlossaryTerm createTerm =
-        new CreateGlossaryTerm()
-            .withName(name)
-            .withGlossary(glossary.getFullyQualifiedName())
-            .withDescription("Shared test glossary term");
-    return glossaryTermService.create(createTerm);
+    GlossaryTerm term = null;
+    if (glossary != null) {
+      term =
+          glossaryTermService.create(
+              new CreateGlossaryTerm()
+                  .withName(name)
+                  .withGlossary(glossary.getFullyQualifiedName())
+                  .withDescription("Shared test glossary term"));
+    }
+    return term;
   }
 
   private static DatabaseService createMySqlService(

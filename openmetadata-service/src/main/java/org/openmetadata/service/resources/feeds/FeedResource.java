@@ -49,6 +49,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.SecurityContext;
 import jakarta.ws.rs.core.UriInfo;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.openmetadata.schema.api.feed.CloseTask;
 import org.openmetadata.schema.api.feed.CreatePost;
@@ -58,6 +59,7 @@ import org.openmetadata.schema.api.feed.ThreadCount;
 import org.openmetadata.schema.entity.feed.Thread;
 import org.openmetadata.schema.exception.JsonParsingException;
 import org.openmetadata.schema.type.EntityReference;
+import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.type.MetadataOperation;
 import org.openmetadata.schema.type.Post;
 import org.openmetadata.schema.type.TagLabel;
@@ -70,6 +72,8 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.jdbi3.FeedFilter;
 import org.openmetadata.service.jdbi3.FeedRepository;
 import org.openmetadata.service.jdbi3.FeedRepository.FilterType;
+import org.openmetadata.service.jdbi3.FeedRepository.NotificationGroup;
+import org.openmetadata.service.jdbi3.FeedRepository.NotificationPage;
 import org.openmetadata.service.jdbi3.FeedRepository.PaginationType;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.security.Authorizer;
@@ -234,6 +238,44 @@ public class FeedResource {
     ResultList<Thread> threads = dao.list(filter, entityLink, limitPosts, userId, limitParam);
     addHref(uriInfo, threads.getData());
     return threads;
+  }
+
+  @GET
+  @Path("/notifications")
+  @Operation(
+      operationId = "listNotifications",
+      summary = "List the notifications of the current user",
+      description =
+          "Tasks assigned to the current user or their teams and threads that mention them, newest"
+              + " first, with the total and how many were created after `unreadSince`. Always about"
+              + " the authenticated user.")
+  public Map<String, Object> listNotifications(
+      @Context UriInfo uriInfo,
+      @Context SecurityContext securityContext,
+      @Parameter(description = "ALL, PENDING (open tasks) or DECISIONS (review results)")
+          @DefaultValue("ALL")
+          @QueryParam("group")
+          NotificationGroup group,
+      @DefaultValue("25") @Min(1) @Max(100) @QueryParam("limit") int limit,
+      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset,
+      @Parameter(description = "Epoch millis; notifications created later count as unread")
+          @DefaultValue("0")
+          @Min(0)
+          @QueryParam("unreadSince")
+          long unreadSince) {
+    final UUID userId =
+        Entity.getEntityReferenceByName(
+                Entity.USER, securityContext.getUserPrincipal().getName(), Include.NON_DELETED)
+            .getId();
+    final NotificationPage page = dao.listNotifications(userId, group, limit, offset, unreadSince);
+    addHref(uriInfo, page.threads());
+    return Map.of(
+        "data",
+        page.threads(),
+        "paging",
+        Map.of("total", page.total(), "limit", limit, "offset", offset),
+        "unread",
+        page.unread());
   }
 
   @GET

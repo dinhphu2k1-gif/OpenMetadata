@@ -5,6 +5,8 @@
 
 package org.openmetadata.service.glossary.versioning;
 
+import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
+
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -40,6 +43,8 @@ import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.dq.DqCatalog;
 import org.openmetadata.service.glossary.dq.DqTestOutbox;
+import org.openmetadata.service.glossary.notification.GovernedReviewNotifier;
+import org.openmetadata.service.glossary.notification.ReviewDecision;
 import org.openmetadata.service.glossary.search.GovernedGlossaryOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
@@ -445,6 +450,55 @@ public class GlossaryVersioningService {
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     refreshIndexes(entityType, entityId, result.payload());
+    notifyReviewTransition(result, expectedStatus, targetStatus, actor);
+    return result;
+  }
+
+  private static void notifyReviewTransition(
+      WorkingVersionRecord result,
+      EntityStatus expectedStatus,
+      EntityStatus targetStatus,
+      String actor) {
+    if (GLOSSARY_TERM.equals(result.entityType())) {
+      if (targetStatus == EntityStatus.IN_REVIEW) {
+        GovernedReviewNotifier.glossaryTermSubmitted(result.glossaryId(), actor);
+      } else if (expectedStatus == EntityStatus.IN_REVIEW
+          && targetStatus == EntityStatus.REJECTED) {
+        GovernedReviewNotifier.glossaryTermReviewed(
+            result.glossaryId(),
+            actor,
+            ReviewDecision.rejected(
+                result.submittedBy(),
+                requestName(result.payload()),
+                recordRef(
+                    result.entityId(),
+                    result.payload(),
+                    result.businessVersion(),
+                    result.parentBusinessVersion())));
+      } else if (expectedStatus == EntityStatus.IN_REVIEW) {
+        GovernedReviewNotifier.glossaryTermDecided(result.glossaryId(), actor);
+      }
+    }
+  }
+
+  /** What the notification bell needs to open the decided term. */
+  static ReviewDecision.RecordRef recordRef(
+      UUID termId, String payload, String businessVersion, String parentBusinessVersion) {
+    final String fqn =
+        payload == null
+            ? null
+            : JsonUtils.readValue(payload, GlossaryTerm.class).getFullyQualifiedName();
+    return new ReviewDecision.RecordRef(
+        termId.toString(), fqn, businessVersion, parentBusinessVersion);
+  }
+
+  /** The name a submitter knows the term by: its display name, else its name. */
+  static String requestName(String payload) {
+    String result = null;
+    if (payload != null) {
+      final GlossaryTerm term = JsonUtils.readValue(payload, GlossaryTerm.class);
+      result = nullOrEmpty(term.getDisplayName()) ? term.getName() : term.getDisplayName();
+    }
     return result;
   }
 
@@ -459,6 +513,7 @@ public class GlossaryVersioningService {
       String parentBusinessVersion,
       long expectedRevision,
       String actor) {
+    final AtomicReference<UUID> glossaryId = new AtomicReference<>();
     final WorkingVersionRecord result =
         Entity.getJdbi()
             .inTransaction(
@@ -467,6 +522,7 @@ public class GlossaryVersioningService {
                   WorkingVersionRecord working =
                       requireWorking(dao, entityType, entityId, parentBusinessVersion);
                   requireSubmitter(working, actor);
+                  glossaryId.set(working.glossaryId());
                   if (working.revision() != expectedRevision) {
                     throw conflict("Working version revision conflict");
                   }
@@ -499,6 +555,9 @@ public class GlossaryVersioningService {
                   return dao.findWorking(entityType, entityId, parentBusinessVersion);
                 });
     refreshIndexes(entityType, entityId, result == null ? null : result.payload());
+    if (GLOSSARY_TERM.equals(entityType)) {
+      GovernedReviewNotifier.glossaryTermDecided(glossaryId.get(), actor);
+    }
     return result;
   }
 
@@ -554,6 +613,7 @@ public class GlossaryVersioningService {
       PublicationHook publicationHook) {
     requireEntityType(entityType);
     PublishedSnapshotRecord published;
+    final AtomicReference<String> submitter = new AtomicReference<>();
     List<PublishedSnapshotRecord> termsPublishedWithGlossary = new ArrayList<>();
     try {
       published =
@@ -572,6 +632,7 @@ public class GlossaryVersioningService {
                     if (!EntityStatus.IN_REVIEW.value().equals(working.entityStatus())) {
                       throw conflict("Only an In Review working version can be approved");
                     }
+                    submitter.set(working.submittedBy());
                     if (authorizationAndValidation != null) {
                       authorizationAndValidation.accept(working);
                     }
@@ -703,6 +764,21 @@ public class GlossaryVersioningService {
       TechnicalOutbox.drainAsync();
     }
     DqTestOutbox.drainAsync();
+    if (GLOSSARY.equals(entityType)) {
+      GovernedReviewNotifier.glossaryTermDecided(entityId, actor);
+    } else {
+      GovernedReviewNotifier.glossaryTermReviewed(
+          published.glossaryId(),
+          actor,
+          ReviewDecision.approved(
+              submitter.get(),
+              requestName(published.payload()),
+              recordRef(
+                  published.entityId(),
+                  published.payload(),
+                  published.businessVersion(),
+                  published.parentBusinessVersion())));
+    }
     return published;
   }
 
@@ -869,6 +945,9 @@ public class GlossaryVersioningService {
       throw exception;
     }
     refreshIndexes(GLOSSARY_TERM, entityId, result.payload());
+    if (EntityStatus.IN_REVIEW.value().equals(result.entityStatus())) {
+      GovernedReviewNotifier.glossaryTermSubmitted(result.glossaryId(), actor);
+    }
     return result;
   }
 
@@ -1090,7 +1169,7 @@ public class GlossaryVersioningService {
     final boolean previous = DEFER_SIDE_EFFECTS.get();
     DEFER_SIDE_EFFECTS.set(true);
     try {
-      batch.run();
+      GovernedReviewNotifier.collectDuring(batch);
     } finally {
       DEFER_SIDE_EFFECTS.set(previous);
     }

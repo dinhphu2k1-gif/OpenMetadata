@@ -31,6 +31,19 @@ jest.mock('../../utils/FeedUtils', () => ({
 jest.mock('../../utils/TasksUtils', () => ({
   getTaskDetailPath: (...args: any[]) => mockGetTaskDetailPath(...args),
 }));
+const mockGetGovernedReviewNotice = jest.fn().mockReturnValue(undefined);
+
+jest.mock('../../utils/GovernedReviewTaskUtils', () => ({
+  getGovernedReviewNotice: (...args: unknown[]) =>
+    mockGetGovernedReviewNotice(...args),
+}));
+jest.mock('./GovernedReviewNotificationCard.component', () =>
+  jest
+    .fn()
+    .mockImplementation(({ isUnread }: { isUnread: boolean }) => (
+      <p data-testid="governed-card">{`governed unread=${isUnread}`}</p>
+    ))
+);
 jest.mock('../common/ProfilePicture/ProfilePicture', () =>
   jest.fn().mockReturnValue(<p data-testid="profile-picture">ProfilePicture</p>)
 );
@@ -144,6 +157,32 @@ describe('Test NotificationFeedCard Component', () => {
 
     expect(
       screen.getByText(`#${mockThread.task.id} ${mockThread.task.type}`)
+    ).toBeInTheDocument();
+  });
+
+  it('delegates a governed review notice to its own card', async () => {
+    mockGetGovernedReviewNotice.mockReturnValueOnce({ kind: 'DECISION' });
+
+    await act(async () => {
+      render(<NotificationFeedCard {...mockProps} isUnread />);
+    });
+
+    expect(screen.getByTestId('governed-card')).toHaveTextContent(
+      'governed unread=true'
+    );
+    expect(
+      screen.queryByText(/assigned-you-a-new-task-lowercase/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the stock card for threads without governed facts', async () => {
+    await act(async () => {
+      render(<NotificationFeedCard {...mockProps} />);
+    });
+
+    expect(screen.queryByTestId('governed-card')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/assigned-you-a-new-task-lowercase/i)
     ).toBeInTheDocument();
   });
 

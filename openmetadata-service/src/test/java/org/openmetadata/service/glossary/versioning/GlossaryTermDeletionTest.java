@@ -118,7 +118,12 @@ class GlossaryTermDeletionTest {
     verify(dao).archiveSnapshot(eq(snapshotId), anyLong(), eq("checker"));
     verify(dao).deletePublishedHead(GlossaryVersioningService.GLOSSARY_TERM, ruleId, snapshotId);
     verify(dao)
-        .insertOutbox(any(UUID.class), eq(snapshotId), eq("SNAPSHOT_ARCHIVE"), any(), anyLong());
+        .insertOutbox(
+            any(UUID.class),
+            eq(snapshotId),
+            eq(GlossaryVersioningService.SNAPSHOT_ARCHIVE_EVENT),
+            any(),
+            anyLong());
     verify(dqDao).enqueue(eq("RECONCILE_RULE"), eq(ruleId.toString()), eq(null), anyLong());
     verify(dao).deleteWorking(GlossaryVersioningService.GLOSSARY_TERM, ruleId, "2", 7L);
   }

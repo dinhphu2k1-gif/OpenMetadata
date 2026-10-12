@@ -1585,6 +1585,95 @@ public class FeedRepository {
     return new FilteredThreads(threads, totalCount);
   }
 
+  private static final int NOTIFICATION_POSTS = 3;
+
+  /** Which of the user's notifications a request wants. */
+  public enum NotificationGroup {
+    ALL(true, false, true, false),
+    PENDING(true, true, false, false),
+    DECISIONS(false, false, true, true);
+
+    private final boolean tasks;
+    private final boolean openTasksOnly;
+    private final boolean mentions;
+    private final boolean decisionsOnly;
+
+    NotificationGroup(
+        boolean tasks, boolean openTasksOnly, boolean mentions, boolean decisionsOnly) {
+      this.tasks = tasks;
+      this.openTasksOnly = openTasksOnly;
+      this.mentions = mentions;
+      this.decisionsOnly = decisionsOnly;
+    }
+  }
+
+  /** A page of one user's notifications, with how many exist and how many are newer than a time. */
+  public record NotificationPage(List<Thread> threads, int total, int unread) {}
+
+  /**
+   * The notifications of {@code userId}: tasks assigned to them or their teams, and threads that
+   * mention them or their teams, newest first. {@code unreadSince} counts those created after it.
+   */
+  public NotificationPage listNotifications(
+      UUID userId, NotificationGroup group, int limit, int offset, long unreadSince) {
+    final User user = Entity.getEntity(Entity.USER, userId, TEAMS_FIELD, ALL);
+    final List<String> teamIds = getTeamIds(user);
+    final NotificationQuery query =
+        new NotificationQuery(
+            getUserNameHash(user),
+            getTeamNames(user),
+            getUserTeamJsonPostgres(userId, teamIds),
+            getUserTeamJsonMysql(userId, teamIds),
+            group);
+    final List<Thread> threads =
+        JsonUtils.readObjects(query.list(dao.feedDAO(), limit, offset), Thread.class);
+    sortAndLimitPosts(threads, NOTIFICATION_POSTS);
+    populateAssignees(threads);
+    return new NotificationPage(
+        threads, query.count(dao.feedDAO(), 0L), query.count(dao.feedDAO(), unreadSince));
+  }
+
+  private record NotificationQuery(
+      String userNameHash,
+      List<String> teamNamesHash,
+      String userTeamJsonPostgres,
+      String userTeamJsonMysql,
+      NotificationGroup group) {
+    List<String> list(CollectionDAO.FeedDAO feedDAO, int limit, int offset) {
+      return feedDAO.listNotifications(
+          userNameHash,
+          teamNamesHash,
+          Relationship.MENTIONED_IN.ordinal(),
+          userTeamJsonPostgres,
+          userTeamJsonMysql,
+          flag(group.tasks),
+          flag(group.openTasksOnly),
+          flag(group.mentions),
+          flag(group.decisionsOnly),
+          0L,
+          limit,
+          offset);
+    }
+
+    int count(CollectionDAO.FeedDAO feedDAO, long since) {
+      return feedDAO.countNotifications(
+          userNameHash,
+          teamNamesHash,
+          Relationship.MENTIONED_IN.ordinal(),
+          userTeamJsonPostgres,
+          userTeamJsonMysql,
+          flag(group.tasks),
+          flag(group.openTasksOnly),
+          flag(group.mentions),
+          flag(group.decisionsOnly),
+          since);
+    }
+
+    private static int flag(boolean value) {
+      return value ? 1 : 0;
+    }
+  }
+
   /** Get a list of team ids that the given user is a part of. */
   private List<String> getTeamIds(UUID userId) {
     List<String> teamIds = null;

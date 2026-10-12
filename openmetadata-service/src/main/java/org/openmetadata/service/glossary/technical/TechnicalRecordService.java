@@ -16,6 +16,8 @@ import org.openmetadata.schema.entity.data.Table;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
+import org.openmetadata.service.glossary.notification.GovernedReviewNotifier;
+import org.openmetadata.service.glossary.notification.ReviewDecision;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.StateRow;
 import org.openmetadata.service.util.FullyQualifiedName;
@@ -88,18 +90,21 @@ public class TechnicalRecordService {
   public TechnicalRecord submit(UUID recordId, long expectedRevision, String actor) {
     final TechnicalRecord submitted = submitWithoutFlush(recordId, expectedRevision, actor);
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestSubmitted(actor);
     return submitted;
   }
 
   public TechnicalRecord approve(UUID recordId, long expectedRevision, String actor) {
     final TechnicalRecord approved = approveWithoutFlush(recordId, expectedRevision, actor);
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestReviewed(actor, decisionOn(approved, true));
     return approved;
   }
 
   public TechnicalRecord reject(UUID recordId, long expectedRevision, String actor) {
     final TechnicalRecord rejected = rejectWithoutFlush(recordId, expectedRevision, actor);
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestReviewed(actor, decisionOn(rejected, false));
     return rejected;
   }
 
@@ -146,34 +151,71 @@ public class TechnicalRecordService {
               return draft;
             });
     TechnicalOutbox.flush();
+    GovernedReviewNotifier.technicalRequestDecided(actor);
     return withdrawn;
   }
 
   /** Submits each item in its own transaction; the outbox is flushed once after the last one. */
   public List<TechnicalBulkReview.Outcome> submitAll(
       List<TechnicalBulkReview.Item> items, String actor) {
-    return TechnicalBulkReview.run(
-        items,
-        (recordId, expectedRevision) -> submitWithoutFlush(recordId, expectedRevision, actor),
-        TechnicalOutbox::flush);
+    final List<TechnicalBulkReview.Outcome> outcomes =
+        TechnicalBulkReview.run(
+            items,
+            (recordId, expectedRevision) -> submitWithoutFlush(recordId, expectedRevision, actor),
+            TechnicalOutbox::flush);
+    if (anySucceeded(outcomes)) {
+      GovernedReviewNotifier.technicalRequestSubmitted(actor);
+    }
+    return outcomes;
   }
 
   /** Approves each item in its own transaction; the outbox is flushed once after the last one. */
   public List<TechnicalBulkReview.Outcome> approveAll(
       List<TechnicalBulkReview.Item> items, String actor) {
-    return TechnicalBulkReview.run(
-        items,
-        (recordId, expectedRevision) -> approveWithoutFlush(recordId, expectedRevision, actor),
-        TechnicalOutbox::flush);
+    final List<TechnicalBulkReview.Outcome> outcomes =
+        TechnicalBulkReview.run(
+            items,
+            (recordId, expectedRevision) -> approveWithoutFlush(recordId, expectedRevision, actor),
+            TechnicalOutbox::flush);
+    reportReviews(outcomes, actor, true);
+    return outcomes;
   }
 
   /** Rejects each item in its own transaction; the outbox is flushed once after the last one. */
   public List<TechnicalBulkReview.Outcome> rejectAll(
       List<TechnicalBulkReview.Item> items, String actor) {
-    return TechnicalBulkReview.run(
-        items,
-        (recordId, expectedRevision) -> rejectWithoutFlush(recordId, expectedRevision, actor),
-        TechnicalOutbox::flush);
+    final List<TechnicalBulkReview.Outcome> outcomes =
+        TechnicalBulkReview.run(
+            items,
+            (recordId, expectedRevision) -> rejectWithoutFlush(recordId, expectedRevision, actor),
+            TechnicalOutbox::flush);
+    reportReviews(outcomes, actor, false);
+    return outcomes;
+  }
+
+  /** Reports every successful review of a bulk call as one batch of notifications. */
+  private static void reportReviews(
+      List<TechnicalBulkReview.Outcome> outcomes, String actor, boolean approved) {
+    GovernedReviewNotifier.collectDuring(
+        () ->
+            outcomes.stream()
+                .filter(TechnicalBulkReview.Outcome::succeeded)
+                .forEach(
+                    outcome ->
+                        GovernedReviewNotifier.technicalRequestReviewed(
+                            actor, decisionOn(outcome.record(), approved))));
+  }
+
+  private static ReviewDecision decisionOn(TechnicalRecord record, boolean approved) {
+    final ReviewDecision.RecordRef ref =
+        new ReviewDecision.RecordRef(record.id(), record.columnFqn(), null, null);
+    return approved
+        ? ReviewDecision.approved(record.submittedBy(), record.columnFqn(), ref)
+        : ReviewDecision.rejected(record.submittedBy(), record.columnFqn(), ref);
+  }
+
+  private static boolean anySucceeded(List<TechnicalBulkReview.Outcome> outcomes) {
+    return outcomes.stream().anyMatch(TechnicalBulkReview.Outcome::succeeded);
   }
 
   private TechnicalRecord submitWithoutFlush(UUID recordId, long expectedRevision, String actor) {

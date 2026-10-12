@@ -195,3 +195,32 @@ export const deleteThread = async (threadId: string) => {
 
   return response.data;
 };
+
+export enum NotificationGroup {
+  All = 'ALL',
+  Pending = 'PENDING',
+  Decisions = 'DECISIONS',
+}
+
+export interface NotificationParams {
+  group?: NotificationGroup;
+  limit?: number;
+  offset?: number;
+  unreadSince?: number;
+}
+
+export interface NotificationList {
+  data: Thread[];
+  paging: { total: number; limit: number; offset: number };
+  unread: number;
+}
+
+/** The authenticated user's tasks and mentions in one paged list, newest first. */
+export const getNotifications = async (params: NotificationParams = {}) => {
+  const response = await APIClient.get<NotificationList>(
+    '/feed/notifications',
+    { params }
+  );
+
+  return response.data;
+};

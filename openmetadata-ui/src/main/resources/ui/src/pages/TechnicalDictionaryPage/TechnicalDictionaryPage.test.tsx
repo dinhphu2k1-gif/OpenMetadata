@@ -111,9 +111,16 @@ let mockSnapshotVersion: string | undefined;
 
 const mockNavigate = jest.fn();
 
+let mockSearchParams = new URLSearchParams();
+
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [mockSearchParams],
 }));
+jest.mock(
+  '../../components/common/PendingRequestsTab/PendingRequestsTab.component',
+  () => () => <div data-testid="pending-requests-tab" />
+);
 
 jest.mock('../../hooks/authHooks', () => ({
   useAuth: () => ({ isAdminUser: false }),
@@ -337,6 +344,30 @@ describe('TechnicalDictionaryPage', () => {
     ROW.createdBy = 'maker';
     mockRows = [ROW];
     mockFilters = {};
+    mockSearchParams = new URLSearchParams();
+  });
+
+  it('opens the pending requests tab when a review notification links to it', () => {
+    mockSearchParams = new URLSearchParams('tab=requests');
+
+    render(<TechnicalDictionaryPage />);
+
+    expect(
+      screen.getByTestId('technical-pending-requests-tab')
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('pending-requests-tab')).toBeInTheDocument();
+  });
+
+  it('keeps the records tab for a user who cannot see requests', () => {
+    mockSearchParams = new URLSearchParams('tab=requests');
+    mockContextState.capabilities.canEdit = false;
+    mockContextState.capabilities.canApprove = false;
+
+    render(<TechnicalDictionaryPage />);
+
+    expect(
+      screen.queryByTestId('pending-requests-tab')
+    ).not.toBeInTheDocument();
   });
 
   it('shows an error result instead of a table when the context cannot be loaded', () => {

@@ -11,45 +11,26 @@
  *  limitations under the License.
  */
 
-import Icon from '@ant-design/icons';
-import { ReactComponent as IconMentions } from '../../assets/svg/ic-mentions.svg';
-import { ReactComponent as IconTask } from '../../assets/svg/ic-task.svg';
-import { FeedFilter } from '../../enums/mydata.enum';
-import { NotificationTabsKey } from '../../enums/notification.enum';
-import { ThreadType } from '../../generated/api/feed/createThread';
-import i18n from '../../utils/i18next/LocalUtil';
+import { Thread, ThreadType } from '../../generated/entity/feed/thread';
 
-export const tabsInfo = [
-  {
-    name: i18n.t('label.task-plural'),
-    key: NotificationTabsKey.TASK,
-    icon: (
-      <Icon
-        component={IconTask}
-        style={{
-          marginRight: '8px',
-        }}
-      />
-    ),
-  },
-  {
-    name: i18n.t('label.mention-plural'),
-    key: NotificationTabsKey.CONVERSATION,
-    icon: (
-      <Icon
-        component={IconMentions}
-        style={{
-          marginRight: '8px',
-        }}
-      />
-    ),
-  },
-];
+export const NOTIFICATION_LIST_SIZE = 5;
 
-export const getFilters = (activeTab: ThreadType) => ({
-  threadType: activeTab === ThreadType.Task ? activeTab : undefined,
-  feedFilter:
-    activeTab === ThreadType.Task
-      ? FeedFilter.ASSIGNED_TO
-      : FeedFilter.MENTIONS,
-});
+const MENTION_MARKUP = '<#E::user::';
+
+/**
+ * When the reader was notified: the latest post that mentions someone in a
+ * conversation, otherwise the thread time, which a review task moves forward
+ * on every new submission.
+ */
+export const getNotificationTime = (thread: Thread) => {
+  const mentionPostTimes = (thread.posts ?? [])
+    .filter(
+      (post) =>
+        post.message.includes(MENTION_MARKUP) && post.postTs !== undefined
+    )
+    .map((post) => post.postTs ?? 0);
+
+  return thread.type === ThreadType.Conversation && mentionPostTimes.length > 0
+    ? Math.max(...mentionPostTimes)
+    : thread.threadTs ?? 0;
+};

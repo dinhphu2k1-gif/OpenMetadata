@@ -143,6 +143,14 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @BindUUID("glossaryId") UUID glossaryId,
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
+  @SqlQuery(
+      "SELECT COUNT(*) FROM glossary_business_working WHERE entityType = :entityType "
+          + "AND glossaryId = :glossaryId AND entityStatus = :entityStatus")
+  long countWorkingByGlossaryAndStatus(
+      @Bind("entityType") String entityType,
+      @BindUUID("glossaryId") UUID glossaryId,
+      @Bind("entityStatus") String entityStatus);
+
   @SqlUpdate(
       "DELETE FROM glossary_business_working WHERE entityType = :entityType AND glossaryId = :glossaryId "
           + "AND parentBusinessVersion = :parentBusinessVersion")

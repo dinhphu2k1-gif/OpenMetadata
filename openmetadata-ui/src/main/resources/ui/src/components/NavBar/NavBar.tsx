@@ -84,6 +84,11 @@ import { useEntityExportModalProvider } from '../Entity/EntityExportModalProvide
 import { CSVExportWebsocketResponse } from '../Entity/EntityExportModalProvider/EntityExportModalProvider.interface';
 import { GlobalSearchBar } from '../GlobalSearchBar/GlobalSearchBar';
 import NotificationBox from '../NotificationBox/NotificationBox.component';
+import {
+  hasUnseenNotification,
+  markNotificationsSeen,
+  NOTIFICATIONS_SEEN_EVENT,
+} from '../NotificationBox/NotificationSeen';
 import { UserProfileIcon } from '../Settings/Users/UserProfileIcon/UserProfileIcon.component';
 import './nav-bar.less';
 import popupAlertsCardsClassBase from './PopupAlertClassBase';
@@ -103,12 +108,12 @@ const NavBar = () => {
     useDomainStore();
   const { t } = useTranslation();
   const searchRef = useRef<InputRef>(null);
-  const [hasTaskNotification, setHasTaskNotification] =
-    useState<boolean>(false);
-  const [hasMentionNotification, setHasMentionNotification] =
-    useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>('Task');
-  const { appVersion: version, setAppVersion } = useApplicationStore();
+  const [hasNotification, setHasNotification] = useState<boolean>(false);
+  const {
+    appVersion: version,
+    setAppVersion,
+    currentUser,
+  } = useApplicationStore();
   const [isDomainDropdownOpen, setIsDomainDropdownOpen] = useState(false);
   const {
     preferences: { isSidebarCollapsed },
@@ -166,42 +171,39 @@ const NavBar = () => {
 
   const { socket } = useWebSocketConnector();
 
-  const handleTaskNotificationRead = () => {
-    setHasTaskNotification(false);
+  const handleNotificationRead = () => {
+    setHasNotification(false);
+    markNotificationsSeen(currentUser?.id);
   };
 
-  const handleMentionsNotificationRead = () => {
-    setHasMentionNotification(false);
-  };
+  useEffect(() => {
+    const clearDot = () => setHasNotification(false);
+    window.addEventListener(NOTIFICATIONS_SEEN_EVENT, clearDot);
+
+    return () => window.removeEventListener(NOTIFICATIONS_SEEN_EVENT, clearDot);
+  }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+    hasUnseenNotification(currentUser?.id).then((hasUnseen) => {
+      if (isCurrent && hasUnseen) {
+        setHasNotification(true);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentUser?.id]);
 
   const handleBellClick = useCallback(
     (visible: boolean) => {
-      if (visible) {
-        switch (activeTab) {
-          case 'Task':
-            hasTaskNotification &&
-              setTimeout(() => {
-                handleTaskNotificationRead();
-              }, NOTIFICATION_READ_TIMER);
-
-            break;
-
-          case 'Conversation':
-            hasMentionNotification &&
-              setTimeout(() => {
-                handleMentionsNotificationRead();
-              }, NOTIFICATION_READ_TIMER);
-
-            break;
-        }
+      if (visible && hasNotification) {
+        setTimeout(handleNotificationRead, NOTIFICATION_READ_TIMER);
       }
     },
-    [hasTaskNotification]
+    [hasNotification, currentUser?.id]
   );
-
-  const handleActiveTab = (key: string) => {
-    setActiveTab(key);
-  };
 
   const showBrowserNotification = (
     about: string,
@@ -353,7 +355,7 @@ const NavBar = () => {
       socket.on(SOCKET_EVENTS.TASK_CHANNEL, (newActivity) => {
         if (newActivity) {
           const activity = JSON.parse(newActivity);
-          setHasTaskNotification(true);
+          setHasNotification(true);
           showBrowserNotification(
             activity.about,
             activity.createdBy,
@@ -365,7 +367,7 @@ const NavBar = () => {
       socket.on(SOCKET_EVENTS.MENTION_CHANNEL, (newActivity) => {
         if (newActivity) {
           const activity = JSON.parse(newActivity);
-          setHasMentionNotification(true);
+          setHasNotification(true);
           showBrowserNotification(
             activity.about,
             activity.createdBy,
@@ -551,21 +553,9 @@ const NavBar = () => {
             <Dropdown
               destroyPopupOnHide
               className="cursor-pointer"
-              dropdownRender={() => (
-                <NotificationBox
-                  activeTab={activeTab}
-                  hasMentionNotification={hasMentionNotification}
-                  hasTaskNotification={hasTaskNotification}
-                  onMarkMentionsNotificationRead={
-                    handleMentionsNotificationRead
-                  }
-                  onMarkTaskNotificationRead={handleTaskNotificationRead}
-                  onTabChange={handleActiveTab}
-                />
-              )}
+              dropdownRender={() => <NotificationBox />}
               overlayStyle={{
                 width: '425px',
-                minHeight: '375px',
               }}
               placement="bottomRight"
               trigger={['click']}
@@ -573,9 +563,7 @@ const NavBar = () => {
               <Button
                 className="flex-center"
                 icon={
-                  <Badge
-                    dot={hasTaskNotification || hasMentionNotification}
-                    offset={[-3, 3]}>
+                  <Badge dot={hasNotification} offset={[-3, 3]}>
                     <IconBell data-testid="task-notifications" width={20} />
                   </Badge>
                 }

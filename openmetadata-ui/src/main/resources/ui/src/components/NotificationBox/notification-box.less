@@ -21,17 +21,31 @@
 
   .ant-list {
     .ant-list-footer {
+      padding: 0;
       border-top: 1px solid rgb(220, 227, 236);
-      box-shadow: rgba(0, 0, 0, 0.04) 0px -4px 4px;
+    }
+
+    .ant-list-items {
+      max-height: 420px;
+      overflow-y: auto;
     }
   }
-}
 
-.notification-content-container {
-  min-height: 16rem;
+  .notification-box-footer {
+    display: flex;
+    justify-content: center;
+    padding: 8px 16px;
+    font-size: 13px;
+    line-height: 24px;
+  }
 
-  .ant-spin-nested-loading {
-    height: 200px;
-    overflow-y: scroll;
+  .notification-item-unread {
+    display: block;
+    background: @red-18;
+  }
+
+  .governed-notification {
+    display: block;
+    padding: 4px 0;
   }
 }

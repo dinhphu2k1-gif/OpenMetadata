@@ -165,7 +165,7 @@ const UserProfileTeams = ({
                     style={{
                       width: '30px',
                       height: '30px',
-                      background: '#0950C5',
+                      background: 'var(--ant-primary-color)',
                       position: 'absolute',
                       bottom: '0px',
                       right: '38px',
@@ -182,7 +182,7 @@ const UserProfileTeams = ({
                     style={{
                       width: '30px',
                       height: '30px',
-                      background: '#0950C5',
+                      background: 'var(--ant-primary-color)',
                       position: 'absolute',
                       bottom: '0px',
                     }}

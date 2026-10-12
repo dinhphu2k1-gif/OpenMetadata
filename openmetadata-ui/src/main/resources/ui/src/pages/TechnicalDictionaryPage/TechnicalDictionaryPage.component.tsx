@@ -14,7 +14,7 @@ import { Alert, Result } from 'antd';
 import { AxiosError } from 'axios';
 import { Key, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loader from '../../components/common/Loader/Loader';
 import PendingRequestsTab from '../../components/common/PendingRequestsTab/PendingRequestsTab.component';
 import { usePendingRequestsCount } from '../../components/common/PendingRequestsTab/usePendingRequestsCount';
@@ -37,6 +37,10 @@ import {
   exportTechnicalDictionary,
   rebuildTechnicalIndex,
 } from '../../rest/technicalDictionaryAPI';
+import {
+  TECHNICAL_DICTIONARY_REQUESTS_TAB,
+  TECHNICAL_DICTIONARY_TAB_QUERY,
+} from '../../utils/GovernedReviewTaskUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
 import TechnicalBulkActionBar from './TechnicalBulkActionBar.component';
@@ -167,6 +171,8 @@ const TechnicalDictionaryPage = ({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkResultView>();
   const [isBulkResultOpen, setIsBulkResultOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get(TECHNICAL_DICTIONARY_TAB_QUERY);
   const [activeTab, setActiveTab] = useState<'records' | 'requests'>('records');
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   const pendingRequestsAdapter =
@@ -187,6 +193,15 @@ const TechnicalDictionaryPage = ({
   useEffect(() => {
     setSelectedKeys((keys) => (keys.length > 0 ? [] : keys));
   }, [selectionScope]);
+
+  useEffect(() => {
+    if (
+      requestedTab === TECHNICAL_DICTIONARY_REQUESTS_TAB &&
+      (capabilities.canEdit || capabilities.canApprove)
+    ) {
+      setActiveTab('requests');
+    }
+  }, [requestedTab, capabilities.canEdit, capabilities.canApprove]);
 
   const selectedRows = useMemo(
     () => records.rows.filter((row) => selectedKeys.includes(row.key)),
