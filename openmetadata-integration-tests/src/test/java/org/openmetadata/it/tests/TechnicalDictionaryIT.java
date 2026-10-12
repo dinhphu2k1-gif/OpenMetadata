@@ -85,7 +85,10 @@ public class TechnicalDictionaryIT {
 
     approveCatalogIfWorking(admin, glossaryId);
     assertEquals(
-        termId, search(SdkClients.dataConsumerClient(), glossaryId, scope, approvedColumn).path("termId").asText());
+        termId,
+        search(SdkClients.dataConsumerClient(), glossaryId, scope, approvedColumn)
+            .path("termId")
+            .asText());
 
     JsonNode other = declare(admin, glossaryId, scope, draftColumn);
     ApiException cannotDeleteApproved =
@@ -158,8 +161,7 @@ public class TechnicalDictionaryIT {
   }
 
   private static JsonNode bulkReview(
-      OpenMetadataClient client, String action, List<Map<String, Object>> items)
-      throws Exception {
+      OpenMetadataClient client, String action, List<Map<String, Object>> items) throws Exception {
     return client
         .getHttpClient()
         .execute(
@@ -174,7 +176,9 @@ public class TechnicalDictionaryIT {
     DatabaseSchema schema = DatabaseSchemaTestFactory.createSimple(ns, service);
     List<Column> columns =
         Arrays.stream(columnNames)
-            .map(name -> Columns.build(name).withType(ColumnDataType.VARCHAR).withLength(50).create())
+            .map(
+                name ->
+                    Columns.build(name).withType(ColumnDataType.VARCHAR).withLength(50).create())
             .toList();
     return Tables.create()
         .name(ns.prefix("td_table"))
@@ -204,7 +208,8 @@ public class TechnicalDictionaryIT {
       scope =
           client
               .getHttpClient()
-              .execute(HttpMethod.GET, "/v1/glossaries/" + glossaryId + "/working", null, JsonNode.class)
+              .execute(
+                  HttpMethod.GET, "/v1/glossaries/" + glossaryId + "/working", null, JsonNode.class)
               .path("businessVersion")
               .asText();
     } catch (ApiException noWorking) {
@@ -212,7 +217,10 @@ public class TechnicalDictionaryIT {
           client
               .getHttpClient()
               .execute(
-                  HttpMethod.GET, "/v1/glossaries/" + glossaryId + "/published/latest", null, JsonNode.class)
+                  HttpMethod.GET,
+                  "/v1/glossaries/" + glossaryId + "/published/latest",
+                  null,
+                  JsonNode.class)
               .path("businessVersion")
               .asText();
     }
@@ -226,7 +234,11 @@ public class TechnicalDictionaryIT {
       JsonNode working =
           client
               .getHttpClient()
-              .execute(HttpMethod.GET, "/v1/glossaries/" + glossaryId + "/working", null, JsonNode.class);
+              .execute(
+                  HttpMethod.GET,
+                  "/v1/glossaries/" + glossaryId + "/working",
+                  null,
+                  JsonNode.class);
       client
           .getHttpClient()
           .execute(
@@ -319,7 +331,12 @@ public class TechnicalDictionaryIT {
         .getHttpClient()
         .execute(
             HttpMethod.POST,
-            "/v1/glossaryTerms/" + termId + "/working/" + action + "?parentBusinessVersion=" + scope,
+            "/v1/glossaryTerms/"
+                + termId
+                + "/working/"
+                + action
+                + "?parentBusinessVersion="
+                + scope,
             Map.of("expectedRevision", revision),
             JsonNode.class);
   }

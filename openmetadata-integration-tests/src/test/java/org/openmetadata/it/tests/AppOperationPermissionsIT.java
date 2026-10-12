@@ -151,7 +151,8 @@ public class AppOperationPermissionsIT {
 
     assertTrue(
         response.statusCode() == 403 || response.statusCode() == 404,
-        "DATA_CONSUMER should not be able to configure applications, got: " + response.statusCode());
+        "DATA_CONSUMER should not be able to configure applications, got: "
+            + response.statusCode());
   }
 
   private static String getDataConsumerToken() {
