@@ -328,3 +328,22 @@ CREATE TABLE IF NOT EXISTS `governed_glossary_search_outbox` (
   PRIMARY KEY (`glossaryId`, `parentBusinessVersion`),
   KEY `idx_governed_glossary_search_outbox_enqueued` (`enqueuedAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Approved Technical Dictionary records whose deletion was approved, listed on demand
+-- ("Hiển thị đã xóa") until the next Data Dictionary cutover.
+CREATE TABLE IF NOT EXISTS `technical_record_deleted` (
+  `id` varchar(36) NOT NULL,
+  `columnFqn` text NOT NULL,
+  `cdeTermId` varchar(36) DEFAULT NULL,
+  `dataDictionaryVersion` varchar(16) DEFAULT NULL,
+  `payload` mediumtext NOT NULL,
+  `deletedAt` bigint unsigned NOT NULL,
+  `deletedBy` varchar(256) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_technical_deleted_cde` (`cdeTermId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Why a published snapshot was archived: DELETED (user deletion) or SUPERSEDED (replaced by a
+-- newer Data Dictionary version). Null while the snapshot is still published.
+ALTER TABLE `glossary_business_snapshot`
+  ADD COLUMN `archiveReason` varchar(16) DEFAULT NULL AFTER `archivedBy`;

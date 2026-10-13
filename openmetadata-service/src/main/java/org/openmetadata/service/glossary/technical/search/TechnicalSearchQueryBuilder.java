@@ -121,6 +121,9 @@ public final class TechnicalSearchQueryBuilder {
     if (criteria.hideUnapproved()) {
       filter.add(term(TechnicalIndexFields.STATUS, TechnicalRecord.STATUS_APPROVED));
     }
+    if (!criteria.includeDeleted()) {
+      mustNot.add(deletedTerm());
+    }
     final Map<String, Object> bool = new LinkedHashMap<>();
     bool.put(FILTER, filter);
     if (!nullOrEmpty(criteria.q())) {
@@ -319,7 +322,14 @@ public final class TechnicalSearchQueryBuilder {
                 term(TechnicalIndexFields.STATUS, TechnicalRecord.STATUS_APPROVED),
                 term(
                     TechnicalIndexFields.path(TechnicalIndexFields.CDE, TechnicalIndexFields.ID),
-                    cdeId.toString()))));
+                    cdeId.toString())),
+            MUST_NOT,
+            List.of(deletedTerm())));
+  }
+
+  /** Matches the kept records whose deletion was approved; they list only on request. */
+  static Map<String, Object> deletedTerm() {
+    return term(TechnicalIndexFields.DELETED, true);
   }
 
   /** Records of one table, matched by case-insensitive location names. */

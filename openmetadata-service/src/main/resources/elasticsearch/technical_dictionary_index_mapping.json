@@ -286,6 +286,16 @@
       "hasPendingChange": {
         "type": "boolean"
       },
+      "deleted": {
+        "type": "boolean"
+      },
+      "deletedAt": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "deletedBy": {
+        "type": "keyword"
+      },
       "changeRequestId": {
         "type": "keyword"
       },

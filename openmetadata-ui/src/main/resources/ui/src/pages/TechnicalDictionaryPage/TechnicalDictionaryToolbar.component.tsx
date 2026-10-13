@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 import { PlusOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Space, Switch } from 'antd';
 import { useTranslation } from 'react-i18next';
 import GovernanceListFilterDropdown, {
   GovernanceListFilterOption,
@@ -35,6 +35,8 @@ interface TechnicalDictionaryToolbarProps {
   canAddColumn: boolean;
   /** Drafts are hidden from users who can neither edit nor approve. */
   canSeeDrafts: boolean;
+  /** Lists the Approved records whose deletion was approved; hidden from consumers. */
+  canShowDeleted?: boolean;
   /** A frozen snapshot only supports search; the other filters do not apply. */
   searchOnly?: boolean;
   onAddColumn: () => void;
@@ -58,6 +60,7 @@ const TechnicalDictionaryToolbar = ({
   searchText,
   canAddColumn,
   canSeeDrafts,
+  canShowDeleted = false,
   searchOnly = false,
   onAddColumn,
   onSearchText,
@@ -169,6 +172,20 @@ const TechnicalDictionaryToolbar = ({
               }
             />
           ))}
+          {canShowDeleted && (
+            <Space align="center" size={5}>
+              <Switch
+                checked={filters.showDeleted}
+                data-testid="technical-show-deleted-toggle"
+                id="technical-switch-deleted"
+                size="small"
+                onChange={(checked) => onFilters({ showDeleted: checked })}
+              />
+              <label htmlFor="technical-switch-deleted">
+                {t('label.show-deleted')}
+              </label>
+            </Space>
+          )}
         </>
       )}
     </GovernanceListToolbar>

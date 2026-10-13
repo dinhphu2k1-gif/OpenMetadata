@@ -226,6 +226,31 @@ describe('getReviewableTechnicalRecords', () => {
   });
 });
 
+describe('deleted records', () => {
+  const deleted = toTechnicalDictionaryRow(
+    apiRow({
+      status: 'In Review',
+      createdBy: 'maker',
+      deleted: true,
+      deletedAt: 1700000000000,
+      deletedBy: 'checker',
+    })
+  );
+
+  it('carries who deleted the record and when', () => {
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.deletedAt).toBe(1700000000000);
+    expect(deleted.deletedBy).toBe('checker');
+  });
+
+  it('is neither reviewable nor submittable', () => {
+    expect(canReviewTechnicalRecord(deleted, true, 'other')).toBe(false);
+    expect(
+      getSubmittableTechnicalRecords([{ ...deleted, status: 'Draft' }], true)
+    ).toEqual([]);
+  });
+});
+
 describe('record summaries', () => {
   const row = toTechnicalDictionaryRow(apiRow());
 

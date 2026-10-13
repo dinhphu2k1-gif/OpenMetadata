@@ -273,7 +273,7 @@ public final class TechnicalOutbox {
   }
 
   private static void reconcile() {
-    final long databaseCount = dao().countRecords();
+    final long databaseCount = dao().countRecords() + dao().countDeleted();
     final long indexCount =
         TechnicalSearchIndex.search(
                 Map.of("size", 0, "track_total_hits", true, "query", Map.of("match_all", Map.of())))

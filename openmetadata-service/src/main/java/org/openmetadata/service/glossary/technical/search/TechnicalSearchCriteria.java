@@ -13,6 +13,7 @@ import java.util.Map;
  * request parameter names of {@code TechnicalRowMatcher}. {@code dataDictionaryVersion} restricts
  * the query to documents of the bound Data Dictionary version. {@code hideUnapproved} restricts
  * consumers to the currently approved data; working states are visible only to editors/reviewers.
+ * {@code includeDeleted} also lists the records whose deletion was approved.
  */
 public record TechnicalSearchCriteria(
     String dataDictionaryVersion,
@@ -20,7 +21,8 @@ public record TechnicalSearchCriteria(
     Map<String, List<String>> filters,
     int limit,
     int offset,
-    boolean hideUnapproved) {
+    boolean hideUnapproved,
+    boolean includeDeleted) {
 
   public TechnicalSearchCriteria {
     filters = filters == null ? Map.of() : Map.copyOf(filters);
@@ -32,7 +34,7 @@ public record TechnicalSearchCriteria(
       Map<String, List<String>> filters,
       int limit,
       int offset) {
-    this(dataDictionaryVersion, q, filters, limit, offset, false);
+    this(dataDictionaryVersion, q, filters, limit, offset, false, false);
   }
 
   /** The bound version without user filters, for statistics and full scans. */
@@ -41,10 +43,17 @@ public record TechnicalSearchCriteria(
   }
 
   public TechnicalSearchCriteria withoutPaging() {
-    return new TechnicalSearchCriteria(dataDictionaryVersion, q, filters, 0, 0, hideUnapproved);
+    return new TechnicalSearchCriteria(
+        dataDictionaryVersion, q, filters, 0, 0, hideUnapproved, includeDeleted);
   }
 
   public TechnicalSearchCriteria withUnapprovedHidden(boolean hidden) {
-    return new TechnicalSearchCriteria(dataDictionaryVersion, q, filters, limit, offset, hidden);
+    return new TechnicalSearchCriteria(
+        dataDictionaryVersion, q, filters, limit, offset, hidden, includeDeleted);
+  }
+
+  public TechnicalSearchCriteria withDeletedIncluded(boolean included) {
+    return new TechnicalSearchCriteria(
+        dataDictionaryVersion, q, filters, limit, offset, hideUnapproved, included);
   }
 }

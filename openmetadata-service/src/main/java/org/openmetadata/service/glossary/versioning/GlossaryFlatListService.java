@@ -69,18 +69,16 @@ public class GlossaryFlatListService {
   }
 
   /**
-   * The newest Approved snapshot of every term whose deletion was approved in an active scope.
-   * Archived snapshots only exist in an active scope when a deletion archived them; a cutover
-   * archives the whole scope at once and turns it into an archived scope.
+   * The newest Approved snapshot of every term a user deleted in this scope. The archive reason is
+   * recorded when a snapshot is archived, so a deletion stays visible after the scope itself has
+   * been archived by a Data Dictionary cutover.
    */
   public List<PublishedSnapshotRecord> loadDeleted(UUID glossaryId, Scope scope) {
     final Map<UUID, PublishedSnapshotRecord> newestByTerm = new LinkedHashMap<>();
-    if (scope.type() == ScopeType.ACTIVE) {
-      Entity.getJdbi()
-          .onDemand(GlossaryVersionDAO.class)
-          .listArchivedTermSnapshotsForGlossaryAndParent(glossaryId, scope.parentBusinessVersion())
-          .forEach(snapshot -> newestByTerm.putIfAbsent(snapshot.entityId(), snapshot));
-    }
+    Entity.getJdbi()
+        .onDemand(GlossaryVersionDAO.class)
+        .listDeletedTermSnapshotsForGlossaryAndParent(glossaryId, scope.parentBusinessVersion())
+        .forEach(snapshot -> newestByTerm.putIfAbsent(snapshot.entityId(), snapshot));
     return List.copyOf(newestByTerm.values());
   }
 

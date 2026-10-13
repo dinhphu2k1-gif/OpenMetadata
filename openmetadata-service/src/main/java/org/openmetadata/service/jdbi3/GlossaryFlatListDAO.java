@@ -19,7 +19,7 @@ import org.openmetadata.service.util.jdbi.BindUUID;
 /** Set-based persistence boundary for a governed glossary business-version flat list. */
 public interface GlossaryFlatListDAO {
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = 'glossaryTerm' "
           + "AND glossaryId = :glossaryId AND parentBusinessVersion = :parentBusinessVersion "
           + "AND archivedAt IS NULL")
@@ -38,7 +38,7 @@ public interface GlossaryFlatListDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT DISTINCT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT DISTINCT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_snapshot_term m "
           + "JOIN glossary_business_snapshot manifestTerm ON manifestTerm.snapshotId = m.termSnapshotId "
           + "JOIN glossary_business_snapshot s ON s.entityType = 'glossaryTerm' "

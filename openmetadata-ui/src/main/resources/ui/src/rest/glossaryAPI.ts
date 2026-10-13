@@ -642,9 +642,14 @@ export const createGlossaryTermCorrection = async (
   return response.data;
 };
 
+/**
+ * Asks to delete one Approved version; without `businessVersion` the effective one. Deleting the
+ * effective version makes the previous Approved version effective again.
+ */
 export const requestGlossaryTermDeletion = async (
   id: string,
-  parentBusinessVersion: string
+  parentBusinessVersion: string,
+  businessVersion?: string
 ) => {
   const response = await APIClient.post<undefined, AxiosResponse<GlossaryTerm>>(
     `/glossaryTerms/${id}/working/deletion`,
@@ -654,6 +659,7 @@ export const requestGlossaryTermDeletion = async (
         parentBusinessVersion:
           normalizeCdeParentBusinessVersion(parentBusinessVersion) ??
           parentBusinessVersion,
+        businessVersion: businessVersion || undefined,
       },
     }
   );

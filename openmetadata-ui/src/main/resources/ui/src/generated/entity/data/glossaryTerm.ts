@@ -15,6 +15,11 @@
  */
 export interface GlossaryTerm {
     /**
+     * Why this published snapshot was archived: DELETED when a user deleted the term,
+     * SUPERSEDED when a newer Data Dictionary version replaced it.
+     */
+    archiveReason?: ArchiveReason;
+    /**
      * Time at which this published snapshot was archived.
      */
     archivedAt?: number;
@@ -264,6 +269,15 @@ export interface ChangeSummary {
     changedBy?:    string;
     changeSource?: ChangeSource;
     [property: string]: any;
+}
+
+/**
+ * Why this published snapshot was archived: DELETED when a user deleted the term,
+ * SUPERSEDED when a newer Data Dictionary version replaced it.
+ */
+export enum ArchiveReason {
+    Deleted = "DELETED",
+    Superseded = "SUPERSEDED",
 }
 
 /**

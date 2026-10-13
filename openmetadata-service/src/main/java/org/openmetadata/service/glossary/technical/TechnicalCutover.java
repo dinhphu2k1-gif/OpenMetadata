@@ -59,6 +59,7 @@ public final class TechnicalCutover {
     }
     dao.deleteAllChangeRequests();
     dao.deleteAllRecords();
+    TechnicalDeletedRecords.clear(dao);
     dao.recordReset(newVersion, previousVersion, now, actor);
     TechnicalOutbox.enqueueReset(dao, previousVersion);
   }

@@ -48,6 +48,9 @@ public final class TechnicalIndexFields {
   public static final String CHANGE_REQUEST_STATUS = "changeRequestStatus";
   public static final String CHANGE_OPERATION = "changeOperation";
   public static final String CHANGE_CREATED_BY = "changeCreatedBy";
+  public static final String DELETED = "deleted";
+  public static final String DELETED_AT = "deletedAt";
+  public static final String DELETED_BY = "deletedBy";
 
   public static final String ID = "id";
   public static final String CODE = "code";

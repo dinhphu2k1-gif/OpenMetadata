@@ -24,6 +24,7 @@ import java.util.UUID;
 import org.jdbi.v3.core.Handle;
 import org.junit.jupiter.api.Test;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.ArchiveReason;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.WorkingVersionRecord;
 
@@ -140,8 +141,9 @@ class GlossaryVersioningServiceTest {
         .thenReturn(List.of(v1Term));
     when(dao.listUnarchivedTermSnapshotsForGlossaryAndParent(glossaryId, "1"))
         .thenReturn(List.of(v1Term));
-    when(dao.archiveSnapshot(eq(v1Term.snapshotId()), anyLong(), anyString())).thenReturn(1);
-    when(dao.archiveSnapshot(eq(predecessor.snapshotId()), anyLong(), anyString())).thenReturn(1);
+    when(dao.archiveSnapshot(eq(v1Term.snapshotId()), anyLong(), anyString(), any())).thenReturn(1);
+    when(dao.archiveSnapshot(eq(predecessor.snapshotId()), anyLong(), anyString(), any()))
+        .thenReturn(1);
     when(dao.deletePublishedHead("glossaryTerm", v1Term.entityId(), v1Term.snapshotId()))
         .thenReturn(1);
     when(dao.deletePublishedHead("glossary", glossaryId, predecessor.snapshotId())).thenReturn(1);
@@ -153,6 +155,12 @@ class GlossaryVersioningServiceTest {
     verify(dao).insertSnapshotTerm(predecessor.snapshotId(), v1Term.snapshotId(), 0);
     verify(dao).insertSnapshotTerm(active.snapshotId(), v2Term.snapshotId(), 0);
     verify(dao).deleteWorkingByGlossaryAndParent("glossaryTerm", glossaryId, "1");
+    verify(dao)
+        .archiveSnapshot(
+            eq(v1Term.snapshotId()), anyLong(), anyString(), eq(ArchiveReason.SUPERSEDED));
+    verify(dao)
+        .archiveSnapshot(
+            eq(predecessor.snapshotId()), anyLong(), anyString(), eq(ArchiveReason.SUPERSEDED));
   }
 
   @Test
@@ -211,6 +219,7 @@ class GlossaryVersioningServiceTest {
         1,
         "admin",
         null,
+        null,
         null);
   }
 
@@ -256,6 +265,7 @@ class GlossaryVersioningServiceTest {
         snapshot.publishedAt(),
         snapshot.publishedBy(),
         2L,
-        "admin");
+        "admin",
+        "SUPERSEDED");
   }
 }

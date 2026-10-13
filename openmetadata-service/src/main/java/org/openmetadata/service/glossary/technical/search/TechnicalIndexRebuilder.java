@@ -16,6 +16,7 @@ import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex.IndexAction;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.DeletedRow;
 
 /**
  * Rebuilds `technical_dictionary_search_index` from the database into a new physical index and
@@ -91,6 +92,19 @@ public final class TechnicalIndexRebuilder {
           page.size() < TechnicalOutboxBatch.SIZE
               ? List.of()
               : dao().listAfter(page.getLast().id(), TechnicalOutboxBatch.SIZE);
+    }
+    return indexed + fillDeleted(physicalIndex, builder);
+  }
+
+  private static long fillDeleted(String physicalIndex, TechnicalDocumentBuilder builder) {
+    long indexed = 0;
+    List<DeletedRow> page = dao().listDeletedAfter(FIRST_KEY, TechnicalOutboxBatch.SIZE);
+    while (!page.isEmpty()) {
+      indexed += write(physicalIndex, builder.deletedUpserts(page));
+      page =
+          page.size() < TechnicalOutboxBatch.SIZE
+              ? List.of()
+              : dao().listDeletedAfter(page.getLast().id(), TechnicalOutboxBatch.SIZE);
     }
     return indexed;
   }

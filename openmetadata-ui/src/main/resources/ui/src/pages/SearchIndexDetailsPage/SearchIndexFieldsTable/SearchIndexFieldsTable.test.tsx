@@ -67,16 +67,6 @@ jest.mock('../../../components/Database/TableTags/TableTags.component', () =>
 );
 
 jest.mock(
-  '../../../components/common/ToggleExpandButton/ToggleExpandButton',
-  () =>
-    jest
-      .fn()
-      .mockImplementation(({ toggleExpandAll }) => (
-        <div onClick={toggleExpandAll}>testToggleExpandButton</div>
-      ))
-);
-
-jest.mock(
   '../../../components/common/SearchBarComponent/SearchBar.component',
   () => jest.fn().mockImplementation(() => <div>SearchBar</div>)
 );
@@ -146,7 +136,6 @@ describe('SearchIndexFieldsTable component', () => {
       );
     });
 
-    expect(screen.getByText('testToggleExpandButton')).toBeInTheDocument();
     expect(screen.getByTestId('search-index-fields-table')).toBeInTheDocument();
     expect(screen.getByText('name')).toBeInTheDocument();
     expect(screen.getByText('columns')).toBeInTheDocument();

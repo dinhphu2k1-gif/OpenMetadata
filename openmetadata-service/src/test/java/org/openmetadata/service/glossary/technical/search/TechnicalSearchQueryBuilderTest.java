@@ -110,8 +110,31 @@ class TechnicalSearchQueryBuilderTest {
             .anyMatch(clause -> "cde.id".equals(clause.path("exists").path("field").asText())));
     assertEquals(
         "cde.id", clauses(unmapped, "must_not").getFirst().path("exists").path("field").asText());
-    assertTrue(clauses(both, "must_not").isEmpty());
+    assertTrue(
+        clauses(both, "must_not").stream()
+            .noneMatch(clause -> "cde.id".equals(clause.path("exists").path("field").asText())));
     assertEquals(1, clauses(both, "filter").size());
+  }
+
+  @Test
+  void columnsOfACdeLeaveDeletedRecordsOut() {
+    final JsonNode query = json(TechnicalSearchQueryBuilder.cdeQuery(VERSION, UUID.randomUUID()));
+
+    assertTrue(
+        clauses(query, "must_not").stream()
+            .anyMatch(clause -> clause.path("term").path("deleted").asBoolean(false)));
+  }
+
+  @Test
+  void deletedRecordsAreExcludedUnlessRequested() {
+    final JsonNode hidden = json(TechnicalSearchQueryBuilder.query(criteria(null, Map.of())));
+    final JsonNode included =
+        json(TechnicalSearchQueryBuilder.query(criteria(null, Map.of()).withDeletedIncluded(true)));
+
+    assertTrue(
+        clauses(hidden, "must_not").stream()
+            .anyMatch(clause -> clause.path("term").path("deleted").asBoolean(false)));
+    assertTrue(clauses(included, "must_not").isEmpty());
   }
 
   @Test

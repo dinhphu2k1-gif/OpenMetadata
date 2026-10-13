@@ -11,7 +11,7 @@
  *  limitations under the License.
  */
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Form, InputNumber, Result } from 'antd';
+import { Alert, Button, Form, InputNumber, Result, Tag } from 'antd';
 import { AxiosError } from 'axios';
 import {
   ReactNode,
@@ -83,6 +83,7 @@ import {
   TechnicalRecordVersions,
   updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
+import { formatDateTime } from '../../utils/date-time/DateTimeUtils';
 import { fromTechnicalCorrection } from '../../utils/ApprovedRecordHistoryUtils';
 import { getGlossaryTermDetailsPath } from '../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
@@ -534,7 +535,9 @@ const TechnicalRecordDetailPage = () => {
     }
   }, [viewedVersion]);
 
-  const canWork = Boolean(row && capabilities.canEdit && !viewedVersion);
+  const canWork = Boolean(
+    row && capabilities.canEdit && !viewedVersion && !row.deleted
+  );
   const canViewHistory = Boolean(
     row && !viewedVersion && row.status === 'Approved'
   );
@@ -778,6 +781,14 @@ const TechnicalRecordDetailPage = () => {
                     data-testid="technical-record-title">
                     {row.columnName}
                   </h1>
+                  {row.deleted && (
+                    <Tag
+                      color="error"
+                      data-testid="technical-record-deleted"
+                      title={row.deletedBy}>
+                      {t('cde.deleted-record')}
+                    </Tag>
+                  )}
                   {dataDictionaryVersion && (
                     <TechnicalVersionBadges
                       currentStatus={ENTITY_STATUS[row.status]}
@@ -807,6 +818,19 @@ const TechnicalRecordDetailPage = () => {
             />
           </div>
         </div>
+
+        {row.deleted && (
+          <Alert
+            showIcon
+            className="m-b-md"
+            data-testid="technical-record-deleted-banner"
+            message={t('message.technical-record-deleted-banner', {
+              date: formatDateTime(row.deletedAt),
+              user: row.deletedBy,
+            })}
+            type="warning"
+          />
+        )}
 
         <div className="tech-dict-tab-card">
           <div className="tech-dict-tab-list" role="tablist">

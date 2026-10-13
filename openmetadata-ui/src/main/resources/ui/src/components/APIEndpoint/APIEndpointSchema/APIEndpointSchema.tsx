@@ -48,7 +48,6 @@ import { getVersionedSchema } from '../../../utils/SchemaVersionUtils';
 import { columnFilterIcon } from '../../../utils/TableColumn.util';
 import {
   fieldExistsByFQN,
-  getAllRowKeysByKeyName,
   getHighlightedRowClassName,
   updateFieldDescription,
   updateFieldTags,
@@ -59,7 +58,6 @@ import CopyLinkButton from '../../common/CopyLinkButton/CopyLinkButton';
 import { EntityAttachmentProvider } from '../../common/EntityDescription/EntityAttachmentProvider/EntityAttachmentProvider';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
 import Table from '../../common/Table/Table';
-import ToggleExpandButton from '../../common/ToggleExpandButton/ToggleExpandButton';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ColumnFilter } from '../../Database/ColumnFilter/ColumnFilter.component';
 import TableDescription from '../../Database/TableDescription/TableDescription.component';
@@ -111,8 +109,6 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
     },
   ];
   const {
-    requestSchemaAllRowKeys,
-    responseSchemaAllRowKeys,
     requestSchemaFields,
     responseSchemaFields,
     requestSchema,
@@ -124,45 +120,27 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
     const requestSchemaFields = requestSchema?.schemaFields || [];
     const responseSchemaFields = responseSchema?.schemaFields || [];
 
-    const requestSchemaAllRowKeys = getAllRowKeysByKeyName<Field>(
-      requestSchemaFields,
-      'fullyQualifiedName'
-    );
-    const responseSchemaAllRowKeys = getAllRowKeysByKeyName<Field>(
-      responseSchemaFields,
-      'fullyQualifiedName'
-    );
-
     return {
       requestSchemaFields,
       responseSchemaFields,
-      requestSchemaAllRowKeys,
-      responseSchemaAllRowKeys,
       requestSchema,
       responseSchema,
     };
   }, [apiEndpointDetails]);
 
-  const {
-    activeSchemaFields,
-    activeSchema,
-    activeSchemaKey,
-    schemaAllRowKeys,
-  } = useMemo(() => {
-    let schemaFields, schema, schemaKey, schemaType, allRowKeys;
+  const { activeSchemaFields, activeSchema, activeSchemaKey } = useMemo(() => {
+    let schemaFields, schema, schemaKey, schemaType;
 
     if (viewType === SchemaViewType.REQUEST_SCHEMA) {
       schemaFields = requestSchemaFields;
       schema = requestSchema;
       schemaKey = 'requestSchema';
       schemaType = requestSchema?.schemaType;
-      allRowKeys = requestSchemaAllRowKeys;
     } else {
       schemaFields = responseSchemaFields;
       schema = responseSchema;
       schemaKey = 'responseSchema';
       schemaType = responseSchema?.schemaType;
-      allRowKeys = responseSchemaAllRowKeys;
     }
 
     return {
@@ -170,7 +148,6 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
       activeSchema: schema,
       activeSchemaKey: schemaKey as keyof APIEndpoint,
       activeSchemaType: schemaType,
-      schemaAllRowKeys: allRowKeys,
     };
   }, [
     viewType,
@@ -178,8 +155,6 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
     responseSchemaFields,
     requestSchema,
     responseSchema,
-    requestSchemaAllRowKeys,
-    responseSchemaAllRowKeys,
   ]);
 
   const tagFilter = useMemo(() => {
@@ -242,14 +217,6 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
 
   const handleExpandedRowsChange = (keys: readonly Key[]) => {
     setExpandedRowKeys(keys as string[]);
-  };
-
-  const handleToggleExpandAll = () => {
-    if (expandedRowKeys.length < schemaAllRowKeys.length) {
-      setExpandedRowKeys(schemaAllRowKeys);
-    } else {
-      setExpandedRowKeys([]);
-    }
   };
 
   const handleFieldClick = useCallback(
@@ -489,12 +456,6 @@ const APIEndpointSchema: FC<APIEndpointSchemaProps> = ({
                 options={viewTypeOptions}
                 value={viewType}
                 onChange={(value) => setViewType(value as SchemaViewType)}
-              />
-
-              <ToggleExpandButton
-                allRowKeys={schemaAllRowKeys}
-                expandedRowKeys={expandedRowKeys}
-                toggleExpandAll={handleToggleExpandAll}
               />
             </div>
           }

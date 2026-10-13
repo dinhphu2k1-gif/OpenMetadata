@@ -985,15 +985,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
   @Path("/{id}/working/deletion")
   @Operation(
       operationId = "requestGlossaryTermDeletion",
-      summary = "Submit a request to delete an Approved governed glossary term",
+      summary = "Submit a request to delete one Approved version of a governed glossary term",
       description =
-          "The Approved term stays effective until the request is approved. Approving it archives"
-              + " the term in its governed glossary scope; the Approved history is kept.")
+          "Nothing changes until the request is approved. Approving it archives the chosen"
+              + " version (the effective one when businessVersion is omitted). Deleting the"
+              + " effective version makes the previous Approved version effective again; deleting"
+              + " the only one deletes the term from its scope. The Approved history is kept.")
   public Map<String, Object> requestDeletion(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
       @PathParam("id") UUID id,
-      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion) {
+      @NotNull @QueryParam("parentBusinessVersion") String parentBusinessVersion,
+      @QueryParam("businessVersion") String businessVersion) {
     final GlossaryTerm term = createVersionEntity(uriInfo, securityContext, id);
     requireDeletableGovernedTerm(term);
     requireGovernedIdentityScope(term, parentBusinessVersion);
@@ -1001,6 +1004,7 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
         versioningService.createDeletionWorking(
             id,
             parentBusinessVersion,
+            businessVersion,
             securityContext.getUserPrincipal().getName(),
             snapshot -> {
               final GlossaryTerm published = publishedTerm(snapshot);
@@ -1195,10 +1199,18 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     }
   }
 
-  /** Profile-specific validation repeated at request, submit and approve to close race windows. */
+  /**
+   * Profile-specific validation repeated at request, submit and approve to close race windows. A
+   * CDE that keeps a previous Approved version stays referenced, so its dependents are only
+   * checked when the deletion removes it.
+   */
   private static void validateDeletionRequest(GlossaryTerm term, String parentBusinessVersion) {
     switch (governedProfile(term)) {
-      case DATA_DICTIONARY -> CdeDeletionGuard.requireNoDependents(term, parentBusinessVersion);
+      case DATA_DICTIONARY -> {
+        if (GlossaryVersioningService.deletionRemovesTerm(term.getId(), parentBusinessVersion)) {
+          CdeDeletionGuard.requireNoDependents(term, parentBusinessVersion);
+        }
+      }
       case DATA_QUALITY -> DqCatalog.requireRule(term.getId());
     }
   }
@@ -1291,10 +1303,9 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
     if (!missingOrSelfReference) {
       return;
     }
-    versioningService
-        .listPublished(GlossaryVersioningService.GLOSSARY_TERM, payload.getId())
-        .stream()
-        .max(java.util.Comparator.comparingLong(PublishedSnapshotRecord::publicationSequence))
+    GlossaryVersioningService.selectEffective(
+            versioningService.listPublished(
+                GlossaryVersioningService.GLOSSARY_TERM, payload.getId()))
         .map(GlossaryTermResource::publishedTerm)
         .map(GlossaryTerm::getRelatedTerms)
         .filter(publishedRelations -> publishedRelations != null && publishedRelations.size() == 1)
@@ -2587,17 +2598,13 @@ public class GlossaryTermResource extends EntityResource<GlossaryTerm, GlossaryT
       }
       visibleRows.add(GovernedGlossaryRowMapper.working(record, parentBusinessVersion));
     }
-    if (includeDeleted && !consumerOnly && isDataDictionaryProfile(profile)) {
+    if (includeDeleted && !consumerOnly) {
       visibleRows.addAll(deletedFlatRows(securityContext, glossaryId, scope));
     }
 
     visibleRows.sort(GovernedGlossaryRowMapper.defaultComparator());
     return new AuthorizedFlatRows(
         parentBusinessVersion, scope.type(), consumerOnly, profile, visibleRows);
-  }
-
-  private static boolean isDataDictionaryProfile(GovernedGlossaryProfileRegistry.Profile profile) {
-    return profile == GovernedGlossaryProfileRegistry.Profile.DATA_DICTIONARY;
   }
 
   private List<Map<String, Object>> deletedFlatRows(

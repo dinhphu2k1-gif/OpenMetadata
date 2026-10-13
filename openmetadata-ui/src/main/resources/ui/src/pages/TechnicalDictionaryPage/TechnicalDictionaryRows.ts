@@ -87,6 +87,9 @@ export const toTechnicalDictionaryRow = (
     changeRequestStatus: row.changeRequestStatus,
     changeOperation: row.changeOperation,
     changeCreatedBy: row.changeCreatedBy,
+    deleted: row.deleted,
+    deletedAt: row.deletedAt,
+    deletedBy: row.deletedBy,
   };
 };
 
@@ -103,6 +106,7 @@ export const canReviewTechnicalRecord = (
   currentUserName?: string
 ): boolean =>
   canApprove &&
+  !row.deleted &&
   (row.status === 'In Review' || row.changeRequestStatus === 'InReview') &&
   Boolean(currentUserName) &&
   (row.hasPendingChange
@@ -128,7 +132,7 @@ export const getSubmittableTechnicalRecords = (
   rows: TechnicalDictionaryRow[],
   canEdit: boolean
 ): TechnicalDictionaryRow[] =>
-  canEdit ? rows.filter((row) => row.status === 'Draft') : [];
+  canEdit ? rows.filter((row) => !row.deleted && row.status === 'Draft') : [];
 
 /** Pairs each outcome of a bulk review with the row it was for, in the order of the request. */
 export const toBulkResultItems = (

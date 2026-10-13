@@ -28,14 +28,14 @@ import {
   TermRelation,
 } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
-import { getEntityName } from '../../../utils/EntityNameUtils';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
+import { getEntityName } from '../../../utils/EntityNameUtils';
 import Fqn from '../../../utils/Fqn';
+import { getGlossaryPath } from '../../../utils/RouterUtils';
 import {
   getGovernedTermDetailPath,
   getScopedGovernedTermFqn,
 } from '../../../utils/routing/cdeRoutingHelper';
-import { getGlossaryPath } from '../../../utils/RouterUtils';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type DQExtension = {
@@ -65,16 +65,16 @@ export const DQ_TAG_CLASSIFICATIONS = {
 };
 
 import {
-  getDictionaryReferenceLabel,
-  renderDictionaryOwnerList,
-  renderDictionaryMarkdown,
-  renderDictionaryClassificationTags,
-  getDictionaryTagLabel,
-} from './DictionaryCellRenderers';
-import {
   renderCDEReleaseLevel,
   renderCDEReleaseVersionType,
 } from './CDEGlossaryTableColumns';
+import {
+  getDictionaryReferenceLabel,
+  getDictionaryTagLabel,
+  renderDictionaryClassificationTags,
+  renderDictionaryMarkdown,
+  renderDictionaryOwnerList,
+} from './DictionaryCellRenderers';
 
 export const getDQReferenceLabel = getDictionaryReferenceLabel;
 
@@ -130,7 +130,9 @@ export const renderDQClassificationTags = (
     | 'neutral' = 'neutral'
 ) => renderDictionaryClassificationTags(tags, classification, variant);
 
-export const renderDQMarkdown = renderDictionaryMarkdown;
+export function renderDQMarkdown(value?: string) {
+  return renderDictionaryMarkdown(value);
+}
 
 export const renderDQCdeCode = (
   record: ModifiedGlossaryTerm,
@@ -244,14 +246,13 @@ export const getDQGlossaryTableColumns = ({
       const parentBusinessVersion =
         record.parentBusinessVersion ?? String(businessVersion).split('.')[0];
       const detailPath = getGovernedTermDetailPath({
-        fqn: getScopedGovernedTermFqn(
-          canonicalFqn,
-          parentBusinessVersion
-        ),
+        fqn: getScopedGovernedTermFqn(canonicalFqn, parentBusinessVersion),
         businessVersion,
         parentBusinessVersion,
         termId: record.id,
-        isWorkingDraft: record.entityStatus !== EntityStatus.Approved,
+        isWorkingDraft:
+          record.recordType !== 'deleted' &&
+          record.entityStatus !== EntityStatus.Approved,
       });
 
       return (
@@ -293,6 +294,7 @@ export const getDQGlossaryTableColumns = ({
       if (record.isLoadMoreButton) {
         return null;
       }
+
       return getDQCdeName(record);
     },
   },

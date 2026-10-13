@@ -5,7 +5,6 @@
 
 package org.openmetadata.service.glossary.dq;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.openmetadata.schema.entity.data.Glossary;
@@ -15,12 +14,14 @@ import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 
 /**
- * The newest published snapshot of a Data Quality Rule and whether it is effective, that is
- * approved, not archived and in the scope bound to the Technical Dictionary.
+ * The effective published snapshot of a Data Quality Rule (the newest one not deleted, else the
+ * newest deleted one) and whether it is effective, that is approved, not archived and in the scope
+ * bound to the Technical Dictionary.
  */
 public record DqRuleSource(DqRuleContext context, boolean effective) {
 
@@ -30,10 +31,7 @@ public record DqRuleSource(DqRuleContext context, boolean effective) {
         Entity.getJdbi()
             .onDemand(GlossaryVersionDAO.class)
             .listPublished(Entity.GLOSSARY_TERM, ruleId);
-    return published.stream()
-        .max(Comparator.comparingLong(PublishedSnapshotRecord::publicationSequence))
-        .map(DqRuleSource::of)
-        .orElse(null);
+    return GlossaryVersioningService.selectEffective(published).map(DqRuleSource::of).orElse(null);
   }
 
   /** Ids of the Rules published in the scope bound to the Technical Dictionary. */

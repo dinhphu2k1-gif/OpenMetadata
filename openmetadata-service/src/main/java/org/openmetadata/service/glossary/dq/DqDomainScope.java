@@ -11,7 +11,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +23,9 @@ import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.glossary.dq.DqResultService.RuleState;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.DqRuleTestDAO.RuleExecRow;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
-import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 
 /**
  * The Rules of a Domain. A Rule belongs to a Domain when the newest published version of the Rule,
@@ -76,11 +75,10 @@ final class DqDomainScope {
   }
 
   private static boolean isPublishedInDomain(String termId, String domainFqn) {
-    return Entity.getJdbi()
-        .onDemand(GlossaryVersionDAO.class)
-        .listPublished(Entity.GLOSSARY_TERM, UUID.fromString(termId))
-        .stream()
-        .max(Comparator.comparingLong(PublishedSnapshotRecord::publicationSequence))
+    return GlossaryVersioningService.selectEffective(
+            Entity.getJdbi()
+                .onDemand(GlossaryVersionDAO.class)
+                .listPublished(Entity.GLOSSARY_TERM, UUID.fromString(termId)))
         .map(snapshot -> JsonUtils.readValue(snapshot.payload(), GlossaryTerm.class))
         .map(term -> isAssigned(term.getDomains(), domainFqn))
         .orElse(false);

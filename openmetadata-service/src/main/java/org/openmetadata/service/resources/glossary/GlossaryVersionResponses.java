@@ -63,6 +63,7 @@ final class GlossaryVersionResponses {
       payload.put("entityStatus", "Archived");
       payload.put("archivedAt", record.archivedAt());
       payload.put("archivedBy", record.archivedBy());
+      putIfPresent(payload, "archiveReason", record.archiveReason());
     }
     return payload;
   }

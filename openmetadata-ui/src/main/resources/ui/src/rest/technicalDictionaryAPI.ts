@@ -94,6 +94,10 @@ export interface TechnicalRecordApiRow {
   changeRequestStatus?: TechnicalChangeStatus;
   changeOperation?: TechnicalChangeOperation;
   changeCreatedBy?: string;
+  /** Set on an Approved record whose deletion was approved; listed only on request. */
+  deleted?: boolean;
+  deletedAt?: number;
+  deletedBy?: string;
   /** Set when a pending update lists as two rows: the approved values, then the proposal. */
   rowRole?: TechnicalRowRole;
 }
@@ -129,6 +133,7 @@ export interface TechnicalRecordQuery {
   generationTypes?: string[];
   creationMethods?: string[];
   timeliness?: string[];
+  includeDeleted?: boolean;
   limit: number;
   offset: number;
 }
@@ -308,6 +313,7 @@ export const searchTechnicalRecords = async (
         generationTypes: csv(query.generationTypes),
         creationMethods: csv(query.creationMethods),
         timeliness: csv(query.timeliness),
+        includeDeleted: query.includeDeleted || undefined,
         limit: query.limit,
         offset: query.offset,
       },

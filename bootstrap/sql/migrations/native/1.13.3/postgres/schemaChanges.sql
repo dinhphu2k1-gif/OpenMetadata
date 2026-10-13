@@ -335,3 +335,21 @@ CREATE TABLE IF NOT EXISTS governed_glossary_search_outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_governed_glossary_search_outbox_enqueued
   ON governed_glossary_search_outbox (enqueuedAt);
+
+-- Approved Technical Dictionary records whose deletion was approved, listed on demand
+-- ("Hiển thị đã xóa") until the next Data Dictionary cutover.
+CREATE TABLE IF NOT EXISTS technical_record_deleted (
+  id varchar(36) PRIMARY KEY,
+  columnFqn text NOT NULL,
+  cdeTermId varchar(36),
+  dataDictionaryVersion varchar(16),
+  payload text NOT NULL,
+  deletedAt bigint NOT NULL,
+  deletedBy varchar(256) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_technical_deleted_cde ON technical_record_deleted (cdeTermId);
+
+-- Why a published snapshot was archived: DELETED (user deletion) or SUPERSEDED (replaced by a
+-- newer Data Dictionary version). Null while the snapshot is still published.
+ALTER TABLE glossary_business_snapshot
+  ADD COLUMN IF NOT EXISTS archiveReason varchar(16);

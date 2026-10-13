@@ -14,9 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.openmetadata.schema.utils.JsonUtils;
-import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry;
-import org.openmetadata.service.glossary.GovernedGlossaryProfileRegistry.Profile;
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService;
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Candidates;
 import org.openmetadata.service.glossary.versioning.GlossaryFlatListService.Scope;
@@ -69,7 +66,7 @@ public final class GovernedGlossaryDocumentBuilder {
 
   private void addDeleted(
       final UUID glossaryId, final Scope scope, final Collection<Map<String, Object>> rows) {
-    if (scope.type() == ScopeType.ACTIVE && isDataDictionary(scope)) {
+    if (scope.type() != ScopeType.WORKING) {
       flatListService.loadDeleted(glossaryId, scope).stream()
           .map(
               record ->
@@ -82,11 +79,6 @@ public final class GovernedGlossaryDocumentBuilder {
   private static Map<String, Object> published(
       final PublishedSnapshotRecord record, final Scope scope, final String recordType) {
     return GovernedGlossaryRowMapper.published(record, scope.parentBusinessVersion(), recordType);
-  }
-
-  private static boolean isDataDictionary(final Scope scope) {
-    final String glossaryName = JsonUtils.readTree(scope.payload()).path("name").asText();
-    return GovernedGlossaryProfileRegistry.requireName(glossaryName) == Profile.DATA_DICTIONARY;
   }
 
   public static Map<String, Object> document(final UUID glossaryId, final Map<String, Object> row) {

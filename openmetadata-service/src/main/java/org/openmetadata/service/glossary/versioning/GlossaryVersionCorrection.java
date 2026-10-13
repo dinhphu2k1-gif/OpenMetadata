@@ -117,6 +117,7 @@ final class GlossaryVersionCorrection {
         now,
         actor,
         null,
+        null,
         null);
   }
 

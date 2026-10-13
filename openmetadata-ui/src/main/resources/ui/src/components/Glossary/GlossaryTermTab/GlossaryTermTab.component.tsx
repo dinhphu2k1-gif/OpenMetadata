@@ -44,8 +44,6 @@ import { ReactComponent as IconDrag } from '../../../assets/svg/drag.svg';
 import { ReactComponent as EditIcon } from '../../../assets/svg/edit-new.svg';
 import { ReactComponent as IconDown } from '../../../assets/svg/ic-arrow-down.svg';
 import { ReactComponent as IconRight } from '../../../assets/svg/ic-arrow-right.svg';
-import { ReactComponent as DownUpArrowIcon } from '../../../assets/svg/ic-down-up-arrow.svg';
-import { ReactComponent as UpDownArrowIcon } from '../../../assets/svg/ic-up-down-arrow.svg';
 import { ReactComponent as PlusOutlinedIcon } from '../../../assets/svg/plus-outlined.svg';
 import ErrorPlaceHolder from '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import GovernanceListFilterDropdown from '../../../components/common/GovernanceList/GovernanceListFilterDropdown.component';
@@ -85,8 +83,9 @@ import {
 } from '../../../constants/Glossary.contant';
 import { TABLE_CONSTANTS } from '../../../constants/Teams.constants';
 import { ERROR_PLACEHOLDER_TYPE } from '../../../enums/common.enum';
-import { EntityType, TabSpecificField } from '../../../enums/entity.enum';
+import { EntityType } from '../../../enums/entity.enum';
 import { CursorType } from '../../../enums/pagination.enum';
+import { SearchIndex } from '../../../enums/search.enum';
 import { ResolveTask } from '../../../generated/api/feed/resolveTask';
 import { Glossary } from '../../../generated/entity/data/glossary';
 import {
@@ -104,27 +103,30 @@ import { Include } from '../../../generated/type/include';
 import { Paging } from '../../../generated/type/paging';
 import { usePaging } from '../../../hooks/paging/usePaging';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
-import { SearchIndex } from '../../../enums/search.enum';
-import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
+import { useCDETablePreferences } from '../../../hooks/useCDETablePreferences';
+import { useTableFilters } from '../../../hooks/useTableFilters';
+import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
 import { getDomainList } from '../../../rest/domainAPI';
+import { getDqRuleStatuses } from '../../../rest/dqRuleTestAPI';
 import { getAllFeeds, updateTask } from '../../../rest/feedsAPI';
 import {
   getFirstLevelGlossaryTermsPaginated,
-  getGlossaryVersionPermissions,
-  getPublishedGlossaryTerms,
   getGlossaryTermChildrenLazy,
-  getGlossaryTermWorkingVersion,
   getGlossaryTerms,
   getGlossaryTermsByIds,
   getGlossaryTermsVersionsList,
+  getGlossaryTermWorkingVersion,
+  getGlossaryVersionPermissions,
+  getPublishedGlossaryTerms,
+  GlossaryVersionPermissions,
   patchGlossaryTerm,
   searchGlossaryTermsPaginated,
   transitionGlossaryTermWorkflow,
-  GlossaryVersionPermissions,
 } from '../../../rest/glossaryAPI';
 import { searchQuery } from '../../../rest/searchAPI';
 import { getTags } from '../../../rest/tagAPI';
 import { getTeams } from '../../../rest/teamsAPI';
+import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { getBulkEditButton } from '../../../utils/EntityBulkEdit/EntityBulkEditUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityBulkEditPath } from '../../../utils/EntityPureUtils';
@@ -148,34 +150,32 @@ import Loader from '../../common/Loader/Loader';
 import { PagingHandlerParams } from '../../common/NextPrevious/NextPrevious.interface';
 import RichTextEditorPreviewerNew from '../../common/RichTextEditor/RichTextEditorPreviewNew';
 import StatusAction from '../../common/StatusAction/StatusAction';
-import { useCDETablePreferences } from '../../../hooks/useCDETablePreferences';
-import { useTableFilters } from '../../../hooks/useTableFilters';
 import TagButton from '../../common/TagButton/TagButton.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
+import {
+  DQ_OUTCOME_LABEL_KEY,
+  DQ_TEST_FILTER_STATUSES,
+} from '../DQRuleTests/DQRuleTests.constants';
+import GovernedStatusBadge from '../GovernedStatusBadge/GovernedStatusBadge.component';
+import { isDeletedRecord } from '../GovernedStatusBadge/GovernedStatusBadge.utils';
 import { ModifiedGlossary, useGlossaryStore } from '../useGlossary.store';
 import {
   CDE_TAG_CLASSIFICATIONS,
   getCDEGlossaryTableColumns,
 } from './CDEGlossaryTableColumns';
-import { getDqRuleStatuses } from '../../../rest/dqRuleTestAPI';
-import {
-  DQ_OUTCOME_LABEL_KEY,
-  DQ_TEST_FILTER_STATUSES,
-} from '../DQRuleTests/DQRuleTests.constants';
 import {
   DQ_TAG_CLASSIFICATIONS,
   getDQGlossaryTableColumns,
 } from './DQGlossaryTableColumns';
-import TechnicalDictionaryPage from '../../../pages/TechnicalDictionaryPage/TechnicalDictionaryPage.component';
+import GlossaryBulkActionBar from './GlossaryBulkActionBar/GlossaryBulkActionBar.component';
+import GlossaryBulkActionModal, {
+  BulkActionType,
+} from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 import {
   GlossaryTermTabProps,
   ModifiedGlossaryTerm,
   MoveGlossaryTermType,
 } from './GlossaryTermTab.interface';
-import GlossaryBulkActionBar from './GlossaryBulkActionBar/GlossaryBulkActionBar.component';
-import GlossaryBulkActionModal, {
-  BulkActionType,
-} from './GlossaryBulkActionModal/GlossaryBulkActionModal.component';
 
 const SHOW_DELETED_FILTER = { showDeleted: false };
 
@@ -361,16 +361,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     Record<string, Thread[]>
   >({});
 
-  const { glossaryTerms, expandableKeys } = useMemo(() => {
+  const glossaryTerms = useMemo(() => {
     const terms = Array.isArray(glossaryChildTerms)
       ? (glossaryChildTerms as ModifiedGlossaryTerm[])
       : [];
 
-    return {
-      expandableKeys: findExpandableKeysForArray(terms),
-      glossaryTerms: terms,
-    };
-  }, [glossaryChildTerms, findExpandableKeysForArray]);
+    return terms;
+  }, [glossaryChildTerms]);
 
   const [workflowPermissions, setWorkflowPermissions] =
     useState<GlossaryVersionPermissions>();
@@ -702,8 +699,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     []
   );
   const [searchTerm, setSearchTerm] = useState('');
-  const [isExpandingAll, setIsExpandingAll] = useState(false);
-  const [toggleExpandBtn, setToggleExpandBtn] = useState(false);
   // handle search
   const handleSearch = useCallback(
     async (value: string) => {
@@ -968,7 +963,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   );
 
   const canShowDeleted =
-    isCDEGlossary &&
+    (isCDEGlossary || isDQGlossary) &&
     !isConsumer &&
     !isVersionView &&
     displayedGlossary.entityStatus === EntityStatus.Approved;
@@ -981,21 +976,31 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     [handlePageChange, setDeletedFilter]
   );
 
+  const deletedTogglePrefix = isDQGlossary ? 'dq' : 'cde';
+
   const showDeletedToggle = useMemo(
     () =>
       canShowDeleted ? (
         <Space align="end" size={5}>
           <Switch
             checked={showDeleted}
-            data-testid="cde-show-deleted-toggle"
-            id="cde-switch-deleted"
+            data-testid={`${deletedTogglePrefix}-show-deleted-toggle`}
+            id={`${deletedTogglePrefix}-switch-deleted`}
             size="small"
             onChange={handleShowDeletedChange}
           />
-          <label htmlFor="cde-switch-deleted">{t('label.show-deleted')}</label>
+          <label htmlFor={`${deletedTogglePrefix}-switch-deleted`}>
+            {t('label.show-deleted')}
+          </label>
         </Space>
       ) : null,
-    [canShowDeleted, showDeleted, handleShowDeletedChange, t]
+    [
+      canShowDeleted,
+      deletedTogglePrefix,
+      showDeleted,
+      handleShowDeletedChange,
+      t,
+    ]
   );
 
   const hasActiveDqFilters = useMemo(
@@ -1286,7 +1291,8 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               termId,
               flatRow.parentBusinessVersion,
               getBusinessVersion(flatRow.businessVersion),
-              flatRow.recordType === 'working' || flatRow.recordType === 'deleted'
+              flatRow.recordType === 'working' ||
+              flatRow.recordType === 'deleted'
                 ? flatRow.recordType
                 : 'published',
             ].join('|'),
@@ -1813,47 +1819,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     ]
   );
 
-  const fetchExpadedTree = async () => {
-    setIsTableLoading(true);
-    setIsExpandingAll(true);
-    const key = isGlossary ? 'glossary' : 'parent';
-    const { data } = await getGlossaryTerms({
-      [key]: activeGlossary?.id || '',
-      limit: API_RES_MAX_SIZE,
-      fields: [
-        TabSpecificField.OWNERS,
-        TabSpecificField.PARENT,
-        TabSpecificField.CHILDREN,
-        TabSpecificField.REVIEWERS,
-        ...(isDQGlossary
-          ? [
-              TabSpecificField.TAGS,
-              TabSpecificField.EXTENSION,
-              TabSpecificField.RELATED_TERMS,
-            ]
-          : isCDEGlossary
-          ? [
-              TabSpecificField.TAGS,
-              TabSpecificField.DOMAINS,
-              TabSpecificField.EXTENSION,
-            ]
-          : []),
-      ],
-      ...(isConsumer ? { entityStatus: EntityStatus.Approved } : {}),
-    });
-    setGlossaryChildTerms(buildTree(data) as ModifiedGlossary[]);
-    const keys = data.reduce((prev, curr) => {
-      if (curr.children?.length) {
-        prev.push(curr.fullyQualifiedName ?? '');
-      }
-
-      return prev;
-    }, [] as string[]);
-
-    setExpandedRowKeys(keys);
-    setIsTableLoading(false);
-    setIsExpandingAll(false);
-  };
   const fetchAllTasks = useCallback(async () => {
     if (!activeGlossary?.fullyQualifiedName) {
       return;
@@ -1910,7 +1875,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       lastFetchKeyRef.current = '';
 
       if (previousFQN !== undefined) {
-        setToggleExpandBtn(false);
         setGlossaryChildTerms([]);
         handlePageChange(INITIAL_PAGING_VALUE, {
           cursorType: null,
@@ -2263,6 +2227,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
         title: t('label.status'),
         dataIndex: GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
         key: GLOSSARY_TERM_TABLE_COLUMNS_KEYS.STATUS,
+        className: 'governance-status-cell',
         // this check is added to the width, since the last column is optional and to maintain
         // the re-sizing of the column should not be affected the others columns width sizes.
         ...(canMutate &&
@@ -2285,9 +2250,12 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
             permissions
           );
 
+          const isDeleted = isDeletedRecord(record);
+
           if (
             !isCDEGlossary &&
             !isDQGlossary &&
+            !isDeleted &&
             status === EntityStatus.InReview &&
             permission
           ) {
@@ -2302,10 +2270,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
           return (
             <Space size={4}>
-              <StatusBadge
-                dataTestId={(record.fullyQualifiedName ?? '') + '-status'}
-                label={status}
-                status={EntityStatusClass[status]}
+              <GovernedStatusBadge
+                dataTestId={`${record.fullyQualifiedName ?? record.name}-${
+                  isDeleted ? 'deleted-status' : 'status'
+                }`}
+                deletedBy={record.archivedBy}
+                isDeleted={isDeleted}
+                status={status}
               />
               {record.pendingDeletion && (
                 <Tag
@@ -2453,6 +2424,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               ...column,
               width: 140,
               align: 'center' as const,
+              fixed: 'right' as const,
             };
           }
 
@@ -2483,6 +2455,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
               ...column,
               width: 140,
               align: 'center' as const,
+              fixed: 'right' as const,
             };
           }
 
@@ -2566,33 +2539,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     setStatusDropdownSelection(selectedStatus);
     setIsStatusDropdownVisible(false);
   };
-
-  const toggleExpandAll = useCallback(async () => {
-    if (expandedRowKeys.length === expandableKeys.length) {
-      // Collapse all - immediate UI update
-      lastFetchKeyRef.current = '';
-      setToggleExpandBtn(false);
-      setExpandedRowKeys([]);
-    } else {
-      setToggleExpandBtn(true);
-      fetchExpadedTree();
-    }
-  }, [
-    glossaryTerms,
-    glossaryChildTerms,
-    setGlossaryChildTerms,
-    loadingChildren,
-    setLoadingChildren,
-    expandedRowKeys,
-    expandableKeys,
-    setExpandedRowKeys,
-    showErrorToast,
-    selectedStatus,
-  ]);
-
-  const isAllExpanded = useMemo(() => {
-    return expandedRowKeys.length === expandableKeys.length;
-  }, [expandedRowKeys, expandableKeys]);
 
   const availableStatusOptions = useMemo(() => {
     if (isConsumer) {
@@ -2959,16 +2905,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, []);
 
   const extraTableFilters = useMemo(() => {
-    let expandCollapseLabel = '';
-
-    if (isExpandingAll) {
-      expandCollapseLabel = t('label.loading');
-    } else if (isAllExpanded) {
-      expandCollapseLabel = t('label.collapse-all');
-    } else {
-      expandCollapseLabel = t('label.expand-all');
-    }
-
     return (
       <GovernanceListToolbar
         search={
@@ -3087,42 +3023,15 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           )}
 
         {showDeletedToggle}
-
-        <Button
-          className={classNames('text-primary remove-button-background-hover', {
-            'cde-toolbar-collapse-action': isCDEGlossary,
-            'dq-toolbar-collapse-action': isDQGlossary,
-          })}
-          data-testid="expand-collapse-all-button"
-          disabled={isExpandingAll}
-          size="small"
-          type="text"
-          onClick={toggleExpandAll}>
-          <Space align="center" size={4}>
-            {isExpandingAll ? (
-              <Loader size="small" />
-            ) : (
-              <Icon
-                className="text-primary"
-                component={isAllExpanded ? DownUpArrowIcon : UpDownArrowIcon}
-                height="14px"
-              />
-            )}
-            {expandCollapseLabel}
-          </Space>
-        </Button>
       </GovernanceListToolbar>
     );
   }, [
-    isAllExpanded,
-    isExpandingAll,
     isStatusDropdownVisible,
     showDeletedToggle,
     isCDEGlossary,
     isDQGlossary,
     statusDropdownMenu,
     handleSearch,
-    toggleExpandAll,
     cdeDomainOptions,
     cdeDataSourceOptions,
     cdeOwnerOptions,
@@ -3212,11 +3121,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
 
   // Fetch once per page/filter combination and ignore layout-only rerenders.
   useEffect(() => {
-    if (
-      isWorkflowPermissionLoading ||
-      !activeGlossary?.fullyQualifiedName ||
-      toggleExpandBtn
-    ) {
+    if (isWorkflowPermissionLoading || !activeGlossary?.fullyQualifiedName) {
       return;
     }
 
@@ -3262,7 +3167,6 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   }, [
     fetchKey,
     isWorkflowPermissionLoading,
-    toggleExpandBtn,
     isCDEGlossary,
     activeGlossary.id,
     displayedGlossary.businessVersion,
@@ -3373,97 +3277,97 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
       {/* Have use the col to set the width of the table, to only use the viewport width for the table columns */}
       <Col className="w-full" ref={tableContainerRef} span={24}>
         <GovernanceListTable
-            resizableColumns
-            className={classNames(
-              'drop-over-background',
-              'glossary-terms-table',
-              {
-                'cde-glossary-terms-table': isCDEGlossary,
-                'dq-glossary-terms-table': isDQGlossary,
-                'drop-over-table': isTableHovered,
-              }
-            )}
-            columns={columns}
-            components={TABLE_CONSTANTS}
-            containerClassName={
-              isDQGlossary
-                ? 'dq-glossary-table-container'
-                : isCDEGlossary
-                ? 'cde-glossary-table-container'
-                : undefined
+          resizableColumns
+          className={classNames(
+            'drop-over-background',
+            'glossary-terms-table',
+            {
+              'cde-glossary-terms-table': isCDEGlossary,
+              'dq-glossary-terms-table': isDQGlossary,
+              'drop-over-table': isTableHovered,
             }
-            customPaginationProps={paginationProps}
-            data-testid="glossary-terms-table"
-            dataSource={filteredGlossaryTerms}
-            defaultVisibleColumns={
-              isDQGlossary
-                ? DQ_DEFAULT_VISIBLE_COLUMNS
-                : isCDEGlossary
-                ? CDE_DEFAULT_VISIBLE_COLUMNS
-                : DEFAULT_VISIBLE_COLUMNS
-            }
-            entityType={
-              isDQGlossary
-                ? DQ_GLOSSARY_TABLE_PREFERENCE_KEY
-                : isCDEGlossary
-                ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
-                : undefined
-            }
-            expandable={
-              isCDEGlossary || isDQGlossary ? undefined : expandableConfig
-            }
-            extraTableFilters={extraTableFilters}
-            extraTableFiltersClassName={
-              isDQGlossary
-                ? 'dq-glossary-table-toolbar'
-                : isCDEGlossary
-                ? 'cde-glossary-table-toolbar'
-                : undefined
-            }
-            loading={isTableLoading || isExpandingAll}
-            locale={{
-              emptyText: (
-                <ErrorPlaceHolder
-                  className="p-md"
-                  placeholderText={glossaryPlaceholderText}
-                  type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
-                />
-              ),
-            }}
-            pagination={false}
-            rowClassName={getRowClassName}
-            rowKey={getVersionRowKey}
-            rowSelection={rowSelection}
-            selectionBar={
-              canSelectRows && selectedRowKeys.length > 0 ? (
-                <GlossaryBulkActionBar
-                  canApproveOrReject={canApproveOrReject}
-                  canSubmitForReview={canSubmitForReview}
-                  selectedTerms={selectedTerms}
-                  onApprove={handleBulkApprove}
-                  onClearSelection={handleClearSelection}
-                  onReject={handleBulkReject}
-                  onSubmitForReview={handleBulkSubmitForReview}
-                />
-              ) : undefined
-            }
-            size="small"
-            staticVisibleColumns={
-              isDQGlossary
-                ? DQ_STATIC_VISIBLE_COLUMNS
-                : isCDEGlossary
-                ? CDE_STATIC_VISIBLE_COLUMNS
-                : STATIC_VISIBLE_COLUMNS
-            }
-            sticky={{
-              offsetScroll: 0,
-              getContainer: () =>
-                tableContainerRef.current?.closest<HTMLElement>(
-                  '.ant-tabs-tabpane'
-                ) ?? document.body,
-            }}
-            onHeaderRow={onTableHeader}
-            onRow={onTableRow}
+          )}
+          columns={columns}
+          components={TABLE_CONSTANTS}
+          containerClassName={
+            isDQGlossary
+              ? 'dq-glossary-table-container'
+              : isCDEGlossary
+              ? 'cde-glossary-table-container'
+              : undefined
+          }
+          customPaginationProps={paginationProps}
+          data-testid="glossary-terms-table"
+          dataSource={filteredGlossaryTerms}
+          defaultVisibleColumns={
+            isDQGlossary
+              ? DQ_DEFAULT_VISIBLE_COLUMNS
+              : isCDEGlossary
+              ? CDE_DEFAULT_VISIBLE_COLUMNS
+              : DEFAULT_VISIBLE_COLUMNS
+          }
+          entityType={
+            isDQGlossary
+              ? DQ_GLOSSARY_TABLE_PREFERENCE_KEY
+              : isCDEGlossary
+              ? CDE_GLOSSARY_TABLE_PREFERENCE_KEY
+              : undefined
+          }
+          expandable={
+            isCDEGlossary || isDQGlossary ? undefined : expandableConfig
+          }
+          extraTableFilters={extraTableFilters}
+          extraTableFiltersClassName={
+            isDQGlossary
+              ? 'dq-glossary-table-toolbar'
+              : isCDEGlossary
+              ? 'cde-glossary-table-toolbar'
+              : undefined
+          }
+          loading={isTableLoading}
+          locale={{
+            emptyText: (
+              <ErrorPlaceHolder
+                className="p-md"
+                placeholderText={glossaryPlaceholderText}
+                type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
+              />
+            ),
+          }}
+          pagination={false}
+          rowClassName={getRowClassName}
+          rowKey={getVersionRowKey}
+          rowSelection={rowSelection}
+          selectionBar={
+            canSelectRows && selectedRowKeys.length > 0 ? (
+              <GlossaryBulkActionBar
+                canApproveOrReject={canApproveOrReject}
+                canSubmitForReview={canSubmitForReview}
+                selectedTerms={selectedTerms}
+                onApprove={handleBulkApprove}
+                onClearSelection={handleClearSelection}
+                onReject={handleBulkReject}
+                onSubmitForReview={handleBulkSubmitForReview}
+              />
+            ) : undefined
+          }
+          size="small"
+          staticVisibleColumns={
+            isDQGlossary
+              ? DQ_STATIC_VISIBLE_COLUMNS
+              : isCDEGlossary
+              ? CDE_STATIC_VISIBLE_COLUMNS
+              : STATIC_VISIBLE_COLUMNS
+          }
+          sticky={{
+            offsetScroll: 0,
+            getContainer: () =>
+              tableContainerRef.current?.closest<HTMLElement>(
+                '.ant-tabs-tabpane'
+              ) ?? document.body,
+          }}
+          onHeaderRow={onTableHeader}
+          onRow={onTableRow}
         />
         <Modal
           centered

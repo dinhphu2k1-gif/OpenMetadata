@@ -9,7 +9,8 @@ import React from 'react';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { getCDEReleaseVersionTypeClassName } from '../../../utils/CDEReleaseVersionTypeUtils';
 import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
-import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
+import { StatusType } from '../../common/StatusBadge/StatusBadge.interface';
+import GovernedStatusBadge from '../GovernedStatusBadge/GovernedStatusBadge.component';
 
 export interface GovernedVersionMenuItem {
   key: string;
@@ -18,6 +19,8 @@ export interface GovernedVersionMenuItem {
 
 interface GovernedEntityHeaderBadgesProps {
   businessVersion: string;
+  deletedBy?: string;
+  isDeleted?: boolean;
   isLoadingVersions?: boolean;
   loadingLabel?: string;
   onVersionMenuOpen?: (open: boolean) => void;
@@ -36,6 +39,8 @@ interface GovernedEntityHeaderBadgesProps {
 /** Shared governed header status/version presentation for CDE, DQ and Technical Dictionary. */
 const GovernedEntityHeaderBadges = ({
   businessVersion,
+  deletedBy,
+  isDeleted = false,
   isLoadingVersions = false,
   loadingLabel = 'Loading',
   onVersionMenuOpen,
@@ -50,7 +55,9 @@ const GovernedEntityHeaderBadges = ({
   versionLabel,
   versionSelectionDisabled = false,
 }: GovernedEntityHeaderBadgesProps) => {
-  const statusClass = getEntityStatusClass(status);
+  const statusClass = isDeleted
+    ? StatusType.Archived
+    : getEntityStatusClass(status);
   const versionBadge = (
     <button
       className={`status-badge cde-header-version-badge ${statusClass}`}
@@ -65,10 +72,11 @@ const GovernedEntityHeaderBadges = ({
 
   return (
     <Space align="center" size={8}>
-      <StatusBadge
+      <GovernedStatusBadge
         dataTestId={statusTestId ?? `${testIdPrefix}-status`}
-        label={status}
-        status={statusClass}
+        deletedBy={deletedBy}
+        isDeleted={isDeleted}
+        status={status}
       />
       {versionSelectionDisabled ? (
         versionBadge

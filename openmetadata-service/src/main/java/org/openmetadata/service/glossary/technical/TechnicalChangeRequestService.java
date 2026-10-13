@@ -175,6 +175,7 @@ public final class TechnicalChangeRequestService {
 
               final TechnicalRecord approved;
               if (existing.isDelete()) {
+                TechnicalDeletedRecords.remember(dao, active, version, actor);
                 if (dao.deleteRecord(active.id(), active.revision()) != 1) {
                   throw stale();
                 }

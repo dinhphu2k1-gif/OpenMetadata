@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -24,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -49,6 +51,7 @@ import org.openmetadata.service.glossary.search.GovernedGlossaryOutbox;
 import org.openmetadata.service.glossary.technical.TechnicalCutover;
 import org.openmetadata.service.glossary.technical.TechnicalOutbox;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
+import org.openmetadata.service.jdbi3.GlossaryVersionDAO.ArchiveReason;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotHistoryRecord;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.SnapshotOutboxRecord;
@@ -734,6 +737,7 @@ public class GlossaryVersioningService {
                             now,
                             actor,
                             null,
+                            null,
                             null);
                     if (publicationHook != null) {
                       publicationHook.onPublished(handle, working, result);
@@ -862,6 +866,7 @@ public class GlossaryVersioningService {
               now,
               actor,
               null,
+              null,
               null));
     }
     return publishedTerms;
@@ -920,17 +925,19 @@ public class GlossaryVersioningService {
   }
 
   /**
-   * Opens a Draft that proposes deleting an Approved CDE. The CDE stays effective until the Draft
-   * is approved; see {@link GlossaryTermDeletion}.
+   * Opens a Draft that proposes deleting one Approved version of a governed term; a null {@code
+   * businessVersion} means the effective one. Nothing changes until the Draft is approved; see
+   * {@link GlossaryTermDeletion}.
    */
   public WorkingVersionRecord createDeletionWorking(
       UUID entityId,
       String parentBusinessVersion,
+      String businessVersion,
       String actor,
       Consumer<PublishedSnapshotRecord> authorization) {
     final GlossaryTermDeletion.DeletionRequest request =
         new GlossaryTermDeletion.DeletionRequest(
-            entityId, parentBusinessVersion, actor, authorization);
+            entityId, parentBusinessVersion, businessVersion, actor, authorization);
     final WorkingVersionRecord result;
     try {
       result =
@@ -953,6 +960,28 @@ public class GlossaryVersioningService {
 
   public static boolean isDeletionRequest(WorkingVersionRecord working) {
     return GlossaryTermDeletion.isRequested(working);
+  }
+
+  /** True when deleting one more Approved version removes the term from its scope. */
+  public static boolean deletionRemovesTerm(UUID entityId, String parentBusinessVersion) {
+    return GlossaryTermDeletion.removesTerm(
+        Entity.getJdbi().onDemand(GlossaryVersionDAO.class),
+        entityId,
+        requireParentScope(parentBusinessVersion));
+  }
+
+  /**
+   * The effective Approved snapshot among {@code published}: the newest one that is not archived,
+   * or the newest archived one when every version was deleted. Empty when nothing was published.
+   */
+  public static Optional<PublishedSnapshotRecord> selectEffective(
+      Collection<PublishedSnapshotRecord> published) {
+    final Comparator<PublishedSnapshotRecord> newest =
+        Comparator.comparingLong(PublishedSnapshotRecord::publicationSequence);
+    return published.stream()
+        .filter(snapshot -> snapshot.archivedAt() == null)
+        .max(newest)
+        .or(() -> published.stream().max(newest));
   }
 
   private static WorkingVersionRecord createCorrectionWorking(
@@ -1373,7 +1402,9 @@ public class GlossaryVersioningService {
     for (PublishedSnapshotRecord term :
         dao.listArchivedTermSnapshotsForGlossaryAndParent(
             glossaryId, predecessor.businessVersion())) {
-      latestByTerm.putIfAbsent(term.entityId(), term);
+      if (!ArchiveReason.DELETED.name().equals(term.archiveReason())) {
+        latestByTerm.putIfAbsent(term.entityId(), term);
+      }
     }
     List<PublishedSnapshotRecord> archivedTerms =
         sortTermSnapshotsByName(new ArrayList<>(latestByTerm.values()));
@@ -1724,7 +1755,7 @@ public class GlossaryVersioningService {
       String actor) {
     for (PublishedSnapshotRecord term :
         dao.listUnarchivedTermSnapshotsForGlossaryAndParent(glossaryId, parentBusinessVersion)) {
-      requireUpdated(dao.archiveSnapshot(term.snapshotId(), now, actor));
+      requireUpdated(dao.archiveSnapshot(term.snapshotId(), now, actor, ArchiveReason.SUPERSEDED));
       dao.deletePublishedHead(GLOSSARY_TERM, term.entityId(), term.snapshotId());
       dao.insertOutbox(
           UUID.randomUUID(), term.snapshotId(), SNAPSHOT_ARCHIVE_EVENT, term.payload(), now);
@@ -1773,7 +1804,8 @@ public class GlossaryVersioningService {
     }
     archiveScopedTerms(dao, glossaryId, predecessorVersion, now, actor);
     archiveDataQualityRules(dao, glossaryId, predecessorVersion, now, actor);
-    requireUpdated(dao.archiveSnapshot(predecessor.snapshotId(), now, actor));
+    requireUpdated(
+        dao.archiveSnapshot(predecessor.snapshotId(), now, actor, ArchiveReason.SUPERSEDED));
     // During a live cutover this removes the predecessor head; during repair the old buggy
     // publish may already have replaced that head with the successor.
     dao.deletePublishedHead(GLOSSARY, predecessor.entityId(), predecessor.snapshotId());

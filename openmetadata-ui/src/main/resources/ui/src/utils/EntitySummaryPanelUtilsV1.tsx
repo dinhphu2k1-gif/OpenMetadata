@@ -975,37 +975,8 @@ const APIEndpointSchemaV1: React.FC<{
     return filterFields(fields);
   }, [viewType, requestSchemaFields, responseSchemaFields, searchText]);
 
-  // Get all row keys for expandable functionality
-  const getAllRowKeys = (fields: Field[]): string[] => {
-    const keys: string[] = [];
-    const traverse = (fieldList: Field[]) => {
-      for (const field of fieldList) {
-        keys.push(field.fullyQualifiedName ?? field.name);
-        if (field.children && field.children.length > 0) {
-          traverse(field.children);
-        }
-      }
-    };
-    traverse(fields);
-
-    return keys;
-  };
-
-  const allRowKeys = useMemo(
-    () => getAllRowKeys(activeSchemaFields),
-    [activeSchemaFields]
-  );
-
   const handleExpandedRowsChange = (keys: readonly React.Key[]) => {
     setExpandedRowKeys(keys as string[]);
-  };
-
-  const handleToggleExpandAll = () => {
-    if (expandedRowKeys.length < allRowKeys.length) {
-      setExpandedRowKeys(allRowKeys);
-    } else {
-      setExpandedRowKeys([]);
-    }
   };
 
   const columns = [
@@ -1088,11 +1059,6 @@ const APIEndpointSchemaV1: React.FC<{
             setViewType(value as 'request-schema' | 'response-schema')
           }
         />
-        <Button size="small" type="link" onClick={handleToggleExpandAll}>
-          {expandedRowKeys.length < allRowKeys.length
-            ? t('label.expand-all')
-            : t('label.collapse-all')}
-        </Button>
       </div>
 
       {isEmpty(activeSchemaFields) ? (

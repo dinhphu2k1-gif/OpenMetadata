@@ -136,6 +136,7 @@ import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import GovernedEntityHeaderBadges from '../GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
+import { isDeletedRecord } from '../GovernedStatusBadge/GovernedStatusBadge.utils';
 
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
 import ChangeParentHierarchy from '../../Modals/ChangeParentHierarchy/ChangeParentHierarchy.component';
@@ -971,10 +972,28 @@ const GlossaryHeader = ({
     selectedData.workingRevision,
   ]);
 
-  const canRequestDeletion =
-    canCreateCorrection &&
-    (isCDEGlossaryTerm || isDQGlossaryTerm) &&
-    Boolean(workflowPermissions?.canSubmit);
+  // Any Approved version that is not deleted can be deleted, including an older one opened from
+  // the version list; a pending working version blocks it.
+  const canRequestDeletion = useMemo(
+    () =>
+      !isGlossary &&
+      (isCDEGlossaryTerm || isDQGlossaryTerm) &&
+      glossaryTermStatus === EntityStatus.Approved &&
+      selectedData.archivedAt == null &&
+      (isVersionView || selectedData.workingRevision == null) &&
+      Boolean(workflowPermissions?.canCreateVersion) &&
+      Boolean(workflowPermissions?.canSubmit),
+    [
+      isGlossary,
+      isCDEGlossaryTerm,
+      isDQGlossaryTerm,
+      glossaryTermStatus,
+      selectedData.archivedAt,
+      isVersionView,
+      selectedData.workingRevision,
+      workflowPermissions,
+    ]
+  );
   const deletionTextScope = isDQGlossaryTerm ? 'dq' : 'cde';
 
   const canCancelDeletion =
@@ -1221,7 +1240,8 @@ const GlossaryHeader = ({
       setIsRequestingDeletion(true);
       const created = await requestGlossaryTermDeletion(
         selectedData.id,
-        getParentBusinessVersion()
+        getParentBusinessVersion(),
+        businessVersion ?? undefined
       );
       // The deletion endpoint creates and submits the request atomically.
       navigateToWorkingDraft(
@@ -1640,6 +1660,8 @@ const GlossaryHeader = ({
       return (
         <GovernedEntityHeaderBadges
           businessVersion={cleanVersion}
+          deletedBy={(selectedData as GlossaryTerm).archivedBy}
+          isDeleted={isDeletedRecord(selectedData as GlossaryTerm)}
           isLoadingVersions={isLoadingVersions}
           loadingLabel={t('label.loading')}
           releaseVersionType={releaseVersionType}
@@ -2034,8 +2056,22 @@ const GlossaryHeader = ({
   ]);
 
   const governedWorkflowMenu = useMemo(() => {
-    if (isVersionView || !canRenderMutationActions) {
+    if (!canRenderMutationActions) {
       return [];
+    }
+
+    const requestDeletionItem: WorkflowMenuItem = {
+      key: 'request-deletion',
+      name: t('label.delete'),
+      description: t('message.workflow-request-deletion-description'),
+      icon: IconDelete,
+      onClick: openDeletionRequestModal,
+      testId: 'request-cde-deletion-button',
+      danger: true,
+    };
+    // An older Approved version is read only; deleting that version is its only action.
+    if (isVersionView) {
+      return canRequestDeletion ? [requestDeletionItem] : [];
     }
 
     const items: WorkflowMenuItem[] = [];
@@ -2063,15 +2099,7 @@ const GlossaryHeader = ({
         danger: true,
       });
     } else if (canRequestDeletion) {
-      items.push({
-        key: 'request-deletion',
-        name: t('label.delete'),
-        description: t('message.workflow-request-deletion-description'),
-        icon: IconDelete,
-        onClick: openDeletionRequestModal,
-        testId: 'request-cde-deletion-button',
-        danger: true,
-      });
+      items.push(requestDeletionItem);
     }
 
     return items;
@@ -2361,7 +2389,9 @@ const GlossaryHeader = ({
           showIcon
           className="m-b-sm"
           data-testid="cde-pending-deletion-banner"
-          message={t(`${deletionTextScope}.deletion-pending-banner`)}
+          message={t(`${deletionTextScope}.deletion-pending-banner`, {
+            version: businessVersion,
+          })}
           type="error"
         />
       )}
@@ -2450,6 +2480,7 @@ const GlossaryHeader = ({
         confirmText={t('cde.deletion-request')}
         header={t(`${deletionTextScope}.deletion-request-title`, {
           name: getEntityName(selectedData),
+          version: businessVersion,
         })}
         isLoading={isRequestingDeletion}
         visible={isDeletionRequestModalOpen}

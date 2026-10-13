@@ -7,7 +7,6 @@ package org.openmetadata.service.glossary.dq;
 
 import static org.openmetadata.common.utils.CommonUtil.nullOrEmpty;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,6 +17,7 @@ import org.openmetadata.schema.type.DqTestSpecs;
 import org.openmetadata.schema.type.Include;
 import org.openmetadata.schema.utils.JsonUtils;
 import org.openmetadata.service.Entity;
+import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO.PublishedSnapshotRecord;
 
@@ -66,10 +66,9 @@ public final class DqTestSpecService {
     return threshold;
   }
 
-  /** Declarations of the most recently published snapshot of the Rule identity, if any. */
+  /** Declarations of the effective published snapshot of the Rule identity, if any. */
   public static DqTestSpecs latestApproved(UUID ruleId) {
-    return listPublished(ruleId).stream()
-        .max(Comparator.comparingLong(PublishedSnapshotRecord::publicationSequence))
+    return GlossaryVersioningService.selectEffective(listPublished(ruleId))
         .map(DqTestSpecService::specsOf)
         .orElse(null);
   }

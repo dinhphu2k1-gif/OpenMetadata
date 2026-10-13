@@ -69,6 +69,7 @@ import org.openmetadata.service.glossary.technical.search.TechnicalSearchService
 import org.openmetadata.service.glossary.versioning.GlossaryVersioningService;
 import org.openmetadata.service.jdbi3.GlossaryVersionDAO;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.DeletedRow;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.SnapshotRow;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.SnapshotSummary;
 import org.openmetadata.service.resources.Collection;
@@ -149,7 +150,8 @@ public class TechnicalDictionaryResource {
       @QueryParam("creationMethods") String creationMethods,
       @QueryParam("timeliness") String timeliness,
       @DefaultValue(DEFAULT_PAGE_SIZE) @QueryParam("limit") int limit,
-      @DefaultValue("0") @QueryParam("offset") int offset) {
+      @DefaultValue("0") @QueryParam("offset") int offset,
+      @DefaultValue("false") @QueryParam("includeDeleted") boolean includeDeleted) {
     final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
     final Map<String, String> parameters =
         TechnicalSearchParameters.parameters(
@@ -168,7 +170,8 @@ public class TechnicalDictionaryResource {
     TechnicalOutbox.drainBeforeRead();
     final TechnicalSearchCriteria criteria =
         TechnicalSearchParameters.criteria(version, parameters, limit, offset)
-            .withUnapprovedHidden(!capabilities.canSeeWorkingRecords());
+            .withUnapprovedHidden(!capabilities.canSeeWorkingRecords())
+            .withDeletedIncluded(includeDeleted && capabilities.canSeeWorkingRecords());
     final Map<String, Object> result = searchService.search(criteria);
     if (!capabilities.canSeeWorkingRecords()) {
       return TechnicalOwnerLabels.refreshPage(withoutChangeMetadata(result));
@@ -225,8 +228,18 @@ public class TechnicalDictionaryResource {
   public Map<String, Object> get(
       @Context SecurityContext securityContext, @PathParam("id") UUID recordId) {
     final TechnicalDictionaryAccess.Capabilities capabilities = access.requireView(securityContext);
-    final Map<String, Object> result = row(requireVisibleRecord(recordId, capabilities));
-    return capabilities.canSeeWorkingRecords() ? result : withoutChangeMetadataRow(result);
+    final DeletedRow deleted =
+        capabilities.canSeeWorkingRecords() ? dao().findDeleted(recordId.toString()) : null;
+    final Map<String, Object> result;
+    if (deleted != null && dao().findById(recordId.toString()) == null) {
+      result =
+          new TechnicalDocumentBuilder()
+              .deletedRow(deleted, TechnicalDictionaryState.row().dataDictionaryVersion());
+    } else {
+      final Map<String, Object> visible = row(requireVisibleRecord(recordId, capabilities));
+      result = capabilities.canSeeWorkingRecords() ? visible : withoutChangeMetadataRow(visible);
+    }
+    return result;
   }
 
   @PATCH

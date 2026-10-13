@@ -349,10 +349,19 @@ const TechnicalDictionaryTable = ({
         width: 140,
         render: (_, row) => (
           <div className="d-flex flex-column items-start gap-1">
-            <TechnicalStatusBadge
-              dataTestId={`status-${row.columnName}`}
-              status={row.status}
-            />
+            {row.deleted ? (
+              <Tag
+                color="error"
+                data-testid={`deleted-${row.columnName}`}
+                title={row.deletedBy}>
+                {t('cde.deleted-record')}
+              </Tag>
+            ) : (
+              <TechnicalStatusBadge
+                dataTestId={`status-${row.columnName}`}
+                status={row.status}
+              />
+            )}
             {row.hasPendingChange && row.rowRole !== 'CHANGE' && (
               <Tag color={row.changeOperation === 'DELETE' ? 'red' : 'gold'}>
                 {t(
@@ -435,7 +444,9 @@ const TechnicalDictionaryTable = ({
       loading={isLoading}
       locale={emptyContent ? { emptyText: emptyContent } : undefined}
       pagination={false}
-      rowClassName="tech-dict-row"
+      rowClassName={(row) =>
+        row.deleted ? 'tech-dict-row tech-dict-row--deleted' : 'tech-dict-row'
+      }
       rowKey="key"
       rowSelection={
         isReadOnly
@@ -445,6 +456,7 @@ const TechnicalDictionaryTable = ({
               fixed: true,
               columnWidth: 32,
               selectedRowKeys,
+              getCheckboxProps: (row) => ({ disabled: Boolean(row.deleted) }),
               onChange: onSelectionChange,
             }
       }

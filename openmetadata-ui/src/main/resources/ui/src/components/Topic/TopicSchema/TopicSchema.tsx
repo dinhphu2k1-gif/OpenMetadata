@@ -49,7 +49,6 @@ import {
   getAllRowKeysByKeyName,
   getExpandAllKeysToDepth,
   getHighlightedRowClassName,
-  getSafeExpandAllKeys,
   getSchemaDepth,
   getSchemaFieldCount,
   isLargeSchema,
@@ -64,7 +63,6 @@ import { EntityAttachmentProvider } from '../../common/EntityDescription/EntityA
 import ErrorPlaceHolder from '../../common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
 import Table from '../../common/Table/Table';
-import ToggleExpandButton from '../../common/ToggleExpandButton/ToggleExpandButton';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ColumnFilter } from '../../Database/ColumnFilter/ColumnFilter.component';
 import SchemaEditor from '../../Database/SchemaEditor/SchemaEditor';
@@ -231,19 +229,6 @@ const TopicSchemaFields: FC<TopicSchemaFieldsProps> = ({
   useEffect(() => {
     setDisplayedColumns(messageSchema?.schemaFields ?? []);
   }, [messageSchema?.schemaFields, setDisplayedColumns]);
-
-  const toggleExpandAll = () => {
-    if (expandedRowKeys.length < schemaAllRowKeys.length) {
-      const safeKeys = getSafeExpandAllKeys(
-        messageSchema?.schemaFields ?? [],
-        schemaStats.isLargeSchema,
-        schemaAllRowKeys
-      );
-      setExpandedRowKeys(safeKeys);
-    } else {
-      setExpandedRowKeys([]);
-    }
-  };
 
   const handleExpandedRowsChange = (keys: readonly Key[]) => {
     setExpandedRowKeys(keys as string[]);
@@ -494,13 +479,6 @@ const TopicSchemaFields: FC<TopicSchemaFieldsProps> = ({
                   onExpandedRowsChange: handleExpandedRowsChange,
                   expandedRowKeys,
                 }}
-                extraTableFilters={
-                  <ToggleExpandButton
-                    allRowKeys={schemaAllRowKeys}
-                    expandedRowKeys={expandedRowKeys}
-                    toggleExpandAll={toggleExpandAll}
-                  />
-                }
                 pagination={false}
                 rowClassName={getRowClassName}
                 rowKey="fullyQualifiedName"

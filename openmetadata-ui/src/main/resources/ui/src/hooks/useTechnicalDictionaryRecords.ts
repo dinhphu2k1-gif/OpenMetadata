@@ -30,7 +30,12 @@ import {
   searchTechnicalSnapshotRecords,
 } from '../rest/technicalDictionaryAPI';
 
-const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
+type TechnicalListFilterKey = Exclude<
+  keyof TechnicalDictionaryFilters,
+  'q' | 'showDeleted'
+>;
+
+const LIST_KEYS: TechnicalListFilterKey[] = [
   'statuses',
   'sourceServices',
   'cdeTermIds',
@@ -42,6 +47,7 @@ const LIST_KEYS: Array<keyof TechnicalDictionaryFilters> = [
 const PAGE_PARAM = 'page';
 const PAGE_SIZE_PARAM = 'pageSize';
 const QUERY_PARAM = 'q';
+const SHOW_DELETED_PARAM = 'showDeleted';
 // Same query name the Data Dictionary uses to pick a version.
 const VERSION_PARAM = CDE_ROUTE_QUERY.businessVersion;
 
@@ -54,6 +60,7 @@ export const parseTechnicalFilters = (
   const filters: TechnicalDictionaryFilters = {
     ...EMPTY_TECHNICAL_FILTERS,
     q: params.get(QUERY_PARAM) ?? '',
+    showDeleted: params.get(SHOW_DELETED_PARAM) === 'true',
   };
   LIST_KEYS.forEach((key) => {
     (filters[key] as string[]) = splitList(params.get(key));
@@ -69,6 +76,9 @@ export const writeTechnicalFilters = (
 ): URLSearchParams => {
   const next = new URLSearchParams(params);
   filters.q ? next.set(QUERY_PARAM, filters.q) : next.delete(QUERY_PARAM);
+  filters.showDeleted
+    ? next.set(SHOW_DELETED_PARAM, 'true')
+    : next.delete(SHOW_DELETED_PARAM);
   LIST_KEYS.forEach((key) => {
     const values = filters[key] as string[];
     values.length > 0 ? next.set(key, values.join(',')) : next.delete(key);
@@ -221,6 +231,7 @@ export const useTechnicalDictionaryRecords = ({
             generationTypes: filters.generationType,
             creationMethods: filters.creationMethod,
             timeliness: filters.timeliness,
+            includeDeleted: filters.showDeleted,
             ...paging,
           },
           controller.signal

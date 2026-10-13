@@ -189,7 +189,26 @@ jest.mock(
 jest.mock(
   '../../../components/common/StatusBadge/StatusBadge.component',
   () => {
-    return jest.fn().mockImplementation(() => <p>StatusBadge</p>);
+    return jest
+      .fn()
+      .mockImplementation(
+        ({
+          dataTestId,
+          displayLabel,
+          label,
+          status,
+        }: {
+          dataTestId?: string;
+          displayLabel?: string;
+          label: string;
+          status: string;
+        }) => (
+          <p className={status} data-testid={dataTestId}>
+            StatusBadge
+            <span>{displayLabel ?? label}</span>
+          </p>
+        )
+      );
   }
 );
 
@@ -809,6 +828,46 @@ describe('GlossaryHeader component', () => {
       ).not.toBeInTheDocument()
     );
   });
+
+  it.each([
+    ['DELETED', 'failure', 'cde.deleted-record'],
+    ['SUPERSEDED', 'archived', 'Archived'],
+  ])(
+    'shows an archived CDE with reason %s as %s',
+    async (archiveReason, statusClass, label) => {
+      (useGenericContext as jest.Mock).mockImplementation(() => ({
+        data: {
+          ...mockedGlossaryTerms[0],
+          fullyQualifiedName: 'Data Dictionary.Term1',
+          glossary: { id: 'dictionary-id', name: 'Data Dictionary' },
+          entityStatus: EntityStatus.Archived,
+          businessVersion: '1.1',
+          parentBusinessVersion: '1',
+          archivedAt: 1,
+          archivedBy: 'admin',
+          archiveReason,
+        },
+        onUpdate: mockOnUpdate,
+        permissions: { ManageAll: true },
+        isVersionView: false,
+        type: EntityType.GLOSSARY_TERM,
+      }));
+
+      render(
+        <GlossaryHeader
+          updateVote={mockOnUpdateVote}
+          onAddGlossaryTerm={mockOnDelete}
+          onDelete={mockOnDelete}
+        />
+      );
+
+      const status = await screen.findByTestId('governed-entity-status');
+
+      expect(status).toHaveClass(statusClass);
+      expect(status).toHaveTextContent(label);
+      expect(screen.getByTestId('version-button')).not.toHaveClass('failure');
+    }
+  );
 
   it('should render Submit for Review action when term is Draft and trigger submit', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({

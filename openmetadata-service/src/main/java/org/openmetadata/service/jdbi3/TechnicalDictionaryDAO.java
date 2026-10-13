@@ -226,6 +226,38 @@ public interface TechnicalDictionaryDAO {
       @Bind("schema") String schema,
       @Bind("table") String table);
 
+  // ---- deleted records ---------------------------------------------------------------------
+
+  @SqlUpdate(
+      "INSERT INTO technical_record_deleted (id, columnFqn, cdeTermId, dataDictionaryVersion, "
+          + "payload, deletedAt, deletedBy) VALUES (:id, :columnFqn, :cdeTermId, "
+          + ":dataDictionaryVersion, :payload, :deletedAt, :deletedBy)")
+  void insertDeleted(@BindMethods DeletedRow deleted);
+
+  @SqlQuery("SELECT * FROM technical_record_deleted WHERE id = :id")
+  @RegisterRowMapper(DeletedMapper.class)
+  DeletedRow findDeleted(@Bind("id") String id);
+
+  @SqlQuery("SELECT * FROM technical_record_deleted WHERE id IN (<ids>)")
+  @RegisterRowMapper(DeletedMapper.class)
+  List<DeletedRow> findDeletedByIds(@BindList("ids") List<String> ids);
+
+  @SqlQuery("SELECT * FROM technical_record_deleted WHERE id > :after ORDER BY id LIMIT :limit")
+  @RegisterRowMapper(DeletedMapper.class)
+  List<DeletedRow> listDeletedAfter(@Bind("after") String afterId, @Bind("limit") int limit);
+
+  @SqlQuery("SELECT id FROM technical_record_deleted")
+  List<String> listDeletedIds();
+
+  @SqlQuery("SELECT id FROM technical_record_deleted WHERE cdeTermId IN (<cdeIds>)")
+  List<String> listDeletedIdsByCde(@BindList("cdeIds") List<String> cdeIds);
+
+  @SqlQuery("SELECT COUNT(*) FROM technical_record_deleted")
+  long countDeleted();
+
+  @SqlUpdate("DELETE FROM technical_record_deleted")
+  int deleteAllDeleted();
+
   // ---- audit -------------------------------------------------------------------------------
 
   @SqlUpdate(
@@ -427,6 +459,15 @@ public interface TechnicalDictionaryDAO {
       Long resetAt,
       String resetBy) {}
 
+  record DeletedRow(
+      String id,
+      String columnFqn,
+      String cdeTermId,
+      String dataDictionaryVersion,
+      String payload,
+      long deletedAt,
+      String deletedBy) {}
+
   record AuditRow(
       String id,
       String recordId,
@@ -534,6 +575,20 @@ public interface TechnicalDictionaryDAO {
           .updatedAt(rs.getLong("updatedAt"))
           .updatedBy(rs.getString("updatedBy"))
           .build();
+    }
+  }
+
+  class DeletedMapper implements RowMapper<DeletedRow> {
+    @Override
+    public DeletedRow map(ResultSet rs, StatementContext ctx) throws SQLException {
+      return new DeletedRow(
+          rs.getString("id"),
+          rs.getString("columnFqn"),
+          rs.getString("cdeTermId"),
+          rs.getString("dataDictionaryVersion"),
+          rs.getString("payload"),
+          rs.getLong("deletedAt"),
+          rs.getString("deletedBy"));
     }
   }
 

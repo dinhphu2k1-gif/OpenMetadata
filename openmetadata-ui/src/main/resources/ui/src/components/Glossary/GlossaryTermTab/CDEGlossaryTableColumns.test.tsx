@@ -44,24 +44,38 @@ describe('CDE version and date columns', () => {
     );
 
     expect(isValidElement(rendered)).toBe(true);
-    expect((rendered as React.ReactElement<React.ComponentProps<typeof Link>>).props.to)
-      .toBe(
-        '/glossary/Data%20Dictionary.CDE1?businessVersion=1.1&parentBusinessVersion=1&termId=cde-term-id&view=working'
-      );
+    expect(
+      (rendered as React.ReactElement<React.ComponentProps<typeof Link>>).props
+        .to
+    ).toBe(
+      '/glossary/Data%20Dictionary.CDE1?businessVersion=1.1&parentBusinessVersion=1&termId=cde-term-id&view=working'
+    );
   });
 
-  it('appends version metadata and keeps status last', () => {
-    expect(columns.slice(-6).map((column) => column.key)).toEqual([
+  it('appends version metadata after the static CDE columns', () => {
+    expect(columns.slice(-5).map((column) => column.key)).toEqual([
       'version',
       'releaseVersionType',
       'releaseLevel',
       'effectiveDate',
       'expirationDate',
-      'entityStatus',
     ]);
-    expect(columns.slice(-6).map((column) => column.width)).toEqual([
-      120, 190, 170, 160, 160, 150,
+    expect(columns.slice(-5).map((column) => column.width)).toEqual([
+      100, 120, 170, 130, 130,
     ]);
+  });
+
+  it('keeps compact widths for short data-quality and release-type values', () => {
+    expect(
+      columns.find(
+        (column) => column.key === 'cdeDataQualityRule'
+      )?.width
+    ).toBe(150);
+    expect(
+      columns.find(
+        (column) => column.key === 'releaseVersionType'
+      )?.width
+    ).toBe(120);
   });
 
   it('uses the stored release type and derives it only for legacy rows', () => {
@@ -153,8 +167,11 @@ describe('CDE version and date columns', () => {
 
   it('renders the release-level label before the effective date', () => {
     expect(
-      (renderCell('releaseLevel', { releaseLevel: ['CEO'] }) as React.ReactElement)
-        .props.children
+      (
+        renderCell('releaseLevel', {
+          releaseLevel: ['CEO'],
+        }) as React.ReactElement
+      ).props.children
     ).toBe('cde.release-level-ceo');
     expect(
       (
@@ -172,10 +189,7 @@ describe('CDE version and date columns', () => {
     'effectiveDate',
     'expirationDate',
     'releaseLevel',
-  ])(
-    'leaves load-more row empty in %s',
-    (key) => {
-      expect(renderCell(key, {}, true)).toBeNull();
-    }
-  );
+  ])('leaves load-more row empty in %s', (key) => {
+    expect(renderCell(key, {}, true)).toBeNull();
+  });
 });

@@ -5,12 +5,15 @@
 
 package org.openmetadata.service.glossary.technical;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Builder;
 
 /**
  * One declared Column of the unversioned Technical Dictionary as stored in `technical_record`.
- * Identifiers are kept as strings because they are bound to varchar columns.
+ * Identifiers are kept as strings because they are bound to varchar columns. Its JSON form is the
+ * payload of a deleted record; the derived {@code is...} flags it also writes are ignored on read.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Builder(toBuilder = true)
 public record TechnicalRecord(
     String id,

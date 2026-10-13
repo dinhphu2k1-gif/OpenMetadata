@@ -10,15 +10,30 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { EntityType } from '../enums/entity.enum';
+import { EntityTabs, EntityType } from '../enums/entity.enum';
 import { Domain, DomainType } from '../generated/entity/domains/domain';
 import {
+  getDomainDetailTabs,
   getQueryFilterToIncludeDomain,
   isDomainExist,
 } from '../utils/DomainUtils';
+import { DomainDetailPageTabProps } from './Domain/DomainClassBase';
 
 jest.mock('../hooks/useDomainStore');
 jest.mock('./RouterUtils');
+
+describe('getDomainDetailTabs', () => {
+  it('excludes activity feed and custom properties from domain detail tabs', () => {
+    const tabs = getDomainDetailTabs({
+      domain: { fullyQualifiedName: 'test-domain' } as Domain,
+      isVersionsView: false,
+    } as DomainDetailPageTabProps);
+    const tabKeys = tabs.map((tab) => tab.key);
+
+    expect(tabKeys).not.toContain(EntityTabs.ACTIVITY_FEED);
+    expect(tabKeys).not.toContain(EntityTabs.CUSTOM_PROPERTIES);
+  });
+});
 
 describe('isDomainExist', () => {
   it('should return true if domain fqn matches directly', () => {

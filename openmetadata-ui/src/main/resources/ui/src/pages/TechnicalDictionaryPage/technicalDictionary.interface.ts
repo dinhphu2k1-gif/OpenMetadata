@@ -64,6 +64,10 @@ export interface TechnicalDictionaryRow {
   changeRequestStatus?: 'Draft' | 'InReview' | 'Rejected';
   changeOperation?: 'UPDATE' | 'DELETE';
   changeCreatedBy?: string;
+  /** An Approved record whose deletion was approved; read only. */
+  deleted?: boolean;
+  deletedAt?: number;
+  deletedBy?: string;
 }
 
 /** Filters that are reflected in the URL and sent to the server. */
@@ -76,6 +80,7 @@ export interface TechnicalDictionaryFilters {
   generationType: string[];
   creationMethod: string[];
   timeliness: string[];
+  showDeleted: boolean;
 }
 
 export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
@@ -87,6 +92,7 @@ export const EMPTY_TECHNICAL_FILTERS: TechnicalDictionaryFilters = {
   generationType: [],
   creationMethod: [],
   timeliness: [],
+  showDeleted: false,
 };
 
 /** What the signed-in user may do; the backend remains the authority. */

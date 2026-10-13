@@ -11,6 +11,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -24,6 +25,7 @@ import org.openmetadata.schema.type.Include;
 import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.technical.TechnicalCdeInfo;
+import org.openmetadata.service.glossary.technical.TechnicalDeletedRecords;
 import org.openmetadata.service.glossary.technical.TechnicalDictionaryState;
 import org.openmetadata.service.glossary.technical.TechnicalOwnerRef;
 import org.openmetadata.service.glossary.technical.TechnicalOwners;
@@ -31,6 +33,7 @@ import org.openmetadata.service.glossary.technical.TechnicalRecord;
 import org.openmetadata.service.glossary.technical.TechnicalRecordChangeRequest;
 import org.openmetadata.service.glossary.technical.search.TechnicalSearchIndex.IndexAction;
 import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO;
+import org.openmetadata.service.jdbi3.TechnicalDictionaryDAO.DeletedRow;
 
 /**
  * Builds the flat search documents of Technical Dictionary records. A document is always rebuilt
@@ -47,20 +50,36 @@ public final class TechnicalDocumentBuilder {
   private final Cache<String, Optional<EntityReference>> teams =
       Caffeine.newBuilder().maximumSize(MAX_CACHED_REFERENCES).build();
 
-  /** One upsert per existing record and one delete per id that no longer has a record. */
+  /**
+   * One upsert per existing or deleted-and-kept record and one delete per id that has neither.
+   */
   public List<IndexAction> build(Collection<String> recordIds) {
     final Map<String, TechnicalRecord> found = new LinkedHashMap<>();
+    final Map<String, DeletedRow> deleted = new LinkedHashMap<>();
     if (!recordIds.isEmpty()) {
-      dao().findByIds(List.copyOf(recordIds)).forEach(record -> found.put(record.id(), record));
+      final List<String> ids = List.copyOf(recordIds);
+      dao().findByIds(ids).forEach(record -> found.put(record.id(), record));
+      dao().findDeletedByIds(ids).forEach(row -> deleted.put(row.id(), row));
     }
     final List<IndexAction> actions = new ArrayList<>();
     final String version = TechnicalDictionaryState.row().dataDictionaryVersion();
     for (String id : recordIds) {
-      final TechnicalRecord record = found.get(id);
-      actions.add(
-          record == null ? IndexAction.delete(id) : new IndexAction(id, row(record, version)));
+      actions.add(action(id, found.get(id), deleted.get(id), version));
     }
     return actions;
+  }
+
+  private IndexAction action(
+      String id, TechnicalRecord record, DeletedRow deleted, String version) {
+    final IndexAction action;
+    if (record != null) {
+      action = new IndexAction(id, row(record, version));
+    } else if (deleted != null) {
+      action = new IndexAction(id, deletedRow(deleted, version));
+    } else {
+      action = IndexAction.delete(id);
+    }
+    return action;
   }
 
   /** Upserts for records already read, used by the index rebuild. */
@@ -69,6 +88,29 @@ public final class TechnicalDocumentBuilder {
     return records.stream()
         .map(record -> new IndexAction(record.id(), row(record, version)))
         .toList();
+  }
+
+  /** Upserts for deleted records already read, used by the index rebuild. */
+  public List<IndexAction> deletedUpserts(List<DeletedRow> rows) {
+    final String version = TechnicalDictionaryState.row().dataDictionaryVersion();
+    return rows.stream()
+        .map(deleted -> new IndexAction(deleted.id(), deletedRow(deleted, version)))
+        .toList();
+  }
+
+  /** The last Approved row of a deleted record, read-only and without a pending change. */
+  public Map<String, Object> deletedRow(DeletedRow deleted, String dataDictionaryVersion) {
+    final Map<String, Object> row =
+        row(TechnicalDeletedRecords.record(deleted), dataDictionaryVersion);
+    row.put(TechnicalIndexFields.HAS_PENDING_CHANGE, false);
+    row.remove(TechnicalIndexFields.CHANGE_REQUEST_ID);
+    row.remove(TechnicalIndexFields.CHANGE_REQUEST_STATUS);
+    row.remove(TechnicalIndexFields.CHANGE_OPERATION);
+    row.remove(TechnicalIndexFields.CHANGE_CREATED_BY);
+    row.put(TechnicalIndexFields.DELETED, true);
+    row.put(TechnicalIndexFields.DELETED_AT, deleted.deletedAt());
+    row.put(TechnicalIndexFields.DELETED_BY, deleted.deletedBy());
+    return row;
   }
 
   /** The flat row of one record in the given Data Dictionary version. */
@@ -250,12 +292,15 @@ public final class TechnicalDocumentBuilder {
     }
   }
 
-  /** Ids of every record referencing one of the CDEs, read from the database. */
+  /** Ids of every record, kept deleted ones included, referencing one of the CDEs. */
   public static Set<String> recordIdsOfCdes(Collection<UUID> cdeIds) {
-    return cdeIds.isEmpty()
-        ? Set.of()
-        : Set.copyOf(
-            dao().listIdsByCde(cdeIds.stream().map(UUID::toString).collect(Collectors.toList())));
+    final Set<String> ids = new HashSet<>();
+    if (!cdeIds.isEmpty()) {
+      final List<String> cdes = cdeIds.stream().map(UUID::toString).collect(Collectors.toList());
+      ids.addAll(dao().listIdsByCde(cdes));
+      ids.addAll(dao().listDeletedIdsByCde(cdes));
+    }
+    return Set.copyOf(ids);
   }
 
   private static TechnicalDictionaryDAO dao() {

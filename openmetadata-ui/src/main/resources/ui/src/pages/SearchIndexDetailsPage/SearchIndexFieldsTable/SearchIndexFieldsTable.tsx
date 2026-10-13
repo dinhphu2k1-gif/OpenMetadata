@@ -31,7 +31,6 @@ import CopyLinkButton from '../../../components/common/CopyLinkButton/CopyLinkBu
 import { EntityAttachmentProvider } from '../../../components/common/EntityDescription/EntityAttachmentProvider/EntityAttachmentProvider';
 import FilterTablePlaceHolder from '../../../components/common/ErrorWithPlaceholder/FilterTablePlaceHolder';
 import Table from '../../../components/common/Table/Table';
-import ToggleExpandButton from '../../../components/common/ToggleExpandButton/ToggleExpandButton';
 import { useGenericContext } from '../../../components/Customization/GenericProvider/GenericProvider';
 import { ColumnFilter } from '../../../components/Database/ColumnFilter/ColumnFilter.component';
 import TableDescription from '../../../components/Database/TableDescription/TableDescription.component';
@@ -147,14 +146,6 @@ const SearchIndexFieldsTable = ({
       TagFilterOptions[]
     >;
   }, [data]);
-
-  const toggleExpandAll = useCallback(() => {
-    if (expandedRowKeys.length < fieldAllRowKeys.length) {
-      setExpandedRowKeys(fieldAllRowKeys);
-    } else {
-      setExpandedRowKeys([]);
-    }
-  }, [expandedRowKeys, fieldAllRowKeys]);
 
   const handleEditField = useCallback(
     (field: SearchIndexField, index: number) => {
@@ -440,13 +431,6 @@ const SearchIndexFieldsTable = ({
         dataSource={filteredData}
         defaultVisibleColumns={DEFAULT_SEARCH_INDEX_VISIBLE_COLUMNS}
         expandable={expandableConfig}
-        extraTableFilters={
-          <ToggleExpandButton
-            allRowKeys={fieldAllRowKeys}
-            expandedRowKeys={expandedRowKeys}
-            toggleExpandAll={toggleExpandAll}
-          />
-        }
         locale={{
           emptyText: <FilterTablePlaceHolder />,
         }}

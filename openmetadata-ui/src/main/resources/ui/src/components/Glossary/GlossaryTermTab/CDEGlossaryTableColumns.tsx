@@ -24,15 +24,13 @@ import {
   EntityStatus,
 } from '../../../generated/entity/data/glossaryTerm';
 import { TagLabel } from '../../../generated/type/tagLabel';
+import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
 import { formatCDEDate } from '../../../utils/CDEDateUtils';
 import {
   getCDEReleaseVersionType,
   getCDEReleaseVersionTypeClassName,
 } from '../../../utils/CDEReleaseVersionTypeUtils';
-import { getBusinessVersion } from '../../../utils/BusinessVersionUtils';
-import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import { getCdeDetailPath } from '../../../utils/routing/cdeRoutingHelper';
-import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 export type CDEExtension = {
@@ -58,10 +56,10 @@ type CDEGlossaryTableColumnsProps = {
 
 import {
   getDictionaryReferenceLabel,
-  renderDictionaryReferences,
-  renderDictionaryOwnerList,
-  renderDictionaryMarkdown,
   renderDictionaryClassificationTags,
+  renderDictionaryMarkdown,
+  renderDictionaryOwnerList,
+  renderDictionaryReferences,
 } from './DictionaryCellRenderers';
 
 export const CDE_TAG_CLASSIFICATIONS = {
@@ -326,7 +324,7 @@ export const getCDEGlossaryTableColumns = ({
   {
     title: t('cde.data-quality-rules'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.DATA_QUALITY_RULE,
-    width: 210,
+    width: 150,
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
@@ -340,7 +338,7 @@ export const getCDEGlossaryTableColumns = ({
   {
     title: String(t('cde.version')),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.VERSION,
-    width: 120,
+    width: 100,
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
@@ -349,7 +347,7 @@ export const getCDEGlossaryTableColumns = ({
   {
     title: t('cde.release-version-type'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
-    width: 190,
+    width: 120,
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
@@ -375,39 +373,8 @@ export const getCDEGlossaryTableColumns = ({
       t(key === 'effectiveDate' ? 'cde.effective-date' : 'cde.expiration-date')
     ),
     key,
-    width: 160,
+    width: 130,
     render: (_: unknown, record: ModifiedGlossaryTerm) =>
       record.isLoadMoreButton ? null : formatCDEDate(record.extension?.[key]),
   })),
-  {
-    title: t('label.status'),
-    dataIndex: 'entityStatus',
-    key: 'entityStatus',
-    width: 150,
-    render: (entityStatus: EntityStatus | undefined, record) => {
-      if (record.isLoadMoreButton) {
-        return null;
-      }
-      if (record.recordType === 'deleted') {
-        return (
-          <Tag
-            color="error"
-            data-testid={`cde-deleted-${record.name}`}
-            title={record.archivedBy}>
-            {t('cde.deleted-record')}
-          </Tag>
-        );
-      }
-      const status = entityStatus ?? EntityStatus.Approved;
-
-      return (
-        <div className="d-flex flex-column gap-1">
-          <StatusBadge label={status} status={getEntityStatusClass(status)} />
-          {status === EntityStatus.Draft && (
-            <Tag color="default">Chưa thêm vào gói phát hành</Tag>
-          )}
-        </div>
-      );
-    },
-  },
 ];

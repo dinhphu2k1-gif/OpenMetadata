@@ -412,6 +412,7 @@ const TechnicalDictionaryPage = ({
                   isEmbedded && capabilities.canEdit && !snapshotVersion
                 }
                 canSeeDrafts={capabilities.canEdit || capabilities.canApprove}
+                canShowDeleted={capabilities.canEdit || capabilities.canApprove}
                 filters={records.filters}
                 options={options}
                 searchOnly={Boolean(snapshotVersion)}

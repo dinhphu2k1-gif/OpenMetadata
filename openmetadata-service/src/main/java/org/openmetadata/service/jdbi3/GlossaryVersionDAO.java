@@ -355,7 +355,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("businessVersion") String businessVersion);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = :entityType AND entityId = :entityId AND businessVersion = :businessVersion FOR UPDATE")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
   PublishedSnapshotRecord lockPublishedVersion(
@@ -408,7 +408,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("publicationSequence") long publicationSequence);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId = :entityId "
           + "ORDER BY h.publicationSequence DESC LIMIT 1")
@@ -417,7 +417,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId = :entityId "
           + "AND h.parentBusinessVersion = :parentBusinessVersion")
@@ -428,7 +428,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_published_head h JOIN glossary_business_snapshot s ON s.snapshotId = h.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId = :entityId "
           + "ORDER BY h.publicationSequence DESC LIMIT 1 FOR UPDATE")
@@ -437,7 +437,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_published_head h JOIN glossary_business_snapshot s ON s.snapshotId = h.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId = :entityId "
           + "AND h.parentBusinessVersion = :parentBusinessVersion FOR UPDATE")
@@ -448,7 +448,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId IN (<entityIds>)")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
@@ -462,7 +462,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
   }
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "WHERE h.entityType = :entityType AND h.entityId IN (<entityIds>) "
           + "AND h.parentBusinessVersion = :parentBusinessVersion")
@@ -481,7 +481,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
   }
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "JOIN glossary_term_entity t ON t.id = s.entityId "
           + "WHERE s.entityType = 'glossaryTerm' AND s.glossaryId = :glossaryId "
@@ -491,7 +491,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @BindUUID("glossaryId") UUID glossaryId);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_business_snapshot s JOIN glossary_published_head h ON h.snapshotId = s.snapshotId "
           + "JOIN glossary_term_entity t ON t.id = s.entityId "
           + "WHERE s.entityType = 'glossaryTerm' AND s.glossaryId = :glossaryId "
@@ -504,7 +504,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = 'glossaryTerm' "
           + "AND glossaryId = :glossaryId AND parentBusinessVersion = :parentBusinessVersion "
           + "AND archivedAt IS NULL ORDER BY publicationSequence, entityId")
@@ -514,7 +514,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = 'glossaryTerm' "
           + "AND glossaryId = :glossaryId AND parentBusinessVersion = :parentBusinessVersion "
           + "AND archivedAt IS NOT NULL ORDER BY publicationSequence DESC, entityId")
@@ -524,7 +524,17 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("parentBusinessVersion") String parentBusinessVersion);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
+          + "FROM glossary_business_snapshot WHERE entityType = 'glossaryTerm' "
+          + "AND glossaryId = :glossaryId AND parentBusinessVersion = :parentBusinessVersion "
+          + "AND archiveReason = 'DELETED' ORDER BY publicationSequence DESC, entityId")
+  @RegisterRowMapper(PublishedSnapshotMapper.class)
+  List<PublishedSnapshotRecord> listDeletedTermSnapshotsForGlossaryAndParent(
+      @BindUUID("glossaryId") UUID glossaryId,
+      @Bind("parentBusinessVersion") String parentBusinessVersion);
+
+  @SqlQuery(
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = :entityType AND entityId = :entityId AND businessVersion = :businessVersion")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
   PublishedSnapshotRecord findPublishedVersion(
@@ -533,24 +543,25 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @Bind("businessVersion") String businessVersion);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE snapshotId = :snapshotId")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
   PublishedSnapshotRecord findSnapshot(@BindUUID("snapshotId") UUID snapshotId);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = :entityType AND entityId = :entityId ORDER BY publicationSequence DESC")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
   List<PublishedSnapshotRecord> listPublished(
       @Bind("entityType") String entityType, @BindUUID("entityId") UUID entityId);
 
   @SqlUpdate(
-      "UPDATE glossary_business_snapshot SET archivedAt = :archivedAt, archivedBy = :archivedBy WHERE snapshotId = :snapshotId AND archivedAt IS NULL")
+      "UPDATE glossary_business_snapshot SET archivedAt = :archivedAt, archivedBy = :archivedBy, archiveReason = :archiveReason WHERE snapshotId = :snapshotId AND archivedAt IS NULL")
   int archiveSnapshot(
       @BindUUID("snapshotId") UUID snapshotId,
       @Bind("archivedAt") long archivedAt,
-      @Bind("archivedBy") String archivedBy);
+      @Bind("archivedBy") String archivedBy,
+      @Bind("archiveReason") ArchiveReason archiveReason);
 
   @SqlUpdate(
       "DELETE FROM glossary_published_head WHERE entityType = :entityType AND entityId = :entityId AND snapshotId = :snapshotId")
@@ -560,7 +571,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       @BindUUID("snapshotId") UUID snapshotId);
 
   @SqlQuery(
-      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy "
+      "SELECT snapshotId, entityType, entityId, glossaryId, parentBusinessVersion, businessVersion, nativeVersion, publicationSequence, payload, contentHash, publishedAt, publishedBy, archivedAt, archivedBy, archiveReason "
           + "FROM glossary_business_snapshot WHERE entityType = :entityType AND entityId = :entityId AND archivedAt IS NULL "
           + "ORDER BY publicationSequence DESC LIMIT 1")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
@@ -579,7 +590,7 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
   int deleteSnapshotTerms(@BindUUID("glossarySnapshotId") UUID glossarySnapshotId);
 
   @SqlQuery(
-      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy "
+      "SELECT s.snapshotId, s.entityType, s.entityId, s.glossaryId, s.parentBusinessVersion, s.businessVersion, s.nativeVersion, s.publicationSequence, s.payload, s.contentHash, s.publishedAt, s.publishedBy, s.archivedAt, s.archivedBy, s.archiveReason "
           + "FROM glossary_snapshot_term r JOIN glossary_business_snapshot s ON s.snapshotId = r.termSnapshotId "
           + "WHERE r.glossarySnapshotId = :glossarySnapshotId ORDER BY r.displayOrder, s.entityId")
   @RegisterRowMapper(PublishedSnapshotMapper.class)
@@ -667,7 +678,14 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
       long publishedAt,
       String publishedBy,
       Long archivedAt,
-      String archivedBy) {}
+      String archivedBy,
+      String archiveReason) {}
+
+  /** Why a published snapshot left the effective set; null while it is still published. */
+  enum ArchiveReason {
+    DELETED,
+    SUPERSEDED
+  }
 
   record SnapshotHistoryRecord(
       UUID historyId,
@@ -740,7 +758,8 @@ public interface GlossaryVersionDAO extends GovernedGlossarySearchDAO {
           rs.getLong("publishedAt"),
           rs.getString("publishedBy"),
           nullableLong(rs, "archivedAt"),
-          rs.getString("archivedBy"));
+          rs.getString("archivedBy"),
+          rs.getString("archiveReason"));
     }
   }
 

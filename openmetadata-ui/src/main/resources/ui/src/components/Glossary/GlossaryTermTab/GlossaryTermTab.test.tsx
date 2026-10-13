@@ -22,20 +22,19 @@ import { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MemoryRouter } from 'react-router-dom';
 import { API_RES_MAX_SIZE } from '../../../constants/constants';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { CDE_GLOSSARY_TERM_FIELDS } from '../../../constants/Glossary.contant';
 import { SearchIndex } from '../../../enums/search.enum';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
+import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import {
   mockedGlossaryTerms,
   MOCK_PERMISSIONS,
 } from '../../../mocks/Glossary.mock';
-import { findExpandableKeysForArray } from '../../../utils/GlossaryUtils';
-import GlossaryTermTab from './GlossaryTermTab.component';
 import {
   getCDEGlossaryTableColumns,
   renderCDEQualityRule,
 } from './CDEGlossaryTableColumns';
+import GlossaryTermTab from './GlossaryTermTab.component';
 import { ModifiedGlossaryTerm } from './GlossaryTermTab.interface';
 
 jest.mock('@openmetadata/ui-core-components', () => ({
@@ -78,6 +77,7 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.personal-data': 'Personal Data',
     'cde.related-regulatory-documents': 'Related Regulatory Documents',
     'cde.data-quality-rules': 'Data Quality Rules',
+    'cde.deleted-record': 'Deleted',
     'cde.notes': 'Notes',
     'label.yes': 'Yes',
     'label.no': 'No',
@@ -96,6 +96,7 @@ const cdeTranslations: Record<'en' | 'vi', Record<string, string>> = {
     'cde.personal-data': 'Dữ liệu cá nhân',
     'cde.related-regulatory-documents': 'Văn bản quy định liên quan',
     'cde.data-quality-rules': 'Quy định về chất lượng dữ liệu',
+    'cde.deleted-record': 'Đã xóa',
     'cde.notes': 'Ghi chú',
     'label.yes': 'Có',
     'label.no': 'Không',
@@ -231,6 +232,7 @@ jest.mock('../../../utils/EntityStatusUtils', () => {
       InReview: 'info',
       Rejected: 'error',
       Approved: 'success',
+      Archived: 'archived',
       Deprecated: 'warning',
     },
     getEntityStatusClass: jest.fn((status) => {
@@ -239,6 +241,7 @@ jest.mock('../../../utils/EntityStatusUtils', () => {
         InReview: 'info',
         Rejected: 'error',
         Approved: 'success',
+        Archived: 'archived',
         Deprecated: 'warning',
       };
 
@@ -787,13 +790,74 @@ describe('Test GlossaryTermTab component', () => {
         wrapper: MemoryRouter,
       });
 
-      expect(
-        await screen.findByTestId('Data Dictionary.CDE102-status')
-      ).toBeInTheDocument();
+      const archivedBadge = await screen.findByTestId(
+        'Data Dictionary.CDE102-status'
+      );
+
+      expect(archivedBadge).toHaveClass('archived');
+      expect(archivedBadge).toHaveTextContent('Archived');
       expect(
         screen.queryByTestId('CDE102-approve-btn')
       ).not.toBeInTheDocument();
       expect(screen.queryByTestId('CDE102-reject-btn')).not.toBeInTheDocument();
+    });
+
+    it('shows a deleted CDE as a failure badge instead of Archived', async () => {
+      const deletedTerm = {
+        ...cdeTerm,
+        archivedBy: 'archiver',
+        businessVersion: '1.0',
+        entityStatus: EntityStatus.Archived,
+        parentBusinessVersion: '1',
+        recordType: 'deleted',
+      };
+      Object.assign(mockUseGlossaryStore, {
+        glossaryChildTerms: [deletedTerm],
+      });
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [deletedTerm],
+        paging: { after: null },
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      const deletedBadge = await screen.findByTestId(
+        'Data Dictionary.CDE102-deleted-status'
+      );
+
+      expect(deletedBadge).toHaveClass('failure');
+      expect(deletedBadge).toHaveTextContent('Đã xóa');
+      expect(screen.queryByText('Archived')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('CDE102-approve-btn')
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId('CDE102-reject-btn')).not.toBeInTheDocument();
+    });
+
+    it('keeps Archived status for a CDE that was not deleted', async () => {
+      const archivedTerm = {
+        ...cdeTerm,
+        businessVersion: '1.0',
+        entityStatus: EntityStatus.Archived,
+        parentBusinessVersion: '1',
+      };
+      Object.assign(mockUseGlossaryStore, {
+        glossaryChildTerms: [archivedTerm],
+      });
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [archivedTerm],
+        paging: { after: null },
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      expect(
+        await screen.findByTestId('Data Dictionary.CDE102-status')
+      ).toBeInTheDocument();
     });
 
     it('should not show or submit approval actions without task permission', async () => {
@@ -1122,7 +1186,9 @@ describe('Test GlossaryTermTab component', () => {
       });
 
       await waitFor(() => {
-        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(1);
+        expect(mockGetFirstLevelGlossaryTermsPaginated).toHaveBeenCalledTimes(
+          1
+        );
       });
 
       workingGlossary = {
@@ -1359,30 +1425,7 @@ describe('Test GlossaryTermTab component', () => {
     });
   });
 
-  describe('Expand/Collapse Functionality', () => {
-    beforeEach(() => {
-      const termsWithChildren = [
-        {
-          ...mockedGlossaryTerms[0],
-          childrenCount: 2,
-          children: [],
-        },
-      ];
-      mockUseGlossaryStore.glossaryChildTerms = termsWithChildren;
-    });
-
-    it('should render expand/collapse all button', async () => {
-      render(<GlossaryTermTab isGlossary={false} />, {
-        wrapper: MemoryRouter,
-      });
-
-      await waitFor(() => {
-        expect(
-          screen.getByTestId('expand-collapse-all-button')
-        ).toBeInTheDocument();
-      });
-    });
-
+  describe('Row expansion', () => {
     it('should show expand icon for terms with children', async () => {
       render(<GlossaryTermTab isGlossary={false} />, {
         wrapper: MemoryRouter,
@@ -1825,78 +1868,6 @@ describe('Test GlossaryTermTab component', () => {
     });
   });
 
-  describe('Expand All Functionality', () => {
-    beforeEach(() => {
-      // Use the actual mock data which has proper nested structure
-      // Only reset the children arrays to test loading behavior
-      const termsWithChildren = mockedGlossaryTerms.map((term) => ({
-        ...term,
-        children: [], // Clear children to test loading
-        childrenCount: term.childrenCount || 0,
-      }));
-      mockUseGlossaryStore.glossaryChildTerms = termsWithChildren;
-
-      // Mock findExpandableKeysForArray to return keys for terms with children
-      const expandableKeys = termsWithChildren
-        .filter((term) => term.childrenCount && term.childrenCount > 0)
-        .map((term) => term.fullyQualifiedName);
-
-      (findExpandableKeysForArray as jest.Mock).mockReturnValue(expandableKeys);
-
-      // Reset mock to ensure clean state
-      mockGetGlossaryTermChildrenLazy.mockClear();
-    });
-
-    it('should expand all button exists and is clickable', async () => {
-      render(<GlossaryTermTab isGlossary={false} />, {
-        wrapper: MemoryRouter,
-      });
-
-      // Wait for initial render
-      await waitFor(() => {
-        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
-      });
-
-      const expandAllButton = screen.getByTestId('expand-collapse-all-button');
-
-      expect(expandAllButton).toBeInTheDocument();
-
-      // Button text can be either expand-all or collapse-all depending on state
-      expect(
-        expandAllButton.textContent === 'label.expand-all' ||
-          expandAllButton.textContent === 'label.collapse-all'
-      ).toBe(true);
-
-      // The button should be clickable
-      expect(expandAllButton).not.toBeDisabled();
-
-      // Simply verify the button can be clicked without errors
-      fireEvent.click(expandAllButton);
-    });
-
-    it('should have expand/collapse button with proper text', async () => {
-      render(<GlossaryTermTab isGlossary={false} />, {
-        wrapper: MemoryRouter,
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId('glossary-terms-table')).toBeInTheDocument();
-      });
-
-      const expandAllButton = screen.getByTestId('expand-collapse-all-button');
-
-      // Button should have either expand or collapse text
-      expect(
-        expandAllButton.textContent === 'label.expand-all' ||
-          expandAllButton.textContent === 'label.collapse-all'
-      ).toBe(true);
-
-      // Note: Since the actual expansion is complex and involves async operations,
-      // we're just testing that the button exists and has proper text
-      // The full integration test would require more complex setup
-    });
-  });
-
   describe('Drag and Drop Modal', () => {
     it('should show confirmation modal when terms are moved', async () => {
       const termsWithChildren = [
@@ -2200,6 +2171,10 @@ describe('Test GlossaryTermTab component', () => {
     ];
 
     beforeEach(() => {
+      (useTranslation as jest.Mock).mockReturnValue({
+        t: getCDETranslation('vi'),
+        i18n: { language: 'vi-VN', dir: jest.fn().mockReturnValue('ltr') },
+      });
       mockUseGlossaryStore.activeGlossary = {
         id: 'dq-glossary-id',
         name: 'Data Quality',
@@ -2234,6 +2209,36 @@ describe('Test GlossaryTermTab component', () => {
       expect(
         screen.getByTestId('dq-target-population-filter')
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('expand-collapse-all-button')
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows a deleted DQ rule in the shared status column only', async () => {
+      const deletedDqTerm = {
+        ...mockDqTerms[0],
+        archivedBy: 'archiver',
+        entityStatus: EntityStatus.Archived,
+        recordType: 'deleted',
+      };
+      mockUseGlossaryStore.glossaryChildTerms = [deletedDqTerm];
+      mockGetFirstLevelGlossaryTermsPaginated.mockResolvedValue({
+        data: [deletedDqTerm],
+        paging: { after: null },
+      });
+
+      render(<GlossaryTermTab isGlossary />, {
+        wrapper: MemoryRouter,
+      });
+
+      const deletedBadge = await screen.findByTestId(
+        'DataQuality.DQ01-deleted-status'
+      );
+
+      expect(deletedBadge).toHaveClass('failure');
+      expect(deletedBadge).toHaveTextContent('Đã xóa');
+      expect(screen.queryByTestId('dq-deleted-DQ01')).not.toBeInTheDocument();
+      expect(screen.queryByText('Archived')).not.toBeInTheDocument();
     });
 
     it('should show bulk action bar when row is selected on DQ table', async () => {

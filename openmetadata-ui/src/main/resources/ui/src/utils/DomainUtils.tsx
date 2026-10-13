@@ -14,14 +14,11 @@ import { Tooltip, TooltipTrigger } from '@openmetadata/ui-core-components';
 import { InfoCircle } from '@untitledui/icons';
 import { Divider, Space, Tooltip as AntDTooltip, Typography } from 'antd';
 import classNames from 'classnames';
-import { get, isEmpty, isUndefined, noop } from 'lodash';
+import { get, isEmpty, isUndefined } from 'lodash';
 import { Fragment, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ReactComponent as DomainIcon } from '../assets/svg/ic-domain.svg';
 import { ReactComponent as SubDomainIcon } from '../assets/svg/ic-subdomain.svg';
-import { ActivityFeedTab } from '../components/ActivityFeed/ActivityFeedTab/ActivityFeedTab.component';
-import { ActivityFeedLayoutType } from '../components/ActivityFeed/ActivityFeedTab/ActivityFeedTab.interface';
-import { CustomPropertyTable } from '../components/common/CustomPropertyTable/CustomPropertyTable';
 import { TreeListItem } from '../components/common/DomainSelectableTree/DomainSelectableTree.interface';
 import ResizablePanels from '../components/common/ResizablePanels/ResizablePanels';
 import TabsLabel from '../components/common/TabsLabel/TabsLabel.component';
@@ -39,7 +36,6 @@ import { DOMAIN_TYPE_DATA } from '../constants/Domain.constants';
 import { DetailPageWidgetKeys } from '../enums/CustomizeDetailPage.enum';
 import { EntityTabs, EntityType } from '../enums/entity.enum';
 import { Domain } from '../generated/entity/domains/domain';
-import { Operation } from '../generated/entity/policies/policy';
 import { EntityReference } from '../generated/entity/type';
 import { PageType } from '../generated/system/ui/page';
 import { WidgetConfig } from '../pages/CustomizablePage/CustomizablePage.interface';
@@ -56,10 +52,6 @@ import {
 import { getEntityName } from './EntityNameUtils';
 import { t } from './i18next/LocalUtil';
 import { renderIcon } from './IconUtils';
-import {
-  getPrioritizedEditPermission,
-  getPrioritizedViewPermission,
-} from './PermissionsUtils';
 import { getDomainPath } from './RouterUtils';
 
 export {
@@ -212,8 +204,6 @@ export const getDomainDetailTabs = ({
   handleAssetClick,
   handleAssetSave,
   setShowAddSubDomainModal,
-  feedCount,
-  onFeedUpdate,
   onDeleteSubDomain,
   labelMap,
 }: DomainDetailPageTabProps) => {
@@ -285,34 +275,6 @@ export const getDomainDetailTabs = ({
           {
             label: (
               <TabsLabel
-                count={feedCount?.totalCount ?? 0}
-                id={EntityTabs.ACTIVITY_FEED}
-                isActive={activeTab === EntityTabs.ACTIVITY_FEED}
-                name={get(
-                  labelMap,
-                  EntityTabs.ACTIVITY_FEED,
-                  t('label.activity-feed-and-task-plural')
-                )}
-              />
-            ),
-            key: EntityTabs.ACTIVITY_FEED,
-            children: (
-              <ActivityFeedTab
-                refetchFeed
-                entityFeedTotalCount={feedCount?.totalCount ?? 0}
-                entityType={EntityType.DOMAIN}
-                feedCount={feedCount}
-                layoutType={ActivityFeedLayoutType.THREE_PANEL}
-                owners={domain.owners}
-                urlFqn={domain.fullyQualifiedName}
-                onFeedUpdate={onFeedUpdate ?? noop}
-                onUpdateEntityDetails={noop}
-              />
-            ),
-          },
-          {
-            label: (
-              <TabsLabel
                 count={assetCount ?? 0}
                 id={EntityTabs.ASSETS}
                 isActive={activeTab === EntityTabs.ASSETS}
@@ -358,33 +320,6 @@ export const getDomainDetailTabs = ({
                   className:
                     'entity-summary-resizable-right-panel-container domain-resizable-panel-container',
                 }}
-              />
-            ),
-          },
-          {
-            label: (
-              <TabsLabel
-                id={EntityTabs.CUSTOM_PROPERTIES}
-                name={get(
-                  labelMap,
-                  EntityTabs.CUSTOM_PROPERTIES,
-                  t('label.custom-property-plural')
-                )}
-              />
-            ),
-            key: EntityTabs.CUSTOM_PROPERTIES,
-            children: (
-              <CustomPropertyTable<EntityType.DOMAIN>
-                className="p-lg"
-                entityType={EntityType.DOMAIN}
-                hasEditAccess={getPrioritizedEditPermission(
-                  domainPermission,
-                  Operation.EditCustomFields
-                )}
-                hasPermission={getPrioritizedViewPermission(
-                  domainPermission,
-                  Operation.ViewCustomFields
-                )}
               />
             ),
           },

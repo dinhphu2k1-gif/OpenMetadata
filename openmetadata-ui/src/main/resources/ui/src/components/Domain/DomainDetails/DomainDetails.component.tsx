@@ -37,7 +37,6 @@ import { AssetsOfEntity } from '../../../components/Glossary/GlossaryTerms/tabs/
 import EntityNameModal from '../../../components/Modals/EntityNameModal/EntityNameModal.component';
 import { FQN_SEPARATOR_CHAR } from '../../../constants/char.constants';
 import { ERROR_MESSAGE, ROUTES } from '../../../constants/constants';
-import { FEED_COUNT_INITIAL_DATA } from '../../../constants/entity.constants';
 import { EntityField } from '../../../constants/Feeds.constants';
 import { usePermissionProvider } from '../../../context/PermissionProvider/PermissionProvider';
 import {
@@ -64,7 +63,6 @@ import {
 import { addDomains, patchDomains } from '../../../rest/domainAPI';
 import { getActiveAnnouncement } from '../../../rest/feedsAPI';
 import { searchQuery } from '../../../rest/searchAPI';
-import { getFeedCounts } from '../../../utils/CommonUtils';
 import { createEntityWithCoverImage } from '../../../utils/CoverImageUploadUtils';
 import {
   checkIfExpandViewSupported,
@@ -104,7 +102,6 @@ import { useBreadcrumbs } from '../../common/atoms/navigation/useBreadcrumbs';
 
 import { Avatar } from '@openmetadata/ui-core-components';
 import { LEARNING_PAGE_IDS } from '../../../constants/Learning.constants';
-import { FeedCounts } from '../../../interface/feed.interface';
 import { getIsErrorMatch } from '../../../utils/APIUtils';
 import { getEntityAvatarProps } from '../../../utils/IconUtils';
 import { withActivityFeed } from '../../AppRouter/withActivityFeed';
@@ -124,6 +121,11 @@ import '../domain.less';
 import { DomainFormType } from '../DomainPage.interface';
 import { DataProductsTabRef } from '../DomainTabs/DataProductsTab/DataProductsTab.interface';
 import { DomainDetailsProps } from './DomainDetails.interface';
+
+const HIDDEN_DOMAIN_TABS = new Set<EntityTabs>([
+  EntityTabs.ACTIVITY_FEED,
+  EntityTabs.CUSTOM_PROPERTIES,
+]);
 
 const DomainDetails = ({
   domain,
@@ -173,10 +175,13 @@ const DomainDetails = ({
       (routeParams.fqn ? getDecodedFqn(routeParams.fqn) : ''),
     [domainFqnOverride, domain.fullyQualifiedName, routeParams.fqn]
   );
-  const activeTab = useMemo(
+  const requestedActiveTab = useMemo(
     () => activeTabOverride ?? routeParams.tab ?? EntityTabs.DOCUMENTATION,
     [activeTabOverride, routeParams.tab]
   ) as EntityTabs;
+  const activeTab = HIDDEN_DOMAIN_TABS.has(requestedActiveTab)
+    ? EntityTabs.DOCUMENTATION
+    : requestedActiveTab;
   const { version } = routeParams;
   const { currentUser } = useApplicationStore();
 
@@ -202,9 +207,6 @@ const DomainDetails = ({
   const [assetCount, setAssetCount] = useState<number>(0);
   const [dataProductsCount, setDataProductsCount] = useState<number>(0);
   const [subDomainsCount, setSubDomainsCount] = useState<number>(0);
-  const [feedCount, setFeedCount] = useState<FeedCounts>(
-    FEED_COUNT_INITIAL_DATA
-  );
   const [isAnnouncementDrawerOpen, setIsAnnouncementDrawerOpen] =
     useState<boolean>(false);
   const [activeAnnouncement, setActiveAnnouncement] = useState<Thread>();
@@ -327,18 +329,6 @@ const DomainDetails = ({
   const onDeleteSubDomain = () => {
     fetchSubDomainsCount();
     refreshDomains?.();
-  };
-
-  const handleFeedCount = useCallback((data: FeedCounts) => {
-    setFeedCount(data);
-  }, []);
-
-  const getEntityFeedCount = () => {
-    getFeedCounts(
-      EntityType.DOMAIN,
-      domain.fullyQualifiedName ?? '',
-      handleFeedCount
-    );
   };
 
   const {
@@ -829,15 +819,13 @@ const DomainDetails = ({
       onDeleteSubDomain: onDeleteSubDomain,
       showAddSubDomainModal: false,
       labelMap: tabLabelMap,
-      feedCount,
-      onFeedUpdate: getEntityFeedCount,
     });
 
     return getDetailsTabWithNewLabel(
       tabs,
       customizedPage?.tabs,
       EntityTabs.DOCUMENTATION
-    );
+    ).filter((tab) => !HIDDEN_DOMAIN_TABS.has(tab.key as EntityTabs));
   }, [
     domain,
     domainPermission,
@@ -849,7 +837,6 @@ const DomainDetails = ({
     subDomainsCount,
     queryFilter,
     customizedPage?.tabs,
-    feedCount,
     openAssetDrawer,
     fetchDomainAssets,
     handleTabChange,
@@ -859,9 +846,18 @@ const DomainDetails = ({
     fetchDomainPermission();
     fetchDomainAssets();
     fetchDataProducts();
-    getEntityFeedCount();
     fetchActiveAnnouncement();
   }, [domain.fullyQualifiedName]);
+
+  useEffect(() => {
+    if (HIDDEN_DOMAIN_TABS.has(requestedActiveTab)) {
+      if (onActiveTabChange) {
+        onActiveTabChange(EntityTabs.DOCUMENTATION);
+      } else if (domainFqn) {
+        navigate(getDomainDetailsPath(domainFqn, EntityTabs.DOCUMENTATION));
+      }
+    }
+  }, [domainFqn, navigate, onActiveTabChange, requestedActiveTab]);
 
   useEffect(() => {
     fetchSubDomainsCount();

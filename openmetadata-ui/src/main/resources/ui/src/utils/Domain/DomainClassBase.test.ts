@@ -83,6 +83,13 @@ describe('DomainClassBase', () => {
   });
 
   describe('getDomainDetailPageTabsIds', () => {
+    it('excludes activity feed and custom properties tabs', () => {
+      const tabIds = instance.getDomainDetailPageTabsIds().map((tab) => tab.id);
+
+      expect(tabIds).not.toContain(EntityTabs.ACTIVITY_FEED);
+      expect(tabIds).not.toContain(EntityTabs.CUSTOM_PROPERTIES);
+    });
+
     it('names the DATA_OBSERVABILITY tab Data Quality', () => {
       const dqTab = instance
         .getDomainDetailPageTabsIds()
