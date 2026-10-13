@@ -146,6 +146,13 @@ export const ActivityFeedTab = ({
     () => entityType === EntityType.USER,
     [entityType]
   );
+  const selectedActivityTab = useMemo(
+    () =>
+      isUserEntity && activeTab === ActivityFeedTabs.MENTIONS
+        ? ActivityFeedTabs.TASKS
+        : activeTab,
+    [activeTab, isUserEntity]
+  );
 
   const entityTypeTask = useMemo(
     () =>
@@ -157,15 +164,15 @@ export const ActivityFeedTab = ({
   );
 
   const isTaskActiveTab = useMemo(
-    () => activeTab === ActivityFeedTabs.TASKS,
-    [activeTab]
+    () => selectedActivityTab === ActivityFeedTabs.TASKS,
+    [selectedActivityTab]
   );
   useEffect(() => {
     setIsFullWidth(false);
   }, [isTaskActiveTab]);
   const isMentionTabSelected = useMemo(
-    () => activeTab === ActivityFeedTabs.MENTIONS,
-    [activeTab]
+    () => selectedActivityTab === ActivityFeedTabs.MENTIONS,
+    [selectedActivityTab]
   );
   useEffect(() => {
     setIsFirstLoad(true);
@@ -187,7 +194,7 @@ export const ActivityFeedTab = ({
   };
 
   const placeholderText = useMemo(() => {
-    if (activeTab === ActivityFeedTabs.ALL) {
+    if (selectedActivityTab === ActivityFeedTabs.ALL) {
       return (
         <div className="d-flex flex-col gap-4">
           <Typography.Text className="placeholder-title">
@@ -198,7 +205,7 @@ export const ActivityFeedTab = ({
           </Typography.Text>
         </div>
       );
-    } else if (activeTab === ActivityFeedTabs.MENTIONS) {
+    } else if (selectedActivityTab === ActivityFeedTabs.MENTIONS) {
       return (
         <Typography.Text className="placeholder-text">
           {t('message.no-mentions')}
@@ -216,7 +223,7 @@ export const ActivityFeedTab = ({
         </div>
       );
     }
-  }, [activeTab]);
+  }, [selectedActivityTab]);
 
   const handleFeedCount = useCallback(
     (data: FeedCounts) => {
@@ -265,16 +272,25 @@ export const ActivityFeedTab = ({
     const currentFilter =
       isAdminUser &&
       currentUser?.name === fqn &&
-      activeTab !== ActivityFeedTabs.TASKS
+      selectedActivityTab !== ActivityFeedTabs.TASKS
         ? FeedFilter.ALL
         : FeedFilter.OWNER_OR_FOLLOWS;
     const filter = isUserEntity ? currentFilter : undefined;
 
     return {
-      threadType: getThreadType(activeTab),
-      feedFilter: activeTab === 'mentions' ? FeedFilter.MENTIONS : filter,
+      threadType: getThreadType(selectedActivityTab),
+      feedFilter:
+        selectedActivityTab === ActivityFeedTabs.MENTIONS
+          ? FeedFilter.MENTIONS
+          : filter,
     };
-  }, [activeTab, isUserEntity, currentUser]);
+  }, [
+    currentUser,
+    getThreadType,
+    isAdminUser,
+    isUserEntity,
+    selectedActivityTab,
+  ]);
 
   const handleFeedFetchFromFeedList = useCallback(
     (after?: string) => {
@@ -492,7 +508,7 @@ export const ActivityFeedTab = ({
 
   const getRightPanelContent = (selectedThread: Thread) => {
     if (
-      activeTab !== ActivityFeedTabs.TASKS &&
+      selectedActivityTab !== ActivityFeedTabs.TASKS &&
       selectedThread?.type !== ThreadType.Task
     ) {
       return (
@@ -546,7 +562,7 @@ export const ActivityFeedTab = ({
   };
 
   const getRightPanelPlaceholder = useMemo(() => {
-    if (activeTab === ActivityFeedTabs.MENTIONS) {
+    if (selectedActivityTab === ActivityFeedTabs.MENTIONS) {
       return (
         <Typography.Text className="placeholder-text m-t-0">
           {t('message.no-mentions')}
@@ -564,7 +580,7 @@ export const ActivityFeedTab = ({
         </Typography.Text>
       </div>
     );
-  }, [activeTab, selectedThread]);
+  }, [selectedActivityTab, selectedThread]);
 
   return (
     <div
@@ -658,7 +674,7 @@ export const ActivityFeedTab = ({
                 icon={<FilterIcon height={16} />}
               />
             </Dropdown>
-            {TaskToggle()}
+            {!isUserEntity && TaskToggle()}
           </div>
         )}
         <ActivityFeedListV1New

@@ -16,7 +16,9 @@ import React, { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../../../generated/settings/settings';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
+import { useFqn } from '../../../hooks/useFqn';
 import { searchQuery } from '../../../rest/searchAPI';
+import { ActivityFeedTabs } from '../../ActivityFeed/ActivityFeedTab/ActivityFeedTab.interface';
 import { mockAccessData, mockUserData, mockUserRole } from './mocks/User.mocks';
 import Users from './Users.component';
 import { UserPageTabs } from './Users.interface';
@@ -108,6 +110,10 @@ jest.mock(
       .fn()
       .mockImplementation(() => <>ActivityFeedTabTest</>),
   })
+);
+jest.mock(
+  '../../NotificationBox/NotificationInbox/NotificationInbox.component',
+  () => jest.fn().mockImplementation(() => <>NotificationInboxTest</>)
 );
 jest.mock('../../../hooks/useApplicationStore', () => ({
   useApplicationStore: jest.fn(() => ({
@@ -223,6 +229,7 @@ describe('Test User Component', () => {
     const profileSection = await screen.findByTestId('profile-section-card');
 
     expect(profileSection).toBeInTheDocument();
+    expect(screen.queryByText('label.permissions')).not.toBeInTheDocument();
   });
 
   it('should trigger afterDeleteAction from UserProfileDetails', async () => {
@@ -378,5 +385,52 @@ describe('Test User Component', () => {
     expect(assetComponent).toBeInTheDocument();
 
     expect(searchQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the notification inbox for the signed-in user', async () => {
+    mockParams.tab = UserPageTabs.TASK;
+    delete mockParams.subTab;
+    (useFqn as jest.Mock).mockReturnValue({ fqn: 'test' });
+
+    await act(async () => {
+      render(<Users userData={mockUserData} {...mockProp} />, {
+        wrapper: MemoryRouter,
+      });
+    });
+
+    expect(screen.getByText('NotificationInboxTest')).toBeInTheDocument();
+    expect(screen.queryByText('ActivityFeedTabTest')).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-profile-page-task-tab')).toHaveTextContent(
+      'label.notification-plural'
+    );
+  });
+
+  it('shows only the activity feed for another user', async () => {
+    mockParams.tab = UserPageTabs.TASK;
+    delete mockParams.subTab;
+    (useFqn as jest.Mock).mockReturnValue({ fqn: 'another-user' });
+
+    await act(async () => {
+      render(<Users userData={mockUserData} {...mockProp} />, {
+        wrapper: MemoryRouter,
+      });
+    });
+
+    expect(screen.getByText('ActivityFeedTabTest')).toBeInTheDocument();
+    expect(screen.queryByText('NotificationInboxTest')).not.toBeInTheDocument();
+  });
+
+  it('opens the notification inbox for a legacy mentions subtab', async () => {
+    mockParams.tab = UserPageTabs.ACTIVITY;
+    mockParams.subTab = ActivityFeedTabs.MENTIONS;
+    (useFqn as jest.Mock).mockReturnValue({ fqn: 'test' });
+
+    await act(async () => {
+      render(<Users userData={mockUserData} {...mockProp} />, {
+        wrapper: MemoryRouter,
+      });
+    });
+
+    expect(screen.getByText('NotificationInboxTest')).toBeInTheDocument();
   });
 });

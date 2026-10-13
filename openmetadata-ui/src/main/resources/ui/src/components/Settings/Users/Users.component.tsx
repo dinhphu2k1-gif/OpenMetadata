@@ -48,13 +48,13 @@ import {
   AssetNoDataPlaceholderProps,
   AssetsOfEntity,
 } from '../../Glossary/GlossaryTerms/tabs/AssetsTabs.interface';
+import NotificationInbox from '../../NotificationBox/NotificationInbox/NotificationInbox.component';
 import ProfileSectionUserDetailsCard from '../../ProfileCard/ProfileSectionUserDetailsCard.component';
 import { useApplicationsProvider } from '../Applications/ApplicationsProvider/ApplicationsProvider';
 import AccessTokenCard from './AccessTokenCard/AccessTokenCard.component';
 import UserProfilePersonas from './UserProfilePersona/UserProfilePersona.component';
 import { Props, UserPageTabs } from './Users.interface';
 import './users.less';
-import UserPermissions from './UsersProfile/UserPermissions/UserPermissions.component';
 import UserProfileRoles from './UsersProfile/UserProfileRoles/UserProfileRoles.component';
 import UserProfileTeams from './UsersProfile/UserProfileTeams/UserProfileTeams.component';
 
@@ -112,17 +112,7 @@ const Users = ({
     []
   );
 
-  const handleTabRedirection = useCallback(() => {
-    if (!isLoggedInUser && activeTab === UserPageTabs.ACCESS_TOKEN) {
-      navigate({
-        pathname: getUserPath(decodedUsername, UserPageTabs.ACTIVITY),
-        search: location.search,
-      });
-    }
-  }, [activeTab, decodedUsername, isLoggedInUser]);
-
   useEffect(() => {
-    handleTabRedirection();
     initLimits();
   }, []);
 
@@ -200,14 +190,17 @@ const Users = ({
       {
         label: (
           <TabsLabel
-            data-testid="user-profile-page-task-tab"
-            id={UserPageTabs.TASK}
+            id="user-profile-page-task-tab"
             isActive={currentTab === UserPageTabs.TASK}
-            name={t('label.task-plural')}
+            name={t('label.notification-plural')}
           />
         ),
         key: UserPageTabs.TASK,
-        children: (
+        children: isLoggedInUser ? (
+          <div className="user-layout-scroll">
+            <NotificationInbox />
+          </div>
+        ) : (
           <ActivityFeedProvider user={userData.id}>
             <ActivityFeedTab
               entityType={EntityType.USER}
@@ -251,22 +244,6 @@ const Users = ({
             message: t('server.no-records-found'),
           },
         }),
-      },
-      {
-        label: (
-          <TabsLabel
-            id={UserPageTabs.PERMISSIONS}
-            isActive={activeTab === UserPageTabs.PERMISSIONS}
-            name={t('label.permissions')}
-          />
-        ),
-        key: UserPageTabs.PERMISSIONS,
-        children: (
-          <UserPermissions
-            isLoggedInUser={isLoggedInUser}
-            username={userData.name}
-          />
-        ),
       },
       ...(isLoggedInUser
         ? [
@@ -355,6 +332,16 @@ const Users = ({
     children: JSX.Element;
     disabled?: boolean;
   }> = useMemo(() => [...tabs, ...pluginTabs], [tabs, pluginTabs]);
+
+  useEffect(() => {
+    if (!allTabs.some((tab) => tab.key === currentTab)) {
+      navigate({
+        pathname: getUserPath(decodedUsername, UserPageTabs.ACTIVITY),
+        search: location.search,
+      });
+      setCurrentTab(UserPageTabs.ACTIVITY);
+    }
+  }, [allTabs, currentTab, decodedUsername, location.search, navigate]);
 
   const handleRestoreUser = useCallback(async () => {
     try {
