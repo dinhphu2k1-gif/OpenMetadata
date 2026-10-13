@@ -6,7 +6,7 @@
 
 ## Hiện trạng triển khai (cập nhật 2026-10-08)
 
-> Đối chiếu mã nguồn tại commit `b9a2421e757`. Các mục còn lại là thiết kế đích; khác biệt ghi ở bảng dưới. Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
+> Đối chiếu mã nguồn tại commit `9254e583845` (2026-10-13). Các mục còn lại là thiết kế đích; khác biệt ghi ở bảng dưới. Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
 
 | Hạng mục | Hiện trạng |
 | --- | --- |
@@ -521,7 +521,7 @@ Vì yêu cầu là kế thừa mô hình CDE, target không cho client tự sử
 
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
-│ Chất lượng dữ liệu  [v1] [Approved]      [Xuất] [⋯] [Thêm thuật ngữ]│
+│ Chất lượng dữ liệu  [v1] [Approved]   [🕘] │ [Thêm quy tắc] [⋯]       │
 ├───────────────────┬────────────────────────────────────────────────┤
 │ Danh mục          │ [Tìm kiếm........] [Trạng thái] [Tiêu chí] ...│
 │                   ├────────────────────────────────────────────────┤
@@ -532,6 +532,7 @@ Vì yêu cầu là kế thừa mô hình CDE, target không cho client tự sử
 └───────────────────┴────────────────────────────────────────────────┘
 ```
 
+- Cụm nút dùng `WorkflowActionBar` như CDE ([Kiến trúc §5.2](./agribank-metadata-architecture.md)): icon Lịch sử sửa đổi (drawer so sánh trước/sau), nút phụ, nút chính, menu `⋯`. Menu cấp catalog: **Nhập Excel**, **Đổi tên** (Xuất chưa có, `GAP-DQ-01`); menu của Rule: **Đổi tên hiển thị**, **Xóa** (xóa bản nháp hoặc đề nghị xóa tùy trạng thái).
 - Giữ cùng spacing, typography, toolbar, table density, sticky header, resizable columns và column preferences của CDE.
 - Profile direct-child hiển thị flat list; không có expand/collapse tree. Nút expand/collapse hiện tại của DQ phải bỏ.
 - Bảng hiển thị đủ 19 trường nghiệp vụ theo đúng thứ tự đã chốt; mặc định cố định `Mã quy tắc`, `Tên quy tắc`, `Mã CDE`, `Trạng thái`. Checkbox và `Thao tác` là cột tiện ích ngoài schema.

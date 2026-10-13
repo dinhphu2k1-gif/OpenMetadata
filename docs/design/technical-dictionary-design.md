@@ -456,13 +456,14 @@ Quản trị / Từ điển kỹ thuật
 - **Xem bản chụp** (chọn phiên bản đã lưu trữ, hoặc nút **Xem bản chụp v{N-1}** ở banner): danh sách đọc
   `GET /technical/snapshots/{v}/records` — chỉ đọc, chỉ có ô tìm kiếm, không checkbox, không **Thêm cột**, hàng mở trang chi tiết của bản chụp.
 - Nút **Thêm cột** (`canEdit`, có DD đang gắn, không ở chế độ bản chụp) nằm ở header (trang độc lập) hoặc thanh công cụ (bản nhúng).
-- Menu `⋯`: **Xuất Excel** (`canExport`), **Nhập gán CDE** (`canImport`), **Bản chụp các phiên bản trước** (§12.3), **Dựng lại index** (Admin).
-  Hai mục đầu chỉ có khi đã có DD đang gắn. Menu dùng đúng kiểu menu quản lý của OpenMetadata (như header glossary): mỗi mục có icon,
+- Cụm nút dùng `WorkflowActionBar` chung với CDE/DQ: nút **Thêm cột**, menu `⋯`. Trang chi tiết bản ghi (§11.3) có thêm icon **Lịch sử sửa đổi** (drawer so sánh trước/sau theo trường).
+- Menu `⋯`: **Xuất Excel** (`canExport`), **Nhập Excel** (gán CDE, `canImport`), **Dựng lại index** (Admin). Hai mục đầu chỉ có khi đã có DD đang gắn.
+  Mục **Bản chụp các phiên bản trước** đã bỏ; xem bản chụp qua bộ chọn phiên bản hoặc banner (§12.3). Menu dùng đúng kiểu menu quản lý của OpenMetadata (như header glossary): mỗi mục có icon,
   tên và một dòng mô tả (`ManageButtonItemLabel`), rộng 350px, đóng lại sau khi chọn.
 - Banner sau lần làm mới, hiển thị tới khi người dùng đóng hoặc sau 30 ngày: **“Từ điển kỹ thuật đã được làm
   mới ngày {resetAt} khi Từ điển dữ liệu dùng chung v{N} được phê duyệt.”** kèm hai nút **Xem bản chụp v{N-1}** và **Tải bản chụp v{N-1}**
   (để nhập lại các cột đã duyệt và gán CDE).
-- Trạng thái trống: **“Chưa có cột nào được khai báo”**; hành động nằm ở nút **Thêm cột** và mục **Nhập gán CDE** trong menu `⋯`.
+- Trạng thái trống: **“Chưa có cột nào được khai báo”**; hành động nằm ở nút **Thêm cột** và mục **Nhập Excel** trong menu `⋯`.
 
 ### 11.2. Bảng
 
@@ -641,8 +642,8 @@ cùng bố cục với trang nhập CDE của Từ điển dữ liệu dùng chu
 
 ### 12.3. Bản chụp các phiên bản trước
 
-- Menu `⋯` → **Bản chụp các phiên bản trước**: danh sách DD đã lưu trữ có bản chụp, gồm phiên bản, `frozenAt`,
-  số cột đã gán CDE, nút **Tải Excel**.
+- Không còn mục menu riêng. Chọn phiên bản đã lưu trữ ở bộ chọn phiên bản (§11.1) để xem bản chụp; tải Excel bản chụp qua nút
+  **Tải bản chụp v{N-1}** ở banner.
 - File bản chụp cùng cột với Export (Mã/Tên CDE lấy từ lúc chụp), tên `TuDienKyThuat_Agribank_TDDLv{K}_banchup_YYYYMMDD.xlsx`.
   Import tạo record mới ở Draft; dòng cập nhật record Approved tạo/cập nhật change request Draft, không đổi
   dữ liệu đang có hiệu lực và không tự submit/approve. Mã CDE được resolve lại trong DD đang hiệu lực.

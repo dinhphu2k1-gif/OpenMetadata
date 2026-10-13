@@ -1,6 +1,6 @@
 # Thiết kế luồng Từ điển dữ liệu dùng chung (CDE Glossary) và Thành tố dữ liệu dùng chung (CDE) theo Version, Workflow và Role
 
-> Cập nhật 2026-10-08 theo mã nguồn hiện tại (commit `b9a2421e757`): vai trò `DataProposer`/`DataSteward`/`DataConsumer`/`BasicConsumer`, đề nghị xóa CDE đã phê duyệt (§5.7), rút lại yêu cầu (§5.8), tab **Yêu cầu** (§6.4). Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
+> Cập nhật 2026-10-13 theo mã nguồn hiện tại (commit `9254e583845`): cụm nút `WorkflowActionBar` và lịch sử sửa đổi dạng drawer (§6.2, §7.1), thông báo luồng duyệt ([Kiến trúc §5.3](./agribank-metadata-architecture.md)); vai trò `DataProposer`/`DataSteward`/`DataConsumer`/`BasicConsumer`, đề nghị xóa CDE đã phê duyệt (§5.7), rút lại yêu cầu (§5.8), tab **Yêu cầu** (§6.4). Kiến trúc tổng thể: [Kiến trúc hiện tại hệ thống](./agribank-metadata-architecture.md).
 >
 > Baseline kiến trúc: [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md). Mọi list/detail/workflow của Glossary và GlossaryTerm coi database là nguồn sự thật; search engine chỉ phục vụ global discovery và truy vấn tài sản liên quan, không làm nguồn trạng thái cho bảng CDE.
 
@@ -290,17 +290,17 @@ Toàn bộ thông tin chi tiết về phiên bản, trạng thái, mô tả và 
    - `[ Archived ]`: Màu xám - Bản cũ đã đóng băng, chỉ đọc.
 4. **Cụm nút thao tác (Action Buttons phân cấp theo Action Hierarchy):**
 
-Bố cục góc phải Header: `[ Bộ chọn Version ]  [ Nút trực diện ]  [ Menu ba chấm (...) ]`
+Bố cục góc phải Header (`WorkflowActionBar`): `[ Bộ chọn Version ]  [ Lịch sử sửa đổi ] │ [ Nút phụ ] [ Nút chính ]  [ Menu ba chấm (...) ]`. Menu `...` cấp glossary gồm **Xuất Excel**, **Nhập Excel** (theo capability) và **Đổi tên**; bảng dưới ghi các mục theo trạng thái.
 
 Bên dưới Header, trang Data Dictionary có hai tab: **Thành tố dữ liệu** (bảng CDE, §6.3) và **Yêu cầu** kèm số yêu cầu đang chờ (§6.4). Tab Yêu cầu ẩn với Consumer-only.
 
 | Trạng thái Glossary đang xem | Nút hiển thị trực diện trên Header (Role Quản trị) | Tùy chọn trong Menu ba chấm `...` | Role Khai thác (Consumer) |
 | :--- | :--- | :--- | :--- |
-| **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` theo capability | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Chờ duyệt` (`DataProposer` - Read-only) | • `Xuất dữ liệu (Export)` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Draft** | • `Lưu nháp` <br>• `Gửi duyệt` | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận)<br>• `Xuất Excel`<br>• `Nhập Excel` theo capability | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Chờ duyệt` (`DataProposer` - Read-only) | • `Xuất Excel` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Approved (Đang hoạt động)** | • `Tạo phiên bản mới`<br>• thao tác CDE theo capability | • `Xuất dữ liệu (Export)`<br>• `Nhập dữ liệu (Import)` | Chỉ đọc; thấy live Approved CDE cùng scope. |
-| **Archived** | Không có nút mutation. | • `Xuất dữ liệu (Export)` | Được chọn/xem lại, chỉ đọc và được Export; không có mutation hoặc Import. |
+| **Approved (Đang hoạt động)** | • `Tạo phiên bản mới`<br>• thao tác CDE theo capability | • `Xuất Excel`<br>• `Nhập Excel` | Chỉ đọc; thấy live Approved CDE cùng scope. |
+| **Archived** | Không có nút mutation. | • `Xuất Excel` | Được chọn/xem lại, chỉ đọc và được Export; không có mutation hoặc Import. |
 
 ---
 
@@ -402,14 +402,17 @@ Màn hình chi tiết CDE trong phân hệ Từ điển dữ liệu dùng chung 
   - `[ Archived ]`: Version thuộc Data Dictionary predecessor đã đóng; chỉ đọc và chỉ xuất hiện trong lịch sử/audit theo quyền.
 - **Cụm nút thao tác (Action Buttons phân cấp theo Action Hierarchy):**
 
-Bố cục góc phải Header CDE: `[ Bộ chọn Version CDE ]  [ Nút trực diện ]  [ Menu ba chấm (...) ]`
+Bố cục góc phải Header CDE (`WorkflowActionBar`): `[ Bộ chọn Version CDE ]  [ Lịch sử sửa đổi ] │ [ Nút phụ ] [ Nút chính ]  [ Menu ba chấm (...) ]`
+
+- Icon **Lịch sử sửa đổi** mở drawer bên phải: danh sách lần sửa bản Approved, mỗi mục so sánh giá trị trước/sau theo trường.
+- Menu `...` chỉ có **Đổi tên hiển thị** và **Xóa** (chữ đỏ). **Xóa** là xóa bản nháp khi CDE chưa từng phê duyệt, là đề nghị xóa (§5.7) khi đang xem bản Approved. Trang chi tiết CDE không có phiên bản kỹ thuật, Xuất, Nhập, Kiểu dáng, Đổi cha, Thêm.
 
 | Trạng thái CDE đang xem | Nút hiển thị trực diện trên Header (Role Quản trị) | Tùy chọn trong Menu ba chấm `...` | Role Khai thác (Consumer) |
 | :--- | :--- | :--- | :--- |
-| **Draft** | • `Lưu nháp` (Secondary)<br>• `Gửi duyệt` (Primary) | • `Xóa bản nháp` (Chữ đỏ, có modal xác nhận) | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Draft** | • `Lưu nháp` (Secondary)<br>• `Gửi duyệt` (Primary) | • `Xóa` (Chữ đỏ, có modal xác nhận) | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Rút lại yêu cầu` (chỉ người gửi)<br>• `Chờ duyệt` (`DataProposer` khác - Read-only) | *(Không có)* | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` / `Hủy đề nghị xóa` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Approved** | • `Tạo phiên bản mới` (Primary)<br>• `Sửa phiên bản` | • `Lịch sử sửa đổi`<br>• `Đề nghị xóa` (Chữ đỏ, §5.7) |
+| **Approved** | • `Tạo phiên bản mới` (Primary)<br>• `Sửa phiên bản` | • `Xóa` (Chữ đỏ, tạo đề nghị xóa §5.7) | Chỉ đọc bản Approved; không có nút. |
 | **Đề nghị xóa (In Review)** | • `Phê duyệt` / `Từ chối` (`DataSteward`)<br>• `Rút lại yêu cầu` (người gửi) | *(Không có)* | Không truy cập bản đề nghị; tiếp tục thấy bản Approved tới khi đề nghị được duyệt. |
 
 #### 2. Khu vực thông tin nghiệp vụ và Custom Properties của CDE (Overview Panel):

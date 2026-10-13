@@ -1,6 +1,6 @@
 # Kiến trúc hiện tại hệ thống Agribank Metadata
 
-> Đối chiếu mã nguồn tại commit `d793acfbb63` (2026-10-08). Vận hành index: [van-hanh-search-index.md](../../../docs/van-hanh-search-index.md). Đây là nguồn tham chiếu kiến trúc cho các tài liệu thiết kế phân hệ; nền upstream xem [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md), contract API xem [Đặc tả API governed](../api/openmetadata-governed-api-specification.md).
+> Đối chiếu mã nguồn tại commit `9254e583845` (2026-10-13). Đây là nguồn tham chiếu kiến trúc cho các tài liệu thiết kế phân hệ; nền upstream xem [Kiến trúc tham chiếu OpenMetadata 1.13.3](./openmetadata-1.13.3-upstream-architecture-reference.md), contract API xem [Đặc tả API governed](../api/openmetadata-governed-api-specification.md).
 
 ## 1. Triển khai và người dùng
 
@@ -83,7 +83,7 @@ Approve DD `N+1` trong một transaction:
 - **Glossary** (`glossary/search`): `GovernedGlossaryOutbox` ghi `governed_glossary_search_outbox` cùng transaction với thay đổi working/snapshot, flush tối đa 5 giây ngay sau commit; `GovernedGlossaryDocumentBuilder`, `GovernedGlossarySearchQueryBuilder`, `GovernedGlossarySearchService`, `GovernedGlossaryReconciler` (so số dòng và tổng revision theo từng phiên bản đang dùng, bỏ phiên bản archived), `GovernedGlossaryIndexRebuilder` (`POST /glossaryTerms/index/rebuild`, Admin). `GovernedGlossarySearchBootstrap` tự tạo/rebuild khi mapping đổi.
 - **Quyền xem** không phụ thuộc từng term: kiểm tra một lần mỗi request, sau đó lọc theo trạng thái trong truy vấn (Consumer chỉ thấy bản Approved); không lưu thông tin phân quyền trong index.
 - **Tìm kiếm** không phân biệt dấu và hoa thường (gồm `đ`→`d`). DD/CDE và DQ tìm chuỗi con trong **mã, tên và mô tả** (`nameSearch`, `displayNameSearch`, `descriptionSearch`, cùng ngữ nghĩa với đường dự phòng DB). TD dùng ngram 3–10 ký tự.
-- **UI** dùng bộ thành phần chung `common/GovernanceList` (`GovernanceListSearchInput`, `GovernanceListFilterDropdown`, `GovernanceListTable`, `GovernanceListToolbar`) cho cả ba danh sách; `ApprovedRecordHistoryModal` thay modal lịch sử sửa riêng của CDE.
+- **UI** dùng bộ thành phần chung `common/GovernanceList` (`GovernanceListSearchInput`, `GovernanceListFilterDropdown`, `GovernanceListTable`, `GovernanceListToolbar`) cho cả ba danh sách; lịch sử sửa đổi và cụm nút thao tác xem §5.2.
 
 | Kênh outbox | Nguồn | Consumer | Worker |
 | --- | --- | --- | --- |
@@ -92,13 +92,34 @@ Approve DD `N+1` trong một transaction:
 | `technical_outbox` | Ghi `technical_record`, reset khi cutover | `INDEX` (`technical_dictionary_search_index`), `PROJECTION` (tag trên Column), `RESET` | Xử lý ngay sau commit; lỗi được worker và lần đọc kế tiếp retry |
 | `dq_test_outbox` | Approve/xóa/cutover DQ Rule, thay đổi TD | `DqTestReconciler` sinh/gỡ TestCase, suite, pipeline; `SYNC_INGESTION_PIPELINE`, `TRIGGER_INGESTION_PIPELINE` | OM server, 60 giây; Portal không drain |
 
-Trước mỗi lần đọc danh sách server đồng bộ thêm các mục outbox đang chờ nếu không có luồng nào khác đang chạy. Metric cảnh báo và quy trình rebuild: [van-hanh-search-index.md](../../../docs/van-hanh-search-index.md).
+Trước mỗi lần đọc danh sách server đồng bộ thêm các mục outbox đang chờ nếu không có luồng nào khác đang chạy. Metric cảnh báo `om_governance_search_*`; rebuild bằng `POST /glossaryTerms/index/rebuild` (glossary) hoặc mục **Dựng lại index** của Từ điển kỹ thuật (Admin).
 
 Sửa phiên bản (`GlossaryVersionCorrection`) ghi lịch sử thay đổi theo từng trường (`GlossaryCorrectionChanges`); tạo DQ Rule trả `409` chỉ khi vi phạm khóa duy nhất thật sự (`isDuplicateKeyViolation`), các lỗi SQL khác được ném lại.
 
 ## 5.1. Tab theo phân hệ
 
 Term DQ ẩn tab **Tài sản** (cùng nhóm tab bị hạn chế của CDE): DQ Rule không gắn trực tiếp vào asset, quan hệ với dữ liệu thực đi qua kiểm thử (tab Kiểm thử).
+
+Trang **Miền** (Domain) có tab **Chất lượng dữ liệu** tổng hợp kết quả DQ Rule thuộc miền: Rule thuộc miền khi bản đã publish của Rule hoặc của CDE liên kết gắn với miền đó hay miền con (`DqDomainScope`, cache 15 giây). API `GET /glossaryTerms/dataQuality/domains/{id}/results` và `.../trend`; UI dùng chung `DQScopeTestResults` với tab Chất lượng dữ liệu của CDE ([Kiểm thử theo DQ Rule §9.3](./dq-rule-test-execution-design.md)).
+
+## 5.2. Thành phần UI dùng chung
+
+- **`WorkflowActionBar`**: cụm nút ở header của glossary CDE/DQ, term CDE/DQ, danh sách và chi tiết Từ điển kỹ thuật. Thứ tự: icon **Lịch sử sửa đổi** (khi có) │ một vạch ngăn │ các nút phụ │ nút chính │ menu `⋯`. Nút chính/phụ lấy từ capability (Gửi duyệt, Phê duyệt, Từ chối, Rút lại yêu cầu, Tạo phiên bản mới, Sửa phiên bản, Chỉnh sửa lại, Hủy đề nghị xóa, Thêm thuật ngữ/quy tắc).
+- Menu `⋯` của term CDE/DQ chỉ còn **Đổi tên hiển thị** và **Xóa** (chữ đỏ). **Xóa** gộp hai hành vi: xóa bản nháp với working chưa từng phê duyệt, đề nghị xóa với bản Approved. Trang chi tiết term không còn phiên bản kỹ thuật, Xuất, Nhập, Kiểu dáng, Đổi cha, Thêm. Menu cấp glossary giữ **Xuất Excel**, **Nhập Excel**, **Đổi tên**. Menu Từ điển kỹ thuật: **Xuất Excel**, **Nhập Excel** (gán CDE), **Dựng lại index** (Admin); bỏ mục **Bản chụp các phiên bản trước** (xem bản chụp qua bộ chọn phiên bản).
+- **Lịch sử sửa đổi** (`ApprovedRecordHistoryModal`, dùng chung CDE, DQ, TD): drawer bên phải liệt kê các lần sửa bản Approved, mỗi mục so sánh giá trị trước/sau theo trường (`ApprovedRecordHistoryUtils`).
+
+## 5.3. Thông báo luồng duyệt
+
+Không đổi schema: dùng Task và thông báo của Activity Feed upstream, dữ liệu có cấu trúc đặt trong `feedInfo.entitySpecificInfo.entity.governedReview` (`GovernedNoticePayload`).
+
+- **Gửi duyệt** (đơn lẻ hoặc hàng loạt, cả ba phân hệ): mỗi từ điển có **một** Task mở, giao cho mọi `DataSteward` trừ người gửi (`DataStewardDirectory`, `GovernedReviewTasks`). Task tự cập nhật số yêu cầu chờ và tự đóng khi hàng đợi hết (`ReviewQueue`).
+- **Kết quả duyệt**: người gửi nhận thông báo khi yêu cầu được duyệt hoặc bị từ chối (không kèm lý do); duyệt hàng loạt gửi một thông báo tổng hợp cho mỗi người (`GovernedDecisionNotices`, `DecisionSummary`).
+- **API** `GET /v1/feed/notifications`: Task và lượt nhắc đến của người dùng hiện tại, phân trang, kèm tổng số và số chưa đọc (MySQL và PostgreSQL).
+- **UI**: chuông trên NavBar gộp Nhiệm vụ và Nhắc đến thành một danh sách, một chấm đỏ, mục chưa đọc tô nền. `NotificationInbox` (bộ lọc Tất cả / Chờ duyệt / Kết quả duyệt) dùng chung cho trang `/notifications` và tab **Thông báo** ở hồ sơ của chính mình; hồ sơ người khác chỉ hiện nhiệm vụ. Hồ sơ bỏ tab **Quyền**; link cũ `subTab=mentions` mở tab Thông báo.
+
+## 5.4. Hiệu năng tải trang
+
+`PermissionProvider` dedupe và cache quyền, prefetch `/permissions` song song với `loggedInUser`; `ApplicationsProvider` không chặn render. Trang Glossary tải song song chi tiết term CDE, không chờ danh sách glossary; `GlossaryResource /permissions` không tính capability hai lần.
 
 ## 6. Tài liệu phân hệ
 
@@ -108,5 +129,4 @@ Term DQ ẩn tab **Tài sản** (cùng nhóm tab bị hạn chế của CDE): DQ
 | DQ | [dq-glossary-ui-design.md](./dq-glossary-ui-design.md) | [dq-glossary-feature-implementation-plan.md](./dq-glossary-feature-implementation-plan.md) |
 | Kiểm thử theo DQ Rule | [dq-rule-test-execution-design.md](./dq-rule-test-execution-design.md) | [dq-rule-test-execution-implementation-plan.md](./dq-rule-test-execution-implementation-plan.md) |
 | Từ điển kỹ thuật | [technical-dictionary-design.md](./technical-dictionary-design.md) | [technical-dictionary-search-index-implementation-plan.md](./technical-dictionary-search-index-implementation-plan.md) |
-| Search index (vận hành) | [van-hanh-search-index.md](../../../docs/van-hanh-search-index.md) | [ke-hoach-dong-nhat-doc-du-lieu.md](../../../docs/ke-hoach-dong-nhat-doc-du-lieu.md) |
 | Triển khai Portal/OM | [public-admin-split-deployment-architecture.md](./public-admin-split-deployment-architecture.md) | — |

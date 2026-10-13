@@ -473,6 +473,7 @@ Mọi endpoint nằm dưới `/v1/glossaryTerms/dataQuality` (cùng kiểu với
 | Trạng thái kết quả của mọi Rule hiệu lực (cho bộ lọc danh sách; cache 30 giây) | `GET /rules/status` |
 | Kết quả CDE (tổng hợp, theo tiêu chí, Rule, testcase) | `GET /cdes/{cdeId}/results` |
 | Xu hướng CDE | `GET /cdes/{cdeId}/trend?days=30` |
+| Kết quả và xu hướng theo Miền (§9.5) | `GET /domains/{domainId}/results`, `GET /domains/{domainId}/trend?days=30` |
 | Rule nào quản lý một testcase (cho trang testcase gốc) | `GET /testCases/{testCaseId}/managedBy` |
 | Reconcile toàn bộ (Admin) | `POST /reconcile` |
 | Tình trạng reconcile (Admin) | `GET /reconcile/status` (outbox lag, số pipeline, binding `ERROR`) |
@@ -607,6 +608,14 @@ Cũng thay nội dung tab `data_observability` của CDE, nhãn **Chất lượn
    Tỷ lệ đạt, Vi phạm, Thời điểm, Chi tiết, Mở testcase. Dòng không áp dụng hoặc lỗi đồng bộ hiện nhãn tiếng Việt.
 
 Tab **Quy tắc chất lượng dữ liệu** hiện có của CDE (CDE §7.1 mục 3) được gộp vào bảng Quy tắc ở trên.
+
+Màn hình này là component dùng chung `DQScopeTestResults` (một thanh cuộn duy nhất), cũng dùng cho tab **Chất lượng dữ liệu** của **Miền** (§9.5). Tiêu chí trống hiện **Chưa phân loại**; Rule chưa khai báo kiểm thử tách nhóm **Chưa khai báo kiểm thử**; tỷ lệ hiện `--` khi chưa có kết quả; có trạng thái trống `DQResultsEmptyState`.
+
+### 9.5. Miền — tab Chất lượng dữ liệu
+
+Trang Domain có tab **Chất lượng dữ liệu** (kèm badge số Rule), cùng bố cục §9.3. Rule thuộc miền khi bản đã publish của Rule
+hoặc của CDE liên kết gắn với miền đó hay miền con (`DqDomainScope`, cache 15 giây). REST: `GET /domains/{domainId}/results`,
+`GET /domains/{domainId}/trend?days=30` (cùng tiền tố `/glossaryTerms/dataQuality`). Consumer chỉ thấy Rule Approved.
 
 ### 9.4. Danh sách DQ
 
