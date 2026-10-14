@@ -345,7 +345,7 @@ proposal đã đổi sau preview. Cutover DD ghi
 `RESET_CHANGE`, xóa proposal trước khi xóa record để không để lại dữ liệu mồ côi.
 
 Trên giao diện (§11.3): **Sửa phiên bản** tạo đề xuất `UPDATE` ở `Draft` sao chép giá trị đã duyệt rồi mở `view=working` để sửa từng trường;
-**Đề nghị xóa** gọi `POST /records/{id}/deletion-request`: tạo đề xuất `DELETE` và gửi duyệt (`InReview`) trong cùng transaction, không có bước Draft; bản ghi Approved và tag trên Column giữ hiệu lực tới khi duyệt. Phê duyệt xóa bản ghi, gỡ tag CDE/phân loại được quản lý trên Column và có thể kích hoạt reconcile kiểm thử DQ; audit vẫn giữ. **Hủy bản nháp thay đổi** gọi `DELETE /change-request`. Danh sách hiển thị bản đã duyệt và bản đề xuất thành hai dòng (§5.3, §11.2).
+**Xóa** bản ghi Approved (modal yêu cầu gõ `DELETE`, giống Từ điển dữ liệu và Chất lượng dữ liệu) gọi `POST /records/{id}/deletion-request`: tạo đề xuất `DELETE` và gửi duyệt (`InReview`) trong cùng transaction, không có bước Draft; bản ghi Approved và tag trên Column giữ hiệu lực tới khi duyệt. Đề xuất `DELETE` không phải bản nháp: chỉ xuất hiện ở tab **Yêu cầu**; sau khi gửi UI ở lại trang bản Approved, bộ chọn phiên bản không có mục cho nó, `view=working` trỏ tới nó mở bản Approved và nút Phê duyệt/Từ chối chỉ có ở tab Yêu cầu. Phê duyệt xóa bản ghi, gỡ tag CDE/phân loại được quản lý trên Column và có thể kích hoạt reconcile kiểm thử DQ; audit vẫn giữ. **Từ chối** kết thúc đề xuất `DELETE` (xóa change request, audit `REJECT_CHANGE` vẫn ghi), bản Approved giữ nguyên; đề xuất `UPDATE` bị từ chối vẫn giữ để sửa lại. **Hủy bản nháp thay đổi** gọi `DELETE /change-request`. Danh sách hiển thị bản đã duyệt và bản đề xuất thành hai dòng (§5.3, §11.2).
 
 ### 7.5. Rút lại yêu cầu
 
@@ -511,7 +511,7 @@ Thay cho modal xem/sửa/duyệt trước đây. Bố cục giống trang chi ti
 | `Draft`, `canEdit` | **Gửi phê duyệt** |
 | `In Review`, `canApprove`, khác người tạo | **Từ chối** (viền đỏ), **Phê duyệt** — mở hộp xác nhận §11.6 với một bản ghi |
 | `Approved`, chưa có đề xuất, `canEdit` | **Sửa phiên bản** (tạo đề xuất `UPDATE` ở `Draft`, chuyển sang `view=working`) |
-| Menu `⋯` | `Draft`/`Rejected`: **Xóa khai báo**; `Approved`: **Đề nghị xóa** (đề xuất `DELETE`); đề xuất đang mở: **Hủy bản nháp thay đổi** |
+| Menu `⋯` | `Draft`/`Rejected`: **Xóa khai báo**; `Approved`: **Xóa** (đề xuất `DELETE`, gửi duyệt ngay); đề xuất đang mở: **Hủy bản nháp thay đổi** |
 
   Xóa bản chưa Approved có hiệu lực ngay (TDV-07); mọi thao tác trên bản `Approved` đi qua đề xuất (§7.4). Đề xuất `DELETE` chỉ đọc.
 - **Lịch sử thay đổi** (`TechnicalHistoryPanel`, `GET /records/{id}/history`, 10 dòng/trang): thời gian, người thực hiện, hành động và từng thay đổi `giá trị cũ → mới`. Ẩn khi xem bản chụp.

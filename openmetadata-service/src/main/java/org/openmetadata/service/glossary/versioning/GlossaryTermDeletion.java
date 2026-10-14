@@ -50,6 +50,21 @@ final class GlossaryTermDeletion {
         && JsonUtils.readTree(working.payload()).path(PENDING_DELETION).asBoolean(false);
   }
 
+  /**
+   * A rejected deletion request has nothing left to edit or resubmit, so rejecting it ends the
+   * request: the working row is removed and the Approved version stays as it was.
+   */
+  static void closeIfRejected(GlossaryVersionDAO dao, WorkingVersionRecord working) {
+    if (isRequested(working) && EntityStatus.REJECTED.value().equals(working.entityStatus())) {
+      GlossaryVersioningService.requireUpdated(
+          dao.deleteWorking(
+              working.entityType(),
+              working.entityId(),
+              working.parentBusinessVersion(),
+              working.revision()));
+    }
+  }
+
   static WorkingVersionRecord createWorking(GlossaryVersionDAO dao, DeletionRequest request) {
     final String scope =
         GlossaryVersioningService.requireParentScope(request.parentBusinessVersion());

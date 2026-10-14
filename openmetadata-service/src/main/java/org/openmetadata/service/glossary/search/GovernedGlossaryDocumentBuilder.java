@@ -110,7 +110,8 @@ public final class GovernedGlossaryDocumentBuilder {
         "|",
         String.valueOf(row.get(GovernedGlossaryIndexFields.TERM_ID)),
         String.valueOf(row.get(GovernedGlossaryIndexFields.PARENT_BUSINESS_VERSION)),
-        String.valueOf(row.get(GovernedGlossaryIndexFields.RECORD_TYPE)));
+        String.valueOf(row.get(GovernedGlossaryIndexFields.RECORD_TYPE)),
+        String.valueOf(row.get(GovernedGlossaryIndexFields.BUSINESS_VERSION)));
   }
 
   static String versionSort(final Object value) {

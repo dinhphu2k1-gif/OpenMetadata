@@ -783,7 +783,15 @@ const GlossaryTermsV1 = ({
                   { replace: true }
                 );
               }
-              if (action !== 'createDraft') {
+              // A correction keeps the business version, so opening its draft from a working
+              // route of that version does not change the route and must reload the page's term.
+              const isDraftOnCurrentRoute =
+                Boolean(cdeRoute.isWorkingDraft && businessVersion) &&
+                compareBusinessVersions(
+                  getBusinessVersion(updatedTerm.businessVersion),
+                  businessVersion ?? ''
+                ) === 0;
+              if (action !== 'createDraft' || isDraftOnCurrentRoute) {
                 await refreshActiveGlossaryTerm?.();
               }
             }}

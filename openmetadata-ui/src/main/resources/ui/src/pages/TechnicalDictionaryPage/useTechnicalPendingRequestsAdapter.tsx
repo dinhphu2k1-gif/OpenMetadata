@@ -86,7 +86,7 @@ export const useTechnicalPendingRequestsAdapter = (
           source.recordId
         )}?businessVersion=${encodeURIComponent(
           source.dataDictionaryVersion ?? ''
-        )}&view=working`,
+        )}${source.requestType === 'DELETE' ? '' : '&view=working'}`,
         changedFields:
           source.requestType === 'UPDATE'
             ? FIELDS.filter(

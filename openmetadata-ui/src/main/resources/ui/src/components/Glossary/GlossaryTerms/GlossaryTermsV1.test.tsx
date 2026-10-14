@@ -29,6 +29,7 @@ import { getDetailsTabWithNewLabel } from '../../../utils/CustomizePage/Customiz
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { getGlossaryTermsVersionsList } from '../../../rest/glossaryAPI';
 import { useRequiredParams } from '../../../utils/useRequiredParams';
+import GlossaryHeader from '../GlossaryHeader/GlossaryHeader.component';
 import GlossaryTerms from './GlossaryTermsV1.component';
 import { GenericProvider } from '../../Customization/GenericProvider/GenericProvider';
 
@@ -250,6 +251,44 @@ describe('Test Glossary-term component', () => {
     );
     expect(mockProps.refreshActiveGlossaryTerm).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('reloads the term when a correction draft opens on the current working route', async () => {
+    (useLocation as jest.Mock).mockReturnValue({
+      pathname: '/glossary/glossaryTerm',
+      search: '?businessVersion=1.1&parentBusinessVersion=1&view=working',
+    });
+    render(<GlossaryTerms {...mockProps} />);
+
+    const { onWorkflowTransition } = (GlossaryHeader as unknown as jest.Mock)
+      .mock.lastCall[0];
+    await act(async () => {
+      await onWorkflowTransition(
+        { ...mockProps.glossaryTerm, businessVersion: '1.1' },
+        'createDraft'
+      );
+    });
+
+    expect(mockProps.refreshActiveGlossaryTerm).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the reload to the navigation when a new version draft is created', async () => {
+    (useLocation as jest.Mock).mockReturnValue({
+      pathname: '/glossary/glossaryTerm',
+      search: '?businessVersion=1.1&parentBusinessVersion=1&view=working',
+    });
+    render(<GlossaryTerms {...mockProps} />);
+
+    const { onWorkflowTransition } = (GlossaryHeader as unknown as jest.Mock)
+      .mock.lastCall[0];
+    await act(async () => {
+      await onWorkflowTransition(
+        { ...mockProps.glossaryTerm, businessVersion: '1.2' },
+        'createDraft'
+      );
+    });
+
+    expect(mockProps.refreshActiveGlossaryTerm).not.toHaveBeenCalled();
   });
 
   it('redirects the legacy Relations Graph URL to Overview', async () => {

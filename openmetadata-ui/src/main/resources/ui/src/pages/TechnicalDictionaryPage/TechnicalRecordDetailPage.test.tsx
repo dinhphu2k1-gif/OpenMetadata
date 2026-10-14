@@ -21,7 +21,6 @@ import {
   saveTechnicalChangeRequest,
   submitTechnicalRecord,
   updateTechnicalRecord,
-  withdrawTechnicalChangeRequest,
 } from '../../rest/technicalDictionaryAPI';
 import TechnicalRecordDetailPage from './TechnicalRecordDetailPage.component';
 
@@ -90,8 +89,13 @@ jest.mock(
     ),
   })
 );
+const mockNavigate = jest.fn();
+jest.mock('../../utils/ToastUtils', () => ({
+  showErrorToast: jest.fn(),
+  showSuccessToast: jest.fn(),
+}));
 jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
   useParams: () => ({ termId: 'term-1' }),
   useSearchParams: () => [new URLSearchParams(mockSearch)],
 }));
@@ -130,7 +134,7 @@ jest.mock(
       open ? <div data-testid="history-panel" /> : null
 );
 jest.mock(
-  '../../components/Modals/ConfirmationModal/ConfirmationModal',
+  '../../components/Modals/EntityDeleteModal/EntityDeleteModal',
   () =>
     ({ visible, onConfirm }: { visible: boolean; onConfirm: () => void }) =>
       visible ? (
@@ -304,37 +308,30 @@ describe('TechnicalRecordDetailPage', () => {
     expect(screen.getByTestId('correction-history-button')).toBeInTheDocument();
   });
 
-  it('shows a deletion request like the Data Dictionary: banner, history and withdraw for its submitter', async () => {
+  it('opens a deletion request as the Approved record, like the Data Dictionary', async () => {
     mockSearch = 'businessVersion=2&view=working';
     (getTechnicalRecord as jest.Mock).mockResolvedValue({
       ...RECORD,
       hasPendingChange: true,
       changeOperation: 'DELETE',
       changeRequestStatus: 'InReview',
-    });
-    (getTechnicalChangeRequest as jest.Mock).mockResolvedValue({
-      id: 'change-1',
-      recordId: 'term-1',
-      operation: 'DELETE',
-      status: 'InReview',
-      revision: 4,
-      createdBy: 'checker',
-      submittedBy: 'checker',
-      approvedRecord: RECORD,
-      proposedRecord: null,
+      changeCreatedBy: 'maker',
     });
     render(<TechnicalRecordDetailPage />);
 
     expect(
-      await screen.findByTestId('technical-pending-deletion-banner')
+      await screen.findByTestId('correction-history-button')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('correction-history-button')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('withdraw-request-button'));
-
-    await waitFor(() =>
-      expect(withdrawTechnicalChangeRequest).toHaveBeenCalledWith('term-1', 4)
-    );
+    expect(getTechnicalChangeRequest).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId('technical-pending-deletion-banner')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('technical-record-approve')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('withdraw-request-button')
+    ).not.toBeInTheDocument();
   });
 
   it('reads a replaced version by its businessVersion, read only', async () => {
@@ -423,6 +420,11 @@ describe('TechnicalRecordDetailPage', () => {
 
     await waitFor(() =>
       expect(requestTechnicalRecordDeletion).toHaveBeenCalledWith('term-1', 1)
+    );
+    await waitFor(() => expect(getTechnicalRecord).toHaveBeenCalledTimes(2));
+
+    expect(mockNavigate).not.toHaveBeenCalledWith(
+      expect.stringContaining('view=working')
     );
 
     expect(saveTechnicalChangeRequest).not.toHaveBeenCalledWith(

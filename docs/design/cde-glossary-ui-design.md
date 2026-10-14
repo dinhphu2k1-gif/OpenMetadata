@@ -242,11 +242,11 @@ Bảng lịch sử `glossary_business_snapshot_history`: `historyId`, `snapshotI
 
 Áp dụng cho CDE và DQ Rule (`GlossaryTermDeletion`). Data Dictionary không xóa được; chỉ thay bằng version `N+1`.
 
-1. Trên CDE Approved (không Archived, chưa có working), người có `canCreateVersion` và `canSubmit` bấm **Đề nghị xóa**. Modal xác nhận: "Đề nghị xóa được gửi duyệt ngay. CDE đã phê duyệt vẫn có hiệu lực cho tới khi đề nghị được phê duyệt."
-2. `POST /glossaryTerms/{id}/working/deletion?parentBusinessVersion=N` tạo working mang cờ `pendingDeletion = true`, `businessVersion` bằng Approved mới nhất của scope, và chuyển ngay sang `In Review` trong cùng transaction. Không có Draft trung gian.
-3. Trong thời gian chờ, Consumer vẫn thấy CDE Approved. Trang chi tiết bản đề nghị hiện banner "Đây là đề nghị xóa…", tag **Đề nghị xóa**; bảng CDE hiện dòng đề nghị cạnh dòng Approved.
+1. Trên CDE Approved (không Archived, chưa có working), người có `canCreateVersion` và `canSubmit` bấm **Xóa**. Modal xác nhận yêu cầu gõ `DELETE` (cùng modal với xóa bản nháp) và nêu rõ yêu cầu được gửi duyệt ngay, CDE đã phê duyệt vẫn có hiệu lực cho tới khi được phê duyệt.
+2. `POST /glossaryTerms/{id}/working/deletion?parentBusinessVersion=N` tạo working mang cờ `pendingDeletion = true`, `businessVersion` bằng version được chọn (mặc định Approved mới nhất của scope), và chuyển ngay sang `In Review` trong cùng transaction. Không có Draft trung gian. Working này chỉ là bản ghi của yêu cầu, **không phải bản nháp**.
+3. Yêu cầu xóa chỉ xuất hiện ở tab **Yêu cầu chờ xử lý** (loại **Xóa**). Sau khi bấm Xóa, UI ở lại trang version Approved; bảng CDE và bộ chọn version không hiển thị working của yêu cầu xóa; URL `view=working` trỏ tới yêu cầu xóa mở version Approved. Consumer vẫn thấy CDE Approved như bình thường.
 4. Backend kiểm tra `CdeDeletionGuard` lúc tạo, gửi và duyệt: CDE không được còn record Từ điển kỹ thuật, DQ Rule, CDE khác tham chiếu (`relatedTerms`) hay asset gắn tag. Vi phạm trả `400` liệt kê nguồn tham chiếu.
-5. **Phê duyệt**: archive mọi snapshot Approved của CDE trong scope, bỏ published head, giữ lịch sử phê duyệt; CDE biến mất khỏi Data Dictionary đang hiệu lực. **Từ chối**: bản đề nghị về `Rejected`, có thể **Hủy đề nghị xóa** (`DELETE .../working`). **Rút lại**: hủy hẳn đề nghị (§5.8).
+5. **Phê duyệt**: archive snapshot được yêu cầu xóa, giữ lịch sử phê duyệt; nếu đó là version hiệu lực thì version Approved liền trước có hiệu lực lại, nếu là version duy nhất thì CDE biến mất khỏi Data Dictionary đang hiệu lực. **Từ chối**: kết thúc yêu cầu — working bị xóa ngay trong transaction từ chối, version Approved giữ nguyên, người gửi nhận thông báo bị từ chối. **Rút lại**: hủy hẳn yêu cầu (§5.8).
 6. Duyệt hàng loạt nhận cả đề nghị xóa; UI hiện danh sách CDE sẽ bị xóa trong hộp xác nhận.
 
 ### 5.8. Rút lại yêu cầu và hủy bản nháp
@@ -411,7 +411,7 @@ Bố cục góc phải Header CDE (`WorkflowActionBar`): `[ Bộ chọn Version 
 | :--- | :--- | :--- | :--- |
 | **Draft** | • `Lưu nháp` (Secondary)<br>• `Gửi duyệt` (Primary) | • `Xóa` (Chữ đỏ, có modal xác nhận) | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **In Review** | • `Phê duyệt` (`DataSteward` - Xanh lá)<br>• `Từ chối` (`DataSteward` - Đỏ)<br>• `Rút lại yêu cầu` (chỉ người gửi)<br>• `Chờ duyệt` (`DataProposer` khác - Read-only) | *(Không có)* | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
-| **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` / `Hủy đề nghị xóa` | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
+| **Rejected** | • `Chỉnh sửa lại` (`DataProposer` - đưa về Draft) | • `Xóa bản nháp` (yêu cầu xóa bị từ chối được đóng ngay, không còn ở trạng thái Rejected) | Không truy cập được (403/404); Ẩn hoàn toàn trên UI và không hiển thị bất kỳ nút thao tác nào. |
 | **Approved** | • `Tạo phiên bản mới` (Primary)<br>• `Sửa phiên bản` | • `Xóa` (Chữ đỏ, tạo đề nghị xóa §5.7) | Chỉ đọc bản Approved; không có nút. |
 | **Đề nghị xóa (In Review)** | • `Phê duyệt` / `Từ chối` (`DataSteward`)<br>• `Rút lại yêu cầu` (người gửi) | *(Không có)* | Không truy cập bản đề nghị; tiếp tục thấy bản Approved tới khi đề nghị được duyệt. |
 

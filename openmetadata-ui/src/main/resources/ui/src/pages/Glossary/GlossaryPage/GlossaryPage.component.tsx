@@ -508,7 +508,8 @@ const GlossaryPage = () => {
             ''
           );
           if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
-            if (isWorkingDraft) {
+            // A deletion request is not a draft: it opens as the Approved version it targets.
+            if (isWorkingDraft && !workingResult.value.pendingDeletion) {
               setIsTermHistorical(false);
               setActiveGlossary(workingResult.value as ModifiedGlossary);
 
@@ -572,7 +573,7 @@ const GlossaryPage = () => {
         // snapshot it corrects. Only open the draft when the route asks for
         // it (view=working); otherwise the Approved row must show Approved.
         if (compareBusinessVersions(workingVersion, reqCdeVer) === 0) {
-          if (isWorkingDraft) {
+          if (isWorkingDraft && !working.pendingDeletion) {
             setIsTermHistorical(false);
             setActiveGlossary(working as ModifiedGlossary);
 

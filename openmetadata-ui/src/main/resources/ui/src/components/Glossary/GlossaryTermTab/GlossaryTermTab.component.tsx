@@ -1273,7 +1273,7 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
                   ? withoutAll(selectedCdeClassifications)
                   : dqClassificationTags
                 ).join(',') || undefined,
-              include: includeDeleted ? Include.Deleted : Include.NonDeleted,
+              include: includeDeleted ? Include.All : Include.NonDeleted,
               limit: pageSize,
               offset: (currentPage - 1) * pageSize,
             })

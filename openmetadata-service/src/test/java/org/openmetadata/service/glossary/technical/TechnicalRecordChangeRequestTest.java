@@ -7,8 +7,13 @@ package org.openmetadata.service.glossary.technical;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.List;
@@ -45,6 +50,42 @@ class TechnicalRecordChangeRequestTest {
     assertTrue(request.isDraft());
     assertEquals(values, TechnicalChangeRequestService.values(request));
     assertEquals(4, request.baseRevision());
+  }
+
+  @Test
+  void rejectingADeletionRequestEndsIt() {
+    final TechnicalDictionaryDAO dao = mock(TechnicalDictionaryDAO.class);
+    final TechnicalRecordChangeRequest rejected =
+        rejectedRequest(TechnicalRecordChangeRequest.OPERATION_DELETE);
+    when(dao.deleteChangeRequest(rejected.recordId(), 3L)).thenReturn(1);
+
+    TechnicalChangeRequestService.storeRejection(dao, rejected, 3L);
+
+    verify(dao).deleteChangeRequest(rejected.recordId(), 3L);
+    verify(dao, never()).updateChangeRequest(any(), anyLong());
+  }
+
+  @Test
+  void rejectingAnUpdateRequestKeepsItForRework() {
+    final TechnicalDictionaryDAO dao = mock(TechnicalDictionaryDAO.class);
+    final TechnicalRecordChangeRequest rejected =
+        rejectedRequest(TechnicalRecordChangeRequest.OPERATION_UPDATE);
+    when(dao.updateChangeRequest(rejected, 3L)).thenReturn(1);
+
+    TechnicalChangeRequestService.storeRejection(dao, rejected, 3L);
+
+    verify(dao).updateChangeRequest(rejected, 3L);
+    verify(dao, never()).deleteChangeRequest(anyString(), anyLong());
+  }
+
+  private static TechnicalRecordChangeRequest rejectedRequest(final String operation) {
+    return TechnicalRecordChangeRequest.builder()
+        .id(UUID.randomUUID().toString())
+        .recordId(UUID.randomUUID().toString())
+        .operation(operation)
+        .status(TechnicalRecordChangeRequest.STATUS_REJECTED)
+        .revision(4)
+        .build();
   }
 
   @Test

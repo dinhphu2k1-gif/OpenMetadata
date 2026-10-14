@@ -142,7 +142,7 @@ public final class TechnicalChangeRequestService {
                       .reviewedBy(actor)
                       .reviewComment(null)
                       .build();
-              update(dao, rejected, expectedRevision);
+              storeRejection(dao, rejected, expectedRevision);
               audit(dao, TechnicalRecordAudit.REJECT_CHANGE, active, rejected, version, actor);
               TechnicalOutbox.enqueueIndex(dao, active.id());
               return rejected;
@@ -485,6 +485,21 @@ public final class TechnicalChangeRequestService {
       TechnicalDictionaryDAO dao, TechnicalRecordChangeRequest request, long expectedRevision) {
     if (dao.updateChangeRequest(request, expectedRevision) != 1) {
       throw stale();
+    }
+  }
+
+  /**
+   * A rejected deletion request has nothing left to rework, so rejecting it ends the request and
+   * the Approved record stays as it was; a rejected update is kept for rework.
+   */
+  static void storeRejection(
+      TechnicalDictionaryDAO dao, TechnicalRecordChangeRequest rejected, long expectedRevision) {
+    if (rejected.isDelete()) {
+      if (dao.deleteChangeRequest(rejected.recordId(), expectedRevision) != 1) {
+        throw stale();
+      }
+    } else {
+      update(dao, rejected, expectedRevision);
     }
   }
 

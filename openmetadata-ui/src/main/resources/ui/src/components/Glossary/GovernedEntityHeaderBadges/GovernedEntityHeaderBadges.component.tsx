@@ -56,17 +56,15 @@ const GovernedEntityHeaderBadges = ({
   versionLabel,
   versionSelectionDisabled = false,
 }: GovernedEntityHeaderBadgesProps) => {
+  // The version badge always carries the same color as the status badge next to it.
   const statusClass = isDeleted
-    ? StatusType.Archived
+    ? StatusType.Failure
     : getEntityStatusClass(status);
   const versionBadge = (
     <button
       className={classNames(
         'status-badge cde-header-version-badge',
-        statusClass,
-        {
-          'cde-header-version-badge-deleted': isDeleted,
-        }
+        statusClass
       )}
       data-testid={versionButtonTestId ?? `${testIdPrefix}-version-button`}
       type="button">

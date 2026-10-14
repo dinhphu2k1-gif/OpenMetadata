@@ -6,6 +6,7 @@
 package org.openmetadata.service.glossary.search;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.List;
 import java.util.Map;
@@ -42,5 +43,28 @@ class GovernedGlossaryDocumentBuilderTest {
     assertEquals(
         "0000000000000000000000000000000000000012.0000000000000000000000000000000000000010",
         document.get("businessVersionSort"));
+  }
+
+  @Test
+  void givesEachPublishedVersionOfTheSameTermItsOwnDocumentId() {
+    final String termId = UUID.randomUUID().toString();
+
+    final String firstVersionId = GovernedGlossaryDocumentBuilder.id(publishedRow(termId, "1.0"));
+    final String minorVersionId = GovernedGlossaryDocumentBuilder.id(publishedRow(termId, "1.1"));
+
+    assertNotEquals(firstVersionId, minorVersionId);
+  }
+
+  private static Map<String, Object> publishedRow(
+      final String termId, final String businessVersion) {
+    return Map.of(
+        "termId",
+        termId,
+        "parentBusinessVersion",
+        "1",
+        "recordType",
+        "published",
+        "businessVersion",
+        businessVersion);
   }
 }

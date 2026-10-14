@@ -284,12 +284,17 @@ const TechnicalDictionaryPage = ({
     }
   }, [review, reviewMany]);
 
-  /** Every record opens on its own page; a pending change opens as its working view. */
+  /**
+   * Every record opens on its own page; a pending update opens as its working view, while a
+   * pending deletion opens as the Approved record because it is not a draft.
+   */
   const handleOpenDetail = useCallback(
     (row: TechnicalDictionaryRow) => {
       const version = snapshotVersion ?? dataDictionaryVersion ?? '';
       const working =
-        !snapshotVersion && (row.rowRole === 'CHANGE' || row.hasPendingChange);
+        !snapshotVersion &&
+        (row.rowRole === 'CHANGE' ||
+          (Boolean(row.hasPendingChange) && row.changeOperation !== 'DELETE'));
       navigate(
         `${ROUTES.TECHNICAL_DICTIONARY_DETAILS.replace(
           ':termId',

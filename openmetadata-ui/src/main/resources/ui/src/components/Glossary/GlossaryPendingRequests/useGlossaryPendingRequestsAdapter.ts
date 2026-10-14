@@ -562,7 +562,7 @@ export const useGlossaryPendingRequestsAdapter = ({
                   (record.version == null ? '1.0' : String(record.version)),
                 parentBusinessVersion: businessVersion,
                 termId: recordId(record),
-                isWorkingDraft: true,
+                isWorkingDraft: type !== 'delete',
               })
             : getGlossaryPath(glossaryName),
         };

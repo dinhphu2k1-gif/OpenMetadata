@@ -750,7 +750,8 @@ const GlossaryHeader = ({
           const isCorrectionDraft = versions.some(
             (item) => item.label === workingBusinessVersion
           );
-          if (workingBusinessVersion) {
+          // A deletion request lives only in the pending requests tab, not as a version.
+          if (workingBusinessVersion && !working.pendingDeletion) {
             versions.unshift({
               label: workingBusinessVersion,
               snapshotVersion: isCorrectionDraft
@@ -985,6 +986,9 @@ const GlossaryHeader = ({
     selectedData.workingRevision,
   ]);
 
+  const deletionRequestKey = `${selectedData.id}|${businessVersion ?? ''}`;
+  const [requestedDeletionKey, setRequestedDeletionKey] = useState<string>();
+
   // Any Approved version that is not deleted can be deleted, including an older one opened from
   // the version list; a pending working version blocks it.
   const canRequestDeletion = useMemo(
@@ -994,6 +998,7 @@ const GlossaryHeader = ({
       glossaryTermStatus === EntityStatus.Approved &&
       selectedData.archivedAt == null &&
       (isVersionView || selectedData.workingRevision == null) &&
+      requestedDeletionKey !== deletionRequestKey &&
       Boolean(workflowPermissions?.canCreateVersion) &&
       Boolean(workflowPermissions?.canSubmit),
     [
@@ -1004,6 +1009,8 @@ const GlossaryHeader = ({
       selectedData.archivedAt,
       isVersionView,
       selectedData.workingRevision,
+      requestedDeletionKey,
+      deletionRequestKey,
       workflowPermissions,
     ]
   );
@@ -1254,19 +1261,14 @@ const GlossaryHeader = ({
     }
     try {
       setIsRequestingDeletion(true);
-      const created = await requestGlossaryTermDeletion(
+      // The request is created already In Review and is decided in the pending requests tab,
+      // so the Approved version stays on screen instead of opening the request as a draft.
+      await requestGlossaryTermDeletion(
         selectedData.id,
         getParentBusinessVersion(),
         businessVersion ?? undefined
       );
-      // The deletion endpoint creates and submits the request atomically.
-      navigateToWorkingDraft(
-        getBusinessVersion(
-          created.businessVersion,
-          getBusinessVersion(businessVersion ?? undefined, '')
-        )
-      );
-      await onWorkflowTransition?.(created, 'createDraft');
+      setRequestedDeletionKey(deletionRequestKey);
       requestPendingRequestsRefresh();
       showSuccessToast(t(`${deletionTextScope}.deletion-request-created`));
       setIsDeletionRequestModalOpen(false);
@@ -2493,15 +2495,10 @@ const GlossaryHeader = ({
         onConfirm={handleCreateCorrection}
       />
 
-      <ConfirmationModal
+      <EntityDeleteModal
         bodyText={t(`${deletionTextScope}.deletion-request-confirm`)}
-        cancelText={t('label.cancel')}
-        confirmText={t('cde.deletion-request')}
-        header={t(`${deletionTextScope}.deletion-request-title`, {
-          name: getEntityName(selectedData),
-          version: businessVersion,
-        })}
-        isLoading={isRequestingDeletion}
+        entityName={`${getEntityName(selectedData)} (${businessVersion})`}
+        entityType="Glossary"
         visible={isDeletionRequestModalOpen}
         onCancel={() => setIsDeletionRequestModalOpen(false)}
         onConfirm={handleRequestDeletion}

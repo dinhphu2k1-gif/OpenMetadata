@@ -49,7 +49,7 @@ import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/Surv
 import { renderDictionaryPastelTag } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
 import { GovernedVersionKind } from '../../components/Glossary/GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.utils';
 import GovernedStatusBadge from '../../components/Glossary/GovernedStatusBadge/GovernedStatusBadge.component';
-import ConfirmationModal from '../../components/Modals/ConfirmationModal/ConfirmationModal';
+import EntityDeleteModal from '../../components/Modals/EntityDeleteModal/EntityDeleteModal';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import TagsViewer from '../../components/Tag/TagsViewer/TagsViewer';
 import { DisplayType } from '../../components/Tag/TagsViewer/TagsViewer.interface';
@@ -258,7 +258,12 @@ const TechnicalRecordDetailPage = () => {
         return { row: { ...frozen, status: 'Archived' as const } };
       }
       const record = await getTechnicalRecord(termId);
-      if (wantsWorking && record.hasPendingChange) {
+      // A deletion request is not a draft: it opens as the Approved record it targets.
+      if (
+        wantsWorking &&
+        record.hasPendingChange &&
+        record.changeOperation !== 'DELETE'
+      ) {
         const { working } = toWorkingRow(
           await getTechnicalChangeRequest(termId)
         );
@@ -313,10 +318,8 @@ const TechnicalRecordDetailPage = () => {
   );
 
   const workingVersionKind =
-    row?.hasPendingChange && !viewedVersion
-      ? row.changeOperation === 'DELETE'
-        ? GovernedVersionKind.DeletionRequest
-        : GovernedVersionKind.CorrectionDraft
+    row?.hasPendingChange && !viewedVersion && row.changeOperation !== 'DELETE'
+      ? GovernedVersionKind.CorrectionDraft
       : undefined;
   /** The proposal of a pending change is on screen, not the approved record it changes. */
   const isWorkingView = Boolean(
@@ -513,7 +516,8 @@ const TechnicalRecordDetailPage = () => {
       if (deleteKind === 'request') {
         await requestTechnicalRecordDeletion(row.termId, row.revision);
         showSuccessToast(t('message.technical-deletion-request-submitted'));
-        navigate(detailPath(undefined, row.termId, true));
+        // The request is decided in the pending requests tab; the Approved record stays on screen.
+        reload();
       } else if (deleteKind === 'change') {
         await cancelTechnicalChangeRequest(row.termId, row.revision);
         navigate(detailPath(undefined, row.termId));
@@ -527,7 +531,7 @@ const TechnicalRecordDetailPage = () => {
     } finally {
       setDeleteKind(undefined);
     }
-  }, [deleteKind, detailPath, failAction, goToList, navigate, row, t]);
+  }, [deleteKind, detailPath, failAction, goToList, navigate, reload, row, t]);
 
   const handleReview = useCallback(async () => {
     if (!row || !review) {
@@ -590,16 +594,18 @@ const TechnicalRecordDetailPage = () => {
     row && canWork && row.status === 'Approved' && !isChange
   );
   const canSubmitNow = Boolean(row && canWork && row.status === 'Draft');
+  // A deletion request is decided only in the pending requests tab.
   const canReviewNow = Boolean(
     row &&
       !viewedVersion &&
+      !isDeleteChange &&
       canReviewTechnicalRecord(row, capabilities.canApprove, currentUser?.name)
   );
   const deleteOption: { kind: DeleteKind; labelKey: string } | undefined =
     !row || !canWork
       ? undefined
       : row.status === 'Approved' && !isChange
-      ? { kind: 'request', labelKey: 'label.technical-request-delete' }
+      ? { kind: 'request', labelKey: 'label.delete' }
       : isChange && isOpenDraft
       ? { kind: 'change', labelKey: 'label.technical-cancel-change' }
       : isOpenDraft
@@ -1148,15 +1154,10 @@ const TechnicalRecordDetailPage = () => {
           ]}
         />
 
-        <ConfirmationModal
+        <EntityDeleteModal
           bodyText={deleteKind ? t(DELETE_BODY_KEYS[deleteKind]) : ''}
-          cancelText={t('label.cancel')}
-          confirmText={t(
-            deleteKind === 'request'
-              ? 'label.technical-request-delete'
-              : 'label.delete'
-          )}
-          header={t(deleteOption?.labelKey ?? 'label.technical-request-delete')}
+          entityName={row.columnName}
+          entityType="technicalRecord"
           visible={Boolean(deleteKind)}
           onCancel={() => setDeleteKind(undefined)}
           onConfirm={handleDelete}

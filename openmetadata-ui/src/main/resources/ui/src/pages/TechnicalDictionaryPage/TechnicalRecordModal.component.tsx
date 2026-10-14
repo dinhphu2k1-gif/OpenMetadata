@@ -103,6 +103,7 @@ const TechnicalRecordModal = ({
   const { t } = useTranslation();
   const [form] = Form.useForm<TechnicalRecordFormValues>();
   const [pendingCde, setPendingCde] = useState<EntityReference | null>();
+  const [isCdeMissing, setIsCdeMissing] = useState(false);
   const isReadOnly = mode === 'view' || mode === 'review';
   const isCreate = mode === 'create';
   const isSaveDisabled = isSaving || (isCreate && !row);
@@ -116,6 +117,7 @@ const TechnicalRecordModal = ({
   useEffect(() => {
     if (open && row) {
       setPendingCde(undefined);
+      setIsCdeMissing(false);
       form.setFieldsValue({
         rank: row.rank,
         elementType: row.elementType?.fqn,
@@ -149,11 +151,13 @@ const TechnicalRecordModal = ({
     const values = await form.validateFields();
     const hasCde =
       pendingCde === undefined ? Boolean(row?.cdeTermId) : pendingCde !== null;
-    if (hasCde && !values.rank) {
+    setIsCdeMissing(!hasCde);
+    if (!values.rank) {
       form.setFields([
         { name: 'rank', errors: [t('message.technical-rank-required')] },
       ]);
-
+    }
+    if (!hasCde || !values.rank) {
       return;
     }
     onSave({ ...values, cde: pendingCde });
@@ -382,14 +386,23 @@ const TechnicalRecordModal = ({
             'message.technical-specification-and-reference-description'
           )}
           title={t('label.technical-specification-and-reference')}>
-          <Form.Item label={t('label.cde-code-ref')}>
+          <Form.Item
+            required
+            help={
+              isCdeMissing ? t('message.technical-cde-required') : undefined
+            }
+            label={t('label.cde-code-ref')}
+            validateStatus={isCdeMissing ? 'error' : undefined}>
             <CDESelectableField
               dataDictionaryVersion={dataDictionaryVersion}
               disabled={isReadOnly}
               selectedCde={
                 pendingCde === undefined ? selectedCde : pendingCde ?? undefined
               }
-              onChange={(cde) => setPendingCde(cde ?? null)}
+              onChange={(cde) => {
+                setPendingCde(cde ?? null);
+                setIsCdeMissing(false);
+              }}
             />
           </Form.Item>
           <Form.Item label={t('label.cde-name')}>
@@ -399,6 +412,10 @@ const TechnicalRecordModal = ({
             label={t('label.rank')}
             name="rank"
             rules={[
+              {
+                required: true,
+                message: t('message.technical-rank-required'),
+              },
               {
                 type: 'number',
                 min: 1,

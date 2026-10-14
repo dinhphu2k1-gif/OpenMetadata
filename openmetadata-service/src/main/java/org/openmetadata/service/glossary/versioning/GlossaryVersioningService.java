@@ -450,7 +450,10 @@ public class GlossaryVersioningService {
                   requireUpdated(updated);
                   enqueueSearch(
                       dao, entityType, working.glossaryId(), working.parentBusinessVersion());
-                  return dao.findWorking(entityType, entityId, parentBusinessVersion);
+                  final WorkingVersionRecord transitioned =
+                      dao.findWorking(entityType, entityId, parentBusinessVersion);
+                  GlossaryTermDeletion.closeIfRejected(dao, transitioned);
+                  return transitioned;
                 });
     refreshIndexes(entityType, entityId, result.payload());
     notifyReviewTransition(result, expectedStatus, targetStatus, actor);

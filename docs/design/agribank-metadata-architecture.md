@@ -104,7 +104,7 @@ Trang **Miền** (Domain) có tab **Chất lượng dữ liệu** tổng hợp k
 
 ## 5.2. Thành phần UI dùng chung
 
-- **`WorkflowActionBar`**: cụm nút ở header của glossary CDE/DQ, term CDE/DQ, danh sách và chi tiết Từ điển kỹ thuật. Thứ tự: icon **Lịch sử sửa đổi** (khi có) │ một vạch ngăn │ các nút phụ │ nút chính │ menu `⋯`. Nút chính/phụ lấy từ capability (Gửi duyệt, Phê duyệt, Từ chối, Rút lại yêu cầu, Tạo phiên bản mới, Sửa phiên bản, Chỉnh sửa lại, Hủy đề nghị xóa, Thêm thuật ngữ/quy tắc).
+- **`WorkflowActionBar`**: cụm nút ở header của glossary CDE/DQ, term CDE/DQ, danh sách và chi tiết Từ điển kỹ thuật. Thứ tự: icon **Lịch sử sửa đổi** (khi có) │ một vạch ngăn │ các nút phụ │ nút chính │ menu `⋯`. Nút chính/phụ lấy từ capability (Gửi duyệt, Phê duyệt, Từ chối, Rút lại yêu cầu, Tạo phiên bản mới, Sửa phiên bản, Chỉnh sửa lại, Thêm thuật ngữ/quy tắc).
 - Menu `⋯` của term CDE/DQ chỉ còn **Đổi tên hiển thị** và **Xóa** (chữ đỏ). **Xóa** gộp hai hành vi: xóa bản nháp với working chưa từng phê duyệt, đề nghị xóa với bản Approved. Trang chi tiết term không còn phiên bản kỹ thuật, Xuất, Nhập, Kiểu dáng, Đổi cha, Thêm. Menu cấp glossary giữ **Xuất Excel**, **Nhập Excel**, **Đổi tên**. Menu Từ điển kỹ thuật: **Xuất Excel**, **Nhập Excel** (gán CDE), **Dựng lại index** (Admin); bỏ mục **Bản chụp các phiên bản trước** (xem bản chụp qua bộ chọn phiên bản).
 - **Lịch sử sửa đổi** (`ApprovedRecordHistoryModal`, dùng chung CDE, DQ, TD): drawer bên phải liệt kê các lần sửa bản Approved, mỗi mục so sánh giá trị trước/sau theo trường (`ApprovedRecordHistoryUtils`).
 

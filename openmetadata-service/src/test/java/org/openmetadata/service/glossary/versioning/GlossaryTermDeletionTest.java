@@ -83,6 +83,44 @@ class GlossaryTermDeletionTest {
   }
 
   @Test
+  void rejectingADeletionRequestEndsItAndKeepsTheApprovedVersion() {
+    final GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);
+    final WorkingVersionRecord rejected =
+        decidedWorking("{\"pendingDeletion\":true}", EntityStatus.REJECTED);
+    when(dao.deleteWorking(GlossaryVersioningService.GLOSSARY_TERM, rejected.entityId(), "1", 4L))
+        .thenReturn(1);
+
+    GlossaryTermDeletion.closeIfRejected(dao, rejected);
+
+    verify(dao)
+        .deleteWorking(GlossaryVersioningService.GLOSSARY_TERM, rejected.entityId(), "1", 4L);
+    verify(dao, never()).archiveSnapshot(any(), anyLong(), any(), any());
+  }
+
+  @Test
+  void rejectingAnEditRequestKeepsItForRework() {
+    final GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);
+
+    GlossaryTermDeletion.closeIfRejected(dao, decidedWorking("{}", EntityStatus.REJECTED));
+    GlossaryTermDeletion.closeIfRejected(
+        dao, decidedWorking("{\"pendingDeletion\":true}", EntityStatus.IN_REVIEW));
+
+    verify(dao, never()).deleteWorking(any(), any(), any(), anyLong());
+  }
+
+  private static WorkingVersionRecord decidedWorking(
+      final String payload, final EntityStatus status) {
+    final WorkingVersionRecord working = mock(WorkingVersionRecord.class);
+    when(working.entityType()).thenReturn(GlossaryVersioningService.GLOSSARY_TERM);
+    when(working.entityId()).thenReturn(UUID.randomUUID());
+    when(working.parentBusinessVersion()).thenReturn("1");
+    when(working.revision()).thenReturn(4L);
+    when(working.payload()).thenReturn(payload);
+    when(working.entityStatus()).thenReturn(status.value());
+    return working;
+  }
+
+  @Test
   void deletingTheOnlyVersionDeletesTheRuleAndQueuesReconciliation() {
     final Handle handle = mock(Handle.class);
     final GlossaryVersionDAO dao = mock(GlossaryVersionDAO.class);

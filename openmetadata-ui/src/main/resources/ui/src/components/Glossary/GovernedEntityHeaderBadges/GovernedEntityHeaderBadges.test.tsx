@@ -30,22 +30,12 @@ describe('GovernedEntityHeaderBadges', () => {
     renderBadges(false, EntityStatus.Approved);
 
     expect(screen.getByTestId('version-button')).toHaveClass('success');
-    expect(screen.getByTestId('version-button')).not.toHaveClass(
-      'cde-header-version-badge-deleted'
-    );
   });
 
-  it('keeps the version badge neutral when the record is deleted', () => {
+  it('colors the version badge like the Deleted status of a deleted record', () => {
     renderBadges(true, EntityStatus.Archived);
 
     expect(screen.getByTestId('governed-entity-status')).toHaveClass('failure');
-
-    const versionBadge = screen.getByTestId('version-button');
-
-    expect(versionBadge).toHaveClass(
-      'archived',
-      'cde-header-version-badge-deleted'
-    );
-    expect(versionBadge).not.toHaveClass('failure');
+    expect(screen.getByTestId('version-button')).toHaveClass('failure');
   });
 });
