@@ -5,6 +5,7 @@
 
 import { DownOutlined } from '@ant-design/icons';
 import { Dropdown, Space, Tag } from 'antd';
+import classNames from 'classnames';
 import React from 'react';
 import { EntityStatus } from '../../../generated/entity/data/glossaryTerm';
 import { getCDEReleaseVersionTypeClassName } from '../../../utils/CDEReleaseVersionTypeUtils';
@@ -60,7 +61,13 @@ const GovernedEntityHeaderBadges = ({
     : getEntityStatusClass(status);
   const versionBadge = (
     <button
-      className={`status-badge cde-header-version-badge ${statusClass}`}
+      className={classNames(
+        'status-badge cde-header-version-badge',
+        statusClass,
+        {
+          'cde-header-version-badge-deleted': isDeleted,
+        }
+      )}
       data-testid={versionButtonTestId ?? `${testIdPrefix}-version-button`}
       type="button">
       <span className={`status-badge-label ${statusClass}`}>

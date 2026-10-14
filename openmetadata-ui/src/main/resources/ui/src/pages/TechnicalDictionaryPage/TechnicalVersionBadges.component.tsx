@@ -14,13 +14,18 @@ import { AxiosError } from 'axios';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import GovernedEntityHeaderBadges from '../../components/Glossary/GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
+import {
+  getGovernedVersionLabel,
+  GovernedVersionKind,
+} from '../../components/Glossary/GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.utils';
 import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import {
   listTechnicalSnapshots,
   TechnicalSnapshotSummary,
 } from '../../rest/technicalDictionaryAPI';
-import { getEntityStatusLabel } from '../../utils/EntityStatusUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
+
+const WORKING_ITEM_KEY = 'working';
 
 interface TechnicalVersionBadgesProps {
   /** Data Dictionary version the dictionary follows now. */
@@ -31,6 +36,11 @@ interface TechnicalVersionBadgesProps {
   currentStatus?: EntityStatus;
   /** Replaced versions to offer; every replaced version is offered when left out. */
   versions?: string[];
+  isDeleted?: boolean;
+  /** Kind of the pending change of the current version; the change is offered next to it when set. */
+  workingKind?: GovernedVersionKind;
+  onSelectWorking?: () => void;
+  deletedBy?: string;
   testId?: string;
   /** Called with no version for the current one. */
   onSelectVersion: (version?: string) => void;
@@ -42,6 +52,10 @@ const TechnicalVersionBadges = ({
   snapshotVersion,
   currentStatus = EntityStatus.Approved,
   versions,
+  isDeleted = false,
+  workingKind,
+  onSelectWorking,
+  deletedBy,
   testId = 'technical-dictionary-version-button',
   onSelectVersion,
 }: TechnicalVersionBadgesProps) => {
@@ -66,33 +80,52 @@ const TechnicalVersionBadges = ({
     [versions]
   );
 
-  const label = (version: string, status: EntityStatus) =>
-    `${t('label.version')}: ${version} — ${getEntityStatusLabel(status)}`;
-
   return (
     <GovernedEntityHeaderBadges
       businessVersion={snapshotVersion ?? dataDictionaryVersion}
+      deletedBy={deletedBy}
+      isDeleted={isDeleted}
       isLoadingVersions={isLoading}
       loadingLabel={t('label.loading')}
       status={snapshotVersion ? EntityStatus.Archived : currentStatus}
       versionButtonTestId={testId}
       versionItems={[
+        ...(workingKind
+          ? [
+              {
+                key: WORKING_ITEM_KEY,
+                label: getGovernedVersionLabel(
+                  dataDictionaryVersion,
+                  EntityStatus.InReview,
+                  workingKind
+                ),
+              },
+            ]
+          : []),
         {
           key: dataDictionaryVersion,
-          label: label(dataDictionaryVersion, EntityStatus.Approved),
+          label: getGovernedVersionLabel(
+            dataDictionaryVersion,
+            EntityStatus.Approved,
+            isDeleted ? GovernedVersionKind.Deleted : undefined
+          ),
         },
         ...(
           versions ??
           snapshots.map((snapshot) => snapshot.dataDictionaryVersion)
         ).map((version) => ({
           key: version,
-          label: label(version, EntityStatus.Archived),
+          label: getGovernedVersionLabel(version, EntityStatus.Archived),
         })),
       ]}
       versionLabel={t('label.version')}
       onVersionMenuOpen={loadVersions}
       onVersionSelect={(version) =>
-        onSelectVersion(version === dataDictionaryVersion ? undefined : version)
+        version === WORKING_ITEM_KEY
+          ? onSelectWorking?.()
+          : onSelectVersion(
+              version === dataDictionaryVersion ? undefined : version
+            )
       }
     />
   );

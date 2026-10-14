@@ -31,9 +31,9 @@ jest.mock('react-data-grid', () => ({
       <div>Rows: {rows?.length ?? 0}</div>
       <div>Columns: {columns?.length ?? 0}</div>
       {rows?.map((row: any, rIdx: number) => (
-        <div key={row.id || rIdx} data-testid={`grid-row-${rIdx}`}>
+        <div data-testid={`grid-row-${rIdx}`} key={row.id || rIdx}>
           {columns?.map((col: any) => (
-            <div key={col.key} data-testid={`cell-${col.key}`}>
+            <div data-testid={`cell-${col.key}`} key={col.key}>
               {col.renderCell ? col.renderCell({ row }) : row[col.key]}
             </div>
           ))}
@@ -134,10 +134,14 @@ describe('DQImportPage', () => {
     expect(screen.getByText('Cập nhật')).toBeInTheDocument();
 
     // Check upload hint
-    expect(screen.getByText(/Kéo thả tệp Excel/i)).toBeInTheDocument();
+    expect(
+      screen.getByTestId('message.drag-and-drop-or-browse-excel-file-here')
+    ).toBeInTheDocument();
 
     // Check template button
-    expect(screen.getByText('Tải file mẫu Excel (.xlsx)')).toBeInTheDocument();
+    expect(
+      screen.getByText('label.download-excel-template')
+    ).toBeInTheDocument();
   });
 
   it('should transition to Step 2 (Xem Trước Sửa) with DataGrid, add row, and navigation buttons', async () => {
@@ -182,6 +186,7 @@ describe('DQImportPage', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const draggerInput = document.querySelector('input[type="file"]');
+
     expect(draggerInput).toBeInTheDocument();
 
     await act(async () => {
@@ -190,7 +195,7 @@ describe('DQImportPage', () => {
 
     // Step 2 should display: '+ Thêm hàng', 'Trước', and 'Tiếp theo'
     expect(screen.getByTestId('add-row-btn')).toBeInTheDocument();
-    expect(screen.getByText('Trước')).toBeInTheDocument();
+    expect(screen.getByText('label.previous')).toBeInTheDocument();
     expect(screen.getByTestId('next-button')).toBeInTheDocument();
 
     // Click '+ Thêm hàng'
@@ -208,34 +213,41 @@ describe('DQImportPage', () => {
     expect(screen.getByTestId('update-button')).toBeInTheDocument();
     expect(screen.getByTestId('status-filter-group')).toBeInTheDocument();
     expect(
-      screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)
+      screen.getByText(/cde\.validation-has-errors|cde\.validation-all-valid/)
     ).toBeInTheDocument();
 
     // Rows in Step 3 (1 valid + 1 added row with missing fields)
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
+
     const filterGroup = screen.getByTestId('status-filter-group');
-    expect(within(filterGroup).getByText('Bị lỗi')).toBeInTheDocument();
-    expect(within(filterGroup).getByText('Hợp lệ')).toBeInTheDocument();
+
+    expect(
+      within(filterGroup).getByText('label.errors-only')
+    ).toBeInTheDocument();
+    expect(within(filterGroup).getByText('label.valid')).toBeInTheDocument();
 
     // Switch filter to 'failure' (Bị lỗi) -> DataGrid receives 1 row
-    const failureFilterBtn = within(filterGroup).getByText('Bị lỗi');
+    const failureFilterBtn = within(filterGroup).getByText('label.errors-only');
     await act(async () => {
       fireEvent.click(failureFilterBtn);
     });
+
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch filter to 'success' (Hợp lệ) -> DataGrid receives 1 row
-    const successFilterBtn = within(filterGroup).getByText('Hợp lệ');
+    const successFilterBtn = within(filterGroup).getByText('label.valid');
     await act(async () => {
       fireEvent.click(successFilterBtn);
     });
+
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch back to 'all' (Tất cả) -> DataGrid receives 2 rows
-    const allFilterBtn = within(filterGroup).getByText('Tất cả');
+    const allFilterBtn = within(filterGroup).getByText('label.all');
     await act(async () => {
       fireEvent.click(allFilterBtn);
     });
+
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
   });
 
@@ -252,7 +264,7 @@ describe('DQImportPage', () => {
       );
     });
 
-    const downloadBtn = screen.getByText('Tải file mẫu Excel (.xlsx)');
+    const downloadBtn = screen.getByText('label.download-excel-template');
     fireEvent.click(downloadBtn);
 
     expect(spyDownload).toHaveBeenCalled();
@@ -328,6 +340,7 @@ describe('DQImportPage', () => {
     ).toBeInTheDocument();
 
     const submitAllBtn = screen.getByTestId('submit-all-imported-btn');
+
     expect(submitAllBtn).toBeInTheDocument();
 
     await act(async () => {

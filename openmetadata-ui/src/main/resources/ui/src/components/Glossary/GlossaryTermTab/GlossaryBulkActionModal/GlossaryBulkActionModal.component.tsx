@@ -12,6 +12,7 @@
  */
 
 import { Progress, Space, Typography } from 'antd';
+import { AxiosError } from 'axios';
 import { FC, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,7 +20,9 @@ import {
   GlossaryWorkflowAction,
   transitionGlossaryTermWorkflow,
 } from '../../../../rest/glossaryAPI';
+import { getErrorText } from '../../../../utils/StringUtils';
 import { showSuccessToast } from '../../../../utils/ToastUtils';
+import { BulkActionResultItem } from '../../../common/BulkActionResultModal/BulkActionResultModal.interface';
 import ReviewActionConfirmModal, {
   ReviewConfirmAction,
 } from '../../../common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
@@ -32,7 +35,8 @@ export interface GlossaryBulkActionModalProps {
   open: boolean;
   terms: ModifiedGlossaryTerm[];
   onCancel: () => void;
-  onSuccess: (successCount: number) => void;
+  /** Called once every term was processed, with the outcome of each. */
+  onSuccess: (successCount: number, results: BulkActionResultItem[]) => void;
 }
 
 const BATCH_CONCURRENCY = 5;
@@ -68,7 +72,7 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
         : actionType;
 
     let successCount = 0;
-    let failedCount = 0;
+    const results: BulkActionResultItem[] = [];
     const total = terms.length;
 
     for (let i = 0; i < total; i += BATCH_CONCURRENCY) {
@@ -90,8 +94,23 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
               term.parentBusinessVersion
             );
             successCount++;
-          } catch {
-            failedCount++;
+            results.push({
+              key: term.id,
+              name: term.name,
+              detail: term.displayName,
+              succeeded: true,
+            });
+          } catch (error) {
+            results.push({
+              key: term.id,
+              name: term.name,
+              detail: term.displayName,
+              succeeded: false,
+              message: getErrorText(
+                error as AxiosError,
+                t('server.unexpected-error')
+              ),
+            });
           }
         })
       );
@@ -100,28 +119,19 @@ export const GlossaryBulkActionModal: FC<GlossaryBulkActionModalProps> = ({
       setProgress(Math.round((processedCount / total) * 100));
     }
 
-    const failedText =
-      failedCount > 0
-        ? `, ${t('label.failed-count', 'thất bại {{count}}', {
-            count: failedCount,
-          })}`
-        : '';
-
-    showSuccessToast(
-      t(
-        'message.bulk-action-completed',
-        'Đã xử lý xong {{success}} bản ghi thành công{{failedText}}.',
-        {
+    if (results.every((result) => result.succeeded)) {
+      showSuccessToast(
+        t('message.bulk-action-completed', {
           success: successCount,
-          failedText,
-        }
-      )
-    );
+          failedText: '',
+        })
+      );
+    }
 
     setIsProcessing(false);
     setProgress(0);
     setCurrentTermName('');
-    onSuccess(successCount);
+    onSuccess(successCount, results);
   }, [actionType, terms, onSuccess, t]);
 
   const handleModalClose = useCallback(() => {

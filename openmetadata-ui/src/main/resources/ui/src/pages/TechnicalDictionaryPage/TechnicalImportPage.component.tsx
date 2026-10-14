@@ -10,20 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { DownloadOutlined } from '@ant-design/icons';
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Result,
-  Row,
-  Segmented,
-  Space,
-  Tooltip,
-  Typography,
-  Upload,
-} from 'antd';
+import { Alert, Button, Card, Col, Result, Tooltip } from 'antd';
 import { AxiosError } from 'axios';
 import { useCallback, useMemo, useState } from 'react';
 import DataGrid, { Column, textEditor } from 'react-data-grid';
@@ -31,14 +18,12 @@ import 'react-data-grid/lib/styles.css';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { ReactComponent as FailBadgeIcon } from '../../assets/svg/fail-badge.svg';
-import { ReactComponent as ImportIcon } from '../../assets/svg/ic-drag-drop.svg';
-import { ReactComponent as SuccessBadgeIcon } from '../../assets/svg/success-badge.svg';
 import Loader from '../../components/common/Loader/Loader';
-import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
-import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
-import Stepper from '../../components/Settings/Services/Ingestion/IngestionStepper/IngestionStepper.component';
-import '../../components/UploadFile/upload-file.less';
+import { GovernedImportStatusFilter } from '../../components/common/GovernedImport/GovernedImport.interface';
+import GovernedImportFooter from '../../components/common/GovernedImport/GovernedImportFooter.component';
+import GovernedImportLayout from '../../components/common/GovernedImport/GovernedImportLayout.component';
+import GovernedImportUploadStep from '../../components/common/GovernedImport/GovernedImportUploadStep.component';
+import GovernedImportValidationHeader from '../../components/common/GovernedImport/GovernedImportValidationHeader.component';
 import { VALIDATION_STEP } from '../../constants/BulkImport.constant';
 import { ROUTES } from '../../constants/constants';
 import { useGridEditController } from '../../hooks/useGridEditController';
@@ -50,10 +35,8 @@ import {
   TechnicalImportPreview,
 } from '../../rest/technicalDictionaryAPI';
 import { showErrorToast } from '../../utils/ToastUtils';
-import '../CDEImportPage/cde-import-page.less';
 
 type GridRow = Record<string, string>;
-type StatusFilter = 'all' | 'failure' | 'success';
 
 const CREATE_RECORD_ACTION = 'CREATE_RECORD';
 const UPDATE_ACTION = 'UPDATE';
@@ -130,7 +113,8 @@ const TechnicalImportPage = () => {
   const [dataSource, setDataSource] = useState<GridRow[]>([]);
   const [preview, setPreview] = useState<TechnicalImportPreview>();
   const [validatedRows, setValidatedRows] = useState<GridRow[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] =
+    useState<GovernedImportStatusFilter>('all');
   const [committed, setCommitted] = useState(0);
   const [created, setCreated] = useState(0);
   const [proposed, setProposed] = useState(0);
@@ -184,8 +168,8 @@ const TechnicalImportPage = () => {
         renderEditCell: textEditor,
         ...(index === 0
           ? {
-              headerCellClass: 'cde-first-column-header',
-              cellClass: 'cde-first-column-cell',
+              headerCellClass: 'governed-import-first-column-header',
+              cellClass: 'governed-import-first-column-cell',
             }
           : {}),
       })),
@@ -342,8 +326,8 @@ const TechnicalImportPage = () => {
         width: 120,
         minWidth: 100,
         resizable: true,
-        headerCellClass: 'cde-status-column-header',
-        cellClass: 'cde-status-column-cell',
+        headerCellClass: 'governed-import-status-column-header',
+        cellClass: 'governed-import-status-column-cell',
         renderCell: ({ row }) => (
           <div className="d-flex items-center h-full">
             {row.status === 'success' ? (
@@ -368,8 +352,8 @@ const TechnicalImportPage = () => {
         width: 320,
         minWidth: 220,
         resizable: true,
-        headerCellClass: 'cde-details-column-header',
-        cellClass: 'cde-details-column-cell',
+        headerCellClass: 'governed-import-details-column-header',
+        cellClass: 'governed-import-details-column-cell',
         renderCell: ({ row }) => {
           const isSuccess = row.status === 'success';
           const text =
@@ -408,245 +392,143 @@ const TechnicalImportPage = () => {
   }
 
   return (
-    <PageLayoutV1 pageTitle={t('label.import-cde-mapping')}>
-      <Row
-        className="cde-import-page-container"
-        data-testid="technical-import-page"
-        gutter={[16, 16]}>
-        <Col span={24}>
-          <TitleBreadcrumb titleLinks={breadcrumbList} />
-        </Col>
-        <Col span={24}>
-          <Stepper activeStep={activeStep} steps={steps} />
-        </Col>
+    <GovernedImportLayout
+      activeStep={activeStep}
+      breadcrumb={breadcrumbList}
+      pageTitle={t('label.import-cde-mapping')}
+      steps={steps}
+      testId="technical-import-page">
+      {activeStep === VALIDATION_STEP.UPLOAD && (
+        <GovernedImportUploadStep
+          accept=".xlsx"
+          isDisabled={!capabilities.canEdit}
+          isParsing={isBusy}
+          notice={
+            <Alert
+              showIcon
+              description={t('message.technical-import-template-hint')}
+              message={t('message.technical-import-description', {
+                version: dataDictionaryVersion,
+              })}
+              type="info"
+            />
+          }
+          templateTestId="technical-import-template"
+          testId="technical-import-dragger"
+          onCancel={() => navigate(ROUTES.TECHNICAL_DICTIONARY)}
+          onDownloadTemplate={handleTemplate}
+          onFileSelect={handleFileSelect}
+        />
+      )}
 
-        {activeStep === VALIDATION_STEP.UPLOAD && (
-          <Col span={24}>
-            <Space
-              className="w-full"
-              direction="vertical"
-              size={16}
-              style={{ width: '100%' }}>
+      {activeStep === VALIDATION_STEP.EDIT_VALIDATE && (
+        <Col span={24}>
+          <div
+            className="om-rdg governed-import-rdg"
+            data-testid="technical-import-grid"
+            ref={setGridContainer}>
+            <DataGrid
+              className="rdg-light"
+              columns={editColumns}
+              rows={dataSource}
+              onCopy={handleCopy}
+              onPaste={handlePaste as unknown as () => Record<string, string>}
+              onRowsChange={handleOnRowsChange}
+            />
+          </div>
+        </Col>
+      )}
+
+      {activeStep === VALIDATION_STEP.UPDATE && !isCompleted && (
+        <>
+          <GovernedImportValidationHeader
+            failed={failedCount}
+            filter={statusFilter}
+            passed={passedCount}
+            total={validateRows.length}
+            onFilterChange={setStatusFilter}
+          />
+          {preview?.truncated && (
+            <Col span={24}>
               <Alert
                 showIcon
-                message={t('message.technical-import-description', {
-                  version: dataDictionaryVersion,
-                })}
-                type="info"
+                message={t('message.technical-import-truncated')}
+                type="warning"
               />
-              <div className="d-flex justify-between items-center">
-                <Typography.Text type="secondary">
-                  {t('message.technical-import-template-hint')}
-                </Typography.Text>
-                <Button
-                  data-testid="technical-import-template"
-                  icon={<DownloadOutlined />}
-                  onClick={handleTemplate}>
-                  {t('label.download-template')}
-                </Button>
-              </div>
-              <Upload.Dragger
-                accept=".xlsx"
-                beforeUpload={handleFileSelect}
-                className="file-dragger-wrapper"
-                data-testid="technical-import-dragger"
-                disabled={isBusy || !capabilities.canEdit}
-                multiple={false}
-                showUploadList={false}>
-                <Space
-                  align="center"
-                  className="w-full justify-center"
-                  direction="vertical"
-                  size={36}
-                  style={{ padding: '40px 0' }}>
-                  <ImportIcon height={86} width={86} />
-                  <Typography.Text>
-                    {isBusy
-                      ? t(
-                          'cde.parsing-file',
-                          'Đang đọc và thẩm định file Excel...'
-                        )
-                      : t('message.technical-import-upload')}
-                  </Typography.Text>
-                </Space>
-              </Upload.Dragger>
-            </Space>
-          </Col>
-        )}
-
-        {activeStep === VALIDATION_STEP.EDIT_VALIDATE && (
+            </Col>
+          )}
           <Col span={24}>
             <div
-              className="om-rdg cde-import-rdg"
-              data-testid="technical-import-grid"
-              ref={setGridContainer}>
+              className="om-rdg governed-import-rdg-step3"
+              data-testid="technical-import-validation-grid">
               <DataGrid
                 className="rdg-light"
-                columns={editColumns}
-                rows={dataSource}
-                onCopy={handleCopy}
-                onPaste={handlePaste as unknown as () => Record<string, string>}
-                onRowsChange={handleOnRowsChange}
+                columns={validateColumns}
+                rows={filteredValidateRows}
               />
             </div>
           </Col>
-        )}
+        </>
+      )}
 
-        {activeStep === VALIDATION_STEP.UPDATE && !isCompleted && (
-          <>
-            <Col span={24}>
-              <div className="cde-validation-header d-flex justify-between items-center w-full flex-wrap gap-2">
-                <div
-                  className={`cde-validation-summary-badge ${
-                    failedCount > 0 ? 'has-error' : 'is-success'
-                  }`}>
-                  {failedCount > 0 ? (
-                    <>
-                      <FailBadgeIcon height={16} width={16} />
-                      <span>
-                        {t(
-                          'cde.validation-has-errors',
-                          'Phát hiện {{count}} bản ghi bị lỗi, vui lòng kiểm tra cột Chi tiết',
-                          { count: failedCount }
-                        )}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <SuccessBadgeIcon height={16} width={16} />
-                      <span>
-                        {t(
-                          'cde.validation-all-valid',
-                          'Tất cả {{count}} bản ghi đều hợp lệ, sẵn sàng cập nhật',
-                          { count: passedCount }
-                        )}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <Segmented
-                  className="cde-status-filter-segmented"
-                  data-testid="status-filter-group"
-                  options={[
-                    {
-                      label: `${t('label.all', 'Tất cả')} (${
-                        validateRows.length
-                      })`,
-                      value: 'all',
-                    },
-                    {
-                      label: `${t(
-                        'label.errors-only',
-                        'Bị lỗi'
-                      )} (${failedCount})`,
-                      value: 'failure',
-                    },
-                    {
-                      label: `${t('label.valid', 'Hợp lệ')} (${passedCount})`,
-                      value: 'success',
-                    },
-                  ]}
-                  value={statusFilter}
-                  onChange={(value) => setStatusFilter(value as StatusFilter)}
-                />
-              </div>
-            </Col>
-            {preview?.truncated && (
-              <Col span={24}>
-                <Alert
-                  showIcon
-                  message={t('message.technical-import-truncated')}
-                  type="warning"
-                />
-              </Col>
-            )}
-            <Col span={24}>
-              <div
-                className="om-rdg cde-import-rdg-step3"
-                data-testid="technical-import-validation-grid">
-                <DataGrid
-                  className="rdg-light"
-                  columns={validateColumns}
-                  rows={filteredValidateRows}
-                />
-              </div>
-            </Col>
-          </>
-        )}
+      {activeStep === VALIDATION_STEP.UPDATE && isCompleted && (
+        <Col span={24}>
+          <Card className="m-t-md">
+            <Result
+              extra={[
+                <Button
+                  key="done"
+                  type="primary"
+                  onClick={() => navigate(ROUTES.TECHNICAL_DICTIONARY)}>
+                  {t('label.back-to-technical-dictionary')}
+                </Button>,
+                <Button key="another" onClick={handleReset}>
+                  {t('cde.import-another-file')}
+                </Button>,
+              ]}
+              status="success"
+              subTitle={t('message.technical-import-result-detail', {
+                created,
+                proposed,
+                updated,
+              })}
+              title={t('message.technical-import-committed', {
+                count: committed,
+              })}
+            />
+          </Card>
+        </Col>
+      )}
 
-        {activeStep === VALIDATION_STEP.UPDATE && isCompleted && (
-          <Col span={24}>
-            <Card className="m-t-md">
-              <Result
-                extra={[
-                  <Button
-                    key="done"
-                    type="primary"
-                    onClick={() => navigate(ROUTES.TECHNICAL_DICTIONARY)}>
-                    {t(
-                      'label.back-to-technical-dictionary',
-                      'Quay lại Từ điển kỹ thuật'
-                    )}
-                  </Button>,
-                  <Button key="another" onClick={handleReset}>
-                    {t('cde.import-another-file', 'Nhập tiếp file khác')}
-                  </Button>,
-                ]}
-                status="success"
-                subTitle={t('message.technical-import-result-detail', {
-                  created,
-                  proposed,
-                  updated,
-                })}
-                title={t('message.technical-import-committed', {
-                  count: committed,
-                })}
-              />
-            </Card>
-          </Col>
-        )}
-
-        {activeStep !== VALIDATION_STEP.UPLOAD && !isCompleted && (
-          <Col span={24}>
-            <div className="cde-import-footer">
-              {activeStep === VALIDATION_STEP.EDIT_VALIDATE ? (
-                <Button data-testid="add-row-btn" onClick={handleAddRow}>
-                  {`+ ${t('label.add-row', 'Thêm hàng')}`}
-                </Button>
-              ) : (
-                <div />
-              )}
-              <Space size={12}>
-                <Button disabled={isBusy} onClick={handleBack}>
-                  {t('label.previous', 'Trước')}
-                </Button>
-                {activeStep === VALIDATION_STEP.EDIT_VALIDATE ? (
-                  <Button
-                    className="cde-action-btn"
-                    data-testid="next-button"
-                    disabled={dataSource.length === 0 || isBusy}
-                    loading={isBusy}
-                    type="primary"
-                    onClick={handleValidate}>
-                    {t('label.next', 'Tiếp theo')}
-                  </Button>
-                ) : (
-                  <Button
-                    className="cde-action-btn"
-                    data-testid="technical-import-commit"
-                    disabled={!preview?.canCommit || isBusy}
-                    loading={isBusy}
-                    type="primary"
-                    onClick={handleCommit}>
-                    {t('label.update', 'Cập nhật')}
-                  </Button>
-                )}
-              </Space>
-            </div>
-          </Col>
-        )}
-      </Row>
-    </PageLayoutV1>
+      {activeStep !== VALIDATION_STEP.UPLOAD && !isCompleted && (
+        <GovernedImportFooter
+          isBackDisabled={isBusy}
+          primary={
+            activeStep === VALIDATION_STEP.EDIT_VALIDATE
+              ? {
+                  label: t('label.next'),
+                  testId: 'next-button',
+                  isDisabled: dataSource.length === 0 || isBusy,
+                  isLoading: isBusy,
+                  onClick: handleValidate,
+                }
+              : {
+                  label: t('label.update'),
+                  testId: 'technical-import-commit',
+                  isDisabled: !preview?.canCommit || isBusy,
+                  isLoading: isBusy,
+                  onClick: handleCommit,
+                }
+          }
+          onAddRow={
+            activeStep === VALIDATION_STEP.EDIT_VALIDATE
+              ? handleAddRow
+              : undefined
+          }
+          onBack={handleBack}
+        />
+      )}
+    </GovernedImportLayout>
   );
 };
 

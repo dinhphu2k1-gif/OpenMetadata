@@ -113,10 +113,7 @@ import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUt
 import { getEntityDeleteMessage } from '../../../utils/EntityDisplayUtils';
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import { getEntityImportPath } from '../../../utils/EntityPureUtils';
-import {
-  getEntityStatusClass,
-  getEntityStatusLabel,
-} from '../../../utils/EntityStatusUtils';
+import { getEntityStatusClass } from '../../../utils/EntityStatusUtils';
 import Fqn from '../../../utils/Fqn';
 import { checkPermission } from '../../../utils/PermissionsUtils';
 import {
@@ -136,6 +133,10 @@ import StatusBadge from '../../common/StatusBadge/StatusBadge.component';
 import { TitleBreadcrumbProps } from '../../common/TitleBreadcrumb/TitleBreadcrumb.interface';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import GovernedEntityHeaderBadges from '../GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.component';
+import {
+  getGovernedVersionLabel,
+  GovernedVersionKind,
+} from '../GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.utils';
 import { isDeletedRecord } from '../GovernedStatusBadge/GovernedStatusBadge.utils';
 
 import { LearningIcon } from '../../Learning/LearningIcon/LearningIcon.component';
@@ -148,6 +149,18 @@ import './glossery-header.less';
 export { getCreatedDraftSearch } from '../../../utils/routing/cdeRoutingHelper';
 
 const CORRECTION_DRAFT_KEY_SUFFIX = '#correction';
+
+const getTermVersionKind = (
+  snapshot: GlossaryTerm | undefined,
+  isCorrectionDraft?: boolean
+): GovernedVersionKind | undefined =>
+  snapshot?.pendingDeletion
+    ? GovernedVersionKind.DeletionRequest
+    : isCorrectionDraft
+    ? GovernedVersionKind.CorrectionDraft
+    : snapshot && isDeletedRecord(snapshot)
+    ? GovernedVersionKind.Deleted
+    : undefined;
 
 /** Withdrawing a deletion request removes the working version, so no term comes back. */
 const wasWorkingVersionDiscarded = (response: unknown) =>
@@ -1004,11 +1017,14 @@ const GlossaryHeader = ({
     Boolean(workflowPermissions?.canEditWorking);
 
   const canViewCorrectionHistory =
-    !isVersionView &&
     !isGlossary &&
     isCustomManagedTerm &&
-    selectedData.workingRevision == null &&
-    [EntityStatus.Approved, EntityStatus.Archived].includes(glossaryTermStatus);
+    (isPendingDeletion ||
+      isDeletedRecord(selectedData as GlossaryTerm) ||
+      glossaryTermStatus === EntityStatus.Archived ||
+      (!isVersionView &&
+        selectedData.workingRevision == null &&
+        glossaryTermStatus === EntityStatus.Approved));
 
   const canCreateDraft = useMemo(() => {
     const hasWorkingCopy = selectedData.workingRevision != null;
@@ -1670,20 +1686,19 @@ const GlossaryHeader = ({
           versionButtonTestId="version-button"
           versionItems={versionList.map((availableVersion) => ({
             key: availableVersion.snapshotVersion,
-            label: isGlossary
-              ? `${t('label.version')}: ${
-                  availableVersion.label
-                } — ${getEntityStatusLabel(
-                  (availableVersion.snapshot?.entityStatus ??
-                    (availableVersion.snapshot?.archivedAt != null
-                      ? EntityStatus.Archived
-                      : EntityStatus.Approved)) as EntityStatus
-                )}`
-              : `${t('label.version')}: ${availableVersion.label}${
-                  availableVersion.isCorrectionDraft
-                    ? ` — ${t('label.correction-draft')}`
-                    : ''
-                }`,
+            label: getGovernedVersionLabel(
+              availableVersion.label,
+              (availableVersion.snapshot?.entityStatus ??
+                (availableVersion.snapshot?.archivedAt != null
+                  ? EntityStatus.Archived
+                  : EntityStatus.Approved)) as EntityStatus,
+              isGlossary
+                ? undefined
+                : getTermVersionKind(
+                    availableVersion.snapshot as GlossaryTerm | undefined,
+                    availableVersion.isCorrectionDraft
+                  )
+            ),
           }))}
           versionLabel={t('label.version')}
           versionSelectionDisabled={isWorkflowPermissionLoading}
@@ -2378,10 +2393,14 @@ const GlossaryHeader = ({
         glossaryTermStatus === EntityStatus.Rejected &&
         selectedData.rejectedBy && (
           <Typography.Text className="text-grey-muted" type="secondary">
-            Từ chối bởi {selectedData.rejectedBy}
             {selectedData.rejectedAt
-              ? ` lúc ${new Date(selectedData.rejectedAt).toLocaleString()}`
-              : ''}
+              ? t('message.rejected-by-at', {
+                  user: selectedData.rejectedBy,
+                  time: new Date(selectedData.rejectedAt).toLocaleString(),
+                })
+              : t('message.rejected-by-user', {
+                  user: selectedData.rejectedBy,
+                })}
           </Typography.Text>
         )}
       {isPendingDeletion && (
@@ -2496,11 +2515,11 @@ const GlossaryHeader = ({
               loading={isReloadingWorking}
               size="small"
               onClick={handleReloadWorking}>
-              Tải representation mới nhất
+              {t('label.reload-latest-version')}
             </Button>
           }
           className="m-b-sm"
-          message="Bản làm việc đã thay đổi. Trạng thái hiện tại được giữ nguyên cho đến khi bạn tải lại."
+          message={t('message.working-version-changed-reload')}
           type="warning"
         />
       )}
@@ -2586,10 +2605,10 @@ const GlossaryHeader = ({
                   loading={isReloadingWorking}
                   size="small"
                   onClick={handleReloadWorking}>
-                  Tải representation mới nhất
+                  {t('label.reload-latest-version')}
                 </Button>
               }
-              message="Đã có thay đổi đồng thời. Bản hiện tại vẫn được giữ nguyên."
+              message={t('message.concurrent-change-kept')}
               type="warning"
             />
           )}

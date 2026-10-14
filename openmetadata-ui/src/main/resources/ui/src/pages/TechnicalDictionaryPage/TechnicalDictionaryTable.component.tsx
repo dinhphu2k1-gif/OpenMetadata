@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { PagingHandlerParams } from '../../components/common/NextPrevious/NextPrevious.interface';
 import GovernanceListTable from '../../components/common/GovernanceList/GovernanceListTable.component';
+import GovernedStatusBadge from '../../components/Glossary/GovernedStatusBadge/GovernedStatusBadge.component';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import {
   renderDictionaryMarkdown,
@@ -46,8 +47,10 @@ import {
 } from '../../utils/RouterUtils';
 import { showErrorToast } from '../../utils/ToastUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
-import { getTagLabel } from './TechnicalDictionaryRows';
-import TechnicalStatusBadge from './TechnicalStatusBadge.component';
+import {
+  getTagLabel,
+  TECHNICAL_ENTITY_STATUS,
+} from './TechnicalDictionaryRows';
 
 export interface TechnicalDictionaryTableProps {
   rows: TechnicalDictionaryRow[];
@@ -343,42 +346,6 @@ const TechnicalDictionaryTable = ({
         render: (_, row) => renderDictionaryMarkdown(row.description),
       },
       {
-        title: t('label.status'),
-        dataIndex: KEYS.STATUS,
-        key: KEYS.STATUS,
-        width: 140,
-        render: (_, row) => (
-          <div className="d-flex flex-column items-start gap-1">
-            {row.deleted ? (
-              <Tag
-                color="error"
-                data-testid={`deleted-${row.columnName}`}
-                title={row.deletedBy}>
-                {t('cde.deleted-record')}
-              </Tag>
-            ) : (
-              <TechnicalStatusBadge
-                dataTestId={`status-${row.columnName}`}
-                status={row.status}
-              />
-            )}
-            {row.hasPendingChange && row.rowRole !== 'CHANGE' && (
-              <Tag color={row.changeOperation === 'DELETE' ? 'red' : 'gold'}>
-                {t(
-                  row.changeOperation === 'DELETE'
-                    ? 'label.technical-change-delete-pending'
-                    : row.changeRequestStatus === 'InReview'
-                    ? 'label.technical-change-in-review'
-                    : row.changeRequestStatus === 'Rejected'
-                    ? 'label.technical-change-rejected'
-                    : 'label.technical-change-draft'
-                )}
-              </Tag>
-            )}
-          </div>
-        ),
-      },
-      {
         title: t('label.updated-at'),
         dataIndex: KEYS.UPDATED_AT,
         key: KEYS.UPDATED_AT,
@@ -392,6 +359,25 @@ const TechnicalDictionaryTable = ({
         key: KEYS.UPDATED_BY,
         width: 140,
         render: (_, row) => row.updatedBy || <Placeholder />,
+      },
+      {
+        title: t('label.status'),
+        dataIndex: KEYS.STATUS,
+        key: KEYS.STATUS,
+        className: 'governance-status-cell',
+        width: 140,
+        align: 'center',
+        fixed: 'right',
+        render: (_, row) => (
+          <GovernedStatusBadge
+            dataTestId={`${row.deleted ? 'deleted' : 'status'}-${
+              row.columnName
+            }`}
+            deletedBy={row.deletedBy}
+            isDeleted={Boolean(row.deleted)}
+            status={TECHNICAL_ENTITY_STATUS[row.status]}
+          />
+        ),
       },
     ],
     [handleCdeClick, onView, renderFieldPath, renderTag, t]

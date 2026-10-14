@@ -12,7 +12,7 @@
  */
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import Icon from '@ant-design/icons/lib/components/Icon';
-import { Alert, Input, Modal, Spin } from 'antd';
+import { Input, Spin } from 'antd';
 import { ColumnsType } from 'antd/lib/table';
 import { AxiosError } from 'axios';
 import classNames from 'classnames';
@@ -33,6 +33,8 @@ import { TABLE_CONSTANTS } from '../../../constants/Teams.constants';
 import { ERROR_PLACEHOLDER_TYPE } from '../../../enums/common.enum';
 import { customFormatDateTime } from '../../../utils/date-time/DateTimeUtils';
 import { showErrorToast, showSuccessToast } from '../../../utils/ToastUtils';
+import BulkActionResultModal from '../BulkActionResultModal/BulkActionResultModal.component';
+import { BulkActionResultItem } from '../BulkActionResultModal/BulkActionResultModal.interface';
 import BulkSelectionBar from '../BulkSelectionBar/BulkSelectionBar.component';
 import { BulkSelectionChip } from '../BulkSelectionBar/BulkSelectionBar.interface';
 import ErrorPlaceHolder from '../ErrorWithPlaceholder/ErrorPlaceHolder';
@@ -48,7 +50,6 @@ import {
   PendingRequestAction,
   PendingRequestChangeDetail,
   PendingRequestFilter,
-  PendingRequestFailure,
   PendingRequestsTabProps,
   PendingRequestType,
   PendingRequestTypeCounts,
@@ -57,6 +58,11 @@ import {
 const SEARCH_DEBOUNCE_MS = 400;
 const REQUESTED_AT_FORMAT = 'dd/MM/yyyy HH:mm';
 const TYPES: PendingRequestType[] = ['create', 'update', 'delete'];
+const RESULT_LABEL_KEYS: Record<PendingRequestAction, string> = {
+  approve: 'label.approved',
+  reject: 'label.rejected',
+  withdraw: 'label.withdrawn',
+};
 const TYPE_LABEL_KEYS: Record<PendingRequestType, string> = {
   create: 'label.request-type-create',
   update: 'label.request-type-update',
@@ -108,9 +114,10 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
   const [pendingAction, setPendingAction] =
     useState<PendingRequestAction | null>(null);
   const [isApplying, setIsApplying] = useState(false);
-  const [actionFailures, setActionFailures] = useState<PendingRequestFailure[]>(
-    []
-  );
+  const [actionResult, setActionResult] = useState<{
+    action: PendingRequestAction;
+    items: BulkActionResultItem[];
+  }>();
   const [typeCounts, setTypeCounts] =
     useState<PendingRequestTypeCounts>(EMPTY_COUNTS);
 
@@ -227,15 +234,34 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
         };
         attempts += 1;
       }
-      const failed = result.failures.length;
-      setActionFailures(result.failures);
-      showSuccessToast(
-        t('message.bulk-action-completed', {
-          success: result.succeeded,
-          failedText:
-            failed > 0 ? `, ${t('label.failed-count', { count: failed })}` : '',
-        })
-      );
+      if (result.failures.length > 0) {
+        const failuresById = new Map(
+          result.failures.map((failure) => [failure.id, failure])
+        );
+        setActionResult({
+          action: pendingAction,
+          items: actionTargets.map((request) => {
+            const failure = failuresById.get(request.id);
+
+            return {
+              key: request.id,
+              name: request.code,
+              detail: request.name,
+              succeeded: !failure,
+              message: [failure?.code, failure?.message]
+                .filter(Boolean)
+                .join(' · '),
+            };
+          }),
+        });
+      } else {
+        showSuccessToast(
+          t('message.bulk-action-completed', {
+            success: result.succeeded,
+            failedText: '',
+          })
+        );
+      }
       setPendingAction(null);
       clearSelection();
       onDecided?.(result, pendingAction);
@@ -746,27 +772,19 @@ export const PendingRequestsTab: FC<PendingRequestsTabProps> = ({
           )}
         </ReviewActionConfirmModal>
       )}
-      <Modal
-        destroyOnClose
-        footer={null}
-        open={actionFailures.length > 0}
-        title={t('label.failed-count', { count: actionFailures.length })}
-        onCancel={() => setActionFailures([])}>
-        <Alert
-          showIcon
-          message={t('message.partial-action-failure')}
-          type="warning"
-        />
-        <ul className="m-t-md" data-testid="pending-requests-failure-details">
-          {actionFailures.map((failure) => (
-            <li key={`${failure.id}:${failure.code ?? ''}`}>
-              <strong>{failure.id}</strong>
-              {failure.code ? ` · ${failure.code}` : ''}
-              {failure.message ? ` · ${failure.message}` : ''}
-            </li>
-          ))}
-        </ul>
-      </Modal>
+      <BulkActionResultModal
+        description={t('message.partial-action-failure')}
+        items={actionResult?.items ?? []}
+        open={Boolean(actionResult)}
+        succeededLabel={t(RESULT_LABEL_KEYS[actionResult?.action ?? 'approve'])}
+        testId="pending-requests-result"
+        title={t('label.bulk-action-result-title', {
+          succeeded: actionResult?.items.filter((item) => item.succeeded)
+            .length,
+          total: actionResult?.items.length ?? 0,
+        })}
+        onClose={() => setActionResult(undefined)}
+      />
     </div>
   );
 };

@@ -45,6 +45,8 @@ import { ReactComponent as EditIcon } from '../../../assets/svg/edit-new.svg';
 import { ReactComponent as IconDown } from '../../../assets/svg/ic-arrow-down.svg';
 import { ReactComponent as IconRight } from '../../../assets/svg/ic-arrow-right.svg';
 import { ReactComponent as PlusOutlinedIcon } from '../../../assets/svg/plus-outlined.svg';
+import BulkActionResultModal from '../../../components/common/BulkActionResultModal/BulkActionResultModal.component';
+import { BulkActionResultItem } from '../../../components/common/BulkActionResultModal/BulkActionResultModal.interface';
 import ErrorPlaceHolder from '../../../components/common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import GovernanceListFilterDropdown from '../../../components/common/GovernanceList/GovernanceListFilterDropdown.component';
 import GovernanceListSearchInput from '../../../components/common/GovernanceList/GovernanceListSearchInput.component';
@@ -178,6 +180,12 @@ import {
 } from './GlossaryTermTab.interface';
 
 const SHOW_DELETED_FILTER = { showDeleted: false };
+
+const BULK_RESULT_LABEL_KEYS: Record<BulkActionType, string> = {
+  submitForReview: 'label.technical-result-submitted',
+  approve: 'label.approved',
+  reject: 'label.rejected',
+};
 
 const compareCDETermVersions = (
   first: ModifiedGlossaryTerm,
@@ -433,6 +441,10 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
     return Array.from(selectedTermsMap.values());
   }, [selectedTermsMap]);
 
+  const [bulkResult, setBulkResult] = useState<{
+    actionType: BulkActionType;
+    items: BulkActionResultItem[];
+  }>();
   const [bulkModalConfig, setBulkModalConfig] = useState<{
     open: boolean;
     actionType: BulkActionType;
@@ -1799,7 +1811,13 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
   };
 
   const handleBulkActionSuccess = useCallback(
-    (successCount: number) => {
+    (successCount: number, results: BulkActionResultItem[]) => {
+      if (results.some((result) => !result.succeeded)) {
+        setBulkResult({
+          actionType: bulkModalConfig.actionType,
+          items: results,
+        });
+      }
       if (
         bulkModalConfig.actionType === 'submitForReview' &&
         successCount > 0
@@ -3431,6 +3449,21 @@ const GlossaryTermTab = ({ isGlossary, className }: GlossaryTermTabProps) => {
           )}
         </Modal>
 
+        <BulkActionResultModal
+          description={t('message.partial-action-failure')}
+          items={bulkResult?.items ?? []}
+          open={Boolean(bulkResult)}
+          succeededLabel={t(
+            BULK_RESULT_LABEL_KEYS[bulkResult?.actionType ?? 'approve']
+          )}
+          testId="glossary-bulk-result"
+          title={t('label.bulk-action-result-title', {
+            succeeded: bulkResult?.items.filter((item) => item.succeeded)
+              .length,
+            total: bulkResult?.items.length ?? 0,
+          })}
+          onClose={() => setBulkResult(undefined)}
+        />
         {bulkModalConfig.open && (
           <GlossaryBulkActionModal
             actionType={bulkModalConfig.actionType}

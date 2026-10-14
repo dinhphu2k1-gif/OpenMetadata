@@ -15,7 +15,6 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import * as utils from '../../components/Glossary/CDEImportExport/CDEImportExport.utils';
 import * as domainAPI from '../../rest/domainAPI';
-import * as teamsAPI from '../../rest/teamsAPI';
 import * as userAPI from '../../rest/userAPI';
 import CDEImportPage from './CDEImportPage';
 
@@ -33,9 +32,9 @@ jest.mock('react-data-grid', () => ({
       <div>Rows: {rows?.length ?? 0}</div>
       <div>Columns: {columns?.length ?? 0}</div>
       {rows?.map((row: any, rIdx: number) => (
-        <div key={row.id || rIdx} data-testid={`grid-row-${rIdx}`}>
+        <div data-testid={`grid-row-${rIdx}`} key={row.id || rIdx}>
           {columns?.map((col: any) => (
-            <div key={col.key} data-testid={`cell-${col.key}`}>
+            <div data-testid={`cell-${col.key}`} key={col.key}>
               {col.renderCell ? col.renderCell({ row }) : row[col.key]}
             </div>
           ))}
@@ -143,11 +142,14 @@ describe('CDEImportPage', () => {
     expect(screen.getByText('Cập Nhật')).toBeInTheDocument();
 
     // Check upload dragger text
-    expect(screen.getByText(/Kéo & Thả hoặc/i)).toBeInTheDocument();
-    expect(screen.getByText(/Duyệt tệp Excel/i)).toBeInTheDocument();
+    expect(
+      screen.getByTestId('message.drag-and-drop-or-browse-excel-file-here')
+    ).toBeInTheDocument();
 
     // Check template download button
-    expect(screen.getByText('Tải file Excel mẫu (.xlsx)')).toBeInTheDocument();
+    expect(
+      screen.getByText('label.download-excel-template')
+    ).toBeInTheDocument();
 
     // Check duplicate handling options & descriptions
     expect(screen.getByText('Bỏ qua bản ghi trùng')).toBeInTheDocument();
@@ -214,6 +216,7 @@ describe('CDEImportPage', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const draggerInput = document.querySelector('input[type="file"]');
+
     expect(draggerInput).toBeInTheDocument();
 
     await act(async () => {
@@ -245,7 +248,9 @@ describe('CDEImportPage', () => {
 
     // Initial state: 2 rows in Step 3 (1 valid + 1 added row with missing fields)
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
+
     const filterGroup = screen.getByTestId('status-filter-group');
+
     expect(within(filterGroup).getByText('Bị lỗi')).toBeInTheDocument();
     expect(within(filterGroup).getByText('Hợp lệ')).toBeInTheDocument();
 
@@ -254,6 +259,7 @@ describe('CDEImportPage', () => {
     await act(async () => {
       fireEvent.click(failureFilterBtn);
     });
+
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch filter to 'success' (Hợp lệ) -> DataGrid receives only 1 row
@@ -261,6 +267,7 @@ describe('CDEImportPage', () => {
     await act(async () => {
       fireEvent.click(successFilterBtn);
     });
+
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch back to 'all' (Tất cả) -> DataGrid receives 2 rows
@@ -268,6 +275,7 @@ describe('CDEImportPage', () => {
     await act(async () => {
       fireEvent.click(allFilterBtn);
     });
+
     expect(screen.getByText('Rows: 2')).toBeInTheDocument();
   });
 
@@ -284,7 +292,7 @@ describe('CDEImportPage', () => {
       );
     });
 
-    const downloadBtn = screen.getByText('Tải file Excel mẫu (.xlsx)');
+    const downloadBtn = screen.getByText('label.download-excel-template');
     fireEvent.click(downloadBtn);
 
     expect(spyDownload).toHaveBeenCalled();
@@ -299,7 +307,7 @@ describe('CDEImportPage', () => {
       );
     });
 
-    const cancelBtn = screen.getByText('Hủy');
+    const cancelBtn = screen.getByText('label.cancel');
     fireEvent.click(cancelBtn);
 
     expect(mockNavigate).toHaveBeenCalledWith(
@@ -361,6 +369,7 @@ describe('CDEImportPage', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const draggerInput = document.querySelector('input[type="file"]');
+
     expect(draggerInput).toBeInTheDocument();
 
     await act(async () => {
@@ -443,6 +452,7 @@ describe('CDEImportPage', () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const draggerInput = document.querySelector('input[type="file"]');
+
     expect(draggerInput).toBeInTheDocument();
 
     await act(async () => {
@@ -548,6 +558,7 @@ describe('CDEImportPage', () => {
 
     // Result screen should show submit-all-imported-btn
     const submitAllBtn = screen.getByTestId('submit-all-imported-btn');
+
     expect(submitAllBtn).toBeInTheDocument();
 
     // Click submit all
@@ -556,6 +567,7 @@ describe('CDEImportPage', () => {
     });
 
     const glossaryAPI = require('../../rest/glossaryAPI');
+
     expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       'term-1',
       'submit',

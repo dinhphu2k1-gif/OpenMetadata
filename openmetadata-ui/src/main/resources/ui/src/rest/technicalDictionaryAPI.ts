@@ -196,6 +196,7 @@ export interface TechnicalChangeRequest {
   createdBy: string;
   updatedAt: number;
   updatedBy: string;
+  submittedBy?: string;
   proposedValues?: TechnicalRecordValues;
   approvedRecord: TechnicalRecordApiRow;
   proposedRecord?: TechnicalRecordApiRow | null;

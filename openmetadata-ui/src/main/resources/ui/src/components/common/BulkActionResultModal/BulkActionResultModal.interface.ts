@@ -10,31 +10,24 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { ReactNode } from 'react';
 
-@import (reference) '../../../styles/variables.less';
+export interface BulkActionResultItem {
+  key: string;
+  name: string;
+  /** Where the record lives, shown after its name. */
+  detail?: string;
+  succeeded: boolean;
+  /** Why a failed record was not processed. */
+  message?: string;
+}
 
-.cde-import-modal {
-  .file-dragger-wrapper {
-    padding: @padding-lg;
-    background: @white;
-    border-radius: 4px;
-
-    .browse-text {
-      color: @primary-color;
-    }
-  }
-
-  .cde-progress-step {
-    padding: 24px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .progress-box {
-      width: 100%;
-      max-width: 480px;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-  }
+export interface BulkActionResultModalProps {
+  open: boolean;
+  title: ReactNode;
+  description?: ReactNode;
+  items: BulkActionResultItem[];
+  succeededLabel: string;
+  testId?: string;
+  onClose: () => void;
 }

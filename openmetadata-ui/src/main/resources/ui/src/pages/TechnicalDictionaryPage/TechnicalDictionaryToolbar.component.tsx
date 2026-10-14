@@ -50,7 +50,7 @@ const tagOptions = (tags: Tag[]): GovernanceListFilterOption[] =>
     label: tag.displayName || tag.name,
   }));
 
-// CDEFilterDropdown reports "all" when every option is checked; that is the
+// GovernanceListFilterDropdown reports "all" when every option is checked; that is the
 // same as not filtering.
 const withoutAll = (values: string[]) => (values.includes('all') ? [] : values);
 
@@ -131,9 +131,9 @@ const TechnicalDictionaryToolbar = ({
             label={t('label.status')}
             options={[
               ...(canSeeDrafts
-                ? [{ value: 'Draft', label: t('label.technical-draft') }]
+                ? [{ value: 'Draft', label: t('label.draft') }]
                 : []),
-              { value: 'In Review', label: t('label.technical-in-review') },
+              { value: 'In Review', label: t('label.in-review') },
               { value: 'Approved', label: t('label.approved') },
               { value: 'Rejected', label: t('label.rejected') },
             ]}

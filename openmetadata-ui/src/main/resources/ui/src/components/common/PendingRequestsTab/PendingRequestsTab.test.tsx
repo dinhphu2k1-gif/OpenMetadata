@@ -17,6 +17,22 @@ import {
   PendingRequestsAdapter,
 } from './PendingRequestsTab.interface';
 
+jest.mock('@openmetadata/ui-core-components', () => ({
+  ...jest.requireActual('@openmetadata/ui-core-components'),
+  Button: ({
+    children,
+    onPress,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    onPress?: () => void;
+    'data-testid'?: string;
+  }) => (
+    <button data-testid={testId} onClick={onPress}>
+      {children}
+    </button>
+  ),
+}));
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -156,9 +172,7 @@ describe('PendingRequestsTab', () => {
     fireEvent.click(await screen.findByTestId('pending-requests-approve-btn'));
     fireEvent.click(screen.getByTestId('confirm'));
 
-    const details = await screen.findByTestId(
-      'pending-requests-failure-details'
-    );
+    const details = await screen.findByTestId('pending-requests-result-list');
 
     expect(details).toHaveTextContent('STALE_REVISION');
     expect(details).toHaveTextContent('Reload');

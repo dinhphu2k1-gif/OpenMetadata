@@ -865,9 +865,45 @@ describe('GlossaryHeader component', () => {
 
       expect(status).toHaveClass(statusClass);
       expect(status).toHaveTextContent(label);
+      expect(screen.getByTestId('version-button')).toHaveClass('archived');
       expect(screen.getByTestId('version-button')).not.toHaveClass('failure');
+      expect(
+        screen.getByTestId('correction-history-button')
+      ).toBeInTheDocument();
     }
   );
+
+  it('keeps the correction history of a deleted CDE opened as a historical view', async () => {
+    (useGenericContext as jest.Mock).mockImplementation(() => ({
+      data: {
+        ...mockedGlossaryTerms[0],
+        fullyQualifiedName: 'Data Dictionary.Term1',
+        glossary: { id: 'dictionary-id', name: 'Data Dictionary' },
+        entityStatus: EntityStatus.Archived,
+        businessVersion: '1.1',
+        parentBusinessVersion: '1',
+        archivedAt: 1,
+        archivedBy: 'admin',
+        archiveReason: 'DELETED',
+      },
+      onUpdate: mockOnUpdate,
+      permissions: { ManageAll: true },
+      isVersionView: true,
+      type: EntityType.GLOSSARY_TERM,
+    }));
+
+    render(
+      <GlossaryHeader
+        updateVote={mockOnUpdateVote}
+        onAddGlossaryTerm={mockOnDelete}
+        onDelete={mockOnDelete}
+      />
+    );
+
+    expect(
+      await screen.findByTestId('correction-history-button')
+    ).toBeInTheDocument();
+  });
 
   it('should render Submit for Review action when term is Draft and trigger submit', async () => {
     (useGenericContext as jest.Mock).mockImplementation(() => ({

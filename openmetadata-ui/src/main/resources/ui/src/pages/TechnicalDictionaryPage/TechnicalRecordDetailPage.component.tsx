@@ -11,7 +11,8 @@
  *  limitations under the License.
  */
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Alert, Button, Form, InputNumber, Result, Tag } from 'antd';
+import { Alert, Button, Form, InputNumber, Result, Tabs } from 'antd';
+import classNames from 'classnames';
 import { AxiosError } from 'axios';
 import {
   ReactNode,
@@ -26,13 +27,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg';
 import { ReactComponent as IconDelete } from '../../assets/svg/ic-delete.svg';
 import ApprovedRecordHistoryModal from '../../components/common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component';
-import { CopyToClipboardButton } from '../../components/common/CopyToClipboardButton/CopyToClipboardButton';
 import { EditIconButton } from '../../components/common/IconButtons/EditIconButton';
 import Loader from '../../components/common/Loader/Loader';
 import ReviewActionConfirmModal from '../../components/common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
 import { TagSelectableList } from '../../components/common/TagSelectableList/TagSelectableList.component';
-import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
+import DescriptionV1 from '../../components/common/EntityDescription/DescriptionV1';
+import TabsLabel from '../../components/common/TabsLabel/TabsLabel.component';
 import { UserTeamSelectableList } from '../../components/common/UserTeamSelectableList/UserTeamSelectableList.component';
+import { EntityHeader } from '../../components/Entity/EntityHeader/EntityHeader.component';
 import WorkflowActionBar from '../../components/common/WorkflowActionBar/WorkflowActionBar.component';
 import type {
   WorkflowAction,
@@ -45,15 +47,18 @@ import {
 } from '../../components/Glossary/GlossaryTerms/GovernedGlossaryDetailLayout';
 import SurvivorshipBadge from '../../components/Glossary/GlossaryTerms/tabs/SurvivorshipRules/SurvivorshipBadge.component';
 import { renderDictionaryPastelTag } from '../../components/Glossary/GlossaryTermTab/DictionaryCellRenderers';
+import { GovernedVersionKind } from '../../components/Glossary/GovernedEntityHeaderBadges/GovernedEntityHeaderBadges.utils';
+import GovernedStatusBadge from '../../components/Glossary/GovernedStatusBadge/GovernedStatusBadge.component';
 import ConfirmationModal from '../../components/Modals/ConfirmationModal/ConfirmationModal';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import TagsViewer from '../../components/Tag/TagsViewer/TagsViewer';
 import { DisplayType } from '../../components/Tag/TagsViewer/TagsViewer.interface';
-import { ROUTES } from '../../constants/constants';
+import { DE_ACTIVE_COLOR, ROUTES } from '../../constants/constants';
 import {
   TECHNICAL_CLASSIFICATIONS,
   TECHNICAL_MAX_RANK,
 } from '../../constants/TechnicalDictionary.constants';
+import { EntityType } from '../../enums/entity.enum';
 import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../generated/entity/type';
 import {
@@ -75,11 +80,11 @@ import {
   getTechnicalRecordVersions,
   getTechnicalSnapshotRecord,
   requestTechnicalRecordDeletion,
+  withdrawTechnicalChangeRequest,
   saveTechnicalChangeRequest,
   submitTechnicalChangeRequest,
   TechnicalChangeRequest,
   TechnicalOwnerInput,
-  TechnicalRecordStatus,
   TechnicalRecordVersions,
   updateTechnicalRecord,
 } from '../../rest/technicalDictionaryAPI';
@@ -91,6 +96,7 @@ import { TechnicalDictionaryRow } from './technicalDictionary.interface';
 import './technicalDictionary.less';
 import {
   canReviewTechnicalRecord,
+  TECHNICAL_ENTITY_STATUS,
   toTechnicalDictionaryRow,
   toWorkingRow,
 } from './TechnicalDictionaryRows';
@@ -107,16 +113,10 @@ const toOwnerInputs = (
 ): TechnicalOwnerInput[] =>
   owners.map((owner) => ({ id: owner.id, type: owner.type }));
 
-const ENTITY_STATUS: Record<TechnicalRecordStatus, EntityStatus> = {
-  Draft: EntityStatus.Draft,
-  'In Review': EntityStatus.InReview,
-  Approved: EntityStatus.Approved,
-  Rejected: EntityStatus.Rejected,
-  Archived: EntityStatus.Archived,
-};
 const VERSION_PARAM = 'businessVersion';
 const VIEW_PARAM = 'view';
 const WORKING_VIEW = 'working';
+const OVERVIEW_TAB = 'overview';
 const REVISION_CONFLICT = 'TD_RECORD_REVISION_CONFLICT';
 const CHANGE_REQUEST_STALE = 'TD_CHANGE_REQUEST_STALE';
 const DELETE_BODY_KEYS: Record<DeleteKind, string> = {
@@ -307,6 +307,24 @@ const TechnicalRecordDetailPage = () => {
     [detailPath, navigate, termId, versions?.currentRecordId]
   );
 
+  const selectWorking = useCallback(
+    () => navigate(detailPath(undefined, termId, true)),
+    [detailPath, navigate, termId]
+  );
+
+  const workingVersionKind =
+    row?.hasPendingChange && !viewedVersion
+      ? row.changeOperation === 'DELETE'
+        ? GovernedVersionKind.DeletionRequest
+        : GovernedVersionKind.CorrectionDraft
+      : undefined;
+  /** The proposal of a pending change is on screen, not the approved record it changes. */
+  const isWorkingView = Boolean(
+    wantsWorking && row?.hasPendingChange && row.status !== 'Approved'
+  );
+  const isDeletionRequestView =
+    isWorkingView && row?.changeOperation === 'DELETE';
+
   const openCde = useCallback(
     async (cdeTermId: string) => {
       try {
@@ -340,6 +358,23 @@ const TechnicalRecordDetailPage = () => {
     },
     [reload, t]
   );
+
+  const withdrawChange = useCallback(async () => {
+    if (!row) {
+      return;
+    }
+    setIsBusy(true);
+    try {
+      await withdrawTechnicalChangeRequest(row.termId, row.revision);
+      showSuccessToast(t('message.request-withdrawn-success'));
+      navigate(detailPath(undefined, row.termId));
+      reload();
+    } catch (failure) {
+      failAction(failure);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [detailPath, failAction, navigate, reload, row, t]);
 
   const applyChangeRequest = useCallback((change: TechnicalChangeRequest) => {
     setRow(toWorkingRow(change).working);
@@ -539,7 +574,14 @@ const TechnicalRecordDetailPage = () => {
     row && capabilities.canEdit && !viewedVersion && !row.deleted
   );
   const canViewHistory = Boolean(
-    row && !viewedVersion && row.status === 'Approved'
+    row && !viewedVersion && (row.status === 'Approved' || isWorkingView)
+  );
+  const canWithdraw = Boolean(
+    row &&
+      isWorkingView &&
+      row.changeRequestStatus === 'InReview' &&
+      currentUser?.name &&
+      row.submittedBy === currentUser.name
   );
   const isChange = Boolean(row?.hasPendingChange);
   const isOpenDraft = row?.status === 'Draft' || row?.status === 'Rejected';
@@ -592,6 +634,15 @@ const TechnicalRecordDetailPage = () => {
         testId: 'technical-record-approve',
       });
     }
+    if (canWithdraw) {
+      secondary.push({
+        key: 'withdraw',
+        label: t('label.withdraw-request'),
+        onClick: withdrawChange,
+        testId: 'withdraw-request-button',
+        loading: isBusy,
+      });
+    }
     if (canCreateChange) {
       secondary.push({
         key: 'create-change',
@@ -627,6 +678,8 @@ const TechnicalRecordDetailPage = () => {
   }, [
     canCreateChange,
     canReviewNow,
+    canWithdraw,
+    withdrawChange,
     canSubmitNow,
     createChangeDraft,
     handleDownload,
@@ -756,58 +809,57 @@ const TechnicalRecordDetailPage = () => {
       <div
         className="tech-dict-page-container"
         data-testid="technical-record-detail">
-        <div className="m-b-md">
-          <TitleBreadcrumb
-            titleLinks={[
-              {
-                name: t('label.technical-dictionary'),
-                url: ROUTES.TECHNICAL_DICTIONARY,
-              },
-              { name: row.columnName, url: '', activeTitle: true },
-            ]}
-          />
-        </div>
-
-        <div className="tech-dict-page-header">
-          <div className="tech-dict-title-row">
-            <div className="tech-dict-title-left">
-              <div className="tech-dict-icon-wrapper">
-                <ColumnBulkIcon height={22} width={22} />
-              </div>
-              <div className="tech-dict-title-copy">
-                <div className="tech-dict-title-heading">
-                  <h1
-                    className="tech-dict-title"
-                    data-testid="technical-record-title">
-                    {row.columnName}
-                  </h1>
-                  {row.deleted && (
-                    <Tag
-                      color="error"
-                      data-testid="technical-record-deleted"
-                      title={row.deletedBy}>
-                      {t('cde.deleted-record')}
-                    </Tag>
-                  )}
-                  {dataDictionaryVersion && (
-                    <TechnicalVersionBadges
-                      currentStatus={ENTITY_STATUS[row.status]}
-                      dataDictionaryVersion={dataDictionaryVersion}
-                      snapshotVersion={viewedVersion}
-                      testId="technical-record-version-button"
-                      versions={versions?.data}
-                      onSelectVersion={selectVersion}
+        <div className="glossary-header flex gap-4 justify-between no-wrap tech-dict-page-header">
+          <div
+            className="flex w-min-0 flex-auto"
+            data-testid="technical-record-title">
+            <EntityHeader
+              showNameRow
+              badge={
+                dataDictionaryVersion ? (
+                  <TechnicalVersionBadges
+                    currentStatus={TECHNICAL_ENTITY_STATUS[row.status]}
+                    dataDictionaryVersion={dataDictionaryVersion}
+                    deletedBy={row.deletedBy}
+                    isDeleted={Boolean(row.deleted)}
+                    snapshotVersion={viewedVersion}
+                    testId="technical-record-version-button"
+                    versions={versions?.data}
+                    workingKind={workingVersionKind}
+                    onSelectVersion={selectVersion}
+                    onSelectWorking={selectWorking}
+                  />
+                ) : (
+                  row.deleted && (
+                    <GovernedStatusBadge
+                      isDeleted
+                      dataTestId="technical-record-deleted"
+                      deletedBy={row.deletedBy}
+                      status={EntityStatus.Archived}
                     />
-                  )}
-                </div>
-                <div className="tech-dict-subtitle">
-                  <span data-testid="technical-record-path">
-                    {row.columnFqn}
-                  </span>
-                  <CopyToClipboardButton copyText={row.columnFqn} />
-                </div>
-              </div>
-            </div>
+                  )
+                )
+              }
+              breadcrumb={[
+                {
+                  name: t('label.technical-dictionary'),
+                  url: ROUTES.TECHNICAL_DICTIONARY,
+                },
+                { name: row.columnName, url: '', activeTitle: true },
+              ]}
+              entityData={{ name: row.columnFqn, displayName: row.columnName }}
+              icon={
+                <ColumnBulkIcon
+                  className="align-middle"
+                  color={DE_ACTIVE_COLOR}
+                  height={36}
+                  width={32}
+                />
+              }
+              serviceName=""
+            />
+          </div>
+          <div className="flex items-center">
             <WorkflowActionBar
               historyTestId="correction-history-button"
               menu={technicalWorkflowMenu}
@@ -819,6 +871,15 @@ const TechnicalRecordDetailPage = () => {
           </div>
         </div>
 
+        {isDeletionRequestView && (
+          <Alert
+            showIcon
+            className="m-b-md"
+            data-testid="technical-pending-deletion-banner"
+            message={t('message.technical-deletion-pending-banner')}
+            type="error"
+          />
+        )}
         {row.deleted && (
           <Alert
             showIcon
@@ -832,225 +893,260 @@ const TechnicalRecordDetailPage = () => {
           />
         )}
 
-        <div className="tech-dict-tab-card">
-          <div className="tech-dict-tab-list" role="tablist">
-            <button
-              aria-selected
-              className="tech-dict-tab active"
-              data-testid="technical-record-overview-tab"
-              role="tab"
-              type="button">
-              {t('label.overview')}
-            </button>
-          </div>
-        </div>
-
-        <div className="tech-dict-content-card tech-dict-record-card">
-          <Form className="cde-detail-summary" form={form} layout="vertical">
-            <section
-              className="tech-dict-record-description"
-              data-testid="technical-record-description">
-              <header>{t('label.description')}</header>
-              <div>
-                {row.description || (
-                  <span className="text-grey-muted">
-                    {t('message.technical-no-description')}
-                  </span>
-                )}
-              </div>
-            </section>
-
-            <Section
-              title={t('label.technical-source-information')}
-              variant="classification">
-              <Field label={t('label.source')}>
-                {row.serviceName
-                  ? renderDictionaryPastelTag(row.serviceName, 'source')
-                  : placeholder}
-              </Field>
-              <Field label={t('label.technical-source-table')}>
-                {[row.databaseName, row.schemaName, row.tableName]
-                  .filter(Boolean)
-                  .join(' / ') || placeholder}
-              </Field>
-              <Field label={t('label.data-type')}>
-                {row.dataType
-                  ? renderDictionaryPastelTag(row.dataType, 'classification')
-                  : placeholder}
-              </Field>
-              {field(
-                t('label.technical-data-steward'),
-                row.systemOwners.length
-                  ? row.systemOwners.map((owner) => owner.name).join(', ')
-                  : placeholder,
-                canEditNow ? (
-                  <UserTeamSelectableList
-                    hasPermission
-                    listHeight={200}
-                    multiple={{ team: true, user: true }}
-                    owner={row.systemOwners.map((owner) => ({
-                      id: owner.id,
-                      name: owner.name,
-                      type: owner.type,
-                    }))}
-                    popoverProps={{
-                      open: openPicker === 'systemOwner',
-                      placement: 'bottomLeft',
-                      onOpenChange: (open) =>
-                        setOpenPicker(open ? 'systemOwner' : undefined),
-                    }}
-                    onUpdate={async (owners) => {
-                      await saveField(
-                        {},
-                        undefined,
-                        (owners ?? []).map((owner) => ({
-                          id: owner.id,
-                          type: owner.type === 'user' ? 'user' : 'team',
-                        }))
-                      );
-                    }}>
-                    {editIcon(
-                      t('label.technical-data-steward'),
-                      'technical-edit-system-owner'
+        <Tabs
+          activeKey={OVERVIEW_TAB}
+          className="tabs-new tech-dict-tabs"
+          data-testid="technical-record-tabs"
+          items={[
+            {
+              key: OVERVIEW_TAB,
+              label: (
+                <TabsLabel
+                  isActive
+                  id="technical-record-overview-tab"
+                  name={t('label.overview')}
+                />
+              ),
+              children: (
+                <section
+                  className="cde-glossary-term-overview tech-dict-record-overview"
+                  data-testid="technical-record-overview">
+                  <div
+                    className={classNames(
+                      'cde-glossary-term-overview-panel cde-glossary-term-description',
+                      {
+                        'cde-glossary-term-description-empty': !row.description,
+                      }
                     )}
-                  </UserTeamSelectableList>
-                ) : undefined
-              )}
-            </Section>
-
-            <Section
-              title={t('label.technical-cde-reference')}
-              variant="classification">
-              {field(
-                t('label.cde-code-ref'),
-                row.cdeCode ? (
-                  <Button
-                    className="p-0 h-auto tech-entity-link"
-                    data-testid={`cde-code-${row.cdeCode}`}
-                    title={row.cdeName || row.cdeCode}
-                    type="link"
-                    onClick={() => row.cdeTermId && openCde(row.cdeTermId)}>
-                    {row.cdeCode}
-                  </Button>
-                ) : (
-                  placeholder
-                ),
-                canEditNow ? (
-                  <CDESelectableList
-                    dataDictionaryVersion={dataDictionaryVersion}
-                    isOpen={openPicker === 'cde'}
-                    selectedCde={
-                      row.cdeTermId
-                        ? {
-                            id: row.cdeTermId,
-                            name: row.cdeCode,
-                            displayName: row.cdeName,
-                            type: 'glossaryTerm',
-                          }
-                        : undefined
-                    }
-                    onOpenChange={(open) =>
-                      setOpenPicker(open ? 'cde' : undefined)
-                    }
-                    onSelect={saveCde}>
-                    {editIcon(t('label.cde-code-ref'), 'technical-edit-cde')}
-                  </CDESelectableList>
-                ) : undefined
-              )}
-              <Field label={t('label.cde-name')}>
-                {row.cdeName || placeholder}
-              </Field>
-              {field(
-                t('label.rank'),
-                isEditingRank ? (
-                  <div className="cde-inline-date-editor">
-                    <Form.Item
-                      className="m-0"
-                      name="rank"
-                      rules={[
-                        {
-                          type: 'number',
-                          min: 1,
-                          max: TECHNICAL_MAX_RANK,
-                          message: t('message.technical-rank-range', {
-                            max: TECHNICAL_MAX_RANK,
-                          }),
-                        },
-                      ]}>
-                      <InputNumber
-                        autoFocus
-                        data-testid="technical-rank-input"
-                        max={TECHNICAL_MAX_RANK}
-                        min={1}
-                        precision={0}
-                      />
-                    </Form.Item>
-                    <Button
-                      aria-label={t('label.save')}
-                      className="cde-inline-date-action"
-                      data-testid="technical-rank-save"
-                      icon={<CheckOutlined />}
-                      loading={isBusy}
-                      size="small"
-                      type="primary"
-                      onClick={saveRank}
-                    />
-                    <Button
-                      aria-label={t('label.cancel')}
-                      className="cde-inline-date-action"
-                      data-testid="technical-rank-cancel"
-                      disabled={isBusy}
-                      icon={<CloseOutlined />}
-                      size="small"
-                      onClick={() => setIsEditingRank(false)}
+                    data-testid="technical-record-description">
+                    <DescriptionV1
+                      isReadOnly
+                      wrapInCard
+                      description={row.description}
+                      entityName={row.columnName}
+                      entityType={EntityType.GLOSSARY_TERM}
+                      hasEditAccess={false}
+                      showActions={false}
+                      showCommentsIcon={false}
                     />
                   </div>
-                ) : row.rank ? (
-                  <SurvivorshipBadge
-                    rule={{
-                      assetFqn: row.columnFqn || row.termId,
-                      rank: row.rank,
-                    }}
-                  />
-                ) : (
-                  placeholder
-                ),
-                canEditNow && !isEditingRank
-                  ? editIcon(
-                      t('label.rank'),
-                      'technical-edit-rank',
-                      startRankEdit
-                    )
-                  : undefined
-              )}
-            </Section>
+                  <div className="cde-glossary-term-overview-summary">
+                    <Form
+                      className="cde-detail-summary"
+                      form={form}
+                      layout="vertical">
+                      <Section
+                        title={t('label.technical-source-information')}
+                        variant="classification">
+                        <Field label={t('label.source')}>
+                          {row.serviceName
+                            ? renderDictionaryPastelTag(
+                                row.serviceName,
+                                'source'
+                              )
+                            : placeholder}
+                        </Field>
+                        <Field label={t('label.technical-source-table')}>
+                          {[row.databaseName, row.schemaName, row.tableName]
+                            .filter(Boolean)
+                            .join(' / ') || placeholder}
+                        </Field>
+                        <Field label={t('label.data-type')}>
+                          {row.dataType
+                            ? renderDictionaryPastelTag(
+                                row.dataType,
+                                'classification'
+                              )
+                            : placeholder}
+                        </Field>
+                        {field(
+                          t('label.technical-data-steward'),
+                          row.systemOwners.length
+                            ? row.systemOwners
+                                .map((owner) => owner.name)
+                                .join(', ')
+                            : placeholder,
+                          canEditNow ? (
+                            <UserTeamSelectableList
+                              hasPermission
+                              listHeight={200}
+                              multiple={{ team: true, user: true }}
+                              owner={row.systemOwners.map((owner) => ({
+                                id: owner.id,
+                                name: owner.name,
+                                type: owner.type,
+                              }))}
+                              popoverProps={{
+                                open: openPicker === 'systemOwner',
+                                placement: 'bottomLeft',
+                                onOpenChange: (open) =>
+                                  setOpenPicker(
+                                    open ? 'systemOwner' : undefined
+                                  ),
+                              }}
+                              onUpdate={async (owners) => {
+                                await saveField(
+                                  {},
+                                  undefined,
+                                  (owners ?? []).map((owner) => ({
+                                    id: owner.id,
+                                    type:
+                                      owner.type === 'user' ? 'user' : 'team',
+                                  }))
+                                );
+                              }}>
+                              {editIcon(
+                                t('label.technical-data-steward'),
+                                'technical-edit-system-owner'
+                              )}
+                            </UserTeamSelectableList>
+                          ) : undefined
+                        )}
+                      </Section>
 
-            <Section
-              title={t('label.technical-specification')}
-              variant="classification">
-              {tagField(
-                'elementType',
-                t('label.data-element-type'),
-                TECHNICAL_CLASSIFICATIONS.ELEMENT_TYPE
-              )}
-              {tagField(
-                'generationType',
-                t('label.generation-type'),
-                TECHNICAL_CLASSIFICATIONS.GENERATION_TYPE
-              )}
-              {tagField(
-                'creationMethod',
-                t('label.creation-method'),
-                TECHNICAL_CLASSIFICATIONS.CREATION_METHOD
-              )}
-              {tagField(
-                'timeliness',
-                t('label.timeliness'),
-                TECHNICAL_CLASSIFICATIONS.TIMELINESS
-              )}
-            </Section>
-          </Form>
-        </div>
+                      <Section
+                        title={t('label.technical-cde-reference')}
+                        variant="classification">
+                        {field(
+                          t('label.cde-code-ref'),
+                          row.cdeCode ? (
+                            <Button
+                              className="p-0 h-auto tech-entity-link"
+                              data-testid={`cde-code-${row.cdeCode}`}
+                              title={row.cdeName || row.cdeCode}
+                              type="link"
+                              onClick={() =>
+                                row.cdeTermId && openCde(row.cdeTermId)
+                              }>
+                              {row.cdeCode}
+                            </Button>
+                          ) : (
+                            placeholder
+                          ),
+                          canEditNow ? (
+                            <CDESelectableList
+                              dataDictionaryVersion={dataDictionaryVersion}
+                              isOpen={openPicker === 'cde'}
+                              selectedCde={
+                                row.cdeTermId
+                                  ? {
+                                      id: row.cdeTermId,
+                                      name: row.cdeCode,
+                                      displayName: row.cdeName,
+                                      type: 'glossaryTerm',
+                                    }
+                                  : undefined
+                              }
+                              onOpenChange={(open) =>
+                                setOpenPicker(open ? 'cde' : undefined)
+                              }
+                              onSelect={saveCde}>
+                              {editIcon(
+                                t('label.cde-code-ref'),
+                                'technical-edit-cde'
+                              )}
+                            </CDESelectableList>
+                          ) : undefined
+                        )}
+                        <Field label={t('label.cde-name')}>
+                          {row.cdeName || placeholder}
+                        </Field>
+                        {field(
+                          t('label.rank'),
+                          isEditingRank ? (
+                            <div className="cde-inline-date-editor">
+                              <Form.Item
+                                className="m-0"
+                                name="rank"
+                                rules={[
+                                  {
+                                    type: 'number',
+                                    min: 1,
+                                    max: TECHNICAL_MAX_RANK,
+                                    message: t('message.technical-rank-range', {
+                                      max: TECHNICAL_MAX_RANK,
+                                    }),
+                                  },
+                                ]}>
+                                <InputNumber
+                                  autoFocus
+                                  data-testid="technical-rank-input"
+                                  max={TECHNICAL_MAX_RANK}
+                                  min={1}
+                                  precision={0}
+                                />
+                              </Form.Item>
+                              <Button
+                                aria-label={t('label.save')}
+                                className="cde-inline-date-action"
+                                data-testid="technical-rank-save"
+                                icon={<CheckOutlined />}
+                                loading={isBusy}
+                                size="small"
+                                type="primary"
+                                onClick={saveRank}
+                              />
+                              <Button
+                                aria-label={t('label.cancel')}
+                                className="cde-inline-date-action"
+                                data-testid="technical-rank-cancel"
+                                disabled={isBusy}
+                                icon={<CloseOutlined />}
+                                size="small"
+                                onClick={() => setIsEditingRank(false)}
+                              />
+                            </div>
+                          ) : row.rank ? (
+                            <SurvivorshipBadge
+                              rule={{
+                                assetFqn: row.columnFqn || row.termId,
+                                rank: row.rank,
+                              }}
+                            />
+                          ) : (
+                            placeholder
+                          ),
+                          canEditNow && !isEditingRank
+                            ? editIcon(
+                                t('label.rank'),
+                                'technical-edit-rank',
+                                startRankEdit
+                              )
+                            : undefined
+                        )}
+                      </Section>
+
+                      <Section
+                        title={t('label.technical-specification')}
+                        variant="classification">
+                        {tagField(
+                          'elementType',
+                          t('label.data-element-type'),
+                          TECHNICAL_CLASSIFICATIONS.ELEMENT_TYPE
+                        )}
+                        {tagField(
+                          'generationType',
+                          t('label.generation-type'),
+                          TECHNICAL_CLASSIFICATIONS.GENERATION_TYPE
+                        )}
+                        {tagField(
+                          'creationMethod',
+                          t('label.creation-method'),
+                          TECHNICAL_CLASSIFICATIONS.CREATION_METHOD
+                        )}
+                        {tagField(
+                          'timeliness',
+                          t('label.timeliness'),
+                          TECHNICAL_CLASSIFICATIONS.TIMELINESS
+                        )}
+                      </Section>
+                    </Form>
+                  </div>
+                </section>
+              ),
+            },
+          ]}
+        />
 
         <ConfirmationModal
           bodyText={deleteKind ? t(DELETE_BODY_KEYS[deleteKind]) : ''}

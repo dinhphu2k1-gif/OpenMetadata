@@ -16,17 +16,20 @@ import { ReactComponent as ColumnBulkIcon } from '../../assets/svg/ic-column.svg
 import { ReactComponent as ExportIcon } from '../../assets/svg/ic-export.svg';
 import { ReactComponent as ImportIcon } from '../../assets/svg/ic-import.svg';
 import { ReactComponent as RefreshIcon } from '../../assets/svg/ic-refresh.svg';
-import { CopyToClipboardButton } from '../../components/common/CopyToClipboardButton/CopyToClipboardButton';
+import { TitleBreadcrumbProps } from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.interface';
+import { EntityHeader } from '../../components/Entity/EntityHeader/EntityHeader.component';
 import WorkflowActionBar from '../../components/common/WorkflowActionBar/WorkflowActionBar.component';
 import type {
   WorkflowAction,
   WorkflowMenuItem,
 } from '../../components/common/WorkflowActionBar/WorkflowActionBar.interface';
+import { DE_ACTIVE_COLOR } from '../../constants/constants';
 import { TECHNICAL_DICTIONARY_GLOSSARY_NAME } from '../../constants/Glossary.contant';
 import { TechnicalDictionaryCapabilities } from './technicalDictionary.interface';
 import TechnicalVersionBadges from './TechnicalVersionBadges.component';
 
 interface TechnicalDictionaryHeaderProps {
+  breadcrumb: TitleBreadcrumbProps['titleLinks'];
   /** Data Dictionary version the dictionary follows; undefined while none is approved. */
   dataDictionaryVersion?: string;
   capabilities: TechnicalDictionaryCapabilities;
@@ -42,6 +45,7 @@ interface TechnicalDictionaryHeaderProps {
 }
 
 const TechnicalDictionaryHeader = ({
+  breadcrumb,
   dataDictionaryVersion,
   capabilities,
   isAdmin,
@@ -116,37 +120,38 @@ const TechnicalDictionaryHeader = ({
   ]);
 
   return (
-    <div className="tech-dict-page-header">
-      <div className="tech-dict-title-row">
-        <div className="tech-dict-title-left">
-          <div className="tech-dict-icon-wrapper">
-            <ColumnBulkIcon height={22} width={22} />
-          </div>
-          <div className="tech-dict-title-copy">
-            <div className="tech-dict-title-heading">
-              <h1 className="tech-dict-title">
-                {t('label.technical-dictionary')}
-              </h1>
-              {dataDictionaryVersion && (
-                <span data-testid="technical-dictionary-version-badge">
-                  <TechnicalVersionBadges
-                    dataDictionaryVersion={dataDictionaryVersion}
-                    snapshotVersion={snapshotVersion}
-                    onSelectVersion={onSelectVersion}
-                  />
-                </span>
-              )}
-            </div>
-            <div className="tech-dict-subtitle">
-              <span data-testid="technical-dictionary-name">
-                {TECHNICAL_DICTIONARY_GLOSSARY_NAME}
+    <div className="glossary-header flex gap-4 justify-between no-wrap tech-dict-page-header">
+      <div className="flex w-min-0 flex-auto">
+        <EntityHeader
+          showNameRow
+          badge={
+            dataDictionaryVersion && (
+              <span data-testid="technical-dictionary-version-badge">
+                <TechnicalVersionBadges
+                  dataDictionaryVersion={dataDictionaryVersion}
+                  snapshotVersion={snapshotVersion}
+                  onSelectVersion={onSelectVersion}
+                />
               </span>
-              <CopyToClipboardButton
-                copyText={TECHNICAL_DICTIONARY_GLOSSARY_NAME}
-              />
-            </div>
-          </div>
-        </div>
+            )
+          }
+          breadcrumb={breadcrumb}
+          entityData={{
+            name: TECHNICAL_DICTIONARY_GLOSSARY_NAME,
+            displayName: t('label.technical-dictionary'),
+          }}
+          icon={
+            <ColumnBulkIcon
+              className="align-middle"
+              color={DE_ACTIVE_COLOR}
+              height={36}
+              width={32}
+            />
+          }
+          serviceName=""
+        />
+      </div>
+      <div className="flex items-center">
         <WorkflowActionBar
           menu={menu}
           menuTestId="technical-dictionary-more-actions"

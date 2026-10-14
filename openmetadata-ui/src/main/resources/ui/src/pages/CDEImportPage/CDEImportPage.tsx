@@ -11,38 +11,28 @@
  *  limitations under the License.
  */
 
-import { DownloadOutlined } from '@ant-design/icons';
 import {
   Alert,
   Button,
   Card,
   Col,
-  Progress,
   Radio,
   Result,
-  Row,
-  Segmented,
   Space,
   Tag,
   Tooltip,
   Typography,
-  Upload,
 } from 'antd';
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DataGrid, { Column, RenderCellProps, textEditor } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
-import {
-  CDE_DATE_FIELDS,
-  validateCDEDates,
-} from '../../utils/CDEDateUtils';
+import { CDE_DATE_FIELDS, validateCDEDates } from '../../utils/CDEDateUtils';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ReactComponent as FailBadgeIcon } from '../../assets/svg/fail-badge.svg';
-import { ReactComponent as ImportIcon } from '../../assets/svg/ic-drag-drop.svg';
 import { ReactComponent as PaperPlaneIcon } from '../../assets/svg/paper-plane.svg';
 import { ReactComponent as SuccessBadgeIcon } from '../../assets/svg/success-badge.svg';
-import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
 import {
   findMatchingDomain,
   formatCDEImportErrorMessage,
@@ -53,9 +43,12 @@ import {
   validatePersonalDataValue,
   validateUserOrTeamList,
 } from '../../components/Glossary/CDEImportExport/CDEImportExport.utils';
-import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
-import Stepper from '../../components/Settings/Services/Ingestion/IngestionStepper/IngestionStepper.component';
 import '../../components/UploadFile/upload-file.less';
+import GovernedImportFooter from '../../components/common/GovernedImport/GovernedImportFooter.component';
+import GovernedImportLayout from '../../components/common/GovernedImport/GovernedImportLayout.component';
+import GovernedImportProgress from '../../components/common/GovernedImport/GovernedImportProgress.component';
+import GovernedImportUploadStep from '../../components/common/GovernedImport/GovernedImportUploadStep.component';
+import GovernedImportValidationHeader from '../../components/common/GovernedImport/GovernedImportValidationHeader.component';
 import { VALIDATION_STEP } from '../../constants/BulkImport.constant';
 import { SOCKET_EVENTS } from '../../constants/constants';
 import { useWebSocketConnector } from '../../context/WebSocketProvider/WebSocketProvider';
@@ -85,11 +78,8 @@ import {
 import { getTags } from '../../rest/tagAPI';
 import { getTeams } from '../../rest/teamsAPI';
 import { getUsers } from '../../rest/userAPI';
-import './cde-import-page.less';
 import { getGlossaryPath } from '../../utils/RouterUtils';
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
-
-const { Dragger } = Upload;
 
 type DuplicateHandling = 'skip' | 'update';
 
@@ -174,7 +164,10 @@ const CDEImportPage: FC = () => {
           total?: number;
           message?: string;
         };
-        if (!message.jobId || message.jobId !== activeImportSessionRef.current) {
+        if (
+          !message.jobId ||
+          message.jobId !== activeImportSessionRef.current
+        ) {
           return;
         }
         if (
@@ -183,7 +176,10 @@ const CDEImportPage: FC = () => {
           message.total > 0
         ) {
           setImportProgress(
-            Math.min(99, Math.round(((message.progress ?? 0) / message.total) * 100))
+            Math.min(
+              99,
+              Math.round(((message.progress ?? 0) / message.total) * 100)
+            )
           );
         } else if (message.status === 'STARTED') {
           setImportProgress(0);
@@ -395,8 +391,8 @@ const CDEImportPage: FC = () => {
         width: 190,
         editable: true,
         resizable: true,
-        headerCellClass: 'cde-first-column-header',
-        cellClass: 'cde-first-column-cell',
+        headerCellClass: 'governed-import-first-column-header',
+        cellClass: 'governed-import-first-column-cell',
         renderEditCell: textEditor,
       },
       {
@@ -582,11 +578,9 @@ const CDEImportPage: FC = () => {
         );
         if (missingHeaders.length > 0) {
           throw new Error(
-            t(
-              'cde.missing-import-headers',
-              'Thiếu cột bắt buộc: {{headers}}',
-              { headers: missingHeaders.join(', ') }
-            )
+            t('cde.missing-import-headers', 'Thiếu cột bắt buộc: {{headers}}', {
+              headers: missingHeaders.join(', '),
+            })
           );
         }
         const valueAt = (row: string[], header: string) =>
@@ -875,8 +869,12 @@ const CDEImportPage: FC = () => {
           ...row,
           status: errors.length === 0 ? Status.Success : Status.Failure,
           details:
-            errors.map((error) => `${error.column}: ${error.message}`).join('; ') ||
-            [result?.action, ...(result?.warnings ?? [])].filter(Boolean).join(' — '),
+            errors
+              .map((error) => `${error.column}: ${error.message}`)
+              .join('; ') ||
+            [result?.action, ...(result?.warnings ?? [])]
+              .filter(Boolean)
+              .join(' — '),
         };
       });
       const failed = rows.filter((row) => row.status === Status.Failure).length;
@@ -916,8 +914,8 @@ const CDEImportPage: FC = () => {
         width: 120,
         minWidth: 100,
         resizable: true,
-        headerCellClass: 'cde-status-column-header',
-        cellClass: 'cde-status-column-cell',
+        headerCellClass: 'governed-import-status-column-header',
+        cellClass: 'governed-import-status-column-cell',
         renderCell: (data: RenderCellProps<Record<string, string>>) => {
           const isSuccess = data.row.status === Status.Success;
 
@@ -946,8 +944,8 @@ const CDEImportPage: FC = () => {
         width: 320,
         minWidth: 220,
         resizable: true,
-        headerCellClass: 'cde-details-column-header',
-        cellClass: 'cde-details-column-cell',
+        headerCellClass: 'governed-import-details-column-header',
+        cellClass: 'governed-import-details-column-cell',
         renderCell: (data: RenderCellProps<Record<string, string>>) => {
           const isSuccess = data.row.status === Status.Success;
           const detailsText =
@@ -1197,7 +1195,7 @@ const CDEImportPage: FC = () => {
             allUsers,
             allTeams
           );
-          const { businessVersion, ...createPayload } = payload;
+          const { businessVersion: _businessVersion, ...createPayload } = payload;
           const working = await addGlossaryTerm({
             ...createPayload,
             parentBusinessVersion,
@@ -1298,464 +1296,273 @@ const CDEImportPage: FC = () => {
   };
 
   return (
-    <PageLayoutV1
-      pageTitle={t('cde.import-title', 'Nhập danh sách CDE từ file Excel')}>
-      <Row className="cde-import-page-container" gutter={[16, 16]}>
-        {/* Header Breadcrumb */}
-        <Col span={24}>
-          <TitleBreadcrumb titleLinks={breadcrumbList} />
-        </Col>
-
-        {/* Stepper Header */}
-        <Col span={24}>
-          <Stepper activeStep={activeStep} steps={importSteps} />
-        </Col>
-
-        {/* BƯỚC 1: TẢI LÊN TỆP EXCEL */}
-        {activeStep === VALIDATION_STEP.UPLOAD && (
-          <Col span={24}>
-            <Dragger
-              accept=".xlsx,.xls"
-              beforeUpload={handleFileSelect}
-              className="file-dragger-wrapper"
-              data-testid="cde-upload-dragger"
-              disabled={parsing}
-              multiple={false}
-              showUploadList={false}>
-              <Space
-                align="center"
-                className="w-full justify-center"
-                direction="vertical"
-                size={36}
-                style={{ padding: '40px 0' }}>
-                <ImportIcon height={86} width={86} />
-                <Typography.Text>
-                  {parsing ? (
-                    t('cde.parsing-file', 'Đang đọc và thẩm định file Excel...')
-                  ) : (
-                    <span>
-                      Kéo & Thả hoặc{' '}
-                      <span className="browse-text">
-                        Duyệt tệp Excel (.xlsx)
-                      </span>{' '}
-                      vào đây
+    <GovernedImportLayout
+      activeStep={activeStep}
+      breadcrumb={breadcrumbList}
+      pageTitle={t('cde.import-title')}
+      steps={importSteps}
+      testId="cde-import-page">
+      {activeStep === VALIDATION_STEP.UPLOAD && (
+        <GovernedImportUploadStep
+          isParsing={parsing}
+          options={
+            <>
+              <Typography.Text strong className="d-block m-b-sm">
+                {t('cde.duplicate-handling')}:
+              </Typography.Text>
+              <Radio.Group
+                value={duplicatePolicy}
+                onChange={(e) => setDuplicatePolicy(e.target.value)}>
+                <Space direction="vertical" size={10}>
+                  <Radio value="skip">
+                    <span className="font-medium">
+                      {t('cde.skip-existing', 'Bỏ qua bản ghi trùng')}
                     </span>
-                  )}
-                </Typography.Text>
-              </Space>
-            </Dragger>
+                    <Typography.Text
+                      className="d-block text-xs text-muted"
+                      style={{ marginLeft: 24 }}
+                      type="secondary">
+                      {t(
+                        'cde.skip-existing-desc',
+                        'Giữ nguyên dữ liệu CDE đang có trên hệ thống, không thay đổi các bản ghi đã tồn tại.'
+                      )}
+                    </Typography.Text>
+                  </Radio>
+                  <Radio value="update">
+                    <span className="font-medium">
+                      {t('cde.overwrite-existing', 'Cập nhật ghi đè bản ghi')}
+                    </span>
+                    <Typography.Text
+                      className="d-block text-xs text-muted"
+                      style={{ marginLeft: 24 }}
+                      type="secondary">
+                      {t(
+                        'cde.overwrite-existing-desc',
+                        'Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại (chuyển sang trạng thái Bản nháp để chờ phê duyệt lại).'
+                      )}
+                    </Typography.Text>
+                  </Radio>
+                </Space>
+              </Radio.Group>
+            </>
+          }
+          testId="cde-upload-dragger"
+          onCancel={() => navigate(getGlossaryPath(fqn))}
+          onDownloadTemplate={handleDownloadTemplate}
+          onFileSelect={handleFileSelect}
+        />
+      )}
 
-            {/* Xử lý khi trùng mã CDE kèm chú thích chi tiết */}
-            <div className="m-t-md p-x-xs">
-              <Row align="top" gutter={[16, 16]} justify="space-between">
-                <Col md={18} xs={24}>
-                  <Typography.Text strong className="d-block m-b-sm">
-                    {t('cde.duplicate-handling', 'Xử lý khi trùng mã CDE')}:
-                  </Typography.Text>
-                  <Radio.Group
-                    value={duplicatePolicy}
-                    onChange={(e) => setDuplicatePolicy(e.target.value)}>
-                    <Space direction="vertical" size={10}>
-                      <Radio value="skip">
-                        <span className="font-medium">
-                          {t('cde.skip-existing', 'Bỏ qua bản ghi trùng')}
-                        </span>
-                        <Typography.Text
-                          className="d-block text-xs text-muted"
-                          style={{ marginLeft: 24 }}
-                          type="secondary">
-                          {t(
-                            'cde.skip-existing-desc',
-                            'Giữ nguyên dữ liệu CDE đang có trên hệ thống, không thay đổi các bản ghi đã tồn tại.'
-                          )}
-                        </Typography.Text>
-                      </Radio>
-                      <Radio value="update">
-                        <span className="font-medium">
-                          {t(
-                            'cde.overwrite-existing',
-                            'Cập nhật ghi đè bản ghi'
-                          )}
-                        </span>
-                        <Typography.Text
-                          className="d-block text-xs text-muted"
-                          style={{ marginLeft: 24 }}
-                          type="secondary">
-                          {t(
-                            'cde.overwrite-existing-desc',
-                            'Cập nhật thông tin mới từ tệp Excel vào các mã CDE đã tồn tại (chuyển sang trạng thái Bản nháp để chờ phê duyệt lại).'
-                          )}
-                        </Typography.Text>
-                      </Radio>
-                    </Space>
-                  </Radio.Group>
-                </Col>
-                <Col className="text-right" md={6} xs={24}>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    type="link"
-                    onClick={handleDownloadTemplate}>
-                    {t(
-                      'cde.download-template-btn',
-                      'Tải file Excel mẫu (.xlsx)'
-                    )}
-                  </Button>
-                </Col>
-              </Row>
-            </div>
+      {/* BƯỚC 2: XEM TRƯỚC SỬA (Đồng nhất OpenMetadata: DataGrid) */}
+      {activeStep === VALIDATION_STEP.EDIT_VALIDATE && (
+        <Col span={24}>
+          <div className="om-rdg governed-import-rdg" ref={setGridContainer}>
+            <DataGrid
+              className="rdg-light"
+              columns={cdeColumns}
+              rows={dataSource}
+              onCopy={handleCopy}
+              onPaste={handlePaste}
+              onRowsChange={handleOnRowsChange}
+            />
+          </div>
+        </Col>
+      )}
 
-            <div className="m-t-lg p-b-md">
-              <Button onClick={() => navigate(getGlossaryPath(fqn))}>
-                {t('label.cancel', 'Hủy')}
-              </Button>
-            </div>
-          </Col>
-        )}
-
-        {/* BƯỚC 2: XEM TRƯỚC SỬA (Đồng nhất OpenMetadata: DataGrid) */}
-        {activeStep === VALIDATION_STEP.EDIT_VALIDATE && (
-          <Col span={24}>
-            <div className="om-rdg cde-import-rdg" ref={setGridContainer}>
-              <DataGrid
-                className="rdg-light"
-                columns={cdeColumns}
-                rows={dataSource}
-                onCopy={handleCopy}
-                onPaste={handlePaste}
-                onRowsChange={handleOnRowsChange}
+      {activeStep === VALIDATION_STEP.UPDATE && (
+        <>
+          {!isCompleted ? (
+            isImporting ? (
+              <GovernedImportProgress
+                currentName={currentImportName}
+                percent={importProgress}
+                title={t('cde.importing-title')}
               />
-            </div>
-          </Col>
-        )}
-
-        {/* BƯỚC 3: CẬP NHẬT (Đồng nhất OpenMetadata: ImportStatus + DataGrid thẩm định + Cập nhật) */}
-        {activeStep === VALIDATION_STEP.UPDATE && (
-          <>
-            {!isCompleted ? (
-              <>
-                {isImporting ? (
-                  <Col span={24}>
-                    <Card className="text-center p-y-lg m-t-md">
-                      <Space
-                        align="center"
-                        className="w-full justify-center"
-                        direction="vertical"
-                        size={20}>
-                        <Typography.Title level={4}>
-                          {t('cde.importing-title', 'Đang nạp dữ liệu CDE...')}
-                        </Typography.Title>
-                        <div style={{ width: 400 }}>
-                          <Progress percent={importProgress} status="active" />
-                        </div>
-                        <Typography.Text type="secondary">
-                          {t('label.processing', 'Đang xử lý')}:{' '}
-                          <strong>{currentImportName}</strong>
-                        </Typography.Text>
-                      </Space>
-                    </Card>
-                  </Col>
-                ) : (
-                  <>
-                    {validationData && (
-                      <Col span={24}>
-                        <div className="cde-validation-header d-flex justify-between items-center w-full flex-wrap gap-2">
-                          <div
-                            className={`cde-validation-summary-badge ${
-                              validationData.numberOfRowsFailed > 0
-                                ? 'has-error'
-                                : 'is-success'
-                            }`}>
-                            {validationData.numberOfRowsFailed > 0 ? (
-                              <>
-                                <FailBadgeIcon height={16} width={16} />
-                                <span>
-                                  {t(
-                                    'cde.validation-has-errors',
-                                    'Phát hiện {{count}} bản ghi bị lỗi, vui lòng kiểm tra cột Chi tiết',
-                                    {
-                                      count: validationData.numberOfRowsFailed,
-                                    }
-                                  )}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <SuccessBadgeIcon height={16} width={16} />
-                                <span>
-                                  {t(
-                                    'cde.validation-all-valid',
-                                    'Tất cả {{count}} bản ghi đều hợp lệ, sẵn sàng cập nhật',
-                                    {
-                                      count: validationData.numberOfRowsPassed,
-                                    }
-                                  )}
-                                </span>
-                              </>
-                            )}
-                          </div>
-
-                          <div className="d-flex items-center gap-2">
-                            <Segmented
-                              className="cde-status-filter-segmented"
-                              data-testid="status-filter-group"
-                              options={[
-                                {
-                                  label: (
-                                    <span className="filter-item">
-                                      <span>{t('label.all', 'Tất cả')}</span>
-                                      <span
-                                        className="filter-count"
-                                        data-testid="processed-row">
-                                        {validationData.numberOfRowsProcessed}
-                                      </span>
-                                    </span>
-                                  ),
-                                  value: 'all',
-                                },
-                                {
-                                  label: (
-                                    <span className="filter-item">
-                                      <span className="filter-status-dot dot-error" />
-                                      <span>
-                                        {t('label.errors-only', 'Bị lỗi')}
-                                      </span>
-                                      <span
-                                        className={
-                                          validationData.numberOfRowsFailed > 0
-                                            ? 'filter-count filter-count-error'
-                                            : 'filter-count'
-                                        }
-                                        data-testid="failed-row">
-                                        {validationData.numberOfRowsFailed}
-                                      </span>
-                                    </span>
-                                  ),
-                                  value: 'failure',
-                                },
-                                {
-                                  label: (
-                                    <span className="filter-item">
-                                      <span className="filter-status-dot dot-success" />
-                                      <span>{t('label.valid', 'Hợp lệ')}</span>
-                                      <span
-                                        className={
-                                          validationData.numberOfRowsPassed > 0
-                                            ? 'filter-count filter-count-success'
-                                            : 'filter-count'
-                                        }
-                                        data-testid="passed-row">
-                                        {validationData.numberOfRowsPassed}
-                                      </span>
-                                    </span>
-                                  ),
-                                  value: 'success',
-                                },
-                              ]}
-                              value={statusFilter}
-                              onChange={(val) =>
-                                setStatusFilter(
-                                  val as 'all' | 'failure' | 'success'
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
-                      </Col>
-                    )}
-
-                    <Col span={24}>
-                      <div className="om-rdg cde-import-rdg-step3">
-                        <DataGrid
-                          className="rdg-light"
-                          columns={validateColumns}
-                          rows={filteredValidateDataSource}
-                        />
-                      </div>
-                    </Col>
-                  </>
-                )}
-              </>
             ) : (
-              <Col span={24}>
-                <Card className="m-t-md">
-                  <Result
-                    extra={[
-                      createdTerms.length > 0 && (
-                        <Button
-                          data-testid="submit-all-imported-btn"
-                          disabled={isSubmittingAllSuccess}
-                          icon={<PaperPlaneIcon height={14} width={14} />}
-                          key="submit-all"
-                          loading={isSubmittingAll}
-                          type="primary"
-                          onClick={handleBulkSubmitCreatedTerms}>
-                          {isSubmittingAllSuccess
-                            ? t(
-                                'label.all-submitted-for-review',
-                                'Đã gửi duyệt tất cả'
-                              )
-                            : t(
-                                'label.submit-all-imported-for-review',
-                                'Gửi phê duyệt toàn bộ {{count}} bản ghi vừa nạp',
-                                { count: createdTerms.length }
-                              )}
-                        </Button>
-                      ),
+              <>
+                {validationData && (
+                  <GovernedImportValidationHeader
+                    failed={validationData.numberOfRowsFailed}
+                    filter={statusFilter}
+                    passed={validationData.numberOfRowsPassed}
+                    total={validationData.numberOfRowsProcessed}
+                    onFilterChange={setStatusFilter}
+                  />
+                )}
+                <Col span={24}>
+                  <div className="om-rdg governed-import-rdg-step3">
+                    <DataGrid
+                      className="rdg-light"
+                      columns={validateColumns}
+                      rows={filteredValidateDataSource}
+                    />
+                  </div>
+                </Col>
+              </>
+            )
+          ) : (
+            <Col span={24}>
+              <Card className="m-t-md">
+                <Result
+                  extra={[
+                    createdTerms.length > 0 && (
                       <Button
-                        key="done"
-                        type={createdTerms.length > 0 ? 'default' : 'primary'}
-                        onClick={() => navigate(getGlossaryPath(fqn))}>
+                        data-testid="submit-all-imported-btn"
+                        disabled={isSubmittingAllSuccess}
+                        icon={<PaperPlaneIcon height={14} width={14} />}
+                        key="submit-all"
+                        loading={isSubmittingAll}
+                        type="primary"
+                        onClick={handleBulkSubmitCreatedTerms}>
+                        {isSubmittingAllSuccess
+                          ? t(
+                              'label.all-submitted-for-review',
+                              'Đã gửi duyệt tất cả'
+                            )
+                          : t(
+                              'label.submit-all-imported-for-review',
+                              'Gửi phê duyệt toàn bộ {{count}} bản ghi vừa nạp',
+                              { count: createdTerms.length }
+                            )}
+                      </Button>
+                    ),
+                    <Button
+                      key="done"
+                      type={createdTerms.length > 0 ? 'default' : 'primary'}
+                      onClick={() => navigate(getGlossaryPath(fqn))}>
+                      {t(
+                        'cde.close-and-view-list',
+                        'Đóng & Quay lại danh mục CDE'
+                      )}
+                    </Button>,
+                    <Button key="another" onClick={handleReset}>
+                      {t('cde.import-another-file', 'Nhập tiếp file khác')}
+                    </Button>,
+                  ]}
+                  status={importStats.failed > 0 ? 'warning' : 'success'}
+                  subTitle={
+                    <Space className="w-full" direction="vertical" size="small">
+                      <div>
                         {t(
-                          'cde.close-and-view-list',
-                          'Đóng & Quay lại danh mục CDE'
-                        )}
-                      </Button>,
-                      <Button key="another" onClick={handleReset}>
-                        {t('cde.import-another-file', 'Nhập tiếp file khác')}
-                      </Button>,
-                    ]}
-                    status={importStats.failed > 0 ? 'warning' : 'success'}
-                    subTitle={
-                      <Space
-                        className="w-full"
-                        direction="vertical"
-                        size="small">
+                          'cde.import-success-msg',
+                          'Đã tạo mới thành công {{count}} bản ghi CDE ở trạng thái',
+                          { count: importStats.created }
+                        )}{' '}
+                        <Tag color="orange">
+                          {t('label.draft', 'Bản nháp (Draft)')}
+                        </Tag>
+                        .
+                      </div>
+                      {importStats.updated > 0 && (
                         <div>
                           {t(
-                            'cde.import-success-msg',
-                            'Đã tạo mới thành công {{count}} bản ghi CDE ở trạng thái',
-                            { count: importStats.created }
-                          )}{' '}
-                          <Tag color="orange">
-                            {t('label.draft', 'Bản nháp (Draft)')}
-                          </Tag>
-                          .
+                            'cde.import-updated-msg',
+                            'Đã cập nhật {{count}} bản ghi CDE có sẵn.',
+                            { count: importStats.updated }
+                          )}
                         </div>
-                        {importStats.updated > 0 && (
-                          <div>
-                            {t(
-                              'cde.import-updated-msg',
-                              'Đã cập nhật {{count}} bản ghi CDE có sẵn.',
-                              { count: importStats.updated }
-                            )}
-                          </div>
-                        )}
-                        {importStats.skipped > 0 && (
-                          <Typography.Text type="secondary">
-                            {t(
-                              'cde.import-skipped-msg',
-                              'Đã bỏ qua {{count}} bản ghi do trùng mã.',
-                              { count: importStats.skipped }
-                            )}
-                          </Typography.Text>
-                        )}
-                        {importStats.failed > 0 && (
-                          <Typography.Text type="danger">
-                            {t(
-                              'cde.import-failed-msg',
-                              'Thất bại {{count}} bản ghi do lỗi kết nối hoặc quyền hạn.',
-                              { count: importStats.failed }
-                            )}
-                          </Typography.Text>
-                        )}
-                        {importErrors.length > 0 && (
-                          <Alert
-                            showIcon
-                            className="m-t-sm text-left"
-                            description={
-                              <ul
-                                className="p-l-md m-b-0"
-                                style={{
-                                  maxHeight: '160px',
-                                  overflowY: 'auto',
-                                }}>
-                                {importErrors.map((err, idx) => (
-                                  <li key={idx}>
-                                    <strong>
-                                      {err.name
-                                        ? t(
-                                            'label.row-with-name',
-                                            'Dòng {{row}} ({{name}})',
-                                            {
-                                              row: err.row,
-                                              name: err.name,
-                                            }
-                                          )
-                                        : t('label.row-index', 'Dòng {{row}}', {
+                      )}
+                      {importStats.skipped > 0 && (
+                        <Typography.Text type="secondary">
+                          {t(
+                            'cde.import-skipped-msg',
+                            'Đã bỏ qua {{count}} bản ghi do trùng mã.',
+                            { count: importStats.skipped }
+                          )}
+                        </Typography.Text>
+                      )}
+                      {importStats.failed > 0 && (
+                        <Typography.Text type="danger">
+                          {t(
+                            'cde.import-failed-msg',
+                            'Thất bại {{count}} bản ghi do lỗi kết nối hoặc quyền hạn.',
+                            { count: importStats.failed }
+                          )}
+                        </Typography.Text>
+                      )}
+                      {importErrors.length > 0 && (
+                        <Alert
+                          showIcon
+                          className="m-t-sm text-left"
+                          description={
+                            <ul
+                              className="p-l-md m-b-0"
+                              style={{
+                                maxHeight: '160px',
+                                overflowY: 'auto',
+                              }}>
+                              {importErrors.map((err, idx) => (
+                                <li key={idx}>
+                                  <strong>
+                                    {err.name
+                                      ? t(
+                                          'label.row-with-name',
+                                          'Dòng {{row}} ({{name}})',
+                                          {
                                             row: err.row,
-                                          })}
-                                    </strong>
-                                    :{' '}
-                                    {formatCDEImportErrorMessage(err.reason, t)}
-                                  </li>
-                                ))}
-                              </ul>
-                            }
-                            message={t('label.failure-reason', 'Lý do lỗi')}
-                            type="error"
-                          />
-                        )}
-                      </Space>
-                    }
-                    title={t(
-                      'cde.import-completed-title',
-                      'Hoàn tất nạp dữ liệu CDE!'
-                    )}
-                  />
-                </Card>
-              </Col>
-            )}
-          </>
-        )}
+                                            name: err.name,
+                                          }
+                                        )
+                                      : t('label.row-index', 'Dòng {{row}}', {
+                                          row: err.row,
+                                        })}
+                                  </strong>
+                                  : {formatCDEImportErrorMessage(err.reason, t)}
+                                </li>
+                              ))}
+                            </ul>
+                          }
+                          message={t('label.failure-reason', 'Lý do lỗi')}
+                          type="error"
+                        />
+                      )}
+                    </Space>
+                  }
+                  title={t(
+                    'cde.import-completed-title',
+                    'Hoàn tất nạp dữ liệu CDE!'
+                  )}
+                />
+              </Card>
+            </Col>
+          )}
+        </>
+      )}
 
-        {/* FOOTER ĐIỀU HƯỚNG BƯỚC 2 & BƯỚC 3 (Đồng nhất vị trí, cố định bên phải, không bị xê dịch) */}
-        {(activeStep === VALIDATION_STEP.EDIT_VALIDATE ||
-          (activeStep === VALIDATION_STEP.UPDATE &&
-            !isImporting &&
-            !isCompleted)) && (
-          <Col span={24}>
-            <div className="cde-import-footer">
-              {activeStep === VALIDATION_STEP.EDIT_VALIDATE ? (
-                <Button data-testid="add-row-btn" onClick={handleAddRow}>
-                  {`+ ${t('label.add-row', 'Thêm hàng')}`}
-                </Button>
-              ) : (
-                <div />
-              )}
-              <Space size={12}>
-                <Button disabled={isImporting} onClick={handleBack}>
-                  {t('label.previous', 'Trước')}
-                </Button>
-                {activeStep === VALIDATION_STEP.EDIT_VALIDATE ? (
-                  <Button
-                    className="cde-action-btn"
-                    data-testid="next-button"
-                    disabled={dataSource.length === 0}
-                    type="primary"
-                    onClick={handleValidate}>
-                    {t('label.next', 'Tiếp theo')}
-                  </Button>
-                ) : (
-                  <Button
-                    className="cde-action-btn"
-                    data-testid="update-button"
-                    disabled={
-                      isImporting ||
-                      !validationData ||
-                      validationData.numberOfRowsFailed > 0 ||
-                      !serverPreview?.canCommit
-                    }
-                    type="primary"
-                    onClick={handleStartImport}>
-                    {t('label.update', 'Cập nhật')}
-                  </Button>
-                )}
-              </Space>
-            </div>
-          </Col>
-        )}
-      </Row>
-    </PageLayoutV1>
+      {(activeStep === VALIDATION_STEP.EDIT_VALIDATE ||
+        (activeStep === VALIDATION_STEP.UPDATE &&
+          !isImporting &&
+          !isCompleted)) && (
+        <GovernedImportFooter
+          isBackDisabled={isImporting}
+          primary={
+            activeStep === VALIDATION_STEP.EDIT_VALIDATE
+              ? {
+                  label: t('label.next'),
+                  testId: 'next-button',
+                  isDisabled: dataSource.length === 0,
+                  onClick: handleValidate,
+                }
+              : {
+                  label: t('label.update'),
+                  testId: 'update-button',
+                  isDisabled:
+                    isImporting ||
+                    !validationData ||
+                    validationData.numberOfRowsFailed > 0 ||
+                    !serverPreview?.canCommit,
+                  onClick: handleStartImport,
+                }
+          }
+          onAddRow={
+            activeStep === VALIDATION_STEP.EDIT_VALIDATE
+              ? handleAddRow
+              : undefined
+          }
+          onBack={handleBack}
+        />
+      )}
+    </GovernedImportLayout>
   );
 };
 

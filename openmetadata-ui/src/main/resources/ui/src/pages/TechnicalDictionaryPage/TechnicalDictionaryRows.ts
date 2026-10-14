@@ -10,11 +10,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { EntityStatus } from '../../generated/entity/data/glossaryTerm';
 import {
   TechnicalBulkReviewOutcome,
   TechnicalChangeRequest,
   TechnicalColumnCandidate,
   TechnicalRecordApiRow,
+  TechnicalRecordStatus,
   TechnicalTagValue,
 } from '../../rest/technicalDictionaryAPI';
 import Fqn from '../../utils/Fqn';
@@ -22,6 +24,18 @@ import {
   TechnicalBulkResultItem,
   TechnicalDictionaryRow,
 } from './technicalDictionary.interface';
+
+/** A Technical Dictionary status as the governed status the Data Dictionary shows. */
+export const TECHNICAL_ENTITY_STATUS: Record<
+  TechnicalRecordStatus,
+  EntityStatus
+> = {
+  Draft: EntityStatus.Draft,
+  'In Review': EntityStatus.InReview,
+  Approved: EntityStatus.Approved,
+  Rejected: EntityStatus.Rejected,
+  Archived: EntityStatus.Archived,
+};
 
 const text = (value: unknown): string =>
   value === undefined || value === null ? '' : String(value);
@@ -188,6 +202,7 @@ export const toWorkingRow = (change: TechnicalChangeRequest) => {
     revision: change.revision,
     status: CHANGE_STATUS[change.status],
     createdBy: change.createdBy,
+    submittedBy: change.submittedBy,
     hasPendingChange: true,
     changeRequestId: change.id,
     changeRequestStatus: change.status,

@@ -11,15 +11,15 @@
  *  limitations under the License.
  */
 
-@import '../../styles/variables.less';
-@import '../../styles/components/om-rdg.less';
+@import (reference) '../../../styles/variables.less';
+@import '../../../styles/components/om-rdg.less';
 
-.dq-import-page-container {
+.governed-import-page-container {
   padding: 0 24px 36px 24px;
   width: 100%;
 }
 
-.dq-import-rdg {
+.governed-import-rdg {
   &.om-rdg {
     .rdg {
       border: none;
@@ -29,14 +29,14 @@
       background-color: @grey-9;
     }
 
-    // Tăng khoảng đệm lề trái cho cột đầu tiên (Mã quy tắc nghiệp vụ) tránh bị sát góc bo viền
-    .rdg-cell.dq-first-column-header,
+    // Tăng khoảng đệm lề trái cho cột đầu tiên (mã) tránh bị sát góc bo viền
+    .rdg-cell.governed-import-first-column-header,
     .rdg-header-row .rdg-cell[aria-colindex='1'],
     .rdg-header-row .rdg-cell:first-child {
       padding-left: 20px !important;
     }
 
-    .rdg-cell.dq-first-column-cell,
+    .rdg-cell.governed-import-first-column-cell,
     .rdg-row .rdg-cell[aria-colindex='1'],
     .rdg-row .rdg-cell:first-child {
       padding-left: 20px !important;
@@ -52,7 +52,7 @@
   }
 }
 
-.dq-import-rdg-step3 {
+.governed-import-rdg-step3 {
   &.om-rdg {
     .rdg {
       border: none;
@@ -64,33 +64,33 @@
 
     // Cột 1: Trạng thái (đệm lề trái & phải để không sát viền và không dính vào cột Chi tiết)
     .rdg-header-row .rdg-cell[aria-colindex='1'],
-    .rdg-header-row .rdg-cell.dq-status-column-header {
+    .rdg-header-row .rdg-cell.governed-import-status-column-header {
       padding-left: 20px !important;
       padding-right: 16px !important;
     }
 
     .rdg-row .rdg-cell[aria-colindex='1'],
-    .rdg-row .rdg-cell.dq-status-column-cell {
+    .rdg-row .rdg-cell.governed-import-status-column-cell {
       padding-left: 20px !important;
       padding-right: 16px !important;
     }
 
     // Cột 2: Chi tiết thẩm định (đệm lề trái rõ ràng, phân cách với cột Trạng thái)
     .rdg-header-row .rdg-cell[aria-colindex='2'],
-    .rdg-header-row .rdg-cell.dq-details-column-header {
+    .rdg-header-row .rdg-cell.governed-import-details-column-header {
       padding-left: 16px !important;
       padding-right: 16px !important;
     }
 
     .rdg-row .rdg-cell[aria-colindex='2'],
-    .rdg-row .rdg-cell.dq-details-column-cell {
+    .rdg-row .rdg-cell.governed-import-details-column-cell {
       padding-left: 16px !important;
       padding-right: 16px !important;
     }
   }
 }
 
-.dq-import-footer {
+.governed-import-footer {
   margin-top: 16px;
   padding-bottom: 28px;
   display: flex;
@@ -102,13 +102,13 @@
     justify-content: flex-end;
   }
 
-  .dq-action-btn {
+  .governed-import-action-btn {
     min-width: 96px;
   }
 }
 
 // Bộ lọc trạng thái chuẩn OpenMetadata Segmented Control
-.dq-status-filter-segmented.ant-segmented {
+.governed-import-status-filter.ant-segmented {
   background-color: #f3f4f6;
   padding: 3px;
   border-radius: 6px;
@@ -205,11 +205,11 @@
 }
 
 // Banner tóm tắt trạng thái thẩm định tại Bước 3
-.dq-validation-header {
+.governed-import-validation-header {
   margin-bottom: 12px;
 }
 
-.dq-validation-summary-badge {
+.governed-import-validation-summary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -231,4 +231,13 @@
     border: 1px solid #b7eb8f;
     color: #389e0d;
   }
+}
+
+.governed-import-drop-area {
+  padding: 40px 0;
+}
+
+.governed-import-progress-bar {
+  width: 400px;
+  max-width: 100%;
 }

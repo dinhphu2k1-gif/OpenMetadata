@@ -603,6 +603,11 @@
   &:active {
     outline: none;
   }
+
+  // Only the "Deleted" badge carries the color; the version stays neutral and borderless like it.
+  &.cde-header-version-badge-deleted {
+    border-color: @white;
+  }
 }
 
 .cde-glossary-term-overview {
@@ -1047,7 +1052,12 @@
 }
 
 .ant-table-tbody > tr.glossary-deleted-row {
-  > td:not(.governance-status-cell) {
+  > td:not(.governance-status-cell):not(.ant-table-cell-fix-left) {
+    opacity: 0.6;
+  }
+
+  // A pinned cell covers the scrolled cells, so only its content is dimmed.
+  > td.ant-table-cell-fix-left > * {
     opacity: 0.6;
   }
 }

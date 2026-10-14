@@ -1,0 +1,65 @@
+/*
+ *  Copyright 2026 Collate.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+@import (reference) '../../../styles/variables.less';
+
+.bulk-action-result-modal {
+  .bulk-action-result-description {
+    margin: 0 0 16px;
+  }
+
+  .bulk-action-result-list {
+    max-height: 200px;
+    margin: 0;
+    padding: 8px 12px;
+    overflow-y: auto;
+    border: 1px solid @grey-200;
+    border-radius: 6px;
+    background: @grey-50;
+    list-style: none;
+  }
+
+  .bulk-action-result-item {
+    display: flex;
+    gap: 8px;
+  }
+
+  .bulk-action-result-item + .bulk-action-result-item {
+    margin-top: 4px;
+  }
+
+  .bulk-action-result-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .bulk-action-result-detail {
+    color: @grey-600;
+  }
+
+  .bulk-action-result-icon {
+    margin-top: 2px;
+    color: @green-10;
+
+    &.bulk-action-result-icon--failed {
+      color: @red-10;
+    }
+  }
+
+  .bulk-action-result-text {
+    color: @green-10;
+
+    &.bulk-action-result-text--failed {
+      color: @red-10;
+    }
+  }
+}

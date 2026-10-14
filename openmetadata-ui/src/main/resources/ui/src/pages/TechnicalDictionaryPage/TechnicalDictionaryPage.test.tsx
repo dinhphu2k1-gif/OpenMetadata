@@ -353,7 +353,9 @@ describe('TechnicalDictionaryPage', () => {
     render(<TechnicalDictionaryPage />);
 
     expect(
-      screen.getByTestId('technical-pending-requests-tab')
+      screen
+        .getByTestId('technical-pending-requests-tab')
+        .closest('[role="tab"]')
     ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('pending-requests-tab')).toBeInTheDocument();
   });
@@ -659,7 +661,7 @@ describe('TechnicalDictionaryPage bulk review', () => {
     expect(showSuccessToast).not.toHaveBeenCalled();
     expect(mockReloadRecords).toHaveBeenCalled();
     expect(screen.getByTestId('technical-bulk-result-AGE')).toHaveClass(
-      'tech-review-result--failed'
+      'bulk-action-result-item--failed'
     );
   });
 

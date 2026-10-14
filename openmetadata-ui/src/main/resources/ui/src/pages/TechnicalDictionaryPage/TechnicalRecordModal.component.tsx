@@ -25,7 +25,8 @@ import {
 } from '../../rest/technicalDictionaryAPI';
 import { getEntityName } from '../../utils/EntityNameUtils';
 import { TechnicalDictionaryRow } from './technicalDictionary.interface';
-import TechnicalStatusBadge from './TechnicalStatusBadge.component';
+import { TECHNICAL_ENTITY_STATUS } from './TechnicalDictionaryRows';
+import GovernedStatusBadge from '../../components/Glossary/GovernedStatusBadge/GovernedStatusBadge.component';
 import TechnicalTagSelect from './TechnicalTagSelect.component';
 
 /** Editable values collected from the modal. `cde` is undefined when unchanged, null when cleared. */
@@ -269,9 +270,9 @@ const TechnicalRecordModal = ({
           <div className="tech-record-modal-heading">
             {t(titleKey)}
             {row?.status && !isCreate && (
-              <TechnicalStatusBadge
+              <GovernedStatusBadge
                 dataTestId="technical-record-status"
-                status={row.status}
+                status={TECHNICAL_ENTITY_STATUS[row.status]}
               />
             )}
           </div>

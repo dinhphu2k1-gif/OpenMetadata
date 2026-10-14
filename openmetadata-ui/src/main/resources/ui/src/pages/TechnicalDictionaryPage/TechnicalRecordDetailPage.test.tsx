@@ -21,6 +21,7 @@ import {
   saveTechnicalChangeRequest,
   submitTechnicalRecord,
   updateTechnicalRecord,
+  withdrawTechnicalChangeRequest,
 } from '../../rest/technicalDictionaryAPI';
 import TechnicalRecordDetailPage from './TechnicalRecordDetailPage.component';
 
@@ -72,6 +73,23 @@ jest.mock(
       )
 );
 
+jest.mock(
+  '../../components/Entity/EntityHeader/EntityHeader.component',
+  () => ({
+    EntityHeader: ({
+      badge,
+      entityData,
+    }: {
+      badge?: React.ReactNode;
+      entityData: { displayName?: string };
+    }) => (
+      <div>
+        <span>{entityData.displayName}</span>
+        {badge}
+      </div>
+    ),
+  })
+);
 jest.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
   useParams: () => ({ termId: 'term-1' }),
@@ -93,9 +111,18 @@ jest.mock('../../hooks/useTechnicalDictionaryOptions', () => ({
     isLoading: false,
   }),
 }));
-jest.mock('./TechnicalVersionBadges.component', () => () => (
-  <span data-testid="badges" />
-));
+jest.mock(
+  './TechnicalVersionBadges.component',
+  () =>
+    ({ isDeleted, deletedBy }: { isDeleted?: boolean; deletedBy?: string }) =>
+      (
+        <span
+          data-deleted={String(Boolean(isDeleted))}
+          data-deleted-by={deletedBy}
+          data-testid="badges"
+        />
+      )
+);
 jest.mock(
   '../../components/common/ApprovedRecordHistory/ApprovedRecordHistoryModal.component',
   () =>
@@ -163,6 +190,7 @@ jest.mock('../../rest/technicalDictionaryAPI', () => ({
     .fn()
     .mockResolvedValue({ data: ['1'], currentRecordId: 'term-1' }),
   getTechnicalSnapshotRecord: jest.fn(),
+  withdrawTechnicalChangeRequest: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../rest/glossaryAPI', () => ({
   getGlossaryTermsById: jest.fn(),
@@ -252,6 +280,61 @@ describe('TechnicalRecordDetailPage', () => {
     fireEvent.click(screen.getByTestId('correction-history-button'));
 
     expect(screen.getByTestId('history-panel')).toBeInTheDocument();
+  });
+
+  it('marks a deleted record in the header badges and keeps its history readable', async () => {
+    (getTechnicalRecord as jest.Mock).mockResolvedValue({
+      ...RECORD,
+      deleted: true,
+      deletedAt: 1,
+      deletedBy: 'admin',
+    });
+    render(<TechnicalRecordDetailPage />);
+
+    const badges = await screen.findByTestId('badges');
+
+    expect(badges).toHaveAttribute('data-deleted', 'true');
+    expect(badges).toHaveAttribute('data-deleted-by', 'admin');
+    expect(
+      screen.queryByTestId('technical-record-deleted')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('technical-record-create-change')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('correction-history-button')).toBeInTheDocument();
+  });
+
+  it('shows a deletion request like the Data Dictionary: banner, history and withdraw for its submitter', async () => {
+    mockSearch = 'businessVersion=2&view=working';
+    (getTechnicalRecord as jest.Mock).mockResolvedValue({
+      ...RECORD,
+      hasPendingChange: true,
+      changeOperation: 'DELETE',
+      changeRequestStatus: 'InReview',
+    });
+    (getTechnicalChangeRequest as jest.Mock).mockResolvedValue({
+      id: 'change-1',
+      recordId: 'term-1',
+      operation: 'DELETE',
+      status: 'InReview',
+      revision: 4,
+      createdBy: 'checker',
+      submittedBy: 'checker',
+      approvedRecord: RECORD,
+      proposedRecord: null,
+    });
+    render(<TechnicalRecordDetailPage />);
+
+    expect(
+      await screen.findByTestId('technical-pending-deletion-banner')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('correction-history-button')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('withdraw-request-button'));
+
+    await waitFor(() =>
+      expect(withdrawTechnicalChangeRequest).toHaveBeenCalledWith('term-1', 4)
+    );
   });
 
   it('reads a replaced version by its businessVersion, read only', async () => {

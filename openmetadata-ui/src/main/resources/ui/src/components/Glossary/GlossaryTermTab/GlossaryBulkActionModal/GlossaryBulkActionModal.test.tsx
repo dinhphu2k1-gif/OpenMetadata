@@ -133,7 +133,7 @@ describe('GlossaryBulkActionModal', () => {
         },
         '2.0'
       );
-      expect(mockOnSuccess).toHaveBeenCalledWith(2);
+      expect(mockOnSuccess).toHaveBeenCalledWith(2, expect.any(Array));
     });
   });
 

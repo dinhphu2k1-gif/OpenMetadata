@@ -425,7 +425,7 @@ describe('TechnicalRecordModal draft', () => {
     renderDraft('view');
 
     expect(screen.getByTestId('technical-record-status')).toHaveTextContent(
-      'label.technical-draft'
+      'label.draft'
     );
   });
 

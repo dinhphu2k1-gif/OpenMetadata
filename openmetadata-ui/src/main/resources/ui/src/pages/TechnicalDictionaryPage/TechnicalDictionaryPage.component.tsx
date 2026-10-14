@@ -10,16 +10,17 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { Alert, Result } from 'antd';
+import { Alert, Result, Tabs } from 'antd';
 import { AxiosError } from 'axios';
 import { Key, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loader from '../../components/common/Loader/Loader';
+import BulkActionResultModal from '../../components/common/BulkActionResultModal/BulkActionResultModal.component';
 import PendingRequestsTab from '../../components/common/PendingRequestsTab/PendingRequestsTab.component';
 import { usePendingRequestsCount } from '../../components/common/PendingRequestsTab/usePendingRequestsCount';
 import ReviewActionConfirmModal from '../../components/common/ReviewActionConfirmModal/ReviewActionConfirmModal.component';
-import TitleBreadcrumb from '../../components/common/TitleBreadcrumb/TitleBreadcrumb.component';
+import TabsLabel from '../../components/common/TabsLabel/TabsLabel.component';
 import PageLayoutV1 from '../../components/PageLayoutV1/PageLayoutV1';
 import { ROUTES } from '../../constants/constants';
 import { TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME } from '../../constants/Glossary.contant';
@@ -44,7 +45,6 @@ import {
 import { showErrorToast, showSuccessToast } from '../../utils/ToastUtils';
 import TechnicalAddColumnModal from './TechnicalAddColumnModal.component';
 import TechnicalBulkActionBar from './TechnicalBulkActionBar.component';
-import TechnicalBulkResultModal from './TechnicalBulkResultModal.component';
 import {
   TechnicalBulkResultItem,
   TechnicalDictionaryRow,
@@ -53,6 +53,7 @@ import TechnicalDictionaryHeader from './TechnicalDictionaryHeader.component';
 import {
   getReviewableTechnicalRecords,
   getSubmittableTechnicalRecords,
+  getTechnicalRecordPath,
   toBulkResultItems,
 } from './TechnicalDictionaryRows';
 import TechnicalDictionaryTable from './TechnicalDictionaryTable.component';
@@ -171,6 +172,8 @@ const TechnicalDictionaryPage = ({
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkResultView>();
   const [isBulkResultOpen, setIsBulkResultOpen] = useState(false);
+  const bulkResultConfig =
+    TECHNICAL_REVIEW_ACTIONS[bulkResult?.action ?? 'approve'];
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get(TECHNICAL_DICTIONARY_TAB_QUERY);
   const [activeTab, setActiveTab] = useState<'records' | 'requests'>('records');
@@ -183,6 +186,9 @@ const TechnicalDictionaryPage = ({
       capabilities.canEdit || capabilities.canApprove,
       pendingRefreshKey
     );
+
+  const canSeeRequests =
+    (capabilities.canEdit || capabilities.canApprove) && !snapshotVersion;
 
   const selectionScope = JSON.stringify([
     records.filters,
@@ -451,10 +457,24 @@ const TechnicalDictionaryPage = ({
         onCancel={() => setIsReviewOpen(false)}
         onConfirm={handleReviewConfirm}
       />
-      <TechnicalBulkResultModal
-        action={bulkResult?.action ?? 'approve'}
-        items={bulkResult?.items ?? []}
+      <BulkActionResultModal
+        description={t(bulkResultConfig.resultDescriptionKey)}
+        items={(bulkResult?.items ?? []).map(({ row, outcome }) => ({
+          key: row.key,
+          name: row.columnName,
+          detail: getTechnicalRecordPath(row),
+          succeeded: outcome.outcome === 'SUCCEEDED',
+          message: outcome.message,
+        }))}
         open={isBulkResultOpen}
+        succeededLabel={t(bulkResultConfig.succeededKey)}
+        testId="technical-bulk-result"
+        title={t(bulkResultConfig.resultTitleKey, {
+          succeeded: bulkResult?.items.filter(
+            ({ outcome }) => outcome.outcome === 'SUCCEEDED'
+          ).length,
+          total: bulkResult?.items.length ?? 0,
+        })}
         onClose={() => setIsBulkResultOpen(false)}
       />
     </div>
@@ -469,18 +489,14 @@ const TechnicalDictionaryPage = ({
       mainContainerClassName="technical-dictionary-page-scroll"
       pageTitle={t('label.technical-dictionary')}>
       <div className="tech-dict-page-container">
-        <div className="m-b-md">
-          <TitleBreadcrumb
-            titleLinks={[
-              {
-                name: TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME,
-                url: '',
-                activeTitle: true,
-              },
-            ]}
-          />
-        </div>
         <TechnicalDictionaryHeader
+          breadcrumb={[
+            {
+              name: TECHNICAL_DICTIONARY_GLOSSARY_DISPLAY_NAME,
+              url: '',
+              activeTitle: true,
+            },
+          ]}
           capabilities={capabilities}
           dataDictionaryVersion={dataDictionaryVersion}
           isAdmin={isAdminUser}
@@ -491,60 +507,56 @@ const TechnicalDictionaryPage = ({
           onRebuildIndex={handleRebuildIndex}
           onSelectVersion={records.viewSnapshot}
         />
-        <div className="tech-dict-tab-card">
-          <div className="tech-dict-tab-list" role="tablist">
-            <button
-              aria-selected={activeTab === 'records'}
-              className={`tech-dict-tab ${
-                activeTab === 'records' ? 'active' : ''
-              }`}
-              data-testid="technical-dictionary-tab"
-              role="tab"
-              type="button"
-              onClick={() => setActiveTab('records')}>
-              {t('label.technical-field-plural')}
-              <span
-                className="tech-dict-tab-count"
-                data-testid="technical-dictionary-count">
-                {records.total}
-              </span>
-            </button>
-            {(capabilities.canEdit || capabilities.canApprove) &&
-              !snapshotVersion && (
-                <button
-                  aria-selected={activeTab === 'requests'}
-                  className={`tech-dict-tab ${
-                    activeTab === 'requests' ? 'active' : ''
-                  }`}
-                  data-testid="technical-pending-requests-tab"
-                  role="tab"
-                  type="button"
-                  onClick={() => setActiveTab('requests')}>
-                  {t('label.pending-request-plural')}
-                  <span className="tech-dict-tab-count">
-                    {pendingRequestsCount}
-                  </span>
-                </button>
-              )}
-          </div>
-        </div>
-        {activeTab === 'requests' ? (
-          <div className="tech-dict-content-card">
-            <PendingRequestsTab
-              adapter={pendingRequestsAdapter}
-              canDecide={capabilities.canApprove}
-              refreshKey={pendingRefreshKey}
-              scopeKey={dataDictionaryVersion ?? ''}
-              testId="technical-pending-requests"
-              onDecided={() => {
-                refreshPendingCount();
-                refreshData();
-              }}
-            />
-          </div>
-        ) : (
-          content
-        )}
+        <Tabs
+          activeKey={canSeeRequests ? activeTab : 'records'}
+          className="tabs-new tech-dict-tabs"
+          data-testid="technical-dictionary-tabs"
+          items={[
+            {
+              key: 'records',
+              label: (
+                <TabsLabel
+                  count={records.total}
+                  id="technical-dictionary-tab"
+                  isActive={activeTab === 'records'}
+                  name={t('label.technical-field-plural')}
+                />
+              ),
+              children: content,
+            },
+            ...(canSeeRequests
+              ? [
+                  {
+                    key: 'requests',
+                    label: (
+                      <TabsLabel
+                        count={pendingRequestsCount}
+                        id="technical-pending-requests-tab"
+                        isActive={activeTab === 'requests'}
+                        name={t('label.pending-request-plural')}
+                      />
+                    ),
+                    children: (
+                      <div className="tech-dict-content-card">
+                        <PendingRequestsTab
+                          adapter={pendingRequestsAdapter}
+                          canDecide={capabilities.canApprove}
+                          refreshKey={pendingRefreshKey}
+                          scopeKey={dataDictionaryVersion ?? ''}
+                          testId="technical-pending-requests"
+                          onDecided={() => {
+                            refreshPendingCount();
+                            refreshData();
+                          }}
+                        />
+                      </div>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+          onChange={(key) => setActiveTab(key as 'records' | 'requests')}
+        />
       </div>
     </PageLayoutV1>
   );
