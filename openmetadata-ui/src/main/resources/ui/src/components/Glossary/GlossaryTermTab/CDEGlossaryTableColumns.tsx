@@ -359,7 +359,7 @@ export const getCDEGlossaryTableColumns = ({
   {
     title: t('cde.release-level'),
     key: CDE_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_LEVEL,
-    width: 170,
+    width: 130,
     render: (_, record) =>
       record.isLoadMoreButton
         ? null

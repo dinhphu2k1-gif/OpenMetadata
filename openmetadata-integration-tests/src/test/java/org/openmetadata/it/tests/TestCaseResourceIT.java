@@ -724,6 +724,34 @@ public class TestCaseResourceIT extends BaseEntityIT<TestCase, CreateTestCase> {
   }
 
   @Test
+  void test_restoreTestCaseWithResolutionStatusChildren(TestNamespace ns) {
+    OpenMetadataClient client = SdkClients.adminClient();
+    Table table = createTable(ns);
+
+    TestCase testCase =
+        TestCaseBuilder.create(client)
+            .name(ns.prefix("tcrs_restore"))
+            .forTable(table)
+            .testDefinition("tableRowCountToEqual")
+            .parameter("value", "100")
+            .create();
+
+    // The incident is a time-series PARENT_OF child, which restoring the testcase must skip
+    CreateTestCaseResolutionStatus newStatus = new CreateTestCaseResolutionStatus();
+    newStatus.setTestCaseResolutionStatusType(TestCaseResolutionStatusTypes.New);
+    newStatus.setTestCaseReference(testCase.getFullyQualifiedName());
+    client.testCaseResolutionStatuses().create(newStatus);
+
+    String testCaseId = testCase.getId().toString();
+    deleteEntity(testCaseId);
+
+    restoreEntity(testCaseId);
+
+    TestCase restored = getEntity(testCaseId);
+    assertEquals(testCase.getName(), restored.getName());
+  }
+
+  @Test
   void test_testCaseHardDelete_200_OK(TestNamespace ns) {
     Table table = createTable(ns);
 

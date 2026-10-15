@@ -108,23 +108,25 @@ public final class DqTestCaseGateway {
     if (existing != null && Boolean.TRUE.equals(existing.getDeleted())) {
       repository().restoreEntity(DqManagedWrite.ACTOR, existing.getId());
     }
-    if (existing == null) {
-      // createOrUpdate does not prepare a new entity: this resolves its test suite and definition
-      repository().prepareInternal(wanted, false);
-    }
+    // createOrUpdate does not prepare the entity: this resolves its test suite and definition to
+    // references with ids, which an update compares by id and relinks
+    repository().prepareInternal(wanted, existing != null);
     try {
       repository().createOrUpdate(null, wanted, DqManagedWrite.ACTOR);
     } catch (EntityRelationshipNotFoundException brokenTestCase) {
-      recreate(existing, wanted);
+      repair(existing, wanted);
     }
     return repository().findByNameOrNull(wanted.getFullyQualifiedName(), Include.NON_DELETED);
   }
 
-  /** An interrupted update can leave a testcase without its relationships; it is replaced. */
-  private static void recreate(TestCase broken, TestCase wanted) {
-    LOG.warn("Testcase {} lost its relationships; recreating it", wanted.getFullyQualifiedName());
-    repository().delete(DqManagedWrite.ACTOR, broken.getId(), true, true);
-    repository().prepareInternal(wanted, false);
+  /**
+   * An interrupted update can leave a testcase without its relationships; they are restored in
+   * place, so the testcase keeps its id and its results.
+   */
+  private static void repair(TestCase broken, TestCase wanted) {
+    LOG.warn("Testcase {} lost its relationships; restoring them", wanted.getFullyQualifiedName());
+    wanted.setId(broken.getId());
+    repository().storeRelationships(wanted);
     repository().createOrUpdate(null, wanted, DqManagedWrite.ACTOR);
   }
 

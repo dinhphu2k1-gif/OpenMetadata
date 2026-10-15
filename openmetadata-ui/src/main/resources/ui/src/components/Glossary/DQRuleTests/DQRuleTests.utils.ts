@@ -60,7 +60,10 @@ type MessageRows = { passedRows: number | null; totalRows: number | null };
 interface MessageRule {
   pattern: RegExp;
   key: string;
-  params: (match: RegExpMatchArray, rows?: MessageRows) => Record<string, string>;
+  params: (
+    match: RegExpMatchArray,
+    rows?: MessageRows
+  ) => Record<string, string>;
 }
 
 const MESSAGE_PREFIX = 'dq.test.messages';
@@ -83,8 +86,7 @@ const MESSAGE_RULES: MessageRule[] = [
     }),
   },
   {
-    pattern:
-      /^Found (\d+) value\(s\) matching the forbidden regex pattern\.?$/,
+    pattern: /^Found (\d+) value\(s\) matching the forbidden regex pattern\.?$/,
     key: 'forbidden-regex',
     params: (match) => ({ count: match[1] }),
   },

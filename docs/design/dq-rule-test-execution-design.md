@@ -297,9 +297,10 @@ nhận ở vòng quét của worker `dq-test-outbox` (60 giây), deploy pipeline
 
 - Vì testcase cũng nằm trong basic suite của Table, nếu Admin deploy pipeline cho riêng Table đó thì testcase chạy thêm
   một lần theo lịch của Table. Quy ước vận hành: không deploy pipeline Table cho các bảng có testcase managed (§11).
-- Ghi chú hiện thực: entity tạo qua repository bằng `createOrUpdate` phải gọi `prepareInternal` trước (đặt FQN, test
-  suite và definition cho testcase, FQN cho test suite và pipeline); thiếu bước này DB ghi thiếu `fqnHash` hoặc
-  testcase mất quan hệ (§13).
+- Ghi chú hiện thực: entity tạo hoặc cập nhật qua repository bằng `createOrUpdate` phải gọi `prepareInternal` trước (đặt
+  FQN, test suite và definition cho testcase, FQN cho test suite và pipeline); thiếu bước này DB ghi thiếu `fqnHash` hoặc
+  testcase mất quan hệ (§13). Với testcase đã có, `prepareInternal(…, true)` là bắt buộc: `TestUpdater` so tham chiếu
+  definition và test suite theo `id`, tham chiếu chỉ có FQN sẽ làm nó xóa quan hệ cũ rồi chèn quan hệ với `id` null.
 
 ### 5.4. Binding và trạng thái
 
@@ -484,7 +485,7 @@ Ví dụ response kết quả Rule:
 {
   "rule": { "id": "uuid", "code": "DQ3.1", "threshold": ">= 99.5%", "frequency": "DataQualityFrequency.Daily" },
   "status": "FAILED",
-  "summary": { "specs": 2, "applied": 5, "notApplicable": 1, "passed": 4, "failed": 1, "aborted": 0, "noResult": 0, "lastRunAt": 1790000000000 },
+  "summary": { "specs": 2, "applied": 5, "notApplicable": 1, "errors": 0, "passed": 4, "failed": 1, "aborted": 0, "noResult": 0, "lastRunAt": 1790000000000 },
   "specs": [
     {
       "key": "t1", "name": "Không trống", "kind": "LIBRARY", "testDefinitionFqn": "columnValuesToBeNotNull",
@@ -581,11 +582,14 @@ Từ trên xuống khi Rule đã có kết quả:
   được áp dụng sau khi quy tắc được phê duyệt."** Không có thanh trạng thái, kết quả hay nút Chạy ngay.
 - **Đã phê duyệt, chưa khai báo**: card Khai báo trống và empty state với nút **Tạo phiên bản mới để khai báo kiểm thử**.
 - **Đã phê duyệt nhưng chưa cột nào áp dụng được**: nếu có testcase `ERROR` thì banner đỏ **"Đồng bộ kiểm thử bị lỗi"** (số
-  testcase lỗi, "hệ thống tự thử lại mỗi phút") cùng bảng **Phạm vi áp dụng** (kiểm thử, cột, bảng, trạng thái, lý do:
+  testcase lỗi lấy từ `summary.errors` của cả quy tắc, "hệ thống tự thử lại mỗi phút") cùng bảng **Phạm vi áp dụng** phân trang
+  như bảng kết quả (kiểm thử, cột, bảng, trạng thái, lý do:
   không tạo được testcase / phép kiểm tra không nhận kiểu dữ liệu của cột). Nếu không có lỗi thì empty state "Chưa có cột nào
   được áp dụng" kèm gợi ý kiểm tra CDE liên kết và kiểu dữ liệu.
 - Bản đang xem là Draft của một Rule đã có bản duyệt: kết quả và Chạy ngay thuộc về phiên bản đã duyệt (kết quả thuộc
-  identity, không thuộc version). Khai báo đã bị xóa ở version hiện hành vẫn tra cứu được qua bộ lọc **Đã ngừng**. Rule của
+  identity, không thuộc version). Khi phiên bản đang xem khác `rule.businessVersion` của kết quả (Draft, hoặc một bản duyệt
+  cũ), tab hiện thông báo **"Đang xem phiên bản {x}. Phạm vi áp dụng và kết quả bên dưới thuộc phiên bản {y} đang được áp
+  dụng."** Khai báo đã bị xóa ở version hiện hành vẫn tra cứu được qua bộ lọc **Đã ngừng**. Rule của
   scope đã lưu trữ hiển thị banner **"Quy tắc đã ngừng áp dụng từ {retiredAt}. Kết quả chỉ để tra cứu."**
 - Nút **Chạy ngay** ẩn với người không có quyền; xác nhận "Chạy {k} kiểm thử trên {n} cột của quy tắc {mã} ngay bây giờ?"
   rồi chuyển thành **Đang chạy…** (khóa).
@@ -655,7 +659,7 @@ Người phê duyệt Rule không cần quyền `EditTests` trên từng Table; 
 | Số testcase lớn (Σ khai báo × Column). Không giới hạn số khai báo theo quyết định DQT-03 | Hộp xác nhận Approve hiển thị số testcase sẽ sinh (§4.4); reconcile theo lô, outbox có retry; kết quả Rule và CDE phân trang; pipeline gom testcase theo Table nên nhiều khai báo trên cùng bảng chạy chung một lô |
 | Cutover DD làm retire toàn bộ testcase | Đúng thiết kế: TD làm mới về trống (TD §9). Hộp xác nhận phê duyệt DD (TD §9.4) bổ sung “{n} testcase của {m} quy tắc sẽ ngừng chạy” |
 | Testcase gốc bị xóa hẳn ngoài luồng | Reconciler phát hiện thiếu và tạo lại; kết quả cũ mất, ghi audit |
-| Testcase tồn tại nhưng mất quan hệ với definition (cập nhật dở dang, tạo thiếu `prepareInternal`) | Reconciler bắt `EntityRelationshipNotFoundException`, xóa hẳn testcase hỏng rồi tạo lại sạch (§5.4) |
+| Testcase tồn tại nhưng mất quan hệ với definition (cập nhật dở dang, tạo thiếu `prepareInternal`) | Reconciler bắt `EntityRelationshipNotFoundException`, ghi lại quan hệ test suite và definition ngay trên testcase đó rồi cập nhật tiếp; testcase giữ nguyên id và lịch sử kết quả (§5.4) |
 
 **Kết quả xác minh T0 (đọc code, 2026-10-03):**
 
@@ -715,7 +719,12 @@ Thay đổi và phát hiện khi chạy thử trên DEV (chưa nghiệm thu):
 - **Lỗi nền đã sửa** (cùng nguyên nhân: `createOrUpdate` không gọi `prepareInternal` cho entity mới):
   - Testcase mới thiếu test suite và definition → `NullPointerException` ở `storeRelationships`, để lại dòng `test_case`
     không quan hệ; các lần thử lại sau rơi vào nhánh cập nhật và lỗi mãi. Sửa: `prepareInternal` trước khi tạo, và tự phục hồi
-    bằng cách xóa hẳn rồi tạo lại (§5.4).
+    bằng cách ghi lại quan hệ tại chỗ (§5.4).
+  - (2026-10-14) Sửa khai báo của quy tắc đã có testcase (đổi hash) → nhánh cập nhật cũng không gọi `prepareInternal`,
+    `TestUpdater` xóa quan hệ definition/suite rồi lỗi `UUID parameter 'fromId' must not be null`; repository ghi ngoài
+    transaction reconcile nên quan hệ mất thật. Lần thử lại xóa hẳn testcase thì `postDelete` NPE vì không còn test suite,
+    phải đến lần thứ ba mới tạo lại được và mất lịch sử kết quả. Sửa: luôn `prepareInternal(…, existing != null)`; nhánh
+    phục hồi không xóa hẳn nữa.
   - Test suite và pipeline mới thiếu FQN → `null value in column fqnhash`; lỗi SQL làm hỏng cả transaction reconcile nên
     `dq_rule_exec` cũng không được ghi.
   - Pipeline gửi sang Airflow không có `service` (là quan hệ, không nằm trong JSON lưu) → Airflow báo `'NoneType' object has no

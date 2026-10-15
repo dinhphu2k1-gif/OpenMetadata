@@ -340,7 +340,7 @@ export const getDQGlossaryTableColumns = ({
     title: t('dq.target-population'),
     dataIndex: 'tags',
     key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.TARGET_POPULATION,
-    width: 180,
+    width: 320,
     render: (tags: TagLabel[] = [], record) =>
       record.isLoadMoreButton
         ? null
@@ -405,14 +405,14 @@ export const getDQGlossaryTableColumns = ({
     title: t('label.version'),
     dataIndex: 'businessVersion',
     key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.BUSINESS_VERSION,
-    width: 110,
+    width: 90,
     render: (businessVersion: string | undefined, record) =>
       record.isLoadMoreButton ? null : businessVersion || NO_DATA_PLACEHOLDER,
   },
   {
     title: t('dq.release-version-type', 'Loại phiên bản phát hành'),
     key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_VERSION_TYPE,
-    width: 190,
+    width: 130,
     render: (_, record) =>
       record.isLoadMoreButton
         ? null
@@ -424,7 +424,7 @@ export const getDQGlossaryTableColumns = ({
   {
     title: t('cde.release-level'),
     key: DQ_GLOSSARY_TABLE_COLUMNS_KEYS.RELEASE_LEVEL,
-    width: 170,
+    width: 130,
     render: (_, record) =>
       renderCDEReleaseLevel(
         (record.extension as DQExtension | undefined)?.releaseLevel,
@@ -439,7 +439,7 @@ export const getDQGlossaryTableColumns = ({
       key === 'effectiveDate'
         ? DQ_GLOSSARY_TABLE_COLUMNS_KEYS.EFFECTIVE_DATE
         : DQ_GLOSSARY_TABLE_COLUMNS_KEYS.EXPIRATION_DATE,
-    width: 160,
+    width: 130,
     render: (_: unknown, record: ModifiedGlossaryTerm) =>
       formatCDEDate((record.extension as DQExtension | undefined)?.[key]),
   })),

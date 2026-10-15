@@ -33,16 +33,22 @@ public final class DqTrendService {
 
   private DqTrendService() {}
 
-  public static Map<String, Object> ruleTrend(String ruleId, int days, String specKey) {
-    final RuleState state = DqResultService.load(ruleId);
+  /** Trend of the given business version of a Rule, ending when a replaced version stopped. */
+  public static Map<String, Object> ruleTrend(
+      String ruleId, int days, String specKey, String businessVersion) {
+    final RuleState state = DqResultService.load(ruleId, businessVersion);
     final List<BindingRow> bindings =
         state.evaluated().stream()
             .filter(item -> specKey != null || !DqResultService.isDiscontinued(state, item))
             .map(item -> item.binding())
             .filter(binding -> specKey == null || binding.specKey().equals(specKey))
             .toList();
-    return trend(List.of(state), bindings, normalize(days));
+    final long end =
+        state.replaced() == null ? System.currentTimeMillis() : state.replaced().appliedUntil();
+    return trend(List.of(state), bindings, new Period(normalize(days), end));
   }
+
+  private record Period(int days, long end) {}
 
   public static Map<String, Object> cdeTrend(String cdeId, int days) {
     return trendOf(DqResultService.ruleStatesOfCde(cdeId), days);
@@ -59,12 +65,13 @@ public final class DqTrendService {
             state.evaluated().stream()
                 .filter(item -> !DqResultService.isDiscontinued(state, item))
                 .forEach(item -> bindings.add(item.binding())));
-    return trend(states, bindings, normalize(days));
+    return trend(states, bindings, new Period(normalize(days), System.currentTimeMillis()));
   }
 
   private static Map<String, Object> trend(
-      List<RuleState> states, List<BindingRow> bindings, int days) {
-    final long end = System.currentTimeMillis();
+      List<RuleState> states, List<BindingRow> bindings, Period period) {
+    final int days = period.days();
+    final long end = period.end();
     final long start = end - days * DAY_MILLIS;
     final Map<LocalDate, long[]> byDay = new TreeMap<>();
     for (BindingRow binding : bindings) {

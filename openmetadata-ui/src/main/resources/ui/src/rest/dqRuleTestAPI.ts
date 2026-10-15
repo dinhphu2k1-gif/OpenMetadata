@@ -63,7 +63,12 @@ export const getDqRuleStatuses = async () => {
 
 export const getDqRuleResults = async (
   ruleId: string,
-  params?: { specKey?: string; offset?: number; limit?: number }
+  params?: {
+    specKey?: string;
+    businessVersion?: string;
+    offset?: number;
+    limit?: number;
+  }
 ) => {
   const response = await APIClient.get<DQRuleResults>(
     `${BASE_URL}/rules/${ruleId}/results`,
@@ -75,7 +80,7 @@ export const getDqRuleResults = async (
 
 export const getDqRuleTrend = async (
   ruleId: string,
-  params?: { days?: number; specKey?: string }
+  params?: { days?: number; specKey?: string; businessVersion?: string }
 ) => {
   const response = await APIClient.get<DQTrend>(
     `${BASE_URL}/rules/${ruleId}/trend`,

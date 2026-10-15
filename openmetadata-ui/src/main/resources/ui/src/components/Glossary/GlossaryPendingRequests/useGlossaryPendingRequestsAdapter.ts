@@ -503,23 +503,28 @@ export const useGlossaryPendingRequestsAdapter = ({
 
       return records.map<PendingRequest>((record, index) => {
         const snapshot = published[index];
+        const isNewVersion =
+          !snapshot ||
+          (record.businessVersion != null &&
+            record.businessVersion !== snapshot.businessVersion);
         const type: PendingRequestType = record.pendingDeletion
           ? 'delete'
-          : snapshot
-          ? 'update'
-          : 'create';
+          : isNewVersion
+          ? 'create'
+          : 'update';
 
         return {
           id: recordId(record),
           code: record.name,
           name: record.displayName ?? record.name,
           version:
+            (type === 'create' ? record.businessVersion : undefined) ??
             snapshot?.businessVersion ??
             record.businessVersion ??
             (record.version == null ? undefined : String(record.version)),
           type,
           changedFields:
-            type === 'create'
+            type === 'create' && !snapshot
               ? [t('label.pending-new-cde')]
               : type === 'delete'
               ? [t('label.pending-remove-from-effective-version')]

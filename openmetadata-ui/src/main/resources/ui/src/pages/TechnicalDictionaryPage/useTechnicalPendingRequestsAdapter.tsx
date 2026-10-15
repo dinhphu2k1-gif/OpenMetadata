@@ -27,8 +27,8 @@ import {
 
 type CachedRequest = PendingRequest & { source: TechnicalPendingRequest };
 
-const FIELDS: Array<{ key: string; label: string }> = [
-  { key: 'cdeTermId', label: 'CDE mapping' },
+const FIELDS: Array<{ key: string; label: string; displayKey?: string }> = [
+  { key: 'cdeTermId', label: 'CDE mapping', displayKey: 'cdeCode' },
   { key: 'rank', label: 'Rank' },
   { key: 'elementType', label: 'Element type' },
   { key: 'generationType', label: 'Generation type' },
@@ -119,10 +119,10 @@ export const useTechnicalPendingRequestsAdapter = (
             ({ key }) =>
               value(source.approvedRecord, key) !==
               value(source.proposedRecord, key)
-          ).map(({ key, label }) => ({
+          ).map(({ key, label, displayKey }) => ({
             field: label,
-            oldValue: value(source.approvedRecord, key),
-            newValue: value(source.proposedRecord, key),
+            oldValue: value(source.approvedRecord, displayKey ?? key),
+            newValue: value(source.proposedRecord, displayKey ?? key),
           })),
         };
       }
@@ -138,9 +138,9 @@ export const useTechnicalPendingRequestsAdapter = (
             : undefined,
         fields: [
           { label: 'Column FQN', value: source.columnFqn },
-          ...FIELDS.map(({ key, label }) => ({
+          ...FIELDS.map(({ key, label, displayKey }) => ({
             label,
-            value: value(snapshot, key),
+            value: value(snapshot, displayKey ?? key),
           })),
         ],
       };
@@ -172,7 +172,7 @@ export const useTechnicalPendingRequestsAdapter = (
         });
         const requesters = new Set<string>();
         const services = new Set<string>();
-        const cdes = new Set<string>();
+        const cdes = new Map<string, string>();
         response.data.forEach((item) => {
           if (item.submittedBy) {
             requesters.add(item.submittedBy);
@@ -181,11 +181,14 @@ export const useTechnicalPendingRequestsAdapter = (
             services.add(item.sourceService);
           }
           if (item.cdeTermId) {
-            cdes.add(item.cdeTermId);
+            cdes.set(item.cdeTermId, item.cdeCode ?? item.cdeTermId);
           }
         });
         const options = (items: Set<string>) =>
           [...items].sort().map((item) => ({ label: item, value: item }));
+        const cdeOptions = [...cdes]
+          .sort(([, left], [, right]) => left.localeCompare(right))
+          .map(([id, code]) => ({ label: code, value: id }));
 
         return [
           {
@@ -198,7 +201,7 @@ export const useTechnicalPendingRequestsAdapter = (
             label: t('label.service'),
             options: options(services),
           },
-          { key: 'cde', label: 'CDE', options: options(cdes) },
+          { key: 'cde', label: 'CDE', options: cdeOptions },
         ];
       },
       fetchChangeDetail: detail,

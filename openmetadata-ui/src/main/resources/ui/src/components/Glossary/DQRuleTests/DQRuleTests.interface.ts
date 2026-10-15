@@ -105,6 +105,8 @@ export interface DQSummary {
   aborted: number;
   noResult: number;
   stale: number;
+  /** Bindings whose testcase could not be created or retired. */
+  errors: number;
   lastRunAt: number | null;
 }
 
@@ -157,6 +159,8 @@ export interface DQRuleSummary {
   dimension: string | null;
   effective: boolean;
   businessVersion: string;
+  /** Set when the version was replaced: the end of the period it was applied. */
+  appliedUntil?: number | null;
 }
 
 export interface DQRuleResults {

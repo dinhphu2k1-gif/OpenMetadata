@@ -11,14 +11,15 @@
  *  limitations under the License.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { useTranslation } from 'react-i18next';
 import {
   getDqRuleLatestRun,
   getDqRuleResults,
   getDqRuleTrend,
 } from '../../../rest/dqRuleTestAPI';
 import DQRuleTestResults from './DQRuleTestResults.component';
-import { DQRuleResults } from './DQRuleTests.interface';
+import { DQRuleResults, DQTestCapabilities } from './DQRuleTests.interface';
 
 jest.mock('../../../rest/dqRuleTestAPI', () => ({
   getDqRuleResults: jest.fn(),
@@ -49,6 +50,7 @@ const summary = {
   aborted: 0,
   noResult: 0,
   stale: 0,
+  errors: 0,
   lastRunAt: 1790000000000,
 };
 
@@ -98,7 +100,31 @@ const results: DQRuleResults = {
   paging: { offset: 0, limit: 25, total: 1 },
 };
 
+const errorRow = (index: number) => ({
+  ...results.testCases[0],
+  testCaseId: null,
+  testCaseFqn: null,
+  column: {
+    fqn: `core.db.s.kh${index}.cccd`,
+    table: `kh${index}`,
+    service: 'core',
+  },
+  state: 'ERROR',
+  stateReason: 'RECONCILE_FAILED',
+  thresholdResult: 'NO_RESULT',
+  nativeStatus: null,
+  passedRowsPercentage: null,
+  failedRows: null,
+  timestamp: null,
+});
+
 describe('DQRuleTestResults', () => {
+  const defaultTranslation = (useTranslation as jest.Mock)();
+
+  afterEach(() => {
+    (useTranslation as jest.Mock).mockReturnValue(defaultTranslation);
+  });
+
   beforeEach(() => {
     (getDqRuleResults as jest.Mock).mockResolvedValue(results);
     (getDqRuleTrend as jest.Mock).mockResolvedValue({
@@ -220,6 +246,118 @@ describe('DQRuleTestResults', () => {
     expect(
       await screen.findByTestId('dq-results-not-applied')
     ).toBeInTheDocument();
+  });
+
+  it('counts every failed testcase, not only the rows of the page', async () => {
+    (useTranslation as jest.Mock).mockReturnValue({
+      ...defaultTranslation,
+      t: (key: string, options?: { count?: number }) =>
+        options?.count === undefined ? key : `${key}:${options.count}`,
+    });
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      status: 'NO_RESULT',
+      summary: { ...summary, applied: 0, passed: 0, failed: 0, errors: 29 },
+      testCases: Array.from({ length: 25 }, (_, index) => errorRow(index)),
+      paging: { offset: 0, limit: 25, total: 29 },
+    });
+    render(<DQRuleTestResults ruleId="r1" />);
+
+    expect(await screen.findByTestId('dq-sync-error')).toHaveTextContent(
+      'dq.test.sync-error-description:29'
+    );
+    expect(screen.getByTitle('2')).toBeInTheDocument();
+  });
+
+  it('hides the applied version results when another version is viewed', async () => {
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      rule: { ...results.rule, businessVersion: '1.1' },
+    });
+    render(<DQRuleTestResults ruleId="r1" viewedBusinessVersion="1.0" />);
+
+    expect(
+      await screen.findByTestId('dq-results-other-version')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('dq-rule-test-results')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the results of a replaced version without run actions', async () => {
+    (getDqRuleResults as jest.Mock).mockResolvedValue({
+      ...results,
+      rule: { ...results.rule, businessVersion: '1.0', appliedUntil: 1000 },
+    });
+    render(
+      <DQRuleTestResults
+        capabilities={{ canRun: true } as DQTestCapabilities}
+        ruleId="r1"
+        viewedBusinessVersion="1.0"
+      />
+    );
+
+    expect(
+      await screen.findByTestId('dq-results-replaced-version')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('dq-rule-test-results')).toBeInTheDocument();
+    expect(screen.queryByTestId('dq-run-now')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dq-results-archived')).not.toBeInTheDocument();
+    expect(getDqRuleResults).toHaveBeenCalledWith(
+      'r1',
+      expect.objectContaining({ businessVersion: '1.0' })
+    );
+  });
+
+  it('keeps the results of the version on screen when an earlier read ends last', async () => {
+    let resolveApplied: (value: DQRuleResults) => void = () => undefined;
+    (getDqRuleResults as jest.Mock).mockImplementation(
+      (_ruleId: string, params: { businessVersion?: string }) =>
+        params.businessVersion === '1.1'
+          ? new Promise((resolve) => {
+              resolveApplied = resolve;
+            })
+          : Promise.resolve({
+              ...results,
+              rule: {
+                ...results.rule,
+                businessVersion: '1.0',
+                appliedUntil: 1000,
+              },
+            })
+    );
+    const { rerender } = render(
+      <DQRuleTestResults ruleId="r1" viewedBusinessVersion="1.1" />
+    );
+    rerender(<DQRuleTestResults ruleId="r1" viewedBusinessVersion="1.0" />);
+
+    expect(
+      await screen.findByTestId('dq-results-replaced-version')
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolveApplied({
+        ...results,
+        rule: { ...results.rule, businessVersion: '1.1' },
+      });
+    });
+
+    expect(
+      screen.getByTestId('dq-results-replaced-version')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('dq-results-other-version')
+    ).not.toBeInTheDocument();
+  });
+
+  it('adds no version notice on the applied version', async () => {
+    render(<DQRuleTestResults ruleId="r1" viewedBusinessVersion="1.0" />);
+
+    await screen.findByTestId('dq-rule-test-results');
+
+    expect(
+      screen.queryByTestId('dq-results-other-version')
+    ).not.toBeInTheDocument();
   });
 
   it('flags an archived rule', async () => {

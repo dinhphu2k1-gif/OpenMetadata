@@ -71,7 +71,9 @@ describe('localizeDqMessage', () => {
         'Found 17 value(s) matching regex pattern vs 20 value(s) in the column.',
         { passedRows: 17, totalRows: 40 }
       )
-    ).toBe('Có 17 giá trị khớp biểu thức chính quy trên tổng 40 giá trị của cột.');
+    ).toBe(
+      'Có 17 giá trị khớp biểu thức chính quy trên tổng 40 giá trị của cột.'
+    );
   });
 
   it('keeps a message it does not know', () => {

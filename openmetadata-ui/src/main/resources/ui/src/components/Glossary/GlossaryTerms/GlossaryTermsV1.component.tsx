@@ -551,6 +551,7 @@ const GlossaryTermsV1 = ({
                     }
               }
               ruleId={glossaryTerm.id}
+              viewedBusinessVersion={glossaryTerm.businessVersion}
             />
           </div>
         ),

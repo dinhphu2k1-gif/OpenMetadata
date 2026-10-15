@@ -49,6 +49,7 @@ const emptySummary = {
   aborted: 0,
   noResult: 0,
   stale: 0,
+  errors: 0,
   lastRunAt: null,
 };
 

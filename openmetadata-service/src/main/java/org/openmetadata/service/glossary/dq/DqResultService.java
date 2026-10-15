@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -57,6 +58,8 @@ public final class DqResultService {
       TestCaseResult result,
       boolean stale) {}
 
+  public record ResultPage(int offset, int limit) {}
+
   /** Filters and page of the testcases of a results read. */
   record ResultQuery(
       String ruleFilter,
@@ -70,11 +73,19 @@ public final class DqResultService {
       DqRuleContext context,
       boolean effective,
       Map<String, SpecExecRow> specRows,
-      List<Evaluated> evaluated) {}
+      List<Evaluated> evaluated,
+      DqRuleVersion replaced) {}
 
+  /** Results of the given business version of a Rule; the applied one when it is null. */
   public static Map<String, Object> ruleResults(
-      String ruleId, String specKey, Predicate<String> canViewTable, int offset, int limit) {
-    final RuleState state = load(ruleId);
+      String ruleId,
+      String specKey,
+      String businessVersion,
+      Predicate<String> canViewTable,
+      ResultPage resultPage) {
+    final int offset = resultPage.offset();
+    final int limit = resultPage.limit();
+    final RuleState state = load(ruleId, businessVersion);
     final List<Evaluated> scoped = scope(state, specKey);
     final Map<String, Object> body = new LinkedHashMap<>();
     body.put("rule", ruleSummary(state));
@@ -180,8 +191,101 @@ public final class DqResultService {
     final Map<String, SpecExecRow> specRows = new LinkedHashMap<>();
     dao().listSpecs(ruleId).forEach(spec -> specRows.put(spec.specKey(), spec));
     final RuleState partial =
-        new RuleState(row, source.context(), source.effective(), specRows, List.of());
-    return new RuleState(row, source.context(), source.effective(), specRows, evaluate(partial));
+        new RuleState(row, source.context(), source.effective(), specRows, List.of(), null);
+    return new RuleState(
+        row, source.context(), source.effective(), specRows, evaluate(partial), null);
+  }
+
+  /**
+   * The state of a replaced version of a Rule, read from the period it was applied; the applied
+   * state when the version is the applied one or was never published.
+   */
+  static RuleState load(String ruleId, String businessVersion) {
+    final RuleState applied = load(ruleId);
+    final boolean isReplacedVersion =
+        businessVersion != null && !businessVersion.equals(applied.context().businessVersion());
+    return isReplacedVersion
+        ? DqRuleVersion.loadReplaced(UUID.fromString(ruleId), businessVersion)
+            .map(version -> replacedState(applied, version))
+            .orElse(applied)
+        : applied;
+  }
+
+  private static RuleState replacedState(RuleState applied, DqRuleVersion version) {
+    final Set<String> keys =
+        version.context().specs().stream().map(DqTestSpec::getKey).collect(Collectors.toSet());
+    final Map<String, SpecExecRow> specRows = new LinkedHashMap<>();
+    applied.specRows().values().stream()
+        .filter(spec -> keys.contains(spec.specKey()))
+        .forEach(spec -> specRows.put(spec.specKey(), activeSpec(spec)));
+    final RuleState partial =
+        new RuleState(applied.row(), version.context(), false, specRows, List.of(), version);
+    return new RuleState(
+        applied.row(), version.context(), false, specRows, evaluate(partial), version);
+  }
+
+  private static SpecExecRow activeSpec(SpecExecRow spec) {
+    return new SpecExecRow(
+        spec.ruleTermId(),
+        spec.specKey(),
+        spec.name(),
+        spec.kind(),
+        spec.testDefinitionFqn(),
+        spec.managedTestDefinitionId(),
+        spec.appliedSpecHash(),
+        DqTestReconciler.ACTIVE,
+        null,
+        spec.updatedAt());
+  }
+
+  /** The bindings of a replaced version, active as they were during the period it was applied. */
+  private static List<BindingRow> replacedBindings(RuleState state) {
+    return dao().listBindings(state.row().ruleTermId()).stream()
+        .filter(binding -> state.specRows().containsKey(binding.specKey()))
+        .filter(binding -> binding.testCaseFqn() != null)
+        .filter(
+            binding -> state.replaced().coversBinding(binding.activatedAt(), binding.retiredAt()))
+        .map(DqResultService::activeBinding)
+        .toList();
+  }
+
+  private static BindingRow activeBinding(BindingRow binding) {
+    return new BindingRow(
+        binding.id(),
+        binding.ruleTermId(),
+        binding.specKey(),
+        binding.columnKey(),
+        binding.columnFqn(),
+        binding.cdeTermId(),
+        binding.testCaseId(),
+        binding.testCaseFqn(),
+        DqTestReconciler.ACTIVE,
+        null,
+        null,
+        binding.attempts(),
+        binding.activatedAt(),
+        null,
+        binding.createdAt(),
+        binding.updatedAt());
+  }
+
+  static List<BindingRow> bindingsOf(RuleState state) {
+    return state.replaced() == null
+        ? dao().listBindings(state.row().ruleTermId())
+        : replacedBindings(state);
+  }
+
+  private static TestCaseResult lastResult(RuleState state, String testCaseFqn) {
+    return state.replaced() == null
+        ? resultsRepository().listLastTestCaseResult(testCaseFqn)
+        : resultsRepository()
+            .getTestCaseResults(
+                testCaseFqn, state.replaced().appliedFrom(), state.replaced().appliedUntil())
+            .getData()
+            .stream()
+            .filter(result -> result.getTimestamp() != null)
+            .max(Comparator.comparingLong(TestCaseResult::getTimestamp))
+            .orElse(null);
   }
 
   static List<RuleState> ruleStatesOfCde(String cdeId) {
@@ -196,7 +300,7 @@ public final class DqResultService {
     final Map<String, DqTestSpec> specs = new LinkedHashMap<>();
     state.context().specs().forEach(spec -> specs.put(spec.getKey(), spec));
     final List<Evaluated> evaluated = new ArrayList<>();
-    for (BindingRow binding : dao().listBindings(state.row().ruleTermId())) {
+    for (BindingRow binding : bindingsOf(state)) {
       evaluated.add(evaluateBinding(state, binding, specs.get(binding.specKey())));
     }
     evaluated.sort(
@@ -209,7 +313,7 @@ public final class DqResultService {
     TestCaseResult result = null;
     DqOutcome outcome = DqOutcome.NO_RESULT;
     if (DqTestReconciler.ACTIVE.equals(binding.state()) && binding.testCaseFqn() != null) {
-      result = resultsRepository().listLastTestCaseResult(binding.testCaseFqn());
+      result = lastResult(state, binding.testCaseFqn());
       outcome = DqOutcome.evaluate(thresholdOf(spec, state.context()), result);
     }
     final String specName =
@@ -222,7 +326,7 @@ public final class DqResultService {
         state.context().code(),
         outcome,
         result,
-        isStale(result, intervalOf(spec)));
+        state.replaced() == null && isStale(result, intervalOf(spec)));
   }
 
   static DqThreshold thresholdOf(DqTestSpec spec, DqRuleContext rule) {
@@ -286,6 +390,7 @@ public final class DqResultService {
     rule.put("dimension", state.context().dimension());
     rule.put("effective", state.effective());
     rule.put("businessVersion", state.context().businessVersion());
+    rule.put("appliedUntil", state.replaced() == null ? null : state.replaced().appliedUntil());
     return rule;
   }
 
@@ -296,6 +401,7 @@ public final class DqResultService {
     summary.put("specs", state.context().specs().size());
     summary.put("applied", live.size());
     summary.put("notApplicable", countState(state, DqTestReconciler.NOT_APPLICABLE));
+    summary.put("errors", countState(state, DqTestReconciler.ERROR));
     summary.put("passed", counts.getOrDefault(DqOutcome.PASSED, 0));
     summary.put("failed", counts.getOrDefault(DqOutcome.FAILED, 0));
     summary.put("aborted", counts.getOrDefault(DqOutcome.ABORTED, 0));

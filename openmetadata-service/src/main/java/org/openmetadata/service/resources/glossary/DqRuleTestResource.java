@@ -115,12 +115,17 @@ public class DqRuleTestResource {
       @Context SecurityContext securityContext,
       @PathParam("ruleId") UUID ruleId,
       @QueryParam("specKey") String specKey,
+      @QueryParam("businessVersion") String businessVersion,
       @DefaultValue("0") @QueryParam("offset") int offset,
       @DefaultValue(DEFAULT_LIMIT) @QueryParam("limit") int limit) {
     access.requireView(securityContext);
     DqCatalog.requireRule(ruleId);
     return DqResultService.ruleResults(
-        ruleId.toString(), specKey, tableViewer(securityContext), offset, limit);
+        ruleId.toString(),
+        specKey,
+        businessVersion,
+        tableViewer(securityContext),
+        new DqResultService.ResultPage(offset, limit));
   }
 
   @GET
@@ -130,10 +135,11 @@ public class DqRuleTestResource {
       @Context SecurityContext securityContext,
       @PathParam("ruleId") UUID ruleId,
       @DefaultValue("30") @QueryParam("days") int days,
-      @QueryParam("specKey") String specKey) {
+      @QueryParam("specKey") String specKey,
+      @QueryParam("businessVersion") String businessVersion) {
     access.requireView(securityContext);
     DqCatalog.requireRule(ruleId);
-    return DqTrendService.ruleTrend(ruleId.toString(), days, specKey);
+    return DqTrendService.ruleTrend(ruleId.toString(), days, specKey, businessVersion);
   }
 
   @POST

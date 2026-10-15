@@ -42,6 +42,7 @@ import org.openmetadata.service.Entity;
 import org.openmetadata.service.exception.EntityNotFoundException;
 import org.openmetadata.service.glossary.technical.TechnicalBulkReview;
 import org.openmetadata.service.glossary.technical.TechnicalCatalog;
+import org.openmetadata.service.glossary.technical.TechnicalCdeInfo;
 import org.openmetadata.service.glossary.technical.TechnicalChangeRequestCreate;
 import org.openmetadata.service.glossary.technical.TechnicalChangeRequestService;
 import org.openmetadata.service.glossary.technical.TechnicalChangeRows;
@@ -530,6 +531,7 @@ public class TechnicalDictionaryResource {
           }
         });
 
+    labelCdeCodes(all, dataDictionaryVersion);
     final Set<String> typeFilter = csv(types, true);
     final Set<String> requesterFilter = csv(requesters, false);
     final Set<String> serviceFilter = csv(sourceServices, false);
@@ -964,6 +966,42 @@ public class TechnicalDictionaryResource {
     view.put("cdeTermId", record.cdeTermId());
     view.put("dataDictionaryVersion", dataDictionaryVersion);
     return view;
+  }
+
+  /** Resolves each distinct CDE once so request rows show its code instead of its identifier. */
+  private static void labelCdeCodes(List<Map<String, Object>> items, String dataDictionaryVersion) {
+    final Map<String, String> codes = new HashMap<>();
+    items.forEach(
+        item -> {
+          putCdeCode(item, codes, dataDictionaryVersion);
+          labelRecordCdeCode(item, "approvedRecord", codes, dataDictionaryVersion);
+          labelRecordCdeCode(item, "proposedRecord", codes, dataDictionaryVersion);
+        });
+  }
+
+  private static void labelRecordCdeCode(
+      Map<String, Object> item,
+      String key,
+      Map<String, String> codes,
+      String dataDictionaryVersion) {
+    if (item.get(key) != null) {
+      final Map<String, Object> record = stringKeyMap(item.get(key));
+      putCdeCode(record, codes, dataDictionaryVersion);
+      item.put(key, record);
+    }
+  }
+
+  private static void putCdeCode(
+      Map<String, Object> view, Map<String, String> codes, String dataDictionaryVersion) {
+    if (view != null && view.get("cdeTermId") instanceof String cdeId && !cdeId.isEmpty()) {
+      view.put("cdeCode", codes.computeIfAbsent(cdeId, id -> cdeCode(id, dataDictionaryVersion)));
+    }
+  }
+
+  private static String cdeCode(String cdeId, String dataDictionaryVersion) {
+    final TechnicalCdeInfo info =
+        TechnicalCdeInfo.resolve(UUID.fromString(cdeId), dataDictionaryVersion);
+    return info.isPresent() ? info.code() : cdeId;
   }
 
   /** Request snapshots deliberately use already-loaded data and never issue a query per item. */

@@ -224,6 +224,7 @@ export interface TechnicalPendingRequest {
   sourceSchema?: string;
   sourceTable?: string;
   cdeTermId?: string;
+  cdeCode?: string;
   dataDictionaryVersion?: string;
   approvedRecord?: Record<string, unknown> | null;
   proposedRecord?: Record<string, unknown> | null;

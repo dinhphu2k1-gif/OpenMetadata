@@ -5777,8 +5777,11 @@ public abstract class EntityRepository<T extends EntityInterface> {
       idsByType.computeIfAbsent(record.getType(), k -> new ArrayList<>()).add(record.getId());
     }
     for (var entry : idsByType.entrySet()) {
-      EntityRepository<?> repo = Entity.getEntityRepository(entry.getKey());
-      repo.bulkRestoreSubtree(entry.getValue(), updatedBy);
+      // Time-series children (such as the incidents of a testcase) have no deleted flag to restore
+      if (!Entity.isTimeSeriesEntity(entry.getKey())) {
+        EntityRepository<?> repo = Entity.getEntityRepository(entry.getKey());
+        repo.bulkRestoreSubtree(entry.getValue(), updatedBy);
+      }
     }
   }
 

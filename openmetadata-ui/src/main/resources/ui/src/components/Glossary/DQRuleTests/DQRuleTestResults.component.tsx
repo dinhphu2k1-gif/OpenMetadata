@@ -49,6 +49,7 @@ import {
   getDqRuleTrend,
   runDqRuleTests,
 } from '../../../rest/dqRuleTestAPI';
+import { compareBusinessVersions } from '../../../utils/BusinessVersionUtils';
 import { formatDateTime } from '../../../utils/date-time/DateTimeUtils';
 import {
   calculatePercentage,
@@ -96,6 +97,8 @@ interface DQRuleTestResultsProps {
   capabilities?: DQTestCapabilities;
   /** The way to declare tests from this tab; absent when the viewer cannot edit. */
   declareAction?: DQDeclareAction;
+  /** Business version on screen; the results always belong to the Rule's applied version. */
+  viewedBusinessVersion?: string;
 }
 
 const ALL_FILTER = '__all__';
@@ -138,6 +141,7 @@ const DQRuleTestResults = ({
   ruleId,
   capabilities,
   declareAction,
+  viewedBusinessVersion,
 }: DQRuleTestResultsProps) => {
   const { t } = useTranslation();
   const [results, setResults] = useState<DQRuleResults>();
@@ -150,6 +154,7 @@ const DQRuleTestResults = ({
   const [trendDays, setTrendDays] = useState(DQ_TREND_PERIODS[0]);
   const [requestedAt, setRequestedAt] = useState<number>();
   const wasRunning = useRef(false);
+  const latestLoad = useRef(0);
 
   const hasStarted =
     (latestRun?.startedAt ?? 0) >= (requestedAt ?? 0) - DQ_RUN_CLOCK_SKEW_MS;
@@ -161,30 +166,47 @@ const DQRuleTestResults = ({
     DQ_RUNNING_STATES.has(latestRun?.state ?? '') || isAwaitingStart;
 
   const load = useCallback(async () => {
+    // Only the newest read may update the screen, so a slower read of a version
+    // viewed before cannot replace the results of the version on screen.
+    const loadId = ++latestLoad.current;
+    const isCurrent = () => loadId === latestLoad.current;
     try {
       const [resultData, trendData, runData] = await Promise.all([
         getDqRuleResults(ruleId, {
           specKey: specKey === RETIRED_FILTER ? undefined : specKey,
+          businessVersion: viewedBusinessVersion,
           offset: (page - 1) * DQ_RESULT_PAGE_SIZE,
           limit: DQ_RESULT_PAGE_SIZE,
         }),
-        getDqRuleTrend(ruleId, { days: trendDays, specKey }),
+        getDqRuleTrend(ruleId, {
+          days: trendDays,
+          specKey,
+          businessVersion: viewedBusinessVersion,
+        }),
         getDqRuleLatestRun(ruleId),
       ]);
+      if (!isCurrent()) {
+        return;
+      }
       setResults(resultData);
       setTrend(trendData);
       setLatestRun(runData);
       setIsNotApplied(false);
     } catch (error) {
+      if (!isCurrent()) {
+        return;
+      }
       if (errorCodeOf(error) === NOT_AVAILABLE_CODE) {
         setIsNotApplied(true);
       } else {
         showErrorToast(error as AxiosError);
       }
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) {
+        setIsLoading(false);
+      }
     }
-  }, [ruleId, specKey, page, trendDays]);
+  }, [ruleId, specKey, page, trendDays, viewedBusinessVersion]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -293,7 +315,8 @@ const DQRuleTestResults = ({
   const { rule, summary, status, specs } = results;
   const visibleSpecs = specs.filter((spec) => !spec.retired);
   const hasRetired = specs.some((spec) => spec.retired);
-  const archivedBanner = !rule.effective && (
+  const isReplacedVersion = Boolean(rule.appliedUntil);
+  const archivedBanner = !rule.effective && !isReplacedVersion && (
     <Alert
       showIcon
       data-testid="dq-results-archived"
@@ -302,9 +325,37 @@ const DQRuleTestResults = ({
     />
   );
 
-  const errorRows = results.testCases.filter((row) => row.state === 'ERROR');
+  const isOtherVersion = Boolean(
+    viewedBusinessVersion &&
+      rule.businessVersion &&
+      compareBusinessVersions(viewedBusinessVersion, rule.businessVersion) !== 0
+  );
 
-  if (status !== 'NOT_DECLARED' && summary.applied === 0 && errorRows.length) {
+  if (isOtherVersion) {
+    return (
+      <DQResultsEmptyState
+        description={t('dq.test.results-of-applied-version', {
+          viewed: viewedBusinessVersion,
+          applied: rule.businessVersion,
+        })}
+        testId="dq-results-other-version"
+        title={t('dq.test.other-version-title', {
+          version: viewedBusinessVersion,
+        })}
+      />
+    );
+  }
+
+  const resultPagination = {
+    current: page,
+    pageSize: DQ_RESULT_PAGE_SIZE,
+    total: results.paging.total,
+    showSizeChanger: false,
+    hideOnSinglePage: true,
+    onChange: setPage,
+  };
+
+  if (status !== 'NOT_DECLARED' && summary.applied === 0 && summary.errors) {
     return (
       <div className="dq-rule-test-results" data-testid="dq-rule-test-results">
         {archivedBanner}
@@ -312,7 +363,7 @@ const DQRuleTestResults = ({
           showIcon
           data-testid="dq-sync-error"
           description={t('dq.test.sync-error-description', {
-            count: errorRows.length,
+            count: summary.errors,
           })}
           message={t('dq.test.sync-error-title')}
           type="error"
@@ -321,7 +372,8 @@ const DQRuleTestResults = ({
           <Table<DQTestCaseRow>
             columns={scopeColumns}
             dataSource={results.testCases}
-            pagination={false}
+            loading={isLoading}
+            pagination={resultPagination}
             rowKey={(row) => `${row.spec.key}-${row.column.fqn}`}
             size="small"
           />
@@ -533,6 +585,17 @@ const DQRuleTestResults = ({
   return (
     <div className="dq-rule-test-results" data-testid="dq-rule-test-results">
       {archivedBanner}
+      {isReplacedVersion && (
+        <Alert
+          showIcon
+          data-testid="dq-results-replaced-version"
+          message={t('dq.test.results-of-replaced-version', {
+            version: rule.businessVersion,
+            until: formatDateTime(rule.appliedUntil ?? undefined),
+          })}
+          type="info"
+        />
+      )}
 
       <Card className="dq-run-bar">
         <div className="dq-run-bar-items">
@@ -559,7 +622,7 @@ const DQRuleTestResults = ({
             </span>
           </div>
         </div>
-        {capabilities?.canRun && (
+        {capabilities?.canRun && !isReplacedVersion && (
           <Button
             data-testid="dq-run-now"
             disabled={isRunning}
@@ -581,7 +644,7 @@ const DQRuleTestResults = ({
         />
       )}
 
-      {(latestRun?.pipelines?.length ?? 0) > 0 && (
+      {!isReplacedVersion && (latestRun?.pipelines?.length ?? 0) > 0 && (
         <Card
           className="dq-pipelines"
           data-testid="dq-pipelines"
@@ -795,14 +858,7 @@ const DQRuleTestResults = ({
           }}
           loading={isLoading}
           locale={{ emptyText: t('dq.test.status.no-result') }}
-          pagination={{
-            current: page,
-            pageSize: DQ_RESULT_PAGE_SIZE,
-            total: results.paging.total,
-            showSizeChanger: false,
-            hideOnSinglePage: true,
-            onChange: setPage,
-          }}
+          pagination={resultPagination}
           rowKey={(row) => `${row.spec.key}-${row.column.fqn}`}
           scroll={{ x: 1300 }}
           size="small"
