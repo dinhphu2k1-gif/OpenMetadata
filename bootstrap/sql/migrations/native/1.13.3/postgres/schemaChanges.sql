@@ -353,3 +353,19 @@ CREATE INDEX IF NOT EXISTS idx_technical_deleted_cde ON technical_record_deleted
 -- newer Data Dictionary version). Null while the snapshot is still published.
 ALTER TABLE glossary_business_snapshot
   ADD COLUMN IF NOT EXISTS archiveReason varchar(16);
+
+-- Notification read state per user: every notification created at or before readAllBefore counts
+-- as read, and notification_read holds the ones read one by one after that. readAt is the
+-- thread's createdAt when the user read it, so a reused thread that moves forward turns unread.
+CREATE TABLE IF NOT EXISTS notification_read_all (
+  userId varchar(36) PRIMARY KEY,
+  readAllBefore bigint NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notification_read (
+  userId varchar(36) NOT NULL,
+  threadId varchar(36) NOT NULL,
+  readAt bigint NOT NULL,
+  PRIMARY KEY (userId, threadId)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_read_thread ON notification_read (threadId);

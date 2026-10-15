@@ -352,7 +352,6 @@ export const IN_PAGE_SEARCH_ROUTES: Record<string, Array<string>> = {
   '/database/': [i18n.t('message.in-this-database')],
 };
 
-export const NOTIFICATION_READ_TIMER = 2500;
 export const TIER_CATEGORY = 'Tier';
 
 export const ENTITY_PATH = {

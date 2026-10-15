@@ -39,7 +39,6 @@ import { ReactComponent as SidebarExpandedIcon } from '../../assets/svg/ic-sideb
 import {
   DEFAULT_DOMAIN_VALUE,
   LAST_VERSION_FETCH_TIME_KEY,
-  NOTIFICATION_READ_TIMER,
   ONE_HOUR_MS,
   ROUTES,
   SOCKET_EVENTS,
@@ -83,12 +82,12 @@ import DomainSelectableList from '../common/DomainSelectableList/DomainSelectabl
 import { useEntityExportModalProvider } from '../Entity/EntityExportModalProvider/EntityExportModalProvider.component';
 import { CSVExportWebsocketResponse } from '../Entity/EntityExportModalProvider/EntityExportModalProvider.interface';
 import { GlobalSearchBar } from '../GlobalSearchBar/GlobalSearchBar';
+import { getUnreadNotificationCount } from '../../rest/feedsAPI';
 import NotificationBox from '../NotificationBox/NotificationBox.component';
 import {
-  hasUnseenNotification,
-  markNotificationsSeen,
-  NOTIFICATIONS_SEEN_EVENT,
-} from '../NotificationBox/NotificationSeen';
+  migrateLegacySeenMark,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from '../NotificationBox/NotificationRead';
 import { UserProfileIcon } from '../Settings/Users/UserProfileIcon/UserProfileIcon.component';
 import './nav-bar.less';
 import popupAlertsCardsClassBase from './PopupAlertClassBase';
@@ -108,7 +107,7 @@ const NavBar = () => {
     useDomainStore();
   const { t } = useTranslation();
   const searchRef = useRef<InputRef>(null);
-  const [hasNotification, setHasNotification] = useState<boolean>(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const {
     appVersion: version,
     setAppVersion,
@@ -171,39 +170,30 @@ const NavBar = () => {
 
   const { socket } = useWebSocketConnector();
 
-  const handleNotificationRead = () => {
-    setHasNotification(false);
-    markNotificationsSeen(currentUser?.id);
-  };
-
-  useEffect(() => {
-    const clearDot = () => setHasNotification(false);
-    window.addEventListener(NOTIFICATIONS_SEEN_EVENT, clearDot);
-
-    return () => window.removeEventListener(NOTIFICATIONS_SEEN_EVENT, clearDot);
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      setUnreadCount(await getUnreadNotificationCount());
+    } catch {
+      // The bell keeps its last count when the server cannot be reached.
+    }
   }, []);
 
   useEffect(() => {
-    let isCurrent = true;
-    hasUnseenNotification(currentUser?.id).then((hasUnseen) => {
-      if (isCurrent && hasUnseen) {
-        setHasNotification(true);
-      }
-    });
+    migrateLegacySeenMark(currentUser?.id).then(refreshUnreadCount);
+  }, [currentUser?.id, refreshUnreadCount]);
+
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refreshUnreadCount);
+    window.addEventListener('focus', refreshUnreadCount);
 
     return () => {
-      isCurrent = false;
+      window.removeEventListener(
+        NOTIFICATIONS_CHANGED_EVENT,
+        refreshUnreadCount
+      );
+      window.removeEventListener('focus', refreshUnreadCount);
     };
-  }, [currentUser?.id]);
-
-  const handleBellClick = useCallback(
-    (visible: boolean) => {
-      if (visible && hasNotification) {
-        setTimeout(handleNotificationRead, NOTIFICATION_READ_TIMER);
-      }
-    },
-    [hasNotification, currentUser?.id]
-  );
+  }, [refreshUnreadCount]);
 
   const showBrowserNotification = (
     about: string,
@@ -355,7 +345,7 @@ const NavBar = () => {
       socket.on(SOCKET_EVENTS.TASK_CHANNEL, (newActivity) => {
         if (newActivity) {
           const activity = JSON.parse(newActivity);
-          setHasNotification(true);
+          refreshUnreadCount();
           showBrowserNotification(
             activity.about,
             activity.createdBy,
@@ -367,7 +357,7 @@ const NavBar = () => {
       socket.on(SOCKET_EVENTS.MENTION_CHANNEL, (newActivity) => {
         if (newActivity) {
           const activity = JSON.parse(newActivity);
-          setHasNotification(true);
+          refreshUnreadCount();
           showBrowserNotification(
             activity.about,
             activity.createdBy,
@@ -558,12 +548,16 @@ const NavBar = () => {
                 width: '425px',
               }}
               placement="bottomRight"
-              trigger={['click']}
-              onOpenChange={handleBellClick}>
+              trigger={['click']}>
               <Button
                 className="flex-center"
                 icon={
-                  <Badge dot={hasNotification} offset={[-3, 3]}>
+                  <Badge
+                    count={unreadCount}
+                    data-testid="notification-unread-count"
+                    offset={[-3, 3]}
+                    overflowCount={99}
+                    size="small">
                     <IconBell data-testid="task-notifications" width={20} />
                   </Badge>
                 }

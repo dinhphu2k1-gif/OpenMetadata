@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -227,18 +228,156 @@ public class GovernedReviewNotificationIT {
     GovernedReviewNotifier.glossaryTermReviewed(
         glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "Tên khách hàng"));
 
-    final JsonNode all = notifications(client, "ALL", 0L);
+    final JsonNode all = notifications(client, "ALL");
 
     assertEquals(2, all.path("paging").path("total").asInt());
     assertEquals(2, all.path("data").size());
     assertEquals("Conversation", all.path("data").get(0).path("type").asText());
     assertEquals("Task", all.path("data").get(1).path("type").asText());
-    assertEquals(1, notifications(client, "PENDING", 0L).path("data").size());
-    assertEquals(1, notifications(client, "DECISIONS", 0L).path("data").size());
-    assertEquals(2, notifications(client, "ALL", 0L).path("unread").asInt());
-    assertEquals(
-        0,
-        notifications(client, "ALL", System.currentTimeMillis() + 60_000).path("unread").asInt());
+    assertEquals(1, notifications(client, "PENDING").path("data").size());
+    assertEquals(1, notifications(client, "DECISIONS").path("data").size());
+    assertEquals(2, all.path("unread").asInt());
+  }
+
+  @Test
+  void readingOneNotificationLeavesTheUnreadListButStaysInAll(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "readOne");
+    final OpenMetadataClient client = clientOf(steward);
+    submitOne(SUBMITTER);
+    GovernedReviewNotifier.glossaryTermReviewed(
+        glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "Tên khách hàng"));
+    final JsonNode before = notifications(client, "ALL", "UNREAD", 25, 0);
+    assertEquals(2, before.path("unread").asInt());
+    assertEquals(2, before.path("unreadIds").size());
+    assertEquals(2, unreadCount(client));
+
+    final String decisionId = idOfType(before, "Conversation");
+    assertEquals(1, markRead(client, decisionId, null).path("unread").asInt());
+
+    final JsonNode unread = notifications(client, "ALL", "UNREAD", 25, 0);
+    assertEquals(1, unread.path("data").size());
+    assertEquals(1, unread.path("paging").path("total").asInt());
+    assertEquals("Task", unread.path("data").get(0).path("type").asText());
+    final JsonNode all = notifications(client, "ALL");
+    assertEquals(2, all.path("data").size());
+    assertEquals(1, all.path("unreadIds").size());
+    assertFalse(all.path("unreadIds").toString().contains(decisionId));
+  }
+
+  @Test
+  void readingANotificationDoesNotAffectOtherRecipients(TestNamespace ns) throws Exception {
+    final User first = createSteward(ns, "readerA");
+    final User second = createSteward(ns, "readerB");
+    submitOne(SUBMITTER);
+    final OpenMetadataClient firstClient = clientOf(first);
+
+    markRead(firstClient, idOfType(notifications(firstClient, "ALL"), "Task"), null);
+
+    assertEquals(0, unreadCount(firstClient));
+    assertEquals(1, unreadCount(clientOf(second)));
+  }
+
+  @Test
+  void readAllMarksEverythingReadButLaterNotificationsStayUnread(TestNamespace ns)
+      throws Exception {
+    final User steward = createSteward(ns, "readAll");
+    final OpenMetadataClient client = clientOf(steward);
+    submitOne(SUBMITTER);
+    GovernedReviewNotifier.glossaryTermReviewed(
+        glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "A"));
+    pause();
+
+    assertEquals(0, markAllRead(client, null).path("unread").asInt());
+    assertEquals(0, notifications(client, "ALL", "UNREAD", 25, 0).path("data").size());
+    pause();
+    GovernedReviewNotifier.glossaryTermReviewed(
+        glossary.getId(), SUBMITTER, ReviewDecision.rejected(steward.getName(), "B"));
+
+    assertEquals(1, unreadCount(client));
+    assertEquals(0, singleReadMarks(steward));
+  }
+
+  @Test
+  void readAllDropsTheSingleMarksItCovers(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "coverage");
+    final OpenMetadataClient client = clientOf(steward);
+    GovernedReviewNotifier.glossaryTermReviewed(
+        glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "A"));
+    markRead(client, idOfType(notifications(client, "ALL"), "Conversation"), null);
+    assertEquals(1, singleReadMarks(steward));
+    pause();
+
+    markAllRead(client, null);
+
+    assertEquals(0, singleReadMarks(steward));
+  }
+
+  @Test
+  void aReadReviewTaskTurnsUnreadWhenANewRequestArrives(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "reused");
+    final OpenMetadataClient client = clientOf(steward);
+    submitOne(SUBMITTER);
+    markRead(client, idOfType(notifications(client, "ALL"), "Task"), null);
+    assertEquals(0, unreadCount(client));
+    pause();
+
+    submitOne(SUBMITTER);
+
+    assertEquals(1, unreadCount(client));
+  }
+
+  @Test
+  void aClosedTaskIsNoLongerUnread(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "closedTask");
+    final OpenMetadataClient client = clientOf(steward);
+    decide(submitOne(SUBMITTER));
+
+    assertEquals(0, unreadCount(client));
+    assertEquals(0, notifications(client, "ALL", "UNREAD", 25, 0).path("data").size());
+    assertEquals(1, notifications(client, "ALL").path("data").size());
+  }
+
+  @Test
+  void anOlderReadTimeNeverMakesANotificationUnreadAgain(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "stale");
+    final OpenMetadataClient client = clientOf(steward);
+    GovernedReviewNotifier.glossaryTermReviewed(
+        glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "A"));
+    final String id = idOfType(notifications(client, "ALL"), "Conversation");
+    markRead(client, id, null);
+
+    markRead(client, id, 1L);
+
+    assertEquals(0, unreadCount(client));
+  }
+
+  @Test
+  void aReadTimeBeyondTheThreadIsCappedAtTheThread(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "future");
+    final OpenMetadataClient client = clientOf(steward);
+    submitOne(SUBMITTER);
+    markRead(
+        client,
+        idOfType(notifications(client, "ALL"), "Task"),
+        System.currentTimeMillis() + 3_600_000);
+    pause();
+
+    submitOne(SUBMITTER);
+
+    assertEquals(1, unreadCount(client));
+  }
+
+  @Test
+  void aNotificationOfSomeoneElseCannotBeMarkedRead(TestNamespace ns) throws Exception {
+    final User steward = createSteward(ns, "owner2");
+    final User other = createUser(ns, "intruder", List.of());
+    submitOne(SUBMITTER);
+    final String id = idOfType(notifications(clientOf(steward), "ALL"), "Task");
+
+    assertThrows(Exception.class, () -> markRead(clientOf(other), id, null));
+
+    assertEquals(1, unreadCount(clientOf(steward)));
+    assertEquals(0, singleReadMarks(other));
   }
 
   @Test
@@ -249,8 +388,8 @@ public class GovernedReviewNotificationIT {
     GovernedReviewNotifier.glossaryTermReviewed(
         glossary.getId(), SUBMITTER, ReviewDecision.rejected(steward.getName(), "X"));
 
-    final JsonNode first = notifications(client, "ALL", 0L, 1, 0);
-    final JsonNode second = notifications(client, "ALL", 0L, 1, 1);
+    final JsonNode first = notifications(client, "ALL", "ALL", 1, 0);
+    final JsonNode second = notifications(client, "ALL", "ALL", 1, 1);
 
     assertEquals(2, first.path("paging").path("total").asInt());
     assertEquals(1, first.path("data").size());
@@ -268,7 +407,7 @@ public class GovernedReviewNotificationIT {
     GovernedReviewNotifier.glossaryTermReviewed(
         glossary.getId(), SUBMITTER, ReviewDecision.approved(steward.getName(), "Y"));
 
-    final JsonNode bystanders = notifications(clientOf(other), "ALL", 0L);
+    final JsonNode bystanders = notifications(clientOf(other), "ALL");
 
     assertEquals(0, bystanders.path("data").size());
     assertEquals(0, bystanders.path("paging").path("total").asInt());
@@ -300,7 +439,7 @@ public class GovernedReviewNotificationIT {
             .getHttpClient()
             .execute(HttpMethod.POST, "/v1/feed", request, Thread.class);
     try {
-      final JsonNode inbox = notifications(clientOf(member), "PENDING", 0L);
+      final JsonNode inbox = notifications(clientOf(member), "PENDING");
 
       assertEquals(1, inbox.path("data").size());
       assertEquals("Team task", inbox.path("data").get(0).path("message").asText());
@@ -382,13 +521,12 @@ public class GovernedReviewNotificationIT {
     return SdkClients.createClient(user.getName(), user.getEmail(), new String[] {});
   }
 
-  private static JsonNode notifications(OpenMetadataClient client, String group, long unreadSince)
-      throws Exception {
-    return notifications(client, group, unreadSince, 25, 0);
+  private static JsonNode notifications(OpenMetadataClient client, String group) throws Exception {
+    return notifications(client, group, "ALL", 25, 0);
   }
 
   private static JsonNode notifications(
-      OpenMetadataClient client, String group, long unreadSince, int limit, int offset)
+      OpenMetadataClient client, String group, String status, int limit, int offset)
       throws Exception {
     return client
         .getHttpClient()
@@ -396,14 +534,62 @@ public class GovernedReviewNotificationIT {
             HttpMethod.GET,
             "/v1/feed/notifications?group="
                 + group
+                + "&status="
+                + status
                 + "&limit="
                 + limit
                 + "&offset="
-                + offset
-                + "&unreadSince="
-                + unreadSince,
+                + offset,
             null,
             JsonNode.class);
+  }
+
+  private static JsonNode markRead(OpenMetadataClient client, String threadId, Long readAt)
+      throws Exception {
+    final Map<String, Object> body = readAt == null ? Map.of() : Map.of("readAt", readAt);
+    return client
+        .getHttpClient()
+        .execute(
+            HttpMethod.PUT, "/v1/feed/notifications/" + threadId + "/read", body, JsonNode.class);
+  }
+
+  private static JsonNode markAllRead(OpenMetadataClient client, Long before) throws Exception {
+    final Map<String, Object> body = before == null ? Map.of() : Map.of("before", before);
+    return client
+        .getHttpClient()
+        .execute(HttpMethod.POST, "/v1/feed/notifications/read-all", body, JsonNode.class);
+  }
+
+  private static int unreadCount(OpenMetadataClient client) throws Exception {
+    return client
+        .getHttpClient()
+        .execute(HttpMethod.GET, "/v1/feed/notifications/unread-count", null, JsonNode.class)
+        .path("unread")
+        .asInt();
+  }
+
+  private static String idOfType(JsonNode list, String type) {
+    for (final JsonNode thread : list.path("data")) {
+      if (type.equals(thread.path("type").asText())) {
+        return thread.path("id").asText();
+      }
+    }
+    throw new AssertionError("No " + type + " notification listed");
+  }
+
+  private static long singleReadMarks(User user) {
+    return Entity.getJdbi()
+        .withHandle(
+            handle ->
+                handle
+                    .createQuery("SELECT count(*) FROM notification_read WHERE userId = :userId")
+                    .bind("userId", user.getId().toString())
+                    .mapTo(Long.class)
+                    .one());
+  }
+
+  private static void pause() throws InterruptedException {
+    java.lang.Thread.sleep(10);
   }
 
   /** What the Mentions tab of the bell lists for the user, narrowed to the glossary. */

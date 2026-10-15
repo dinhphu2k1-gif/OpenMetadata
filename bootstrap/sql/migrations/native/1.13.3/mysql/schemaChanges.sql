@@ -347,3 +347,20 @@ CREATE TABLE IF NOT EXISTS `technical_record_deleted` (
 -- newer Data Dictionary version). Null while the snapshot is still published.
 ALTER TABLE `glossary_business_snapshot`
   ADD COLUMN `archiveReason` varchar(16) DEFAULT NULL AFTER `archivedBy`;
+
+-- Notification read state per user: every notification created at or before readAllBefore counts
+-- as read, and notification_read holds the ones read one by one after that. readAt is the
+-- thread's createdAt when the user read it, so a reused thread that moves forward turns unread.
+CREATE TABLE IF NOT EXISTS `notification_read_all` (
+  `userId` varchar(36) NOT NULL,
+  `readAllBefore` bigint unsigned NOT NULL,
+  PRIMARY KEY (`userId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `notification_read` (
+  `userId` varchar(36) NOT NULL,
+  `threadId` varchar(36) NOT NULL,
+  `readAt` bigint unsigned NOT NULL,
+  PRIMARY KEY (`userId`, `threadId`),
+  KEY `idx_notification_read_thread` (`threadId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

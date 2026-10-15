@@ -74,6 +74,7 @@ import org.openmetadata.service.jdbi3.FeedRepository;
 import org.openmetadata.service.jdbi3.FeedRepository.FilterType;
 import org.openmetadata.service.jdbi3.FeedRepository.NotificationGroup;
 import org.openmetadata.service.jdbi3.FeedRepository.NotificationPage;
+import org.openmetadata.service.jdbi3.FeedRepository.NotificationStatus;
 import org.openmetadata.service.jdbi3.FeedRepository.PaginationType;
 import org.openmetadata.service.resources.Collection;
 import org.openmetadata.service.security.Authorizer;
@@ -247,8 +248,8 @@ public class FeedResource {
       summary = "List the notifications of the current user",
       description =
           "Tasks assigned to the current user or their teams and threads that mention them, newest"
-              + " first, with the total and how many were created after `unreadSince`. Always about"
-              + " the authenticated user.")
+              + " first, with the total, how many are unread in the group and which threads of the"
+              + " page are unread. Always about the authenticated user.")
   public Map<String, Object> listNotifications(
       @Context UriInfo uriInfo,
       @Context SecurityContext securityContext,
@@ -256,18 +257,14 @@ public class FeedResource {
           @DefaultValue("ALL")
           @QueryParam("group")
           NotificationGroup group,
+      @Parameter(description = "ALL or UNREAD (only the notifications not read yet)")
+          @DefaultValue("ALL")
+          @QueryParam("status")
+          NotificationStatus status,
       @DefaultValue("25") @Min(1) @Max(100) @QueryParam("limit") int limit,
-      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset,
-      @Parameter(description = "Epoch millis; notifications created later count as unread")
-          @DefaultValue("0")
-          @Min(0)
-          @QueryParam("unreadSince")
-          long unreadSince) {
-    final UUID userId =
-        Entity.getEntityReferenceByName(
-                Entity.USER, securityContext.getUserPrincipal().getName(), Include.NON_DELETED)
-            .getId();
-    final NotificationPage page = dao.listNotifications(userId, group, limit, offset, unreadSince);
+      @DefaultValue("0") @Min(0) @QueryParam("offset") int offset) {
+    final NotificationPage page =
+        dao.listNotifications(currentUserId(securityContext), group, status, limit, offset);
     addHref(uriInfo, page.threads());
     return Map.of(
         "data",
@@ -275,7 +272,61 @@ public class FeedResource {
         "paging",
         Map.of("total", page.total(), "limit", limit, "offset", offset),
         "unread",
-        page.unread());
+        page.unread(),
+        "unreadIds",
+        page.unreadIds());
+  }
+
+  @GET
+  @Path("/notifications/unread-count")
+  @Operation(
+      operationId = "countUnreadNotifications",
+      summary = "Count the unread notifications of the current user")
+  public Map<String, Object> countUnreadNotifications(
+      @Context SecurityContext securityContext,
+      @DefaultValue("ALL") @QueryParam("group") NotificationGroup group) {
+    return Map.of("unread", dao.countUnreadNotifications(currentUserId(securityContext), group));
+  }
+
+  @PUT
+  @Path("/notifications/{threadId}/read")
+  @Operation(
+      operationId = "markNotificationRead",
+      summary = "Mark one notification of the current user as read",
+      description =
+          "`readAt` is the time of the notification the user saw; a later change of the thread"
+              + " makes it unread again. Defaults to the current time of the thread.")
+  public Map<String, Object> markNotificationRead(
+      @Context SecurityContext securityContext,
+      @PathParam("threadId") UUID threadId,
+      @Valid NotificationReadRequest request) {
+    final Long readAt = request == null ? null : request.readAt();
+    return Map.of(
+        "unread", dao.markNotificationRead(currentUserId(securityContext), threadId, readAt));
+  }
+
+  @POST
+  @Path("/notifications/read-all")
+  @Operation(
+      operationId = "markAllNotificationsRead",
+      summary = "Mark the notifications of the current user as read",
+      description =
+          "Marks every notification created up to `before` (default now) as read, and returns"
+              + " how many remain unread.")
+  public Map<String, Object> markAllNotificationsRead(
+      @Context SecurityContext securityContext, @Valid NotificationReadAllRequest request) {
+    final Long before = request == null ? null : request.before();
+    return Map.of("unread", dao.markAllNotificationsRead(currentUserId(securityContext), before));
+  }
+
+  public record NotificationReadRequest(Long readAt) {}
+
+  public record NotificationReadAllRequest(Long before) {}
+
+  private UUID currentUserId(SecurityContext securityContext) {
+    return Entity.getEntityReferenceByName(
+            Entity.USER, securityContext.getUserPrincipal().getName(), Include.NON_DELETED)
+        .getId();
   }
 
   @GET

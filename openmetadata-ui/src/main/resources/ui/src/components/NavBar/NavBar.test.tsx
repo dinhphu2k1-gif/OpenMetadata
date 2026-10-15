@@ -10,12 +10,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import {
   LAST_VERSION_FETCH_TIME_KEY,
   ONE_HOUR_MS,
 } from '../../constants/constants';
+import { getUnreadNotificationCount } from '../../rest/feedsAPI';
 import { getVersion } from '../../rest/miscAPI';
 import { getHelpDropdownItems } from '../../utils/NavbarUtils';
 import NavBarComponent from './NavBar';
@@ -98,9 +99,13 @@ jest.mock('../NotificationBox/NotificationBox.component', () => {
     ));
 });
 
-jest.mock('../NotificationBox/NotificationSeen', () => ({
-  hasUnseenNotification: jest.fn().mockResolvedValue(false),
-  markNotificationsSeen: jest.fn(),
+jest.mock('../NotificationBox/NotificationRead', () => ({
+  migrateLegacySeenMark: jest.fn().mockResolvedValue(undefined),
+  NOTIFICATIONS_CHANGED_EVENT: 'om-notifications-changed',
+}));
+
+jest.mock('../../rest/feedsAPI', () => ({
+  getUnreadNotificationCount: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock(
@@ -234,6 +239,12 @@ describe('Test NavBar Component', () => {
     expect(
       await screen.findByTestId('whats-new-alert-card')
     ).toBeInTheDocument();
+  });
+
+  it('should ask the server for the unread count instead of marking anything read', async () => {
+    render(<NavBarComponent />);
+
+    await waitFor(() => expect(getUnreadNotificationCount).toHaveBeenCalled());
   });
 
   it('should call getVersion onMount', () => {

@@ -3420,13 +3420,26 @@ public interface CollectionDAO {
         @BindMap Map<String, String> params);
 
     /**
+     * A notification is unread when it is newer than the user's read-all mark and than the version
+     * of it the user read, and, for a task, while the task is still open.
+     */
+    String NOTIFICATION_UNREAD_RULE =
+        "createdAt > COALESCE((SELECT readAllBefore FROM notification_read_all WHERE userId = :userId), 0) "
+            + "AND createdAt > COALESCE((SELECT readAt FROM notification_read "
+            + "WHERE userId = :userId AND threadId = thread_entity.id), 0) "
+            + "AND (type != 'Task' OR taskStatus = 'Open')";
+
+    /**
      * One user's notifications: tasks assigned to them or their teams, and threads that mention
-     * them or their teams, newest first. {@code since} keeps only threads created after it.
+     * them or their teams, newest first. With {@code unreadOnly} only the ones the user has not read,
+     * see {@link #NOTIFICATION_UNREAD_RULE}.
      */
     @ConnectionAwareSqlQuery(
         value =
             "SELECT json FROM thread_entity "
-                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "WHERE type != 'Announcement' AND (:unreadOnly = 0 OR "
+                + NOTIFICATION_UNREAD_RULE
+                + ") AND ("
                 + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND to_tsvector('simple', taskAssigneesIds) @@ to_tsquery('simple', :userTeamJsonPostgres)) OR "
                 + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
                 + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
@@ -3437,7 +3450,9 @@ public interface CollectionDAO {
     @ConnectionAwareSqlQuery(
         value =
             "SELECT json FROM thread_entity "
-                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "WHERE type != 'Announcement' AND (:unreadOnly = 0 OR "
+                + NOTIFICATION_UNREAD_RULE
+                + ") AND ("
                 + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND MATCH(taskAssigneesIds) AGAINST (:userTeamJsonMysql IN BOOLEAN MODE)) OR "
                 + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
                 + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
@@ -3446,6 +3461,7 @@ public interface CollectionDAO {
                 + "ORDER BY createdAt DESC, id LIMIT :limit OFFSET :offset",
         connectionType = MYSQL)
     List<String> listNotifications(
+        @Bind("userId") String userId,
         @Bind("userName") String userName,
         @BindList("teamNames") List<String> teamNames,
         @Bind("relation") int relation,
@@ -3455,14 +3471,16 @@ public interface CollectionDAO {
         @Bind("openOnly") int openOnly,
         @Bind("includeMentions") int includeMentions,
         @Bind("decisionsOnly") int decisionsOnly,
-        @Bind("since") long since,
+        @Bind("unreadOnly") int unreadOnly,
         @Bind("limit") int limit,
         @Bind("offset") int offset);
 
     @ConnectionAwareSqlQuery(
         value =
             "SELECT count(id) FROM thread_entity "
-                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "WHERE type != 'Announcement' AND (:threadId IS NULL OR id = :threadId) AND (:unreadOnly = 0 OR "
+                + NOTIFICATION_UNREAD_RULE
+                + ") AND ("
                 + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND to_tsvector('simple', taskAssigneesIds) @@ to_tsquery('simple', :userTeamJsonPostgres)) OR "
                 + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
                 + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
@@ -3472,7 +3490,9 @@ public interface CollectionDAO {
     @ConnectionAwareSqlQuery(
         value =
             "SELECT count(id) FROM thread_entity "
-                + "WHERE type != 'Announcement' AND createdAt > :since AND ("
+                + "WHERE type != 'Announcement' AND (:threadId IS NULL OR id = :threadId) AND (:unreadOnly = 0 OR "
+                + NOTIFICATION_UNREAD_RULE
+                + ") AND ("
                 + "(:includeTasks = 1 AND type = 'Task' AND (:openOnly = 0 OR taskStatus = 'Open') AND MATCH(taskAssigneesIds) AGAINST (:userTeamJsonMysql IN BOOLEAN MODE)) OR "
                 + "(:includeMentions = 1 AND hash_id IN (SELECT toFQNHash FROM field_relationship WHERE "
                 + "((fromType='user' AND fromFQNHash = :userName) OR (fromType='team' AND fromFQNHash IN (<teamNames>))) "
@@ -3480,6 +3500,7 @@ public interface CollectionDAO {
                 + "AND (:decisionsOnly = 0 OR JSON_UNQUOTE(JSON_EXTRACT(json, '$.feedInfo.entitySpecificInfo.entity.governedReview.kind')) = 'DECISION'))) ",
         connectionType = MYSQL)
     int countNotifications(
+        @Bind("userId") String userId,
         @Bind("userName") String userName,
         @BindList("teamNames") List<String> teamNames,
         @Bind("relation") int relation,
@@ -3489,7 +3510,14 @@ public interface CollectionDAO {
         @Bind("openOnly") int openOnly,
         @Bind("includeMentions") int includeMentions,
         @Bind("decisionsOnly") int decisionsOnly,
-        @Bind("since") long since);
+        @Bind("unreadOnly") int unreadOnly,
+        @Bind("threadId") String threadId);
+
+    /** The ids among {@code threadIds} that the user has not read. */
+    @SqlQuery(
+        "SELECT id FROM thread_entity WHERE id IN (<threadIds>) AND " + NOTIFICATION_UNREAD_RULE)
+    List<String> listUnreadNotificationIds(
+        @Bind("userId") String userId, @BindList("threadIds") List<String> threadIds);
 
     @SqlQuery(
         "SELECT json FROM thread_entity <condition> "

@@ -202,17 +202,23 @@ export enum NotificationGroup {
   Decisions = 'DECISIONS',
 }
 
+export enum NotificationStatus {
+  All = 'ALL',
+  Unread = 'UNREAD',
+}
+
 export interface NotificationParams {
   group?: NotificationGroup;
+  status?: NotificationStatus;
   limit?: number;
   offset?: number;
-  unreadSince?: number;
 }
 
 export interface NotificationList {
   data: Thread[];
   paging: { total: number; limit: number; offset: number };
   unread: number;
+  unreadIds: string[];
 }
 
 /** The authenticated user's tasks and mentions in one paged list, newest first. */
@@ -223,4 +229,38 @@ export const getNotifications = async (params: NotificationParams = {}) => {
   );
 
   return response.data;
+};
+
+export const getUnreadNotificationCount = async (
+  group: NotificationGroup = NotificationGroup.All
+) => {
+  const response = await APIClient.get<{ unread: number }>(
+    '/feed/notifications/unread-count',
+    { params: { group } }
+  );
+
+  return response.data.unread;
+};
+
+/** Marks one notification read at the version of it the user saw. */
+export const markNotificationRead = async (
+  threadId: string,
+  readAt?: number
+) => {
+  const response = await APIClient.put<{ unread: number }>(
+    `/feed/notifications/${threadId}/read`,
+    { readAt }
+  );
+
+  return response.data.unread;
+};
+
+/** Marks every notification up to `before` (default now) read. */
+export const markAllNotificationsRead = async (before?: number) => {
+  const response = await APIClient.post<{ unread: number }>(
+    '/feed/notifications/read-all',
+    { before }
+  );
+
+  return response.data.unread;
 };

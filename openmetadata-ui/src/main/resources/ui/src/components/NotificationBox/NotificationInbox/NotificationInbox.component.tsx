@@ -10,49 +10,46 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+import { Button } from 'antd';
 import { AxiosError } from 'axios';
 import { FC, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ERROR_PLACEHOLDER_TYPE } from '../../../enums/common.enum';
+import { ReactComponent as BellIcon } from '../../../assets/svg/ic-alert-bell.svg';
 import { Thread } from '../../../generated/entity/feed/thread';
-import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import '../../../pages/TechnicalDictionaryPage/technicalDictionary.less';
-import { getNotifications, NotificationGroup } from '../../../rest/feedsAPI';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  NotificationStatus,
+} from '../../../rest/feedsAPI';
 import { showErrorToast } from '../../../utils/ToastUtils';
-import ErrorPlaceHolder from '../../common/ErrorWithPlaceholder/ErrorPlaceHolder';
 import Loader from '../../common/Loader/Loader';
 import NextPrevious from '../../common/NextPrevious/NextPrevious';
 import { PagingHandlerParams } from '../../common/NextPrevious/NextPrevious.interface';
 import NotificationItem from '../NotificationItem.component';
 import {
-  markNotificationsSeen,
-  readNotificationSeenAt,
-} from '../NotificationSeen';
+  NOTIFICATIONS_CHANGED_EVENT,
+  notifyNotificationsChanged,
+} from '../NotificationRead';
 import './notification-inbox.less';
 import type { NotificationInboxProps } from './NotificationInbox.interface';
 
 export const NOTIFICATIONS_PAGE_SIZE = 25;
 export const NOTIFICATIONS_PAGE_SIZE_OPTIONS = [10, 25, 50];
 
-const GROUPS = [
-  { key: NotificationGroup.All, label: 'label.all' },
-  {
-    key: NotificationGroup.Pending,
-    label: 'label.notification-group-pending',
-  },
-  {
-    key: NotificationGroup.Decisions,
-    label: 'label.notification-group-decisions',
-  },
+const STATUSES = [
+  { key: NotificationStatus.All, label: 'label.all' },
+  { key: NotificationStatus.Unread, label: 'label.notification-status-unread' },
 ];
 
 const NotificationInbox: FC<NotificationInboxProps> = ({ onUnreadChange }) => {
   const { t } = useTranslation();
-  const { currentUser } = useApplicationStore();
-  const [seenAt] = useState<number>(() =>
-    readNotificationSeenAt(currentUser?.id)
+  const [status, setStatus] = useState<NotificationStatus>(
+    NotificationStatus.All
   );
-  const [group, setGroup] = useState<NotificationGroup>(NotificationGroup.All);
+  const [unread, setUnread] = useState(0);
+  const [unreadIds, setUnreadIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(NOTIFICATIONS_PAGE_SIZE);
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -63,14 +60,14 @@ const NotificationInbox: FC<NotificationInboxProps> = ({ onUnreadChange }) => {
     setIsLoading(true);
     try {
       const result = await getNotifications({
-        group,
+        status,
         limit: pageSize,
         offset: (page - 1) * pageSize,
-        unreadSince: seenAt,
       });
       setThreads(result.data);
       setTotal(result.paging.total);
-      onUnreadChange?.(result.unread);
+      setUnreadIds(result.unreadIds);
+      setUnread(result.unread);
     } catch (error) {
       showErrorToast(
         error as AxiosError,
@@ -79,18 +76,44 @@ const NotificationInbox: FC<NotificationInboxProps> = ({ onUnreadChange }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [group, onUnreadChange, page, pageSize, seenAt, t]);
+  }, [status, page, pageSize, t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    markNotificationsSeen(currentUser?.id);
-  }, [currentUser?.id]);
+    onUnreadChange?.(unread);
+  }, [onUnreadChange, unread]);
 
-  const handleGroup = useCallback((next: NotificationGroup) => {
-    setGroup(next);
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, load);
+
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, load);
+  }, [load]);
+
+  const handleRead = useCallback(
+    (thread: Thread) => {
+      if (unreadIds.includes(thread.id)) {
+        markNotificationRead(thread.id, thread.threadTs)
+          .then(notifyNotificationsChanged)
+          .catch(() => undefined);
+      }
+    },
+    [unreadIds]
+  );
+
+  const handleReadAll = useCallback(async () => {
+    try {
+      await markAllNotificationsRead();
+      notifyNotificationsChanged();
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    }
+  }, []);
+
+  const handleStatus = useCallback((next: NotificationStatus) => {
+    setStatus(next);
     setPage(1);
   }, []);
 
@@ -106,41 +129,75 @@ const NotificationInbox: FC<NotificationInboxProps> = ({ onUnreadChange }) => {
 
   return (
     <div className="notification-inbox">
-      <div className="tech-dict-tab-card">
-        <div className="tech-dict-tab-list" role="tablist">
-          {GROUPS.map(({ key, label }) => (
-            <button
-              aria-selected={group === key}
-              className={`tech-dict-tab ${group === key ? 'active' : ''}`}
-              data-testid={`notifications-group-${key}`}
-              key={key}
-              role="tab"
-              type="button"
-              onClick={() => handleGroup(key)}>
-              {t(label)}
-            </button>
-          ))}
-        </div>
-      </div>
       <div className="tech-dict-content-card" data-testid="notifications-card">
+        <div className="notification-inbox-toolbar">
+          <div className="notification-inbox-filters">
+            {STATUSES.map(({ key, label }) => (
+              <button
+                className={`notification-inbox-filter ${
+                  status === key ? 'active' : ''
+                }`}
+                data-testid={`notifications-status-${key}`}
+                key={key}
+                type="button"
+                onClick={() => handleStatus(key)}>
+                {t(label)}
+                {key === NotificationStatus.Unread && unread > 0 && (
+                  <span className="notification-inbox-filter-count">
+                    {unread}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {unread > 0 && (
+            <Button
+              data-testid="notifications-read-all"
+              type="link"
+              onClick={handleReadAll}>
+              {t('label.notification-mark-all-read')}
+            </Button>
+          )}
+        </div>
         {isLoading && (
           <div className="notification-inbox-loader">
             <Loader />
           </div>
         )}
         {!isLoading && threads.length === 0 && (
-          <ErrorPlaceHolder
-            className="p-md"
-            placeholderText={t('message.notifications-empty')}
-            type={ERROR_PLACEHOLDER_TYPE.NO_DATA}
-          />
+          <div
+            className="notification-inbox-empty"
+            data-testid="notifications-empty">
+            <BellIcon height={32} width={32} />
+            <p>
+              {t(
+                status === NotificationStatus.Unread
+                  ? 'message.notifications-all-read'
+                  : 'message.notifications-empty'
+              )}
+            </p>
+            {status === NotificationStatus.Unread && (
+              <Button
+                data-testid="notifications-show-all"
+                type="link"
+                onClick={() => handleStatus(NotificationStatus.All)}>
+                {t('label.view-entity', {
+                  entity: t('label.all-lowercase'),
+                })}
+              </Button>
+            )}
+          </div>
         )}
         {!isLoading && threads.length > 0 && (
           <>
             <ul className="notification-inbox-list">
               {threads.map((thread) => (
                 <li className="notification-inbox-item" key={thread.id}>
-                  <NotificationItem seenAt={seenAt} thread={thread} />
+                  <NotificationItem
+                    isUnread={unreadIds.includes(thread.id)}
+                    thread={thread}
+                    onRead={handleRead}
+                  />
                 </li>
               ))}
             </ul>

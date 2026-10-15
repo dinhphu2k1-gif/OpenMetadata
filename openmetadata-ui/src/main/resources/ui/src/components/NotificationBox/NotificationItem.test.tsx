@@ -10,7 +10,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Thread } from '../../generated/entity/feed/thread';
 import NotificationFeedCard from './NotificationFeedCard.component';
 import NotificationItem from './NotificationItem.component';
@@ -35,8 +35,8 @@ const task = {
 } as unknown as Thread;
 
 describe('NotificationItem', () => {
-  it('marks a notification newer than the last visit as unread', () => {
-    render(<NotificationItem seenAt={999} thread={task} />);
+  it('passes the unread state to the card', () => {
+    render(<NotificationItem isUnread thread={task} />);
 
     expect(screen.getByText('card')).toBeInTheDocument();
     expect(lastProps().isUnread).toBe(true);
@@ -44,10 +44,19 @@ describe('NotificationItem', () => {
     expect(lastProps().createdBy).toBe('user3');
   });
 
-  it('leaves an older notification read', () => {
-    render(<NotificationItem seenAt={1000} thread={task} />);
+  it('shows a read notification as read', () => {
+    render(<NotificationItem isUnread={false} thread={task} />);
 
     expect(lastProps().isUnread).toBe(false);
+  });
+
+  it('reports the thread when the notification is clicked', () => {
+    const onRead = jest.fn();
+    render(<NotificationItem isUnread thread={task} onRead={onRead} />);
+
+    fireEvent.click(screen.getByText('card'));
+
+    expect(onRead).toHaveBeenCalledWith(task);
   });
 
   it('credits a mention to the author of the mentioning post', () => {
@@ -59,7 +68,7 @@ describe('NotificationItem', () => {
       threadTs: 10,
       posts: [{ message: '<#E::user::user3>', postTs: 50, from: 'replier' }],
     } as unknown as Thread;
-    render(<NotificationItem seenAt={0} thread={conversation} />);
+    render(<NotificationItem isUnread={false} thread={conversation} />);
 
     expect(lastProps().createdBy).toBe('replier');
     expect(lastProps().timestamp).toBe(50);

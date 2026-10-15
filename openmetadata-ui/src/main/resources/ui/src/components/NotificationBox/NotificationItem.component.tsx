@@ -17,12 +17,17 @@ import { getNotificationTime } from './NotificationBox.utils';
 import NotificationFeedCard from './NotificationFeedCard.component';
 
 interface NotificationItemProps {
-  seenAt: number;
+  isUnread: boolean;
+  onRead?: (thread: Thread) => void;
   thread: Thread;
 }
 
 /** One notification, shared by the bell and the notifications page. */
-const NotificationItem: FC<NotificationItemProps> = ({ seenAt, thread }) => {
+const NotificationItem: FC<NotificationItemProps> = ({
+  isUnread,
+  onRead,
+  thread,
+}) => {
   const isConversationFeed = thread.type === ThreadType.Conversation;
   const timestamp = getNotificationTime(thread);
   const mentionPost = isConversationFeed
@@ -30,16 +35,18 @@ const NotificationItem: FC<NotificationItemProps> = ({ seenAt, thread }) => {
     : undefined;
 
   return (
-    <NotificationFeedCard
-      createdBy={mentionPost?.from ?? thread.createdBy ?? ''}
-      entityFQN={getEntityFQN(thread.about) as string}
-      entityType={getEntityType(thread.about) as string}
-      feedType={thread.type ?? ThreadType.Conversation}
-      isConversationFeed={isConversationFeed}
-      isUnread={(thread.threadTs ?? 0) > seenAt}
-      task={thread}
-      timestamp={timestamp}
-    />
+    <div onClickCapture={() => onRead?.(thread)}>
+      <NotificationFeedCard
+        createdBy={mentionPost?.from ?? thread.createdBy ?? ''}
+        entityFQN={getEntityFQN(thread.about) as string}
+        entityType={getEntityType(thread.about) as string}
+        feedType={thread.type ?? ThreadType.Conversation}
+        isConversationFeed={isConversationFeed}
+        isUnread={isUnread}
+        task={thread}
+        timestamp={timestamp}
+      />
+    </div>
   );
 };
 

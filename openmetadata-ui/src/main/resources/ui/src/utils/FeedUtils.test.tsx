@@ -288,6 +288,21 @@ describe('getFrontEndFormat', () => {
     );
   });
 
+  it('should name the mentioned user when the link carries no display text', () => {
+    const message =
+      '<#E::user::user3> Yêu cầu "Kiểm thử 1 tỷ" đã được duyệt trong Chất lượng dữ liệu';
+
+    expect(getFrontEndFormat(message)).toBe(
+      '@user3 Yêu cầu "Kiểm thử 1 tỷ" đã được duyệt trong Chất lượng dữ liệu'
+    );
+  });
+
+  it('should fall back to the name of any other entity without display text', () => {
+    expect(getFrontEndFormat('See <#E::glossary::Data Dictionary>')).toBe(
+      'See Data Dictionary'
+    );
+  });
+
   it('should handle message without mentions', () => {
     const message = 'Hello world';
 

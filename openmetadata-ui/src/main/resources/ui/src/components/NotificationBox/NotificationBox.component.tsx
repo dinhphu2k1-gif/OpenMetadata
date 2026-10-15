@@ -11,36 +11,37 @@
  *  limitations under the License.
  */
 
-import { List, Typography } from 'antd';
+import { Button, List, Typography } from 'antd';
 import { AxiosError } from 'axios';
 import { isEmpty } from 'lodash';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../constants/constants';
 import { Thread } from '../../generated/entity/feed/thread';
-import { useApplicationStore } from '../../hooks/useApplicationStore';
-import { getNotifications } from '../../rest/feedsAPI';
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  NotificationStatus,
+} from '../../rest/feedsAPI';
 import { showErrorToast } from '../../utils/ToastUtils';
 import Loader from '../common/Loader/Loader';
 import './notification-box.less';
 import { NOTIFICATION_LIST_SIZE } from './NotificationBox.utils';
 import NotificationItem from './NotificationItem.component';
-import { readNotificationSeenAt } from './NotificationSeen';
+import { notifyNotificationsChanged } from './NotificationRead';
 
-/** The reader's tasks and mentions in one list, as a single notification inbox. */
+/** The reader's unread tasks and mentions in one list; reading one takes it off the list. */
 const NotificationBox = () => {
   const { t } = useTranslation();
-  const { currentUser } = useApplicationStore();
   const [notifications, setNotifications] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [seenAt] = useState<number>(() =>
-    readNotificationSeenAt(currentUser?.id)
-  );
   const fetchNotifications = async () => {
     setIsLoading(true);
     try {
       const { data } = await getNotifications({
+        status: NotificationStatus.Unread,
         limit: NOTIFICATION_LIST_SIZE,
       });
       setNotifications(data);
@@ -60,14 +61,48 @@ const NotificationBox = () => {
     fetchNotifications();
   }, []);
 
+  const handleRead = useCallback((thread: Thread) => {
+    setNotifications((current) => current.filter(({ id }) => id !== thread.id));
+    markNotificationRead(thread.id, thread.threadTs)
+      .then(notifyNotificationsChanged)
+      .catch(() => undefined);
+  }, []);
+
+  const handleReadAll = async () => {
+    const newest = Math.max(
+      ...notifications.map(({ threadTs }) => threadTs ?? 0)
+    );
+    try {
+      await markAllNotificationsRead(newest);
+      setNotifications([]);
+      notifyNotificationsChanged();
+    } catch (error) {
+      showErrorToast(error as AxiosError);
+    }
+  };
+
   const notificationDropDownList = notifications.map((thread) => (
-    <NotificationItem key={thread.id} seenAt={seenAt} thread={thread} />
+    <NotificationItem
+      isUnread
+      key={thread.id}
+      thread={thread}
+      onRead={handleRead}
+    />
   ));
 
   const notificationList = isEmpty(notifications) ? (
-    <div className="h-64 flex-center">
-      <p>{t('message.no-notification-found')}</p>
-    </div>
+    <>
+      <div className="notification-box-empty" data-testid="notification-empty">
+        <p>{t('message.notifications-all-read')}</p>
+      </div>
+      <div className="notification-box-footer notification-box-footer-bordered">
+        <Link data-testid="notification-view-all" to={ROUTES.NOTIFICATIONS}>
+          {t('label.view-entity', {
+            entity: t('label.all-lowercase'),
+          })}
+        </Link>
+      </div>
+    </>
   ) : (
     <List
       className="notification-content-container"
@@ -93,12 +128,23 @@ const NotificationBox = () => {
 
   return (
     <div className="notification-box">
-      <Typography.Title
-        className="p-x-md p-t-sm p-b-xss notification-box-heading"
-        data-testid="notification-heading"
-        level={5}>
-        {t('label.notification-plural')}
-      </Typography.Title>
+      <div className="notification-box-header">
+        <Typography.Title
+          className="m-0 notification-box-heading"
+          data-testid="notification-heading"
+          level={5}>
+          {t('label.notification-plural')}
+        </Typography.Title>
+        {!isEmpty(notifications) && (
+          <Button
+            className="notification-box-read-all"
+            data-testid="notification-read-all"
+            type="link"
+            onClick={handleReadAll}>
+            {t('label.notification-mark-all-read')}
+          </Button>
+        )}
+      </div>
       {isLoading ? (
         <div className="h-64 d-flex items-center justify-center">
           <Loader size="small" />

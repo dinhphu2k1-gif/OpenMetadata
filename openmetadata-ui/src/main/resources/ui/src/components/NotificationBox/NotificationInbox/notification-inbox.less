@@ -19,6 +19,58 @@
     padding: 48px 0;
   }
 
+  .notification-inbox-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+  }
+
+  .notification-inbox-filters {
+    display: inline-flex;
+    gap: 8px;
+  }
+
+  .notification-inbox-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 1px solid @grey-200;
+    border-radius: 16px;
+    background: @white;
+    color: @text-color-tertiary;
+    font-size: 13px;
+    font-weight: 600;
+
+    &.active {
+      border-color: @primary-color;
+      color: @primary-color;
+    }
+  }
+
+  .notification-inbox-filter-count {
+    padding: 0 6px;
+    border-radius: 4px;
+    background: @primary-color;
+    color: @white;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .notification-inbox-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 16px;
+    color: @text-color-tertiary;
+
+    p {
+      margin: 0;
+    }
+  }
+
   .notification-inbox-list {
     margin: 0;
     padding: 0;

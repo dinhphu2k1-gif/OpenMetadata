@@ -216,6 +216,16 @@ export const getBackendFormat = (message: string) => {
   return getSanitizeContent(updatedMessage);
 };
 
+const plainEntityLinkRegEx = /^<#E::([^<>|]+?)::([^<>|]+?)>$/;
+
+/** The text for a link without display text, such as the mentions in system notices. */
+const getPlainEntityLinkText = (link: string) => {
+  const [, entityType, entityFqn] = link.match(plainEntityLinkRegEx) ?? [];
+  const name = entityFqn ? getDecodedFqn(entityFqn) : link;
+
+  return entityType === EntityType.USER ? `@${name}` : name;
+};
+
 export const getFrontEndFormat = (message: string) => {
   let updatedMessage = message;
   const entityLinkList = [...new Set(getEntityLinkList(message) ?? [])];
@@ -234,6 +244,8 @@ export const getFrontEndFormat = (message: string) => {
 
       markdownLink = `[${linkText}](${decodedUrl})`;
     }
+
+    markdownLink ??= getPlainEntityLinkText(m);
 
     updatedMessage = updatedMessage.replaceAll(m, markdownLink);
   });

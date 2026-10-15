@@ -751,6 +751,8 @@ public class FeedRepository {
     // Delete all the field relationships to other entities
     dao.fieldRelationshipDAO().deleteAllByPrefix(id.toString());
 
+    notificationReadDAO().deleteByThreads(List.of(id.toString()));
+
     // Finally, delete the thread
     dao.feedDAO().delete(id);
   }
@@ -766,6 +768,8 @@ public class FeedRepository {
 
     // Delete all the field relationships to other entities
     dao.fieldRelationshipDAO().deleteAllByPrefixes(threadIds);
+
+    notificationReadDAO().deleteByThreads(threadIds);
 
     // Delete the thread and return the count
     return dao.feedDAO().deleteByIds(threadIds);
@@ -1607,40 +1611,106 @@ public class FeedRepository {
     }
   }
 
-  /** A page of one user's notifications, with how many exist and how many are newer than a time. */
-  public record NotificationPage(List<Thread> threads, int total, int unread) {}
+  /** Whether a request wants every notification or only the unread ones. */
+  public enum NotificationStatus {
+    ALL,
+    UNREAD
+  }
+
+  /**
+   * A page of one user's notifications: how many match the request, how many are unread in the
+   * group, and which threads of the page are unread.
+   */
+  public record NotificationPage(
+      List<Thread> threads, int total, int unread, List<String> unreadIds) {}
 
   /**
    * The notifications of {@code userId}: tasks assigned to them or their teams, and threads that
-   * mention them or their teams, newest first. {@code unreadSince} counts those created after it.
+   * mention them or their teams, newest first.
    */
   public NotificationPage listNotifications(
-      UUID userId, NotificationGroup group, int limit, int offset, long unreadSince) {
-    final User user = Entity.getEntity(Entity.USER, userId, TEAMS_FIELD, ALL);
-    final List<String> teamIds = getTeamIds(user);
-    final NotificationQuery query =
-        new NotificationQuery(
-            getUserNameHash(user),
-            getTeamNames(user),
-            getUserTeamJsonPostgres(userId, teamIds),
-            getUserTeamJsonMysql(userId, teamIds),
-            group);
+      UUID userId, NotificationGroup group, NotificationStatus status, int limit, int offset) {
+    final NotificationQuery query = notificationQuery(userId, group);
+    final boolean unreadOnly = status == NotificationStatus.UNREAD;
     final List<Thread> threads =
-        JsonUtils.readObjects(query.list(dao.feedDAO(), limit, offset), Thread.class);
+        JsonUtils.readObjects(query.list(dao.feedDAO(), unreadOnly, limit, offset), Thread.class);
     sortAndLimitPosts(threads, NOTIFICATION_POSTS);
     populateAssignees(threads);
     return new NotificationPage(
-        threads, query.count(dao.feedDAO(), 0L), query.count(dao.feedDAO(), unreadSince));
+        threads,
+        query.count(dao.feedDAO(), unreadOnly, null),
+        query.count(dao.feedDAO(), true, null),
+        unreadIds(userId, threads));
+  }
+
+  public int countUnreadNotifications(UUID userId, NotificationGroup group) {
+    return notificationQuery(userId, group).count(dao.feedDAO(), true, null);
+  }
+
+  /**
+   * Marks one notification read at the version the user saw, never later than its current one. A
+   * thread that is not among the user's notifications is reported as not found.
+   */
+  public int markNotificationRead(UUID userId, UUID threadId, Long readAt) {
+    final long current = visibleNotification(userId, threadId).getThreadTs();
+    final long seen = Math.min(readAt == null ? current : readAt, current);
+    notificationReadDAO().markRead(userId, threadId, seen);
+    return countUnreadNotifications(userId, NotificationGroup.ALL);
+  }
+
+  private Thread visibleNotification(UUID userId, UUID threadId) {
+    final String json = dao.feedDAO().findById(threadId);
+    final int matches =
+        notificationQuery(userId, NotificationGroup.ALL)
+            .count(dao.feedDAO(), false, threadId.toString());
+    if (json == null || matches == 0) {
+      throw EntityNotFoundException.byMessage(entityNotFound(Entity.THREAD, threadId));
+    }
+    return JsonUtils.readValue(json, Thread.class);
+  }
+
+  /** Marks every notification created up to {@code before} read, and no later than now. */
+  public int markAllNotificationsRead(UUID userId, Long before) {
+    final long now = System.currentTimeMillis();
+    notificationReadDAO().markAllReadBefore(userId, Math.min(before == null ? now : before, now));
+    notificationReadDAO().deleteCoveredByReadAll(userId);
+    return countUnreadNotifications(userId, NotificationGroup.ALL);
+  }
+
+  private NotificationReadDAO notificationReadDAO() {
+    return Entity.getJdbi().onDemand(NotificationReadDAO.class);
+  }
+
+  private List<String> unreadIds(UUID userId, List<Thread> threads) {
+    return threads.isEmpty()
+        ? List.of()
+        : dao.feedDAO()
+            .listUnreadNotificationIds(
+                userId.toString(), threads.stream().map(t -> t.getId().toString()).toList());
+  }
+
+  private NotificationQuery notificationQuery(UUID userId, NotificationGroup group) {
+    final User user = Entity.getEntity(Entity.USER, userId, TEAMS_FIELD, ALL);
+    final List<String> teamIds = getTeamIds(user);
+    return new NotificationQuery(
+        userId.toString(),
+        getUserNameHash(user),
+        getTeamNames(user),
+        getUserTeamJsonPostgres(userId, teamIds),
+        getUserTeamJsonMysql(userId, teamIds),
+        group);
   }
 
   private record NotificationQuery(
+      String userId,
       String userNameHash,
       List<String> teamNamesHash,
       String userTeamJsonPostgres,
       String userTeamJsonMysql,
       NotificationGroup group) {
-    List<String> list(CollectionDAO.FeedDAO feedDAO, int limit, int offset) {
+    List<String> list(CollectionDAO.FeedDAO feedDAO, boolean unreadOnly, int limit, int offset) {
       return feedDAO.listNotifications(
+          userId,
           userNameHash,
           teamNamesHash,
           Relationship.MENTIONED_IN.ordinal(),
@@ -1650,13 +1720,14 @@ public class FeedRepository {
           flag(group.openTasksOnly),
           flag(group.mentions),
           flag(group.decisionsOnly),
-          0L,
+          flag(unreadOnly),
           limit,
           offset);
     }
 
-    int count(CollectionDAO.FeedDAO feedDAO, long since) {
+    int count(CollectionDAO.FeedDAO feedDAO, boolean unreadOnly, String threadId) {
       return feedDAO.countNotifications(
+          userId,
           userNameHash,
           teamNamesHash,
           Relationship.MENTIONED_IN.ordinal(),
@@ -1666,7 +1737,8 @@ public class FeedRepository {
           flag(group.openTasksOnly),
           flag(group.mentions),
           flag(group.decisionsOnly),
-          since);
+          flag(unreadOnly),
+          threadId);
     }
 
     private static int flag(boolean value) {
