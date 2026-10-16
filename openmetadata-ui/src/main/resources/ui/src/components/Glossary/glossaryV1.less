@@ -151,6 +151,8 @@
 
 .glossary-term-page-tabs {
   .ant-tabs-tabpane {
+    // Containing block of the popups rendered into the pane, so they scroll with it.
+    position: relative;
     height: @glossary-term-page-height;
     overflow-y: auto;
     overflow-x: hidden;
@@ -846,26 +848,30 @@
   }
 }
 
-.cde-enum-field-editor {
-  width: 240px;
-}
-
 .cde-enum-field-popover {
   z-index: 1100 !important;
+}
 
-  .ant-popover-inner {
+.cde-enum-field-dropdown {
+  z-index: 1101 !important;
+}
+
+.cde-form-dropdown {
+  &.ant-select-dropdown,
+  &.ant-picker-dropdown .ant-picker-panel-container {
+    overflow: hidden;
     border: 1px solid @grey-200;
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(16, 24, 40, 0.12);
   }
 
-  .ant-popover-inner-content {
-    padding: 12px;
-  }
-}
+  &.ant-select-dropdown {
+    padding: 4px;
 
-.cde-enum-field-dropdown {
-  z-index: 1101 !important;
+    .ant-select-item {
+      border-radius: 6px;
+    }
+  }
 }
 
 .cde-tag-select-popover {
@@ -903,6 +909,13 @@
 
   .selectable-list-virtual-list {
     padding: 0 8px 8px;
+  }
+
+  // rc-virtual-list pins the holder to the full list height, which leaves a
+  // blank area under short classifications.
+  .rc-virtual-list-holder {
+    height: auto !important;
+    max-height: 250px;
   }
 
   .ant-list-item-main {

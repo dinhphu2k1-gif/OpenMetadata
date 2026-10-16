@@ -104,6 +104,7 @@ const TechnicalRecordModal = ({
   const [form] = Form.useForm<TechnicalRecordFormValues>();
   const [pendingCde, setPendingCde] = useState<EntityReference | null>();
   const [isCdeMissing, setIsCdeMissing] = useState(false);
+  const [isColumnMissing, setIsColumnMissing] = useState(false);
   const isReadOnly = mode === 'view' || mode === 'review';
   const isCreate = mode === 'create';
   const isSaveDisabled = isSaving || (isCreate && !row);
@@ -151,13 +152,16 @@ const TechnicalRecordModal = ({
     const values = await form.validateFields();
     const hasCde =
       pendingCde === undefined ? Boolean(row?.cdeTermId) : pendingCde !== null;
+    const hasColumn =
+      !isCreate || !columnPicker || Boolean(columnPicker.selectedKey);
     setIsCdeMissing(!hasCde);
+    setIsColumnMissing(!hasColumn);
     if (!values.rank) {
       form.setFields([
         { name: 'rank', errors: [t('message.technical-rank-required')] },
       ]);
     }
-    if (!hasCde || !values.rank) {
+    if (!hasCde || !hasColumn || !values.rank) {
       return;
     }
     onSave({ ...values, cde: pendingCde });
@@ -317,7 +321,13 @@ const TechnicalRecordModal = ({
             <Form.Item
               required
               className="cde-form-field-full"
-              label={t('label.select-column')}>
+              help={
+                isColumnMissing
+                  ? t('message.technical-column-required')
+                  : undefined
+              }
+              label={t('label.select-column')}
+              validateStatus={isColumnMissing ? 'error' : undefined}>
               <Select
                 showSearch
                 className="cde-form-enum-select"
@@ -329,13 +339,14 @@ const TechnicalRecordModal = ({
                 placeholder={t('label.search-columns')}
                 popupClassName="technical-dictionary-select-dropdown cde-enum-field-dropdown"
                 value={columnPicker.selectedKey}
-                onChange={(key?: string) =>
+                onChange={(key?: string) => {
+                  setIsColumnMissing(false);
                   columnPicker.onSelect(
                     columnPicker.candidates.find(
                       (item) => item.columnKey === key
                     )
-                  )
-                }
+                  );
+                }}
                 onSearch={columnPicker.onSearch}>
                 {columnPicker.candidates.map((item) => (
                   <Select.Option

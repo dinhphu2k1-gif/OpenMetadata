@@ -109,6 +109,7 @@ const DQScheduleField = ({ value, onChange }: DQScheduleFieldProps) => {
         className="w-full"
         data-testid="dq-schedule-mode"
         options={options}
+        popupClassName="cde-form-dropdown"
         value={mode}
         onChange={choose}
       />

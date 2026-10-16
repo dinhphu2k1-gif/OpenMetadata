@@ -94,7 +94,12 @@ jest.mock('../../rest/glossaryAPI', () => ({
     name: 'DQ3.1',
     status: 'Draft',
   }),
-  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({}),
+  transitionGlossaryTermWorkflow: jest.fn().mockResolvedValue({
+    id: 'term-dq-1',
+    name: 'DQ3.1',
+    workingRevision: 0.1,
+    parentBusinessVersion: '1',
+  }),
 }));
 
 jest.mock('../../rest/tagAPI', () => ({
@@ -350,7 +355,8 @@ describe('DQImportPage', () => {
     expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
       'term-dq-1',
       'submit',
-      { expectedRevision: 0.1 }
+      { expectedRevision: 0.1 },
+      '1'
     );
   });
 });

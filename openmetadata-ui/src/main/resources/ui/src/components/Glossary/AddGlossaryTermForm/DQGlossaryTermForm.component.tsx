@@ -284,7 +284,15 @@ const DQGlossaryTermForm = ({
           required
           label={t('dq.rule-code', 'Mã quy tắc CLDL')}
           name="name"
-          rules={[{ required: true, whitespace: true }]}>
+          rules={[
+            {
+              required: true,
+              whitespace: true,
+              message: t('label.field-required', {
+                field: t('dq.rule-code'),
+              }),
+            },
+          ]}>
           <Input
             data-testid="dq-rule-code"
             placeholder="Ví dụ: DQ1.1, DQ3.1..."
@@ -315,7 +323,15 @@ const DQGlossaryTermForm = ({
           initialValue={glossaryTerm?.description ?? ''}
           label={t('dq.rule-statement', 'Quy tắc nghiệp vụ về CLDL')}
           name="description"
-          rules={[{ required: true, whitespace: true }]}
+          rules={[
+            {
+              required: true,
+              whitespace: true,
+              message: t('label.field-required', {
+                field: t('dq.rule-statement'),
+              }),
+            },
+          ]}
           trigger="onTextChange">
           <RichTextEditor
             data-testid="dq-rule-statement"
@@ -327,7 +343,19 @@ const DQGlossaryTermForm = ({
       <GlossaryTermFormSection
         className="cde-form-section-management"
         title={t('cde.management-information', 'Thông tin quản lý')}>
-        <Form.Item required label={t('dq.cde-code', 'Mã CDE liên kết')}>
+        <Form.Item
+          required
+          getValueFromEvent={(cde?: EntityReference) => cde?.name}
+          label={t('dq.cde-code', 'Mã CDE liên kết')}
+          name="cdeCode"
+          rules={[
+            {
+              required: true,
+              message: t('label.field-required', {
+                field: t('dq.cde-code'),
+              }),
+            },
+          ]}>
           <CDESelectableField
             dataDictionaryVersion={
               glossaryTerm?.parentBusinessVersion ?? parentBusinessVersion
@@ -394,6 +422,7 @@ const DQGlossaryTermForm = ({
               data-testid={`dq-${key}`}
               format="dd/MM/yyyy"
               placeholder={t('cde.select-date')}
+              popupClassName="cde-form-dropdown"
             />
           </Form.Item>
         ))}

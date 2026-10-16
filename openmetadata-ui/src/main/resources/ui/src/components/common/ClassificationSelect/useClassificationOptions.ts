@@ -12,6 +12,12 @@
  */
 import { useEffect, useState } from 'react';
 import { Tag } from '../../../generated/entity/classification/tag';
+import {
+  LabelType,
+  State,
+  TagLabel,
+  TagSource,
+} from '../../../generated/type/tagLabel';
 import { getTags } from '../../../rest/tagAPI';
 import { ClassificationOption } from './ClassificationSelect.interface';
 
@@ -26,6 +32,24 @@ export const tagsToClassificationOptions = (
   }));
 
 /** Loads the tags of one classification as options for `ClassificationSelect`. */
+/** Keeps the stored label of an already-selected tag; builds a manual label for a new pick. */
+export const toClassificationTagLabels = (
+  fqns: string[],
+  options: ClassificationOption[],
+  current: TagLabel[] = []
+): TagLabel[] =>
+  fqns.map(
+    (fqn) =>
+      current.find((tag) => tag.tagFQN === fqn) ?? {
+        tagFQN: fqn,
+        name: fqn.split('.').at(-1),
+        displayName: options.find((option) => option.value === fqn)?.label,
+        source: TagSource.Classification,
+        labelType: LabelType.Manual,
+        state: State.Confirmed,
+      }
+  );
+
 export const useClassificationOptions = (classification: string) => {
   const [options, setOptions] = useState<ClassificationOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);

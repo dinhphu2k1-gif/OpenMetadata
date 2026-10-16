@@ -84,14 +84,7 @@ const DQTestSpecsCard = ({
     },
     {
       title: t('dq.test.effective-threshold'),
-      render: (_, spec) =>
-        spec.threshold
-          ? normalizeDqThreshold(spec.threshold)
-          : ruleThreshold
-          ? t('dq.test.threshold-rule', {
-              threshold: normalizeDqThreshold(ruleThreshold),
-            })
-          : '-',
+      render: () => normalizeDqThreshold(ruleThreshold) ?? '-',
     },
     {
       title: t('dq.test.schedule'),

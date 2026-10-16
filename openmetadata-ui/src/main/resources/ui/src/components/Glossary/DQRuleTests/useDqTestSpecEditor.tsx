@@ -96,7 +96,9 @@ export const useDqTestSpecEditor = ({
         otherNames={specs
           .filter((item) => item !== editingSpec)
           .map((item) => item.name)}
-        ruleThreshold={glossaryTerm.extension?.qualityThreshold}
+        ruleLabel={[glossaryTerm.name, glossaryTerm.displayName]
+          .filter(Boolean)
+          .join(' · ')}
         spec={editingSpec}
         onCancel={() => setEditingIndex(undefined)}
         onSave={handleSave}

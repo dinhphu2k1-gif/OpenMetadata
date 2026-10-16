@@ -5,6 +5,7 @@
 
 import { Form, Input } from 'antd';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GovernedVersionFieldsProps {
   bindToForm?: boolean;
@@ -27,36 +28,46 @@ const GovernedVersionFields = ({
   versionLabel,
   versionRequired = false,
   versionTestId,
-}: GovernedVersionFieldsProps) => (
-  <>
-    <Form.Item
-      required={versionRequired}
-      className="governed-form-version"
-      label={versionLabel}
-      name={bindToForm ? 'version' : undefined}
-      rules={
-        bindToForm && versionRequired
-          ? [{ required: true, whitespace: true }]
-          : undefined
-      }>
-      <Input
-        disabled
-        data-testid={versionTestId}
-        placeholder="1.0"
-        {...(!bindToForm ? { value: version ?? '--' } : {})}
-      />
-    </Form.Item>
-    <Form.Item
-      className="governed-form-release-version-type"
-      label={releaseVersionTypeLabel}
-      name={bindToForm ? 'releaseVersionType' : undefined}>
-      <Input
-        disabled
-        data-testid={releaseVersionTypeTestId}
-        {...(!bindToForm ? { value: releaseVersionType ?? '--' } : {})}
-      />
-    </Form.Item>
-  </>
-);
+}: GovernedVersionFieldsProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <Form.Item
+        required={versionRequired}
+        className="governed-form-version"
+        label={versionLabel}
+        name={bindToForm ? 'version' : undefined}
+        rules={
+          bindToForm && versionRequired
+            ? [
+                {
+                  required: true,
+                  whitespace: true,
+                  message: t('label.field-required', { field: versionLabel }),
+                },
+              ]
+            : undefined
+        }>
+        <Input
+          disabled
+          data-testid={versionTestId}
+          placeholder="1.0"
+          {...(!bindToForm ? { value: version ?? '--' } : {})}
+        />
+      </Form.Item>
+      <Form.Item
+        className="governed-form-release-version-type"
+        label={releaseVersionTypeLabel}
+        name={bindToForm ? 'releaseVersionType' : undefined}>
+        <Input
+          disabled
+          data-testid={releaseVersionTypeTestId}
+          {...(!bindToForm ? { value: releaseVersionType ?? '--' } : {})}
+        />
+      </Form.Item>
+    </>
+  );
+};
 
 export default GovernedVersionFields;

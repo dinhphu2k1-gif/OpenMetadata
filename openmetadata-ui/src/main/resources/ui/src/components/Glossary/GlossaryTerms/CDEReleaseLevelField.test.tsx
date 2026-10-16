@@ -4,7 +4,10 @@
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import CDEReleaseLevelField from './CDEReleaseLevelField';
 
 const mockUpdate = jest.fn();
@@ -64,7 +67,7 @@ describe('CDEReleaseLevelField', () => {
     render(<CDEReleaseLevelField />);
 
     expect(screen.getByText('Chưa thiết lập')).toHaveClass('text-grey-muted');
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
   it('opens the editor on demand for an editable draft', () => {
@@ -73,7 +76,7 @@ describe('CDEReleaseLevelField', () => {
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 
   it.each([
@@ -95,13 +98,8 @@ describe('CDEReleaseLevelField', () => {
     render(<CDEReleaseLevelField />);
 
     fireEvent.click(screen.getByRole('button'));
-    fireEvent.mouseDown(screen.getByRole('combobox'));
-    await screen.findByRole('option', { name: 'TTQLDL' });
-    fireEvent.click(
-      document.querySelector(
-        '.ant-select-item-option[title="TTQLDL"]'
-      ) as HTMLElement
-    );
+    fireEvent.click(await screen.findByTestId('classification-option-TTQLDL'));
+    fireEvent.click(screen.getByText('label.update'));
 
     await waitFor(() =>
       expect(mockUpdate).toHaveBeenCalledWith(

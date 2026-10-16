@@ -13,26 +13,183 @@
 @import (reference) '../../../styles/variables.less';
 
 .dq-test-spec-modal {
-  .ant-modal-body {
-    max-height: calc(100vh - 220px);
-    overflow-y: auto;
-  }
-
-  // The shared test case form fills a drawer; inside a modal it only takes its content height.
-  .test-case-form-v1.dq-test-spec-form {
-    min-height: 0;
-    padding-bottom: 0;
-
-    .form-card-section:last-of-type {
-      margin-bottom: @size-md;
-    }
-  }
-
   .dq-test-spec-modal-footer {
     display: flex;
     flex-wrap: wrap;
-    gap: @size-xs;
+    gap: @size-sm;
     align-items: center;
     justify-content: space-between;
   }
+
+  .dq-test-spec-form {
+    .ant-input,
+    .ant-input-number,
+    .ant-input-affix-wrapper,
+    .ant-picker,
+    .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+      border-radius: 6px;
+    }
+
+    .ant-input-number {
+      width: 100%;
+      height: 36px;
+
+      .ant-input-number-input {
+        height: 34px;
+      }
+    }
+
+    .ant-select-single:not(.ant-select-customize-input) .ant-select-selector {
+      display: flex;
+      align-items: center;
+      height: 36px;
+    }
+  }
+
+  .dq-test-spec-form .ant-form-item-extra {
+    margin-top: 4px;
+    color: @text-color-tertiary;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .dq-test-params {
+    display: flex;
+    flex-direction: column;
+    gap: @size-sm;
+    padding: @size-md;
+    border: 1px solid @grey-200;
+    border-radius: 10px;
+    background: @grey-50;
+
+    .ant-form-item {
+      margin-bottom: 0;
+    }
+  }
+
+  .dq-test-preview {
+    border-radius: 10px;
+
+    .dq-test-preview-column {
+      margin: 0;
+      border-radius: 6px;
+      background: @white;
+    }
+  }
+}
+
+.dq-test-kind-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dq-test-kind-options.ant-radio-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: @size-sm;
+
+  .dq-test-kind-option.ant-radio-wrapper {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    padding: 14px @size-md;
+    border: 1px solid @grey-300;
+    border-radius: 10px;
+    background: @white;
+    transition: border-color 0.2s, background-color 0.2s;
+
+    &::after {
+      display: none;
+    }
+
+    .ant-radio {
+      top: 3px;
+    }
+
+    > span:last-child {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-right: 0;
+    }
+
+    &:hover:not(.ant-radio-wrapper-disabled) {
+      border-color: @primary-color;
+    }
+  }
+
+  .dq-test-kind-option.ant-radio-wrapper-checked {
+    border-color: @primary-color;
+    box-shadow: inset 0 0 0 0.5px @primary-color;
+    background: @grey-50;
+
+    .dq-test-kind-option-title {
+      color: @primary-color;
+    }
+  }
+
+  .dq-test-kind-option.ant-radio-wrapper-disabled {
+    border-color: @grey-200;
+    background: @grey-50;
+    cursor: not-allowed;
+
+    &.ant-radio-wrapper-checked {
+      border-color: @grey-300;
+      box-shadow: none;
+
+      .dq-test-kind-option-title {
+        color: @text-color-tertiary;
+      }
+    }
+  }
+
+  .dq-test-kind-option-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: @grey-900;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .dq-test-kind-option-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .dq-test-kind-option-description {
+    color: @text-color-tertiary;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 18px;
+  }
+}
+
+.dq-test-kind-locked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: @text-color-tertiary;
+  font-size: 12px;
+  line-height: 18px;
+
+  .dq-test-kind-locked-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .dq-test-kind-options.ant-radio-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.custom-query-editor .CodeMirror-placeholder {
+  color: #9ca3af !important;
+  white-space: pre;
 }

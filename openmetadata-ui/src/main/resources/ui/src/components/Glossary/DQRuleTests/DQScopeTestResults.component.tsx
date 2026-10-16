@@ -479,6 +479,7 @@ const DQScopeTestResults = ({
                 label: rule.code,
               }))}
               placeholder={t('dq.test.filter-rule')}
+              popupClassName="cde-form-dropdown"
               style={{ minWidth: 160 }}
               value={ruleFilter}
               onChange={(value) => {
@@ -494,6 +495,7 @@ const DQScopeTestResults = ({
                 label: t(DQ_OUTCOME_LABEL_KEY[outcome]),
               }))}
               placeholder={t('dq.test.filter-result')}
+              popupClassName="cde-form-dropdown"
               style={{ minWidth: 160 }}
               value={outcomeFilter}
               onChange={(value) => {

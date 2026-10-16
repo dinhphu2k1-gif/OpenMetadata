@@ -13,7 +13,8 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import * as utils from '../../components/Glossary/CDEImportExport/CDEImportExport.utils';
+import * as XLSX from 'xlsx';
+import * as glossaryAPI from '../../rest/glossaryAPI';
 import * as domainAPI from '../../rest/domainAPI';
 import * as userAPI from '../../rest/userAPI';
 import CDEImportPage from './CDEImportPage';
@@ -23,6 +24,17 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
+}));
+
+jest.mock('xlsx', () => ({
+  read: jest.fn(),
+  write: jest.fn().mockReturnValue(new Uint8Array()),
+  utils: {
+    aoa_to_sheet: jest.fn(),
+    book_append_sheet: jest.fn(),
+    book_new: jest.fn(),
+    sheet_to_json: jest.fn(),
+  },
 }));
 
 jest.mock('react-data-grid', () => ({
@@ -77,6 +89,25 @@ jest.mock('../../hooks/useFqn', () => ({
 }));
 
 jest.mock('../../rest/glossaryAPI', () => ({
+  downloadCdeImportTemplate: jest.fn().mockResolvedValue(new Blob(['x'])),
+  previewCdeImport: jest.fn().mockResolvedValue({
+    importSessionId: 'session-1',
+    expiresAt: '2099-01-01T00:00:00Z',
+    fileHash: 'hash',
+    existingCodePolicy: 'SKIP_EXISTING',
+    summary: { CREATE: 1 },
+    rows: [
+      {
+        rowNumber: 2,
+        cdeCode: 'CDE001',
+        action: 'CREATE',
+        warnings: [],
+        errors: [],
+      },
+    ],
+    canCommit: true,
+  }),
+  commitCdeImport: jest.fn().mockResolvedValue({ committed: 1, skipped: 0 }),
   getGlossariesByName: jest.fn().mockResolvedValue({
     id: 'glossary-1',
     name: 'Tu_Dien_Du_Lieu_Dung_Chung',
@@ -118,7 +149,41 @@ jest.mock('../../utils/ToastUtils', () => ({
   showSuccessToast: jest.fn(),
 }));
 
+const EXCEL_COLUMNS: [string, string][] = [
+  ['name', 'Mã CDE'],
+  ['domain', 'Khối/Miền nghiệp vụ'],
+  ['displayName', 'Tên thuật ngữ nghiệp vụ'],
+  ['dataSource', 'Hệ thống nguồn'],
+  ['description', 'Ý nghĩa nghiệp vụ'],
+  ['entityRelationship', 'Mối quan hệ với thực thể'],
+  ['owner', 'Chủ sở hữu dữ liệu'],
+  ['releaseLevel', 'Cấp phát hành'],
+  ['dataClassification', 'Phân loại dữ liệu'],
+  ['personalData', 'Dữ liệu cá nhân'],
+  ['relatedRegulatoryDocuments', 'Văn bản quy định liên quan'],
+  ['dataQualityRules', 'Quy định chất lượng dữ liệu'],
+  ['effectiveDate', 'Ngày hiệu lực'],
+  ['expirationDate', 'Ngày hết hiệu lực'],
+];
+
+const mockExcelRows = ({ rows }: { rows: Record<string, unknown>[] }) => {
+  (XLSX.read as jest.Mock).mockReturnValue({
+    SheetNames: ['Sheet1'],
+    Sheets: { Sheet1: {} },
+  });
+  (XLSX.utils.sheet_to_json as jest.Mock).mockReturnValue([
+    EXCEL_COLUMNS.map(([, header]) => header),
+    ...rows.map((row) => EXCEL_COLUMNS.map(([key]) => String(row[key] ?? ''))),
+  ]);
+};
+
 describe('CDEImportPage', () => {
+  beforeAll(() => {
+    File.prototype.arrayBuffer = jest
+      .fn()
+      .mockResolvedValue(new ArrayBuffer(0));
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -175,7 +240,7 @@ describe('CDEImportPage', () => {
   });
 
   it('should transition to Step 2 (Xem Trước Sửa) with DataGrid, add row, and navigation buttons', async () => {
-    jest.spyOn(utils, 'readAndValidateCDEExcel').mockResolvedValue({
+    mockExcelRows({
       totalRows: 1,
       validCount: 1,
       warningCount: 0,
@@ -225,7 +290,7 @@ describe('CDEImportPage', () => {
 
     // Step 2 should display: '+ Thêm hàng', 'Trước', and 'Tiếp theo'
     expect(screen.getByTestId('add-row-btn')).toBeInTheDocument();
-    expect(screen.getByText('Trước')).toBeInTheDocument();
+    expect(screen.getByText('label.previous')).toBeInTheDocument();
     expect(screen.getByTestId('next-button')).toBeInTheDocument();
 
     // Click '+ Thêm hàng'
@@ -243,7 +308,7 @@ describe('CDEImportPage', () => {
     expect(screen.getByTestId('update-button')).toBeInTheDocument();
     expect(screen.getByTestId('status-filter-group')).toBeInTheDocument();
     expect(
-      screen.getByText(/Phát hiện.*bản ghi bị lỗi|Tất cả.*bản ghi đều hợp lệ/)
+      screen.getByText(/cde.validation-has-errors|cde.validation-all-valid/)
     ).toBeInTheDocument();
 
     // Initial state: 2 rows in Step 3 (1 valid + 1 added row with missing fields)
@@ -251,11 +316,13 @@ describe('CDEImportPage', () => {
 
     const filterGroup = screen.getByTestId('status-filter-group');
 
-    expect(within(filterGroup).getByText('Bị lỗi')).toBeInTheDocument();
-    expect(within(filterGroup).getByText('Hợp lệ')).toBeInTheDocument();
+    expect(
+      within(filterGroup).getByText('label.errors-only')
+    ).toBeInTheDocument();
+    expect(within(filterGroup).getByText('label.valid')).toBeInTheDocument();
 
     // Switch filter to 'failure' (Bị lỗi) -> DataGrid receives only 1 row
-    const failureFilterBtn = within(filterGroup).getByText('Bị lỗi');
+    const failureFilterBtn = within(filterGroup).getByText('label.errors-only');
     await act(async () => {
       fireEvent.click(failureFilterBtn);
     });
@@ -263,7 +330,7 @@ describe('CDEImportPage', () => {
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch filter to 'success' (Hợp lệ) -> DataGrid receives only 1 row
-    const successFilterBtn = within(filterGroup).getByText('Hợp lệ');
+    const successFilterBtn = within(filterGroup).getByText('label.valid');
     await act(async () => {
       fireEvent.click(successFilterBtn);
     });
@@ -271,7 +338,7 @@ describe('CDEImportPage', () => {
     expect(screen.getByText('Rows: 1')).toBeInTheDocument();
 
     // Switch back to 'all' (Tất cả) -> DataGrid receives 2 rows
-    const allFilterBtn = within(filterGroup).getByText('Tất cả');
+    const allFilterBtn = within(filterGroup).getByText('label.all');
     await act(async () => {
       fireEvent.click(allFilterBtn);
     });
@@ -280,10 +347,6 @@ describe('CDEImportPage', () => {
   });
 
   it('should trigger download template when template link is clicked', async () => {
-    const spyDownload = jest
-      .spyOn(utils, 'downloadCDEExcelTemplate')
-      .mockImplementation();
-
     await act(async () => {
       render(
         <MemoryRouter>
@@ -292,10 +355,14 @@ describe('CDEImportPage', () => {
       );
     });
 
-    const downloadBtn = screen.getByText('label.download-excel-template');
-    fireEvent.click(downloadBtn);
+    URL.createObjectURL = jest.fn().mockReturnValue('blob:template');
+    URL.revokeObjectURL = jest.fn();
 
-    expect(spyDownload).toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByText('label.download-excel-template'));
+    });
+
+    expect(glossaryAPI.downloadCdeImportTemplate).toHaveBeenCalled();
   });
 
   it('should navigate back to glossary when cancel button is clicked', async () => {
@@ -328,7 +395,7 @@ describe('CDEImportPage', () => {
       ],
     });
 
-    jest.spyOn(utils, 'readAndValidateCDEExcel').mockResolvedValue({
+    mockExcelRows({
       totalRows: 1,
       validCount: 1,
       warningCount: 0,
@@ -413,7 +480,7 @@ describe('CDEImportPage', () => {
       ],
     });
 
-    jest.spyOn(utils, 'readAndValidateCDEExcel').mockResolvedValue({
+    mockExcelRows({
       totalRows: 1,
       validCount: 1,
       warningCount: 0,
@@ -488,7 +555,7 @@ describe('CDEImportPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should render bulk submit button and patch terms to InReview when clicked', async () => {
+  it('should commit the previewed import atomically when Cập nhật is clicked', async () => {
     (domainAPI.getDomainList as jest.Mock).mockResolvedValue({
       data: [
         {
@@ -500,7 +567,7 @@ describe('CDEImportPage', () => {
       ],
     });
 
-    jest.spyOn(utils, 'readAndValidateCDEExcel').mockResolvedValue({
+    mockExcelRows({
       totalRows: 1,
       validCount: 1,
       warningCount: 0,
@@ -511,7 +578,7 @@ describe('CDEImportPage', () => {
           name: 'CDE_BATCH_01',
           displayName: 'CDE Batch 01',
           domain: 'Dịch vụ',
-          dataSource: 'Thẻ',
+          dataSource: '',
           description: 'Ý nghĩa test',
           entityRelationship: '1-1',
           owner: '',
@@ -556,22 +623,8 @@ describe('CDEImportPage', () => {
       fireEvent.click(screen.getByTestId('update-button'));
     });
 
-    // Result screen should show submit-all-imported-btn
-    const submitAllBtn = screen.getByTestId('submit-all-imported-btn');
-
-    expect(submitAllBtn).toBeInTheDocument();
-
-    // Click submit all
-    await act(async () => {
-      fireEvent.click(submitAllBtn);
-    });
-
-    const glossaryAPI = require('../../rest/glossaryAPI');
-
-    expect(glossaryAPI.transitionGlossaryTermWorkflow).toHaveBeenCalledWith(
-      'term-1',
-      'submit',
-      { expectedRevision: 0.1 }
-    );
+    expect(glossaryAPI.previewCdeImport).toHaveBeenCalled();
+    expect(glossaryAPI.commitCdeImport).toHaveBeenCalledWith('session-1');
+    expect(screen.queryByTestId('update-button')).not.toBeInTheDocument();
   });
 });

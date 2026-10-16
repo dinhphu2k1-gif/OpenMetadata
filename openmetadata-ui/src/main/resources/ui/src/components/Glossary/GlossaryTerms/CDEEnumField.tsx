@@ -3,9 +3,10 @@
  *  Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-import { Popover, PopoverProps, Select, Tag, Typography } from 'antd';
+import { Popover, PopoverProps, Tag, Typography } from 'antd';
 import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import ClassificationSelectPanel from '../../common/ClassificationSelect/ClassificationSelectPanel.component';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
 
 interface CDEEnumOption {
@@ -22,7 +23,6 @@ interface CDEEnumFieldProps {
   footer?: ReactNode;
   label: string;
   options: CDEEnumOption[];
-  placeholder: string;
   placement?: PopoverProps['placement'];
   value?: string;
   valueClassName?: string;
@@ -39,7 +39,6 @@ const CDEEnumField = ({
   label,
   onChange,
   options,
-  placeholder,
   placement = 'bottomLeft',
   value,
   valueClassName = 'cde-value-pill-neutral',
@@ -47,20 +46,11 @@ const CDEEnumField = ({
 }: CDEEnumFieldProps) => {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const selectedLabel = options.find((option) => option.value === value)?.label;
-  const selectPlacement = placement?.startsWith('top')
-    ? 'topRight'
-    : 'bottomLeft';
 
   const handleChange = async (selectedValue: string) => {
-    setIsSaving(true);
-    try {
-      await onChange(selectedValue);
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
-    }
+    await onChange(selectedValue);
+    setIsEditing(false);
   };
 
   return (
@@ -78,22 +68,18 @@ const CDEEnumField = ({
             autoAdjustOverflow
             destroyTooltipOnHide
             content={
-              <Select
-                className="cde-enum-field-editor"
-                data-testid={editorTestId}
-                dropdownClassName="cde-enum-field-dropdown"
-                getPopupContainer={() => document.body}
-                loading={isSaving}
+              <ClassificationSelectPanel
+                dataTestId={editorTestId}
+                mode="single"
                 options={options}
-                placeholder={placeholder}
-                placement={selectPlacement}
-                value={value}
-                onChange={handleChange}
+                searchPlaceholder={t('label.search-for-type', { type: label })}
+                value={value ? [value] : []}
+                onCancel={() => setIsEditing(false)}
+                onUpdate={([selected]) => selected && handleChange(selected)}
               />
             }
-            getPopupContainer={() => document.body}
             open={isEditing}
-            overlayClassName="cde-enum-field-popover"
+            overlayClassName="classification-select-popover cde-enum-field-popover"
             placement={placement}
             trigger="click"
             onOpenChange={setIsEditing}>

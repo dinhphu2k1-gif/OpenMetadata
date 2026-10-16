@@ -10,12 +10,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCDEReleaseLevelValue } from '../../../constants/CDEReleaseLevel.constants';
 import { EntityType } from '../../../enums/entity.enum';
-import {
-  LabelType,
-  State,
-  TagLabel,
-  TagSource,
-} from '../../../generated/entity/data/glossaryTerm';
+import { TagLabel } from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
 import { useApplicationStore } from '../../../hooks/useApplicationStore';
 import { useEntityRules } from '../../../hooks/useEntityRules';
@@ -24,7 +19,10 @@ import { getCDEReleaseVersionType } from '../../../utils/CDEReleaseVersionTypeUt
 import { getEntityName } from '../../../utils/EntityNameUtils';
 import ClassificationSelect from '../../common/ClassificationSelect/ClassificationSelect.component';
 import SingleClassificationSelect from '../../common/ClassificationSelect/SingleClassificationSelect.component';
-import { useClassificationOptions } from '../../common/ClassificationSelect/useClassificationOptions';
+import {
+  toClassificationTagLabels,
+  useClassificationOptions,
+} from '../../common/ClassificationSelect/useClassificationOptions';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
 import RichTextEditor from '../../common/RichTextEditor/RichTextEditor';
@@ -74,15 +72,6 @@ interface CDETagSelectorProps {
 
 const CDE_CLASSIFICATION_TEST_ID_PREFIX = 'cde-classification-';
 
-const toTagLabel = (fqn: string, label?: string): TagLabel => ({
-  tagFQN: fqn,
-  name: fqn.split('.').at(-1),
-  displayName: label,
-  source: TagSource.Classification,
-  labelType: LabelType.Manual,
-  state: State.Confirmed,
-});
-
 export const CDETagSelector = ({
   classification,
   onChange,
@@ -94,13 +83,7 @@ export const CDETagSelector = ({
   const { options, isLoading } = useClassificationOptions(classification);
 
   const handleChange = (fqns: string[]) =>
-    onChange?.(
-      fqns.map(
-        (fqn) =>
-          value.find((tag) => tag.tagFQN === fqn) ??
-          toTagLabel(fqn, options.find((option) => option.value === fqn)?.label)
-      )
-    );
+    onChange?.(toClassificationTagLabels(fqns, options, value));
 
   return (
     <ClassificationSelect
@@ -359,7 +342,13 @@ const CDEGlossaryTermForm = ({
           required
           label={t('cde.term-code')}
           name="name"
-          rules={[{ required: true, whitespace: true }]}>
+          rules={[
+            {
+              required: true,
+              whitespace: true,
+              message: t('label.field-required', { field: t('cde.term-code') }),
+            },
+          ]}>
           <Input
             data-testid="cde-term-code"
             disabled={editMode}
@@ -388,7 +377,15 @@ const CDEGlossaryTermForm = ({
           initialValue={glossaryTerm?.description ?? ''}
           label={t('cde.business-meaning')}
           name="description"
-          rules={[{ required: true, whitespace: true }]}
+          rules={[
+            {
+              required: true,
+              whitespace: true,
+              message: t('label.field-required', {
+                field: t('cde.business-meaning'),
+              }),
+            },
+          ]}
           trigger="onTextChange">
           <RichTextEditor
             data-testid="cde-business-meaning"
@@ -487,6 +484,7 @@ const CDEGlossaryTermForm = ({
               data-testid={`cde-${key}`}
               format="dd/MM/yyyy"
               placeholder={t('cde.select-date')}
+              popupClassName="cde-form-dropdown"
             />
           </Form.Item>
         ))}

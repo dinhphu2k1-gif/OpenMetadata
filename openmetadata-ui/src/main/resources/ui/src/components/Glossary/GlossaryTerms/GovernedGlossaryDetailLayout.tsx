@@ -11,8 +11,25 @@
  *  limitations under the License.
  */
 
-import { Typography } from 'antd';
+import { ConfigProvider, Typography } from 'antd';
 import { ReactNode } from 'react';
+
+/**
+ * Renders popups inside the tab pane that scrolls the detail page, so an open
+ * editor moves with its field instead of staying fixed on the body.
+ */
+const getScrollPanePopupContainer = (triggerNode?: HTMLElement) =>
+  triggerNode?.closest<HTMLElement>('.ant-tabs-tabpane') ?? document.body;
+
+export const GovernedGlossaryPopupScope = ({
+  children,
+}: {
+  children: ReactNode;
+}) => (
+  <ConfigProvider getPopupContainer={getScrollPanePopupContainer}>
+    {children}
+  </ConfigProvider>
+);
 
 interface GovernedGlossaryFieldProps {
   action?: ReactNode;
@@ -35,7 +52,9 @@ export const GovernedGlossarySection = ({
   variant,
 }: GovernedGlossarySectionProps) => (
   <section
-    className={`cde-detail-section cde-detail-section-${variant} ${className ?? ''}`}>
+    className={`cde-detail-section cde-detail-section-${variant} ${
+      className ?? ''
+    }`}>
     <header className="cde-detail-section-header">
       <span aria-hidden="true" className="cde-detail-section-marker" />
       <Typography.Title className="cde-detail-section-title" level={5}>

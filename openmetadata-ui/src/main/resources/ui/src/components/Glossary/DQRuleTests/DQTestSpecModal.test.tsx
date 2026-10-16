@@ -24,6 +24,26 @@ import DQTestSpecModal, {
   DQTestSpecModalProps,
 } from './DQTestSpecModal.component';
 
+jest.mock('@openmetadata/ui-core-components', () => {
+  const React = require('react');
+
+  return {
+    Button: ({
+      children,
+      iconLeading: _iconLeading,
+      isDisabled,
+      isLoading: _isLoading,
+      onPress,
+      ...props
+    }: Record<string, unknown>) =>
+      React.createElement(
+        'button',
+        { ...props, disabled: isDisabled, onClick: onPress, type: 'button' },
+        children
+      ),
+  };
+});
+
 jest.mock('../../../rest/dqRuleTestAPI', () => ({
   listDqLibraryTestDefinitions: jest
     .fn()
@@ -209,5 +229,32 @@ describe('DQTestSpecModal', () => {
       schemaVersion: 1,
       items: [expect.objectContaining({ name: 'No blanks' })],
     });
+  });
+
+  it('shows the Rule under the title and switches the check kind from the option cards', async () => {
+    await renderModal({ ruleLabel: 'DQ5.1 · Thử' });
+
+    expect(screen.getByText('DQ5.1 · Thử')).toBeInTheDocument();
+    expect(screen.getByTestId('sql-editor')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('dq.test.kind-library-title'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('sql-editor')).not.toBeInTheDocument()
+    );
+
+    expect(screen.queryByTestId('dq-test-kind-locked')).not.toBeInTheDocument();
+  });
+
+  it('locks the check kind with its reason once the test produced test cases', async () => {
+    await renderModal({ isDefinitionLocked: true });
+
+    expect(screen.getByTestId('dq-test-kind-locked')).toHaveTextContent(
+      'dq.test.definition-locked'
+    );
+
+    screen
+      .getAllByRole('radio')
+      .forEach((radio) => expect(radio).toBeDisabled());
   });
 });

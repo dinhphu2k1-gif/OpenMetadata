@@ -27,6 +27,23 @@ jest.mock('../../../hooks/useEntityRules', () => ({
   }),
 }));
 
+jest.mock('../CDESelectableList/CDESelectableField.component', () =>
+  jest.fn().mockImplementation(({ onChange }) => (
+    <button
+      data-testid="mock-select-cde"
+      type="button"
+      onClick={() =>
+        onChange({
+          id: 'cde-id-1',
+          name: 'CDE1',
+          displayName: 'Tên khách hàng',
+        })
+      }>
+      Select CDE
+    </button>
+  ))
+);
+
 jest.mock('../../../rest/glossaryAPI', () => ({
   getFirstLevelGlossaryTermsPaginated: jest.fn().mockResolvedValue({
     data: [
@@ -84,14 +101,14 @@ jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
     )
 );
 
-jest.mock(
-  '../../common/ClassificationSelect/useClassificationOptions',
-  () => ({
-    useClassificationOptions: jest
-      .fn()
-      .mockReturnValue({ options: [], isLoading: false }),
-  })
-);
+jest.mock('../../common/ClassificationSelect/useClassificationOptions', () => ({
+  ...jest.requireActual(
+    '../../common/ClassificationSelect/useClassificationOptions'
+  ),
+  useClassificationOptions: jest
+    .fn()
+    .mockReturnValue({ options: [], isLoading: false }),
+}));
 
 jest.mock('../../../pages/TasksPage/shared/TagSuggestion', () =>
   jest.fn().mockImplementation(({ classificationFilter, onChange }) => (
@@ -193,7 +210,6 @@ describe('DQGlossaryTermForm', () => {
     expect(
       screen.getByTestId('dq-related-regulatory-documents')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('dq-exceptions')).toBeInTheDocument();
     expect(screen.getByTestId('dq-release-version-type')).toBeInTheDocument();
     expect(screen.getByTestId('dq-effectiveDate')).toBeInTheDocument();
     expect(screen.getByTestId('dq-expirationDate')).toBeInTheDocument();
@@ -233,15 +249,16 @@ describe('DQGlossaryTermForm', () => {
       fireEvent.change(screen.getByTestId('dq-rule-name'), {
         target: { value: 'DQ3.1 - Tính đầy đủ' },
       });
-      fireEvent.change(screen.getByTestId('dq-version'), {
-        target: { value: '1.2' },
-      });
       fireEvent.change(screen.getByTestId('dq-rule-statement'), {
         target: { value: 'Mô tả quy tắc' },
       });
       fireEvent.change(screen.getByTestId('dq-quality-threshold'), {
         target: { value: '99%' },
       });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('mock-select-cde'));
     });
 
     await act(async () => {
@@ -255,7 +272,6 @@ describe('DQGlossaryTermForm', () => {
     expect(payload.description).toBe('Mô tả quy tắc');
     expect(payload.extension).toEqual(
       expect.objectContaining({
-        version: '1.2',
         qualityThreshold: '99%',
       })
     );

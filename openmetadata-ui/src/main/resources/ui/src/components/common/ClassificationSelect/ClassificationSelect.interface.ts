@@ -34,3 +34,12 @@ export interface ClassificationSelectProps {
   disabled?: boolean;
   dataTestId?: string;
 }
+
+export interface ClassificationSelectPanelProps
+  extends Pick<
+    ClassificationSelectProps,
+    'mode' | 'options' | 'value' | 'searchPlaceholder' | 'dataTestId'
+  > {
+  onCancel: () => void;
+  onUpdate: (value: string[]) => void;
+}

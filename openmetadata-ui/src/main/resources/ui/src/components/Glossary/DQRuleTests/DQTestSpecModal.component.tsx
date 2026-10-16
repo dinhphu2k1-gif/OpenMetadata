@@ -11,18 +11,18 @@
  *  limitations under the License.
  */
 
+import { Button } from '@openmetadata/ui-core-components';
+import { Eye } from '@untitledui/icons';
 import {
   Alert,
-  Button,
-  Card,
   Form,
   Input,
   Modal,
-  Radio,
   Select,
   Space,
   Switch,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import { AxiosError } from 'axios';
@@ -53,9 +53,9 @@ import { getPopupContainer } from '../../../utils/formUtils';
 import { isValidJSONString } from '../../../utils/StringUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
 import ParameterForm from '../../DataQuality/AddDataQualityTest/components/ParameterForm';
-import '../../DataQuality/AddDataQualityTest/components/TestCaseFormV1.less';
 import './dq-test-spec-modal.less';
 import CodeEditor from '../../Database/SchemaEditor/CodeEditor';
+import GlossaryTermFormSection from '../AddGlossaryTermForm/GlossaryTermFormSection.component';
 import {
   DQ_DEFAULT_TIMEZONE,
   DQ_TEST_DEFINITION_LIMIT,
@@ -63,6 +63,7 @@ import {
 import { DQPreview } from './DQRuleTests.interface';
 import { localizeDqDefinition } from './DQRuleTests.utils';
 import DQScheduleField, { DQScheduleValue } from './DQScheduleField.component';
+import DQTestKindField from './DQTestKindField.component';
 
 type FormParams = Record<string, string | { [key: string]: string }[]>;
 
@@ -73,7 +74,6 @@ interface DQTestSpecFormValues {
   params?: FormParams;
   sqlExpression?: string;
   computePassedFailedRowCount?: boolean;
-  threshold?: string;
   schedule?: DQScheduleValue;
 }
 
@@ -85,13 +85,16 @@ export interface DQTestSpecModalProps {
   /** Names of the other declarations of the Rule, which must stay unique. */
   otherNames: string[];
   isDefinitionLocked?: boolean;
-  ruleThreshold?: string;
+  /** Code and name of the Rule the test belongs to, shown under the title. */
+  ruleLabel?: string;
   cdeTermId?: string;
   onCancel: () => void;
   onSave: (spec: DqTestSpec) => Promise<void>;
 }
 
 /** The inverse of createTestCaseParameters: stored values back into ParameterForm values. */
+const SQL_EXAMPLE = `SELECT *\nFROM {{ table_name }}\nWHERE {{ column_name }} IS NULL\n   OR TRIM({{ column_name }}) = ''`;
+
 const toFormParams = (
   values: TestCaseParameterValue[] = [],
   definition?: TestDefinition
@@ -122,7 +125,7 @@ const DQTestSpecModal = ({
   defaultKind,
   otherNames,
   isDefinitionLocked = false,
-  ruleThreshold,
+  ruleLabel,
   cdeTermId,
   onCancel,
   onSave,
@@ -183,7 +186,6 @@ const DQTestSpecModal = ({
       ) as FormParams,
       sqlExpression: spec?.sqlExpression,
       computePassedFailedRowCount: spec?.computePassedFailedRowCount,
-      threshold: spec?.threshold,
       schedule: {
         cron: spec?.scheduleCron,
         timezone: spec?.scheduleTimezone ?? DQ_DEFAULT_TIMEZONE,
@@ -215,7 +217,6 @@ const DQTestSpecModal = ({
       ...(spec?.key ? { key: spec.key } : {}),
       name: values.name.trim(),
       kind: values.kind,
-      threshold: values.threshold?.trim() || undefined,
       scheduleCron: values.schedule?.cron?.trim() || undefined,
       scheduleTimezone: values.schedule?.cron?.trim()
         ? values.schedule.timezone?.trim() || DQ_DEFAULT_TIMEZONE
@@ -287,35 +288,43 @@ const DQTestSpecModal = ({
     column.tests.some((test) => !test.applicable)
   );
 
+  const previewButton = (
+    <Button
+      color="secondary"
+      data-testid="dq-test-preview-button"
+      iconLeading={<Eye height={18} width={18} />}
+      isDisabled={!cdeTermId}
+      isLoading={isPreviewLoading}
+      onPress={handlePreview}>
+      {t('dq.test.preview')}
+    </Button>
+  );
+
   return (
     <Modal
       centered
       destroyOnClose
-      className="dq-test-spec-modal"
+      className="cde-glossary-term-modal cde-glossary-term-modal--cde dq-test-spec-modal"
       data-testid="dq-test-spec-modal"
       footer={
         <div className="dq-test-spec-modal-footer">
-          <Space>
-            <Button
-              data-testid="dq-test-preview-button"
-              disabled={!cdeTermId}
-              loading={isPreviewLoading}
-              onClick={handlePreview}>
-              {t('dq.test.preview')}
+          {cdeTermId ? (
+            previewButton
+          ) : (
+            <Tooltip title={t('dq.test.preview-no-cde')}>
+              <span>{previewButton}</span>
+            </Tooltip>
+          )}
+          <Space size={12}>
+            <Button color="secondary" onPress={onCancel}>
+              {t('label.cancel')}
             </Button>
-            {!cdeTermId && (
-              <Typography.Text type="secondary">
-                {t('dq.test.preview-no-cde')}
-              </Typography.Text>
-            )}
-          </Space>
-          <Space>
-            <Button onClick={onCancel}>{t('label.cancel')}</Button>
             <Button
+              color="primary"
               data-testid="dq-test-save"
-              loading={isSaving}
-              type="primary"
-              onClick={handleSave}>
+              isDisabled={isSaving}
+              isLoading={isSaving}
+              onPress={handleSave}>
               {t('label.save')}
             </Button>
           </Space>
@@ -323,11 +332,18 @@ const DQTestSpecModal = ({
       }
       maskClosable={false}
       open={open}
-      title={spec ? t('dq.test.edit') : t('dq.test.add')}
-      width={760}
+      title={
+        <div className="cde-glossary-modal-title">
+          <div>{spec ? t('dq.test.edit') : t('dq.test.add')}</div>
+          {ruleLabel && (
+            <div className="cde-glossary-modal-subtitle">{ruleLabel}</div>
+          )}
+        </div>
+      }
+      width={880}
       onCancel={onCancel}>
       <Form<DQTestSpecFormValues>
-        className="test-case-form-v1 dq-test-spec-form"
+        className="cde-glossary-term-form dq-test-spec-form"
         form={form}
         layout="vertical"
         onValuesChange={(changed) => {
@@ -339,12 +355,11 @@ const DQTestSpecModal = ({
           }
           setPreview(undefined);
         }}>
-        <Typography.Paragraph className="text-grey-muted">
-          {t('dq.test.description')}
-        </Typography.Paragraph>
-
-        <Card className="form-card-section">
+        <GlossaryTermFormSection
+          description={t('dq.test.description')}
+          title={t('dq.test.section-info')}>
           <Form.Item
+            className="cde-form-field-full"
             label={t('dq.test.name')}
             name="name"
             rules={[
@@ -366,24 +381,23 @@ const DQTestSpecModal = ({
                     : Promise.resolve(),
               },
             ]}>
-            <Input data-testid="dq-test-name" />
+            <Input
+              data-testid="dq-test-name"
+              placeholder={t('dq.test.name-placeholder')}
+            />
           </Form.Item>
-          <Form.Item label={t('dq.test.kind')} name="kind">
-            <Radio.Group
-              buttonStyle="solid"
-              data-testid="dq-test-kind"
-              disabled={isDefinitionLocked}
-              optionType="button">
-              <Radio.Button value={DqTestSpecKind.Library}>
-                {t('dq.test.kind-library')}
-              </Radio.Button>
-              <Radio.Button value={DqTestSpecKind.SQL}>
-                {t('dq.test.kind-sql')}
-              </Radio.Button>
-            </Radio.Group>
+          <Form.Item
+            className="cde-form-field-full"
+            label={t('dq.test.kind')}
+            name="kind">
+            <DQTestKindField disabled={isDefinitionLocked} />
           </Form.Item>
+        </GlossaryTermFormSection>
+
+        <GlossaryTermFormSection title={t('dq.test.section-config')}>
           {kind === DqTestSpecKind.SQL ? (
             <Form.Item
+              className="cde-form-field-full"
               extra={t('dq.test.sql-hint')}
               label={t('dq.test.sql')}
               name="sqlExpression"
@@ -401,12 +415,13 @@ const DQTestSpecModal = ({
                 showCopyButton
                 className="custom-query-editor query-editor-h-200"
                 mode={{ name: CSMode.SQL }}
+                options={{ placeholder: SQL_EXAMPLE }}
               />
             </Form.Item>
           ) : (
             <>
               <Form.Item
-                extra={isDefinitionLocked && t('dq.test.definition-locked')}
+                className="cde-form-field-full"
                 label={t('dq.test.definition')}
                 name="testDefinitionFqn"
                 rules={[
@@ -425,62 +440,56 @@ const DQTestSpecModal = ({
                   filterOption={filterSelectOptions}
                   getPopupContainer={getPopupContainer}
                   loading={isDefinitionLoading}
+                  optionLabelProp="labelValue"
                   options={testTypeOptions}
                   placeholder={t('dq.test.select-definition')}
-                  popupClassName="no-wrap-option"
+                  popupClassName="no-wrap-option cde-form-dropdown"
                 />
               </Form.Item>
-              {selectedDefinition?.parameterDefinition && (
-                <ParameterForm definition={selectedDefinition} />
-              )}
-              {selectedDefinition?.supportsRowLevelPassedFailed && (
-                <div className="d-flex gap-2 form-switch-container">
-                  <Form.Item
-                    className="m-b-0"
-                    name="computePassedFailedRowCount"
-                    valuePropName="checked">
-                    <Switch data-testid="dq-test-compute" />
-                  </Form.Item>
-                  <Typography.Text className="font-medium">
-                    {t('dq.test.compute-rate')}
-                  </Typography.Text>
+              {(selectedDefinition?.parameterDefinition?.length ||
+                selectedDefinition?.supportsRowLevelPassedFailed) && (
+                <div className="dq-test-params cde-form-field-full">
+                  {selectedDefinition?.parameterDefinition && (
+                    <ParameterForm definition={selectedDefinition} />
+                  )}
+                  {selectedDefinition?.supportsRowLevelPassedFailed && (
+                    <div className="d-flex items-center gap-2">
+                      <Form.Item
+                        noStyle
+                        name="computePassedFailedRowCount"
+                        valuePropName="checked">
+                        <Switch data-testid="dq-test-compute" />
+                      </Form.Item>
+                      <Typography.Text>
+                        {t('dq.test.compute-rate')}
+                      </Typography.Text>
+                    </div>
+                  )}
                 </div>
               )}
             </>
           )}
-          <Form.Item
-            label={t('dq.test.threshold')}
-            name="threshold"
-            rules={[{ max: 64 }]}>
-            <Input
-              data-testid="dq-test-threshold"
-              placeholder={
-                ruleThreshold
-                  ? t('dq.test.threshold-placeholder', {
-                      threshold: ruleThreshold,
-                    })
-                  : t('dq.test.threshold-placeholder-none')
-              }
-            />
-          </Form.Item>
           <Form.Item
             extra={t('dq.test.schedule-hint')}
             label={t('dq.test.schedule')}
             name="schedule">
             <DQScheduleField />
           </Form.Item>
-        </Card>
+        </GlossaryTermFormSection>
 
         {preview && (
           <Alert
             showIcon
+            className="dq-test-preview"
             data-testid="dq-test-preview"
             description={
               notApplicableColumns.length > 0 && (
-                <Space wrap size={4}>
+                <Space wrap size={6}>
                   {notApplicableColumns.map((column) => (
-                    <Tag color="warning" key={column.columnKey}>
-                      {column.columnFqn.split('.').slice(-1)[0]}:{' '}
+                    <Tag
+                      className="dq-test-preview-column"
+                      key={column.columnKey}>
+                      {column.columnFqn.split('.').slice(-1)[0]} ·{' '}
                       {t('dq.test.not-applicable')}
                     </Tag>
                   ))}

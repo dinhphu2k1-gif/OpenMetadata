@@ -163,6 +163,15 @@
   }
 }
 
+.dq-trend-card .ant-segmented {
+  border-radius: 6px;
+
+  .ant-segmented-item,
+  .ant-segmented-thumb {
+    border-radius: 4px;
+  }
+}
+
 .dq-results-card {
   .ant-card-body {
     padding: 0;
@@ -170,6 +179,10 @@
 
   .dq-spec-filter {
     min-width: 220px;
+  }
+
+  .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+    border-radius: 6px;
   }
 
   .ant-table-pagination.ant-pagination {
@@ -306,7 +319,9 @@
 
 // The tabs of a Domain scroll inside a fixed height; this one grows with the page instead, so the
 // page keeps a single vertical scrollbar.
-.domain-details-page-tabs .ant-tabs.tabs-new .ant-tabs-tabpane:has(> .dq-domain-test-results) {
+.domain-details-page-tabs
+  .ant-tabs.tabs-new
+  .ant-tabs-tabpane:has(> .dq-domain-test-results) {
   height: auto;
   overflow-y: visible;
 }

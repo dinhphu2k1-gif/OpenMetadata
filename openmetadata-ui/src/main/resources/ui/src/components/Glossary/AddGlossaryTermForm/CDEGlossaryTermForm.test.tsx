@@ -70,8 +70,9 @@ jest.mock(
 jest.mock(
   '../../common/UserTeamSelectableList/UserTeamSelectableList.component',
   () => ({
-    UserTeamSelectableList: jest.fn().mockImplementation(
-      ({ children, onUpdate }) => (
+    UserTeamSelectableList: jest
+      .fn()
+      .mockImplementation(({ children, onUpdate }) => (
         <div data-testid="mock-user-team-picker">
           {children}
           <button
@@ -83,8 +84,7 @@ jest.mock(
             Set Owner
           </button>
         </div>
-      )
-    ),
+      )),
   })
 );
 
@@ -100,20 +100,23 @@ jest.mock('../../common/RichTextEditor/RichTextEditor', () =>
     ))
 );
 
-jest.mock(
-  '../../common/ClassificationSelect/useClassificationOptions',
-  () => ({
-    useClassificationOptions: jest
-      .fn()
-      .mockReturnValue({ options: [], isLoading: false }),
-  })
-);
+jest.mock('../../common/ClassificationSelect/useClassificationOptions', () => ({
+  ...jest.requireActual(
+    '../../common/ClassificationSelect/useClassificationOptions'
+  ),
+  useClassificationOptions: jest
+    .fn()
+    .mockReturnValue({ options: [], isLoading: false }),
+}));
 
 jest.mock(
   '../../common/ClassificationSelect/ClassificationSelect.component',
   () =>
     jest.fn().mockImplementation(({ dataTestId, onChange, value = [] }) => {
-      const classification = String(dataTestId).replace('cde-classification-', '');
+      const classification = String(dataTestId).replace(
+        'cde-classification-',
+        ''
+      );
 
       return (
         <div data-testid={`mock-classification-select-${classification}`}>
@@ -132,6 +135,7 @@ jest.mock(
 const mockGlossaryTerm: GlossaryTerm = {
   id: 'term-id-1',
   name: 'CDE_MA_KH',
+  businessVersion: '1.0',
   displayName: 'Mã khách hàng',
   description: 'Mã định danh duy nhất của khách hàng',
   glossary: { id: 'glossary-1', name: 'Data Dictionary', type: 'glossary' },

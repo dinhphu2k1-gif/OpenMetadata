@@ -13,7 +13,7 @@
  */
 
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Popover, Select } from 'antd';
+import { Button } from 'antd';
 import { DateTime } from 'luxon';
 import DatePicker from '../../common/DatePicker/DatePicker';
 import {
@@ -23,21 +23,22 @@ import {
   validateCDEDates,
 } from '../../../utils/CDEDateUtils';
 import { showErrorToast } from '../../../utils/ToastUtils';
-import { EntityTags } from 'Models';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EntityStatus, GlossaryTerm } from '../../../generated/entity/data/glossaryTerm';
+import {
+  EntityStatus,
+  GlossaryTerm,
+} from '../../../generated/entity/data/glossaryTerm';
 import { EntityReference } from '../../../generated/entity/type';
-import { TagSource } from '../../../generated/type/tagLabel';
-import { createTagObject } from '../../../utils/TagsUtils';
+import { TagLabel, TagSource } from '../../../generated/type/tagLabel';
 import DomainSelectableList from '../../common/DomainSelectableList/DomainSelectableList.component';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
-import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { UserTeamSelectableList } from '../../common/UserTeamSelectableList/UserTeamSelectableList.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModalWithMarkdownEditor } from '../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
 import TagsViewer from '../../Tag/TagsViewer/TagsViewer';
+import ClassificationTagEditButton from './ClassificationTagEditButton.component';
 import { DisplayType } from '../../Tag/TagsViewer/TagsViewer.interface';
 import {
   CDE_TAG_CLASSIFICATIONS,
@@ -48,6 +49,7 @@ import CDEEnumField from './CDEEnumField';
 import CDEReleaseLevelField from './CDEReleaseLevelField';
 import {
   GovernedGlossaryField as CDEField,
+  GovernedGlossaryPopupScope,
   GovernedGlossarySection as CDESection,
 } from './GovernedGlossaryDetailLayout';
 
@@ -66,10 +68,8 @@ const CDETagField = ({
   glossaryTerm,
   label,
 }: CDETagFieldProps) => {
-  const { t } = useTranslation();
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const selectedTags = (glossaryTerm.tags ?? []).filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
   );
@@ -80,8 +80,7 @@ const CDETagField = ({
     isDraft &&
     !isVersionView &&
     Boolean(permissions?.EditTags || permissions?.EditAll);
-  const handleTagUpdate = async (updatedTags: EntityTags[]) => {
-    const tags = createTagObject(updatedTags) ?? [];
+  const handleTagUpdate = async (tags: TagLabel[]) => {
     const currentTags = data?.tags ?? glossaryTerm.tags ?? [];
     const nonClassificationTags = currentTags.filter(
       (tag) => tag.tagFQN.split('.')[0] !== classification
@@ -92,39 +91,26 @@ const CDETagField = ({
       ...data,
       tags: [...nonClassificationTags, ...tags],
     });
-    setIsEditorOpen(false);
   };
 
   return (
     <CDEField
       action={
         hasEditAccess ? (
-          <TagSelectableList
-            classificationFilter={classification}
-            hasPermission={hasEditAccess}
-            popoverProps={{
-              open: isEditorOpen,
-              overlayClassName: 'cde-tag-select-popover',
-              placement: 'bottomLeft',
-              onOpenChange: setIsEditorOpen,
-            }}
-            searchPlaceholder={t('label.search-for-type', { type: label })}
-            selectedTags={selectedTags}
-            onCancel={() => setIsEditorOpen(false)}
-            onUpdate={handleTagUpdate}>
-            <EditIconButton
-              size="small"
-              title={t('label.edit-entity', { entity: label })}
-            />
-          </TagSelectableList>
+          <ClassificationTagEditButton
+            classification={classification}
+            label={label}
+            value={selectedTags}
+            onUpdate={handleTagUpdate}
+          />
         ) : undefined
       }
       className={`cde-detail-field-${classification}`}
       label={label}>
       <TagsViewer
+        showNoDataPlaceholder
         displayType={DisplayType.READ_MORE}
         entityFqn={glossaryTerm.fullyQualifiedName ?? glossaryTerm.name}
-        showNoDataPlaceholder
         tagType={TagSource.Classification}
         tags={selectedTags}
       />
@@ -292,7 +278,6 @@ const CDEQualityRuleField = ({ glossaryTerm }: CDEGlossaryTermSummaryProps) => {
         { label: t('label.no'), value: 'false' },
       ]}
       placement="topRight"
-      placeholder={t('cde.not-set')}
       value={qualityValue}
       valueClassName={
         qualityValue === 'true'
@@ -480,6 +465,7 @@ export const CDEValidityFields = ({
                 disabled={saving}
                 format="dd/MM/yyyy"
                 open={isPickerOpen}
+                popupClassName="cde-form-dropdown"
                 status={dateError ? 'error' : undefined}
                 value={draftDate}
                 onChange={(value) => {
@@ -506,7 +492,9 @@ export const CDEValidityFields = ({
                 onClick={closeEditor}
               />
               {dateError && (
-                <Typography.Text className="cde-inline-date-error" type="danger">
+                <Typography.Text
+                  className="cde-inline-date-error"
+                  type="danger">
                   {dateError}
                 </Typography.Text>
               )}
@@ -528,62 +516,62 @@ const CDEGlossaryTermSummary = ({
   const { t } = useTranslation();
 
   return (
-    <div className="cde-detail-summary">
-      <div
-        className="cde-detail-summary-group-1"
-        data-testid="cde-glossary-term-summary-group-1">
-        <CDESection
-          title={t('cde.management-information')}
-          variant="management">
-          <CDEDomainsField glossaryTerm={glossaryTerm} />
-          <CDEOwnersField glossaryTerm={glossaryTerm} />
-          <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
-          <CDEValidityFields glossaryTerm={glossaryTerm} />
-        </CDESection>
+    <GovernedGlossaryPopupScope>
+      <div className="cde-detail-summary">
+        <div
+          className="cde-detail-summary-group-1"
+          data-testid="cde-glossary-term-summary-group-1">
+          <CDESection
+            title={t('cde.management-information')}
+            variant="management">
+            <CDEDomainsField glossaryTerm={glossaryTerm} />
+            <CDEOwnersField glossaryTerm={glossaryTerm} />
+            <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
+            <CDEValidityFields glossaryTerm={glossaryTerm} />
+          </CDESection>
 
-        <CDESection
-          title={t('cde.classification-control')}
-          variant="classification">
-          <CDETagField
-            classification={CDE_TAG_CLASSIFICATIONS.dataSource}
-            glossaryTerm={glossaryTerm}
-            label={t('cde.data-source')}
-          />
-          <CDETagField
-            classification={CDE_TAG_CLASSIFICATIONS.dataClassification}
-            glossaryTerm={glossaryTerm}
-            label={t('cde.data-classification')}
-          />
-          <CDETagField
-            classification={CDE_TAG_CLASSIFICATIONS.personalData}
-            glossaryTerm={glossaryTerm}
-            label={t('cde.personal-data')}
-          />
-          <CDEQualityRuleField glossaryTerm={glossaryTerm} />
-        </CDESection>
-      </div>
+          <CDESection
+            title={t('cde.classification-control')}
+            variant="classification">
+            <CDETagField
+              classification={CDE_TAG_CLASSIFICATIONS.dataSource}
+              glossaryTerm={glossaryTerm}
+              label={t('cde.data-source')}
+            />
+            <CDETagField
+              classification={CDE_TAG_CLASSIFICATIONS.dataClassification}
+              glossaryTerm={glossaryTerm}
+              label={t('cde.data-classification')}
+            />
+            <CDETagField
+              classification={CDE_TAG_CLASSIFICATIONS.personalData}
+              glossaryTerm={glossaryTerm}
+              label={t('cde.personal-data')}
+            />
+            <CDEQualityRuleField glossaryTerm={glossaryTerm} />
+          </CDESection>
+        </div>
 
-      <div
-        className="cde-detail-summary-group-2"
-        data-testid="cde-glossary-term-summary-group-2">
-        <CDESection
-          title={t('cde.business-context')}
-          variant="context">
-          <CDETextCustomField
-            fallbackName="moi_quan_he_voi_thuc_the"
-            glossaryTerm={glossaryTerm}
-            label={t('cde.entity-relationship')}
-            propertyName="entityRelationship"
-          />
-          <CDETextCustomField
-            fallbackName="van_ban_quy_dinh_lien_quan"
-            glossaryTerm={glossaryTerm}
-            label={t('cde.related-regulatory-documents')}
-            propertyName="relatedRegulatoryDocuments"
-          />
-        </CDESection>
+        <div
+          className="cde-detail-summary-group-2"
+          data-testid="cde-glossary-term-summary-group-2">
+          <CDESection title={t('cde.business-context')} variant="context">
+            <CDETextCustomField
+              fallbackName="moi_quan_he_voi_thuc_the"
+              glossaryTerm={glossaryTerm}
+              label={t('cde.entity-relationship')}
+              propertyName="entityRelationship"
+            />
+            <CDETextCustomField
+              fallbackName="van_ban_quy_dinh_lien_quan"
+              glossaryTerm={glossaryTerm}
+              label={t('cde.related-regulatory-documents')}
+              propertyName="relatedRegulatoryDocuments"
+            />
+          </CDESection>
+        </div>
       </div>
-    </div>
+    </GovernedGlossaryPopupScope>
   );
 };
 

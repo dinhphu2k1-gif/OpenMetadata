@@ -802,6 +802,7 @@ const DQRuleTestResults = ({
             className="dq-spec-filter"
             data-testid="dq-spec-filter"
             options={specOptions}
+            popupClassName="cde-form-dropdown"
             value={specKey ?? ALL_FILTER}
             onChange={changeSpecFilter}
           />

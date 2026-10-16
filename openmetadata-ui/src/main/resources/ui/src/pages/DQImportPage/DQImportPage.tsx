@@ -429,7 +429,7 @@ const DQImportPage: FC = () => {
       const name = (rowCopy.name || '').trim();
       if (!name) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('dq.rule-code', 'Mã quy tắc nghiệp vụ'),
           })
         );
@@ -454,7 +454,7 @@ const DQImportPage: FC = () => {
       const cdeCode = (rowCopy.cdeCode || '').trim();
       if (!cdeCode) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('dq.cde-code-ref', 'Mã CDE quy chiếu'),
           })
         );
@@ -464,7 +464,7 @@ const DQImportPage: FC = () => {
       const cdeName = (rowCopy.cdeName || '').trim();
       if (!cdeName) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('dq.cde-name-ref', 'Tên thành tố CDE'),
           })
         );
@@ -474,7 +474,7 @@ const DQImportPage: FC = () => {
       const dimensionRaw = (rowCopy.dimension || '').trim();
       if (!dimensionRaw) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('dq.dimension-label', 'Tiêu chí đánh giá CLDL'),
           })
         );
@@ -495,7 +495,7 @@ const DQImportPage: FC = () => {
       const description = (rowCopy.description || '').trim();
       if (!description) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('dq.business-rule', 'Quy tắc nghiệp vụ về CLDL'),
           })
         );

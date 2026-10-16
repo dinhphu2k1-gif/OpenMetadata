@@ -16,6 +16,7 @@ import classNames from 'classnames';
 import { Editor, EditorChange } from 'codemirror';
 import 'codemirror/addon/edit/closebrackets.js';
 import 'codemirror/addon/edit/matchbrackets.js';
+import 'codemirror/addon/display/placeholder.js';
 import 'codemirror/addon/fold/brace-fold';
 import 'codemirror/addon/fold/foldgutter.css';
 import 'codemirror/addon/fold/foldgutter.js';

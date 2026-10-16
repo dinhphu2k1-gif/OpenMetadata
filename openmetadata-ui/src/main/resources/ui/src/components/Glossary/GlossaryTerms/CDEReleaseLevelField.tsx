@@ -20,9 +20,7 @@ interface CDEReleaseLevelFieldProps {
   glossaryTerm?: GlossaryTerm;
 }
 
-const CDEReleaseLevelField = ({
-  glossaryTerm,
-}: CDEReleaseLevelFieldProps) => {
+const CDEReleaseLevelField = ({ glossaryTerm }: CDEReleaseLevelFieldProps) => {
   const { t } = useTranslation();
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
@@ -67,7 +65,6 @@ const CDEReleaseLevelField = ({
       fieldTestId="cde-release-level"
       label={t('cde.release-level')}
       options={options}
-      placeholder={t('cde.select-release-level')}
       value={value}
       valueClassName="cde-value-pill-release"
       valueTestId="cde-release-level-value"

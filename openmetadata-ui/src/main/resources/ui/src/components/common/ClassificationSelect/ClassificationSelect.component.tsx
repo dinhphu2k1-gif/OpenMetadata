@@ -10,35 +10,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import { CheckOutlined } from '@ant-design/icons';
-import { Button, Popover, Space, Tag } from 'antd';
+import { Popover, Tag } from 'antd';
 import classNames from 'classnames';
-import { KeyboardEvent, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ReactComponent as ClassificationIcon } from '../../../assets/svg/classification.svg';
+import { useMemo, useState } from 'react';
 import { CDEFormSelectTrigger } from '../../Glossary/AddGlossaryTermForm/CDEFormSelectTrigger.component';
-import Searchbar from '../SearchBarComponent/SearchBar.component';
 import './classification-select.less';
-import {
-  ClassificationOption,
-  ClassificationSelectProps,
-} from './ClassificationSelect.interface';
+import { ClassificationSelectProps } from './ClassificationSelect.interface';
+import ClassificationSelectPanel from './ClassificationSelectPanel.component';
 
 const MAX_VISIBLE_PILLS = 2;
 
 const fallbackLabel = (value: string) =>
   value.split('.').at(-1)?.replaceAll('_', ' ') ?? value;
-
-const OptionLabel = ({ label }: { label: string }) => (
-  <span className="classification-select-option">
-    <ClassificationIcon
-      className="classification-select-option-icon"
-      height={16}
-      width={16}
-    />
-    <span className="classification-select-option-name">{label}</span>
-  </span>
-);
 
 /**
  * Dropdown for picking classification tags, shared by every form that needs
@@ -58,20 +41,7 @@ const ClassificationSelect = ({
   disabled = false,
   dataTestId,
 }: ClassificationSelectProps) => {
-  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [draft, setDraft] = useState<string[]>([]);
-  const isMultiple = mode === 'multiple';
-
-  const visibleOptions = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-
-    return needle
-      ? options.filter((option) => option.label.toLowerCase().includes(needle))
-      : options;
-  }, [options, search]);
 
   const selectedPills = useMemo(
     () =>
@@ -88,51 +58,14 @@ const ClassificationSelect = ({
   );
 
   const handleOpenChange = (open: boolean) => {
-    if (disabled) {
-      return;
-    }
-    setIsOpen(open);
-    if (open) {
-      setSearch('');
-      setDraft(value);
-      setActiveIndex(
-        Math.max(
-          options.findIndex((option) => value.includes(option.value)),
-          0
-        )
-      );
+    if (!disabled) {
+      setIsOpen(open);
     }
   };
 
-  const handlePick = (option: ClassificationOption) => {
-    if (isMultiple) {
-      setDraft((current) =>
-        current.includes(option.value)
-          ? current.filter((selected) => selected !== option.value)
-          : [...current, option.value]
-      );
-    } else {
-      setDraft([option.value]);
-    }
-  };
-
-  const handleUpdate = () => {
-    onChange?.(draft);
+  const handleUpdate = (selected: string[]) => {
+    onChange?.(selected);
     setIsOpen(false);
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    const lastIndex = visibleOptions.length - 1;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActiveIndex((index) => Math.min(index + 1, lastIndex));
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActiveIndex((index) => Math.max(index - 1, 0));
-    } else if (event.key === 'Enter' && visibleOptions[activeIndex]) {
-      event.preventDefault();
-      handlePick(visibleOptions[activeIndex]);
-    }
   };
 
   const triggerContent = value.length ? (
@@ -156,80 +89,15 @@ const ClassificationSelect = ({
   ) : undefined;
 
   const content = (
-    <div className="classification-select-panel" data-testid={dataTestId}>
-      <Searchbar
-        removeMargin
-        containerClassName="classification-select-search"
-        inputProps={{ autoFocus: true, onKeyDown: handleKeyDown }}
-        placeholder={searchPlaceholder}
-        searchBarDataTestId={dataTestId && `${dataTestId}-search`}
-        searchValue={search}
-        typingInterval={0}
-        onSearch={(text) => {
-          setSearch(text);
-          setActiveIndex(0);
-        }}
-      />
-      <div
-        aria-multiselectable={isMultiple}
-        className="classification-select-list"
-        role="listbox">
-        {visibleOptions.length ? (
-          visibleOptions.map((option, index) => {
-            const isSelected = draft.includes(option.value);
-
-            return (
-              <div
-                aria-selected={isSelected}
-                className={classNames('classification-select-item', {
-                  active: index === activeIndex,
-                  selected: isSelected,
-                })}
-                data-testid={`classification-option-${option.value}`}
-                key={option.value}
-                role="option"
-                title={option.label}
-                onClick={() => handlePick(option)}
-                onMouseEnter={() => setActiveIndex(index)}>
-                <OptionLabel label={option.label} />
-                <CheckOutlined className="classification-select-check" />
-              </div>
-            );
-          })
-        ) : (
-          <div className="classification-select-empty">
-            {t('message.no-match-found')}
-          </div>
-        )}
-      </div>
-      <div className="classification-select-footer">
-        <Button
-          className="p-0"
-          color="primary"
-          data-testid={dataTestId && `${dataTestId}-clear`}
-          size="small"
-          type="text"
-          onClick={() => setDraft([])}>
-          {t('label.clear-entity', { entity: t('label.all-lowercase') })}
-        </Button>
-        <Space className="m-l-auto text-right">
-          <Button
-            color="primary"
-            data-testid={dataTestId && `${dataTestId}-cancel`}
-            size="small"
-            onClick={() => setIsOpen(false)}>
-            {t('label.cancel')}
-          </Button>
-          <Button
-            data-testid={dataTestId && `${dataTestId}-update`}
-            size="small"
-            type="primary"
-            onClick={handleUpdate}>
-            {t('label.update')}
-          </Button>
-        </Space>
-      </div>
-    </div>
+    <ClassificationSelectPanel
+      dataTestId={dataTestId}
+      mode={mode}
+      options={options}
+      searchPlaceholder={searchPlaceholder}
+      value={value}
+      onCancel={() => setIsOpen(false)}
+      onUpdate={handleUpdate}
+    />
   );
 
   return (

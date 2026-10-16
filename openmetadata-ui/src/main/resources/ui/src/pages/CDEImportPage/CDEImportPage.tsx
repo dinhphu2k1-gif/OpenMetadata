@@ -666,7 +666,7 @@ const CDEImportPage: FC = () => {
       const name = (rowCopy.name || '').trim();
       if (!name) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('label.cde-code', 'Mã CDE quy chiếu'),
           })
         );
@@ -691,7 +691,7 @@ const CDEImportPage: FC = () => {
       const displayName = (rowCopy.displayName || '').trim();
       if (!displayName) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('label.cde-name', 'Tên thành tố CDE'),
           })
         );
@@ -701,7 +701,7 @@ const CDEImportPage: FC = () => {
       const domain = (rowCopy.domain || '').trim();
       if (!domain) {
         errors.push(
-          t('message.field-is-required', {
+          t('label.field-required', {
             field: t('label.domain', 'Miền'),
           })
         );

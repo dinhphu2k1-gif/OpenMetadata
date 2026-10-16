@@ -11,7 +11,6 @@
  *  limitations under the License.
  */
 import { Input, Popover, Space, Tag, Typography } from 'antd';
-import { EntityTags } from 'Models';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NO_DATA_PLACEHOLDER } from '../../../constants/constants';
@@ -24,14 +23,13 @@ import {
 import { EntityReference } from '../../../generated/entity/type';
 import { getLatestPublishedGlossaryTerm } from '../../../rest/glossaryAPI';
 import { TagSource } from '../../../generated/type/tagLabel';
-import { createTagObject } from '../../../utils/TagsUtils';
 import { EditIconButton } from '../../common/IconButtons/EditIconButton';
 import CDESelectableList from '../CDESelectableList/CDESelectableList.component';
 import RichTextEditorPreviewerV1 from '../../common/RichTextEditor/RichTextEditorPreviewerV1';
-import { TagSelectableList } from '../../common/TagSelectableList/TagSelectableList.component';
 import { useGenericContext } from '../../Customization/GenericProvider/GenericProvider';
 import { ModalWithMarkdownEditor } from '../../Modals/ModalWithMarkdownEditor/ModalWithMarkdownEditor';
 import TagsViewer from '../../Tag/TagsViewer/TagsViewer';
+import ClassificationTagEditButton from './ClassificationTagEditButton.component';
 import { DisplayType } from '../../Tag/TagsViewer/TagsViewer.interface';
 import {
   DQExtension,
@@ -40,6 +38,7 @@ import {
 } from '../GlossaryTermTab/DQGlossaryTableColumns';
 import {
   GovernedGlossaryField,
+  GovernedGlossaryPopupScope,
   GovernedGlossarySection,
 } from './GovernedGlossaryDetailLayout';
 import CDEReleaseLevelField from './CDEReleaseLevelField';
@@ -178,8 +177,6 @@ const DQTagField = ({
 }: SummaryProps & { classification: string; label: string }) => {
   const { data, isVersionView, onUpdate, permissions } =
     useGenericContext<GlossaryTerm>();
-  const { t } = useTranslation();
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const selectedTags = (glossaryTerm.tags ?? []).filter(
     (tag) => tag.tagFQN.split('.')[0] === classification
   );
@@ -192,19 +189,11 @@ const DQTagField = ({
     <GovernedGlossaryField
       action={
         canEdit ? (
-          <TagSelectableList
-            classificationFilter={classification}
-            hasPermission={canEdit}
-            popoverProps={{
-              open: isEditorOpen,
-              overlayClassName: 'cde-tag-select-popover',
-              placement: 'bottomLeft',
-              onOpenChange: setIsEditorOpen,
-            }}
-            searchPlaceholder={t('label.search-for-type', { type: label })}
-            selectedTags={selectedTags}
-            onCancel={() => setIsEditorOpen(false)}
-            onUpdate={async (updatedTags: EntityTags[]) => {
+          <ClassificationTagEditButton
+            classification={classification}
+            label={label}
+            value={selectedTags}
+            onUpdate={async (tags) => {
               const currentTags = data?.tags ?? glossaryTerm.tags ?? [];
               const otherTags = currentTags.filter(
                 (tag) => tag.tagFQN.split('.')[0] !== classification
@@ -212,15 +201,10 @@ const DQTagField = ({
               await onUpdate?.({
                 ...glossaryTerm,
                 ...data,
-                tags: [...otherTags, ...(createTagObject(updatedTags) ?? [])],
+                tags: [...otherTags, ...tags],
               });
-              setIsEditorOpen(false);
-            }}>
-            <EditIconButton
-              size="small"
-              title={t('label.edit-entity', { entity: label })}
-            />
-          </TagSelectableList>
+            }}
+          />
         ) : undefined
       }
       label={label}>
@@ -287,7 +271,6 @@ const DQQualityThresholdField = ({ glossaryTerm }: SummaryProps) => {
                 </button>
               </div>
             }
-            getPopupContainer={() => document.body}
             open={isEditing}
             placement="bottomRight"
             trigger="click"
@@ -378,66 +361,68 @@ const DQGlossaryTermSummary = ({ glossaryTerm }: SummaryProps) => {
   const { t } = useTranslation();
 
   return (
-    <div
-      className="cde-detail-summary dq-detail-summary"
-      data-testid="dq-glossary-term-summary">
-      <DQCdeRelationFields glossaryTerm={glossaryTerm} />
+    <GovernedGlossaryPopupScope>
+      <div
+        className="cde-detail-summary dq-detail-summary"
+        data-testid="dq-glossary-term-summary">
+        <DQCdeRelationFields glossaryTerm={glossaryTerm} />
 
-      <GovernedGlossarySection
-        className="dq-detail-section-management"
-        title={t('cde.management-information')}
-        variant="management">
-        <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
-        <CDEValidityFields glossaryTerm={glossaryTerm} />
-      </GovernedGlossarySection>
+        <GovernedGlossarySection
+          className="dq-detail-section-management"
+          title={t('cde.management-information')}
+          variant="management">
+          <CDEReleaseLevelField glossaryTerm={glossaryTerm} />
+          <CDEValidityFields glossaryTerm={glossaryTerm} />
+        </GovernedGlossarySection>
 
-      <GovernedGlossarySection
-        className="dq-detail-section-classification"
-        title={t('cde.classification-control')}
-        variant="classification">
-        <DQTagField
-          classification={DQ_TAG_CLASSIFICATIONS.dimension}
-          glossaryTerm={glossaryTerm}
-          label={t('dq.dimension')}
-        />
-        <DQTagField
-          classification={DQ_TAG_CLASSIFICATIONS.targetPopulation}
-          glossaryTerm={glossaryTerm}
-          label={t('dq.target-population')}
-        />
-        <DQTagField
-          classification={DQ_TAG_CLASSIFICATIONS.method}
-          glossaryTerm={glossaryTerm}
-          label={t('dq.method')}
-        />
-        <DQTagField
-          classification={DQ_TAG_CLASSIFICATIONS.frequency}
-          glossaryTerm={glossaryTerm}
-          label={t('dq.frequency')}
-        />
-        <DQQualityThresholdField glossaryTerm={glossaryTerm} />
-      </GovernedGlossarySection>
+        <GovernedGlossarySection
+          className="dq-detail-section-classification"
+          title={t('cde.classification-control')}
+          variant="classification">
+          <DQTagField
+            classification={DQ_TAG_CLASSIFICATIONS.dimension}
+            glossaryTerm={glossaryTerm}
+            label={t('dq.dimension')}
+          />
+          <DQTagField
+            classification={DQ_TAG_CLASSIFICATIONS.targetPopulation}
+            glossaryTerm={glossaryTerm}
+            label={t('dq.target-population')}
+          />
+          <DQTagField
+            classification={DQ_TAG_CLASSIFICATIONS.method}
+            glossaryTerm={glossaryTerm}
+            label={t('dq.method')}
+          />
+          <DQTagField
+            classification={DQ_TAG_CLASSIFICATIONS.frequency}
+            glossaryTerm={glossaryTerm}
+            label={t('dq.frequency')}
+          />
+          <DQQualityThresholdField glossaryTerm={glossaryTerm} />
+        </GovernedGlossarySection>
 
-      <GovernedGlossarySection
-        title={t('cde.business-context')}
-        variant="context">
-        <DQTextField
-          glossaryTerm={glossaryTerm}
-          label={t('dq.rule-explanation')}
-          propertyName="ruleExplanation"
-        />
-        <DQTextField
-          glossaryTerm={glossaryTerm}
-          label={t('dq.other-constraints')}
-          propertyName="otherConstraints"
-        />
-        <DQTextField
-          glossaryTerm={glossaryTerm}
-          label={t('cde.related-regulatory-documents')}
-          propertyName="relatedRegulatoryDocuments"
-        />
-      </GovernedGlossarySection>
-    </div>
+        <GovernedGlossarySection
+          title={t('cde.business-context')}
+          variant="context">
+          <DQTextField
+            glossaryTerm={glossaryTerm}
+            label={t('dq.rule-explanation')}
+            propertyName="ruleExplanation"
+          />
+          <DQTextField
+            glossaryTerm={glossaryTerm}
+            label={t('dq.other-constraints')}
+            propertyName="otherConstraints"
+          />
+          <DQTextField
+            glossaryTerm={glossaryTerm}
+            label={t('cde.related-regulatory-documents')}
+            propertyName="relatedRegulatoryDocuments"
+          />
+        </GovernedGlossarySection>
+      </div>
+    </GovernedGlossaryPopupScope>
   );
 };
 
